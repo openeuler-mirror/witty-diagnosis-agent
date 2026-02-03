@@ -1,0 +1,22 @@
+[project]
+name = "skill-gen"
+version = "0.1.0"
+description = "从 PDF/Markdown/TXT/URL 生成Skill 的工具"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    "rich>=13.0.0",
+    "python-dotenv>=1.2.0",
+    "pyyaml>=6.0",
+    "pydantic>=2.0",
+    "httpx>=0.27.0",
+    "beautifulsoup4>=4.12.0",
+    "langchain>=0.3.0",
+    "langchain-core>=0.3.0",
+    "langchain-openai>=0.2.0",
+    "langfuse>=2.0.0",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
