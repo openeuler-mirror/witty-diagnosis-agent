@@ -1,0 +1,52 @@
+{
+  "hooks": {
+    "session-start": {
+      "description": "Executed when a new diagnosis session starts",
+      "script": "session-start.sh",
+      "enabled": true,
+      "timeout": 30
+    },
+    "session-end": {
+      "description": "Executed when a diagnosis session ends",
+      "script": "session-end.sh",
+      "enabled": true,
+      "timeout": 30
+    },
+    "pre-diagnosis": {
+      "description": "Executed before starting diagnosis",
+      "script": "pre-diagnosis.sh",
+      "enabled": true,
+      "timeout": 60
+    },
+    "post-diagnosis": {
+      "description": "Executed after diagnosis completes",
+      "script": "post-diagnosis.sh",
+      "enabled": true,
+      "timeout": 60
+    },
+    "pre-repair": {
+      "description": "Executed before starting repair operations",
+      "script": "pre-repair.sh",
+      "enabled": true,
+      "timeout": 60
+    },
+    "post-repair": {
+      "description": "Executed after repair operations complete",
+      "script": "post-repair.sh",
+      "enabled": true,
+      "timeout": 60
+    },
+    "error-handler": {
+      "description": "Executed when an error occurs",
+      "script": "error-handler.sh",
+      "enabled": true,
+      "timeout": 30
+    }
+  },
+  "global": {
+    "hook_dir": "hooks",
+    "default_timeout": 60,
+    "enable_logging": true,
+    "log_level": "INFO"
+  }
+}
