@@ -1,0 +1,53 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+ENV/
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+*.log
+
+# uv
+.venv/
+# Note: uv.lock should be committed for applications to ensure reproducible builds
+# Note: .python-version should be committed to specify the Python version
+
+# Environment variables
+.env
+
+# IDE
+.vscode/
+.idea/
+audit.log
+*.swp
+*.swo
+*~
+
+# Outputs
+outputs/
+custom_skills/
+tmp/
+store/
+src/experiments/
+
+# OS
+.DS_Store
+Thumbs.db
+
