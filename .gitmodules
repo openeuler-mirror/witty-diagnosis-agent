@@ -1,0 +1,3 @@
+[submodule "skill-gen/third_party/Skill_Seekers"]
+	path = skill-gen/third_party/Skill_Seekers
+	url = https://github.com/ICEORY/Skill_Seekers.git
