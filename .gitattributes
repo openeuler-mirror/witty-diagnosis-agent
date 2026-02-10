@@ -1,0 +1,58 @@
+# Auto detect text files and perform LF normalization
+* text=auto
+
+# Ensure files with these extensions are treated as text
+*.md text
+*.txt text
+*.json text
+*.yaml text
+*.yml text
+*.py text
+*.sh text
+*.js text
+*.ts text
+*.css text
+*.html text
+*.xml text
+
+# Ensure files with these extensions are treated as binary
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.mov binary
+*.mp4 binary
+*.mp3 binary
+*.flv binary
+*.fla binary
+*.swf binary
+*.gz binary
+*.zip binary
+*.7z binary
+*.ttf binary
+*.eot binary
+*.woff binary
+*.woff2 binary
+
+# Shell scripts should be executable
+*.sh text eol=lf
+
+# Python files should use LF line endings
+*.py text eol=lf
+
+# Markdown files should use LF line endings
+*.md text eol=lf
+
+# JSON files should use LF line endings
+*.json text eol=lf
+
+# YAML files should use LF line endings
+*.yaml text eol=lf
+*.yml text eol=lf
+
+# Git configuration for diff and merge
+*.json diff=json
+*.yaml diff=yaml
+*.yml diff=yaml
+*.py diff=python

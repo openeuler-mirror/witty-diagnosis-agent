@@ -1,0 +1,63 @@
+# Global configuration for witty-diagnosis-agent
+version: "0.1.0"
+
+# Agent settings
+agent:
+  name: "witty-diagnosis-agent"
+  description: "Intelligent diagnostic agent for EulerOS"
+  version: "0.1.0"
+  author: "Huawei"
+
+# Logging configuration
+logging:
+  level: "INFO"
+  format: "json"
+  output:
+    - "file"
+    - "console"
+  file:
+    path: "/var/log/witty-diagnosis-agent.log"
+    max_size: "100MB"
+    max_files: 10
+
+# Diagnosis settings
+diagnosis:
+  timeout: 300  # seconds
+  max_concurrent_diagnoses: 5
+  enable_auto_repair: false
+  enable_notifications: true
+
+# Skill settings
+skills:
+  enabled: true
+  auto_discovery: true
+  default_timeout: 60  # seconds per skill
+  max_retries: 3
+
+# Security settings
+security:
+  enable_auth: false
+  allowed_ips: []
+  api_key_required: false
+
+# API settings
+api:
+  enabled: true
+  port: 8080
+  host: "0.0.0.0"
+  cors_enabled: true
+  rate_limit:
+    enabled: true
+    requests_per_minute: 60
+
+# Database settings (if applicable)
+database:
+  enabled: false
+  type: "sqlite"
+  path: "/var/lib/witty-diagnosis-agent/database.db"
+
+# Monitoring settings
+monitoring:
+  enabled: true
+  metrics_port: 9090
+  health_check_interval: 30  # seconds
