@@ -1,473 +1,90 @@
-# Witty Diagnosis Agent
+# witty-diagnosis-agent
 
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Version](https://img.shields.io/badge/version-0.1.0-blue.svg)](https://gitcode.com/openeuler/witty-diagnosis-agent)
+witty-diagnosis-agent 是一个自动化诊断系统，旨在为复杂的系统问题提供标准化的分析和故障排除。当前版本兼容支持 **OpenCode** 运行环境。
 
-> **AI-Powered Diagnostic Skill Collection for EulerOS**
+## 核心设计理念 (Core Philosophy)
 
-## Overview
+本方案严格遵循 **"发现→收集→定位→根因→方案→实施→验证"** 的标准化运维作业流程，结合**多模块协作 (Multi-Module)** 架构，实现全生命周期的自动化管理。
 
-**Witty Diagnosis Agent** is a comprehensive collection of intelligent diagnostic skills for **EulerOS** systems, designed as a Claude Code plugin. This project provides 10 modular, composable skills that enable automated system troubleshooting, analysis, and controlled repair through natural language interactions with AI assistants.
+### 核心流程图解
 
-Built on the **superpowers project architecture**, this skill collection follows the standardized documentation format for AI-powered tools, making it compatible with Claude Code, Codex, and other AI development platforms.
+`1.问题输入/采集` → `2.收集信息` → `3.定位故障` → `4.分析根因` → `5.制定方案` → `6.实施修复` → `7.验证效果`
 
-### Key Capabilities
+## 核心组件功能 (Core Components & Functions)
 
-- **Intelligent Multi-Source Data Collection** - Gather logs, metrics, processes, and configuration data
-- **Advanced Fault Localization** - Identify affected components and propagation paths
-- **Root Cause Analysis** - AI-powered reasoning to determine underlying issues
-- **Controlled Repair Operations** - Safe, approval-required system fixes
-- **Proactive System Inspection** - Regular health checks and anomaly detection
-- **Comprehensive Log Analysis** - Pattern recognition and correlation analysis
-- **Performance Metric Monitoring** - Real-time metrics collection and trend analysis
-- **Distributed Trace Analysis** - Service dependency and bottleneck identification
-- **Knowledge Base Management** - Historical failure patterns and solutions
-- **Configuration Management** - System config versioning and validation
+| 组件名称 | 功能描述 (Function) |
+| :--- | :--- |
+| **Commander** | **1. 发现问题 & 全局统筹**。作为系统入口接收告警或用户输入，初始化故障上下文，**路由请求**，**调度**各功能模块。 |
+| **Investigator** | **2. 收集信息 & 3. 定位故障**。**并发执行**多个采集任务收集数据，并按“应用→系统→网络→硬件”逻辑进行分层定位。 |
+| **Analyst** | **4. 分析根因**。基于收集的信息进行**逻辑分析**，确定 Root Cause。 |
+| **Strategist** | **5. 制定方案**。生成修复计划，包含临时止血措施和永久修复方案，并评估风险。 |
+| **Guardian** | **风险控制**。在 Step 5/6 阶段审查修复方案的风险，执行审批策略，防止二次故障。 |
+| **Operator** | **6. 实施修复**。执行 Strategist 制定的修复脚本（需通过 Guardian 审批）。 |
+| **Auditor** | **7. 验证效果**。执行冒烟测试 (Smoke Test) 和指标回归检查。 |
 
-## Installation
+## 功能扩展机制 (Functional Extensibility)
 
-### Prerequisites
+系统支持高度的扩展性，允许在标准流程中灵活插入或替换**功能插件**。
 
-- **Claude Code** or compatible AI development platform
-- **EulerOS** or compatible Linux system (for actual diagnosis)
-- **Git** for repository management
+### 1. 阶段扩展 (Phase Extensions)
+支持在任意标准阶段（如 `Investigator` 之后，`Analyst` 之前）挂载**自定义插件 (Hook Plugins)**。
+*   **用途**: 针对特定技术栈（如 Redis, Kafka）增加专用的信息收集或分析步骤。
+*   **机制**: **执行引擎**会自动检测并执行注册的 `pre-step` 或 `post-step` **扩展插件**。
 
-### Installation for Different Platforms
-
-**Note:** Installation differs by platform. Claude Code has a built-in plugin system. Codex and OpenCode require manual setup.
-
-#### Claude Code (via GitCode Repository)
-
-In Claude Code, register the repository as a marketplace first:
-
-```bash
-/plugin marketplace add https://gitcode.com/openeuler/witty-diagnosis-agent.git
-```
-
-Then install the plugin from this marketplace:
-
-```bash
-/plugin install witty-diagnosis-agent@witty-diagnosis-agent
-```
-
-##### Alternative: Local Installation
-
-1. **Clone the repository**:
-   ```bash
-   git clone https://gitcode.com/openeuler/witty-diagnosis-agent.git
-   cd witty-diagnosis-agent
-   ```
-
-2. **Configure as Claude Plugin**:
-   - The `.claude-plugin/` directory contains all necessary configuration
-   - Claude Code will automatically detect the plugin structure
-   - No additional installation required
-
-3. **Verify Plugin Detection**:
-   ```bash
-   # In Claude Code, check if plugin is detected
-   claude --list-plugins
-   ```
-
-#### Codex
-
-Tell Codex:
-
-```
-Fetch and follow instructions from https://raw.gitcode.com/openeuler/witty-diagnosis-agent/raw/master/.codex/INSTALL.md
-```
+### 2. 端到端接管 (End-to-End Override)
+支持跳过标准的 7 步流程，直接调用专用的**端到端流程 (Dedicated Workflows)**。
+*   **用途**: 针对已知的高频特定故障模式（如 "K8s Pod OOM" 或 "MySQL 死锁"），直接执行固化的诊断与修复剧本。
+*   **机制**: `Commander` 在第一步识别场景后，可直接路由至**专用流程**，绕过通用的分层排查流程。
 
 
-#### OpenCode
-
-Tell OpenCode:
-
-```
-Fetch and follow instructions from https://raw.gitcode.com/openeuler/witty-diagnosis-agent/raw/master/.opencode/INSTALL.md
-```
 
 
-### Quick Start
+## 安装与使用 (Installation & Usage)
 
-#### Using Skills Directly
+### 前置要求 (Prerequisites)
+
+本系统依赖 **OpenCode** 运行时环境。请参考 [OpenCode 官方文档](https://github.com/anomalyco/opencode) 完成安装。
+
+### 安装 (Installation)
+
+推荐使用 `bunx` 或 `npx` 进行快速安装：
 
 ```bash
-# Example: Run a complete diagnosis workflow
-claude witty-diagnosis:diagnose --target system --scope full
-
-# Example: Collect system data
-claude witty-diagnosis:collect-data --type all --output json
-
-# Example: Analyze system logs
-claude witty-diagnosis:analyze-logs --files "/var/log/*.log" --time-window "24h"
-
-# Example: Perform system repair (dry-run first)
-claude witty-diagnosis:repair-system --action restart-service --target nginx --dry-run
+bunx witty-diagnosis-agent install # recommended
+# or
+npx witty-diagnosis-agent install
 ```
 
-#### Skill Pipeline Example
+### 快速开始 (Quick Start)
 
-```bash
-# Chain multiple skills for comprehensive analysis
-claude witty-diagnosis:collect-data --type logs,metrics | \
-claude witty-diagnosis:fault-localization --method topology | \
-claude witty-diagnosis:root-cause-analysis --history 7d | \
-claude witty-diagnosis:controlled-repair --dry-run --require-approval
-```
+通过 CLI 交互，体验基于核心组件协作的全流程诊断：
 
-## Project Architecture
+1.  **启动诊断 (Commander)**
+    初始化故障上下文，自动触发信息收集：
+    ```bash
+    witty-diagnosis start --incident-id <ID> --desc "API响应慢"
+    ```
+    *系统将调度 `Investigator` 并行采集数据，并由 `Analyst` 产出根因分析报告。*
 
-### Modular Skill-Based Design
+2.  **审批修复方案 (Guardian)**
+    当 `Strategist` 生成修复方案后，系统会暂停并等待确认：
+    ```bash
+    witty-diagnosis approve --plan-id <PLAN_ID>
+    ```
+    *`Guardian` 组件将拦截所有高危操作，确保人工确认后才由 `Operator` 执行修复。*
 
-```
-witty-diagnosis-agent/
-├── .claude-plugin/                    # Claude plugin configuration
-│   ├── plugin.json                    # Plugin manifest
-│   └── marketplace.json               # Marketplace listing
-├── commands/                          # Command definitions for Claude
-│   ├── diagnose.md                    # Full diagnosis workflow
-│   ├── collect-data.md                # Data collection commands
-│   ├── analyze-logs.md                # Log analysis commands
-│   └── repair-system.md               # System repair commands
-├── skills/                            # Core diagnostic skills (10 skills)
-│   ├── data-collector/                # Multi-source data collection
-│   ├── fault-localization/            # Fault scope identification
-│   ├── root-cause-analysis/           # Root cause investigation
-│   ├── controlled-repair/             # Safe repair operations
-│   ├── intelligent-inspection/        # Proactive system checks
-│   ├── log-analyzer/                  # Log parsing and analysis
-│   ├── metric-analyzer/               # Performance metrics analysis
-│   ├── trace-analyzer/                # Distributed tracing analysis
-│   ├── knowledge-base/                # Failure knowledge management
-│   └── config-manager/                # Configuration management
-├── docs/                              # Documentation
-│   ├── plans/                         # Implementation plans
-│   ├── standards/                     # Format standards
-│   └── architecture/                  # Architecture design
-├── templates/                         # Development templates
-├── agents/                            # Agent definitions
-├── lib/                               # Shared libraries
-├── config/                            # Configuration files
-├── hooks/                             # Hook scripts
-└── tests/                             # Test suites
-```
+3.  **验证结果 (Auditor)**
+    修复完成后，自动运行回归测试：
+    ```bash
+    witty-diagnosis verify --incident-id <ID>
+    ```
+    *由 `Auditor` 确认核心指标恢复基线。*
 
-### Skill Layer Architecture
 
-```
-┌─────────────────────────────────────────────────────────┐
-│                    Intelligent Diagnosis                  │
-├─────────────────────────────────────────────────────────┤
-│   Core Diagnostic Layer (5 skills):                      │
-│   data-collector → fault-localization →                 │
-│   root-cause-analysis → controlled-repair →             │
-│   intelligent-inspection                                │
-├─────────────────────────────────────────────────────────┤
-│   Analysis Support Layer (3 skills):                    │
-│   log-analyzer + metric-analyzer + trace-analyzer       │
-├─────────────────────────────────────────────────────────┤
-│   Management Support Layer (2 skills):                  │
-│   knowledge-base + config-manager                       │
-└─────────────────────────────────────────────────────────┘
-```
 
-## Core Skills
+## 功能扩展 (Extending Functionality)
+参考前文“功能扩展机制”，编写自定义插件配置。
 
-### 1. **data-collector**
-**Purpose**: Collect multi-source system data including logs, metrics, processes, and network status
-**Category**: Core Diagnostic
-**Input**: Collection parameters, data source specifications
-**Output**: Structured JSON data for analysis
-**Related Skills**: log-analyzer, metric-analyzer
 
-### 2. **fault-localization**
-**Purpose**: Determine fault impact scope and affected components
-**Category**: Core Diagnostic
-**Input**: Collected data, system topology
-**Output**: Fault scope analysis, impact assessment
-**Related Skills**: data-collector, root-cause-analysis
 
-### 3. **root-cause-analysis**
-**Purpose**: Identify underlying causes using AI reasoning and pattern matching
-**Category**: Core Diagnostic
-**Input**: Fault scope, historical data, knowledge base
-**Output**: Root cause identification, confidence scores
-**Related Skills**: fault-localization, knowledge-base
 
-### 4. **controlled-repair**
-**Purpose**: Execute safe repair operations with approval requirements
-**Category**: Core Diagnostic
-**Input**: Repair actions, validation rules, backup requirements
-**Output**: Repair execution results, verification status
-**Related Skills**: root-cause-analysis, config-manager
-
-### 5. **intelligent-inspection**
-**Purpose**: Perform proactive system health checks and anomaly detection
-**Category**: Core Diagnostic
-**Input**: Inspection schedules, check criteria
-**Output**: Inspection reports, anomaly alerts
-**Related Skills**: data-collector, metric-analyzer
-
-### 6. **log-analyzer**
-**Purpose**: Analyze system logs for patterns, anomalies, and correlations
-**Category**: Analysis Support
-**Input**: Log data, analysis parameters
-**Output**: Anomaly detection, pattern recognition, correlation analysis
-**Related Skills**: data-collector, trace-analyzer
-
-### 7. **metric-analyzer**
-**Purpose**: Monitor and analyze system performance metrics
-**Category**: Analysis Support
-**Input**: Metric data, baseline references
-**Output**: Performance analysis, trend detection, capacity planning
-**Related Skills**: data-collector, intelligent-inspection
-
-### 8. **trace-analyzer**
-**Purpose**: Analyze distributed service traces and dependencies
-**Category**: Analysis Support
-**Input**: Trace data, service topology
-**Output**: Dependency analysis, bottleneck identification
-**Related Skills**: log-analyzer, fault-localization
-
-### 9. **knowledge-base**
-**Purpose**: Manage historical failure patterns and solution knowledge
-**Category**: Management Support
-**Input**: Failure cases, solutions, best practices
-**Output**: Knowledge retrieval, pattern matching, solution recommendations
-**Related Skills**: root-cause-analysis, config-manager
-
-### 10. **config-manager**
-**Purpose**: Manage system configurations with version control and validation
-**Category**: Management Support
-**Input**: Configuration files, validation rules
-**Output**: Configuration status, compliance reports, change history
-**Related Skills**: controlled-repair, intelligent-inspection
-
-
-## Skill Documentation Format
-
-Each skill follows the **superpowers project documentation standard**:
-
-### SKILL.md Structure
-```yaml
----
-name: "skill-name"
-description: "Brief description of skill purpose"
-version: "1.0.0"
-author: "Witty Diagnosis Team"
-category: "core-diagnosis|analysis-support|management-support"
-prerequisites: []
-related_skills: ["skill1", "skill2"]
----
-# Skill Name - Detailed Description
-
-## Overview
-[Purpose and high-level functionality]
-
-## When to Use
-[Scenarios where this skill should/shouldn't be used]
-
-## Input Requirements
-[Required input data format and parameters]
-
-## Execution Steps
-[Detailed step-by-step process]
-
-## Output Format
-[Standardized output format]
-
-## Examples
-[Practical usage examples]
-
-## Testing
-[Test cases and validation methods]
-
-## Notes and Limitations
-[Important considerations and constraints]
-```
-
-### Data Format Standards
-
-**Input Format** (JSON):
-```json
-{
-  "session_id": "unique-session-id",
-  "parameters": {
-    "target": "system|service|component",
-    "scope": "full|partial|custom",
-    "time_range": "last_1_hour|last_24_hours|custom"
-  },
-  "data": {
-    // Skill-specific input data
-  }
-}
-```
-
-**Output Format** (JSON):
-```json
-{
-  "status": "success|error|partial",
-  "session_id": "unique-session-id",
-  "results": {
-    // Skill-specific analysis results
-  },
-  "metadata": {
-    "skill": "skill-name",
-    "version": "1.0.0",
-    "execution_time": 123.45,
-    "timestamp": "2026-02-03T10:30:00Z"
-  }
-}
-```
-
-## Development
-
-### Adding New Skills
-
-1. **Create Skill Directory**:
-   ```bash
-   mkdir -p skills/new-skill-name/{examples,tests}
-   ```
-
-2. **Create SKILL.md**:
-   - Use `templates/skill-template.md` as starting point
-   - Follow YAML frontmatter format
-   - Include complete execution steps
-
-3. **Add Examples and Tests**:
-   - Create at least 2 usage examples in `examples/`
-   - Create test cases in `tests/`
-
-4. **Update Documentation**:
-   - Add skill to README.md
-   - Update relevant command definitions
-   - Update skill dependencies
-
-### Testing Skills
-
-```bash
-# Run skill documentation validation
-claude witty-diagnosis:validate-skill --skill data-collector
-
-# Test skill execution flow
-claude witty-diagnosis:test-skill --skill log-analyzer --test-case basic
-
-# Run integration tests
-claude witty-diagnosis:test-integration --skills data-collector,log-analyzer
-```
-
-## Configuration
-
-### Plugin Configuration (`.claude-plugin/`)
-
-**plugin.json** - Main plugin manifest:
-```json
-{
-  "name": "witty-diagnosis-agent",
-  "version": "0.1.0",
-  "description": "Intelligent diagnostic skills for EulerOS",
-  "main": "index.js",
-  "keywords": ["diagnosis", "troubleshooting", "euleros", "ai-agent"]
-}
-```
-
-**marketplace.json** - Marketplace listing:
-```json
-{
-  "name": "Witty Diagnosis Agent",
-  "slug": "witty-diagnosis-agent",
-  "version": "0.1.0",
-  "description": "AI-powered diagnostic agent for EulerOS",
-  "features": [
-    {"name": "Intelligent Diagnosis", "description": "Automated system diagnosis"},
-    {"name": "Root Cause Analysis", "description": "AI-powered root cause identification"},
-    {"name": "Controlled Repair", "description": "Safe system repair operations"}
-  ]
-}
-```
-
-### Global Configuration (`config/`)
-
-- `global.yaml` - Global agent settings
-- `skills/` - Skill-specific configurations
-- `euler-os/` - EulerOS-specific configurations
-
-## Contributing
-
-We welcome contributions to improve the Witty Diagnosis Agent!
-
-### Contribution Guidelines
-
-1. **Fork the Repository**
-2. **Create a Feature Branch**:
-   ```bash
-   git checkout -b feature/new-diagnostic-skill
-   ```
-3. **Follow Documentation Standards**:
-   - Use existing skill templates
-   - Maintain consistent formatting
-   - Include comprehensive examples
-4. **Add Tests**:
-   - Create test cases for new functionality
-   - Update existing tests if needed
-5. **Submit Pull Request**:
-   - Describe the feature or fix
-   - Reference related issues
-   - Include test results
-
-### Code Review Process
-
-1. **Documentation Review** - Skill documentation completeness
-2. **Format Validation** - Adherence to standards
-3. **Integration Testing** - Compatibility with existing skills
-4. **Performance Assessment** - Execution efficiency
-5. **Security Review** - Safe operation validation
-
-## License
-
-This project is licensed under the **MIT License** - see the [LICENSE](LICENSE) file for details.
-
-## Support
-
-- **Documentation**: [docs/](docs/)
-- **Issues**: [GitCode Issues](https://gitcode.com/openeuler/witty-diagnosis-agent/issues)
-- **Email**: support@huawei.com
-- **Skill Development Guide**: [docs/standards/skill-documentation-format.md](docs/standards/skill-documentation-format.md)
-
-## Acknowledgments
-
-- **Superpowers Project** - For the skill architecture and documentation standards
-- **Claude Code Community** - For plugin system and development tools
-- **EulerOS Team** - For system insights and testing support
-- **All Contributors** - For improving diagnostic capabilities
-
-## Roadmap
-
-### Phase 1: Core Skills (✅ Completed)
-- [x] 10 core diagnostic skills with complete documentation
-- [x] Standardized skill format and interfaces
-- [x] Basic command definitions
-
-### Phase 2: Integration & Testing
-- [ ] Complete command definitions for all skills
-- [ ] Agent definitions for automated workflows
-- [ ] Skill integration testing suite
-- [ ] Performance benchmarking
-
-### Phase 3: Advanced Features
-- [ ] Machine learning enhanced analysis
-- [ ] Real-time monitoring integration
-- [ ] Multi-system coordination
-- [ ] Advanced visualization tools
-
-### Phase 4: Ecosystem Expansion
-- [ ] Additional specialized diagnostic skills
-- [ ] Cloud platform integrations
-- [ ] Third-party tool integrations
-- [ ] Community skill marketplace
-
----
-
-*Last Updated: 2026-02-03*
-*Project Version: 0.1.0*
-*Skill Count: 10 Core Diagnostic Skills*
