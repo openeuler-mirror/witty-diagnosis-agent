@@ -36,24 +36,68 @@ witty-diagnosis-agent 是一个自动化诊断系统，旨在为复杂的系统�
 *   **用途**: 针对已知的高频特定故障模式（如 "K8s Pod OOM" 或 "MySQL 死锁"），直接执行固化的诊断与修复剧本。
 *   **机制**: `Commander` 在第一步识别场景后，可直接路由至**专用流程**，绕过通用的分层排查流程。
 
-
-
-
-## 安装与使用 (Installation & Usage)
+## 安装与开发 (Installation & Development)
 
 ### 前置要求 (Prerequisites)
 
-本系统依赖 **OpenCode** 运行时环境。请参考 [OpenCode 官方文档](https://github.com/anomalyco/opencode) 完成安装。
+*   [Bun](https://bun.sh) (v1.0.0+)
+*   [OpenCode](https://github.com/anomalyco/opencode)
 
-### 安装 (Installation)
+### 源码构建与安装 (Build from Source)
 
-推荐使用 `bunx` 或 `npx` 进行快速安装：
+如果你想从源码构建并安装本插件，请遵循以下步骤：
 
-```bash
-bunx witty-diagnosis-agent install # recommended
-# or
-npx witty-diagnosis-agent install
-```
+1.  **安装依赖**:
+    ```bash
+    bun install
+    ```
+
+2.  **编译项目**:
+    ```bash
+    bun run build
+    ```
+    这将编译 TypeScript 源码到 `dist/` 目录。
+
+3.  **构建二进制文件 (可选)**:
+    ```bash
+    bun run build:binaries
+    ```
+    这将为不同平台（macOS, Linux, Windows）生成独立的可执行文件，位于 `packages/` 目录下。
+
+4.  **安装插件**:
+    ```bash
+    # 使用开发环境的脚本进行安装
+    ./bin/witty-diagnosis-agent.js install
+    ```
+    该命令会自动检测你的 OpenCode 配置文件位置，并将 `witty-diagnosis-agent` 添加到插件列表中。
+
+### 自动化发布流程 (Automated Publishing)
+
+本项目采用 GitHub Actions 实现自动化发布，流程如下：
+
+1.  **触发方式**:
+    *   在 GitHub 仓库的 "Actions" 页面，选择 "publish" 工作流。
+    *   点击 "Run workflow"。
+    *   选择版本更新类型 (`patch` / `minor` / `major`) 或手动指定版本号（如 `1.0.1`）。
+
+2.  **自动化步骤**:
+    *   **计算版本**: 自动查询 npm registry 获取当前版本，并根据 `bump` 类型计算新版本号。
+    *   **更新文件**: 自动更新 `package.json` 中的 `version` 字段。
+    *   **构建打包**: 执行 `bun run build` 和类型检查。
+    *   **发布 NPM**: 将新版本发布到 npm registry (需要配置 `NPM_TOKEN`)。
+    *   **Git 标记**: 自动创建 git tag (如 `v1.0.1`) 并推送到远程仓库。
+    *   **GitHub Release**: 自动生成 Release Notes 并创建 Release。
+
+### 本地发布流程 (Manual Publishing)
+
+1.  **构建**:
+    运行 `bun run build` 进行构建。
+
+2.  **发布**:
+    运行 `npm publish` 发布到 npm registry (需配置 `NPM_TOKEN`)。
+
+3.  **创建 GitHub Release**:
+    创建 GitHub Release。
 
 ### 快速开始 (Quick Start)
 
@@ -80,11 +124,5 @@ npx witty-diagnosis-agent install
     ```
     *由 `Auditor` 确认核心指标恢复基线。*
 
-
-
 ## 功能扩展 (Extending Functionality)
 参考前文“功能扩展机制”，编写自定义插件配置。
-
-
-
-

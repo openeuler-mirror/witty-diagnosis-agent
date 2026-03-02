@@ -1,0 +1,41 @@
+{
+  "name": "witty-diagnosis-agent",
+  "version": "1.0.0",
+  "description": "Witty Diagnosis Agent - OpenCode Plugin",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "type": "module",
+  "bin": {
+    "witty-diagnosis-agent": "bin/witty-diagnosis-agent.js"
+  },
+  "files": [
+    "dist",
+    "bin",
+    "postinstall.mjs"
+  ],
+  "scripts": {
+    "build": "bun build src/index.ts --outdir dist --target bun --format esm && tsc --emitDeclarationOnly && bun build src/cli/index.ts --outdir dist/cli --target bun --format esm",
+    "build:binaries": "bun run script/build-binaries.ts",
+    "clean": "rm -rf dist",
+    "postinstall": "node postinstall.mjs",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@clack/prompts": "^1.0.1",
+    "@opencode-ai/plugin": "^1.1.19",
+    "commander": "^12.0.0",
+    "picocolors": "^1.1.1",
+    "zod": "^3.22.4"
+  },
+  "devDependencies": {
+    "@types/node": "^25.3.3",
+    "bun-types": "latest",
+    "typescript": "^5.3.3"
+  },
+  "optionalDependencies": {
+    "witty-diagnosis-agent-darwin-arm64": "1.0.0",
+    "witty-diagnosis-agent-darwin-x64": "1.0.0",
+    "witty-diagnosis-agent-linux-x64": "1.0.0",
+    "witty-diagnosis-agent-windows-x64": "1.0.0"
+  }
+}
