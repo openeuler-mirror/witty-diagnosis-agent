@@ -24,6 +24,8 @@ import {
   validateNonTuiArgs,
 } from "./install-validators"
 
+import { installSkills } from "./install-skills"
+
 export async function runCliInstaller(args: InstallArgs, version: string): Promise<number> {
   const validation = validateNonTuiArgs(args)
   if (!validation.valid) {
@@ -45,7 +47,7 @@ export async function runCliInstaller(args: InstallArgs, version: string): Promi
 
   printHeader(isUpdate)
 
-  const totalSteps = 6
+  const totalSteps = 7
   let step = 1
 
   printStep(step++, totalSteps, "Checking OpenCode installation...")
@@ -76,6 +78,14 @@ export async function runCliInstaller(args: InstallArgs, version: string): Promi
   printSuccess(
     `Plugin ${isUpdate ? "verified" : "added"} ${SYMBOLS.arrow} ${color.dim(pluginResult.configPath)}`,
   )
+
+  printStep(step++, totalSteps, "Bundling witty-diagnosis-agent skills...")
+  const skillsResult = await installSkills()
+  if (!skillsResult.success) {
+    printWarning(`Continuing without skills: ${skillsResult.error}`)
+  } else {
+    printSuccess(`Skills updated ${SYMBOLS.arrow} ${color.dim(skillsResult.targetPath ?? "")}`)
+  }
 
   const needsProviderSetup = config.hasGemini || config.hasOpenAI || config.hasCopilot
 
@@ -139,8 +149,8 @@ export async function runCliInstaller(args: InstallArgs, version: string): Promi
 
   printBox(
     `${color.bold("Pro Tip:")} Include ${color.cyan("ultrawork")} (or ${color.cyan("ulw")}) in your prompt.\n` +
-      `All features work like magic—parallel agents, background tasks,\n` +
-      `deep exploration, and relentless execution until completion.`,
+    `All features work like magic—parallel agents, background tasks,\n` +
+    `deep exploration, and relentless execution until completion.`,
     "The Magic Word",
   )
 
@@ -155,9 +165,9 @@ export async function runCliInstaller(args: InstallArgs, version: string): Promi
   if ((config.hasClaude || config.hasGemini || config.hasCopilot) && !args.skipAuth) {
     printBox(
       `Run ${color.cyan("opencode auth login")} and select your provider:\n` +
-        (config.hasClaude ? `  ${SYMBOLS.bullet} Anthropic ${color.gray("→ Claude Pro/Max")}\n` : "") +
-        (config.hasGemini ? `  ${SYMBOLS.bullet} Google ${color.gray("→ OAuth with Antigravity")}\n` : "") +
-        (config.hasCopilot ? `  ${SYMBOLS.bullet} GitHub ${color.gray("→ Copilot")}` : ""),
+      (config.hasClaude ? `  ${SYMBOLS.bullet} Anthropic ${color.gray("→ Claude Pro/Max")}\n` : "") +
+      (config.hasGemini ? `  ${SYMBOLS.bullet} Google ${color.gray("→ OAuth with Antigravity")}\n` : "") +
+      (config.hasCopilot ? `  ${SYMBOLS.bullet} GitHub ${color.gray("→ Copilot")}` : ""),
       "Authenticate Your Providers",
     )
   }
