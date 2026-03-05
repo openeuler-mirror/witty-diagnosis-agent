@@ -42,7 +42,11 @@ export async function sendSyncPrompt(
   },
   deps: SendSyncPromptDeps = sendSyncPromptDeps
 ): Promise<string | null> {
-  const allowTask = isPlanFamily(input.agentToUse)
+  const lowerAgent = input.agentToUse.toLowerCase()
+  const allowTask =
+    isPlanFamily(input.agentToUse) ||
+    lowerAgent.includes("dayu") ||
+    lowerAgent.includes("baize")
   const tools = {
     task: allowTask,
     call_omo_agent: true,

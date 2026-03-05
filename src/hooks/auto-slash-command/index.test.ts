@@ -8,11 +8,10 @@ import type {
 
 // Import real shared module to avoid mock leaking to other test files
 import * as shared from "../../shared"
+import * as sessionState from "../../features/claude-code-session-state"
 
 // Spy on log instead of mocking the entire module
 const logMock = spyOn(shared, "log").mockImplementation(() => {})
-
-
 
 const { createAutoSlashCommandHook } = await import("./index")
 
@@ -86,6 +85,36 @@ describe("createAutoSlashCommandHook", () => {
 
       // then should not modify (feature inactive for unknown commands)
       expect(output.parts[0].text).toBe(originalText)
+    })
+
+    it("should update session agent to dayu for /start-dayu", async () => {
+      // given a known builtin command /start-dayu
+      const updateSpy = spyOn(sessionState, "updateSessionAgent")
+      const hook = createAutoSlashCommandHook()
+      const sessionID = `test-session-dayu-${Date.now()}`
+      const input = createMockInput(sessionID)
+      const output = createMockOutput("/start-dayu some goal")
+
+      // when
+      await hook["chat.message"](input, output)
+
+      // then
+      expect(updateSpy).toHaveBeenCalledWith(sessionID, "dayu")
+    })
+
+    it("should update session agent to baize for /start-baize", async () => {
+      // given a known builtin command /start-baize
+      const updateSpy = spyOn(sessionState, "updateSessionAgent")
+      const hook = createAutoSlashCommandHook()
+      const sessionID = `test-session-baize-${Date.now()}`
+      const input = createMockInput(sessionID)
+      const output = createMockOutput("/start-baize analyze report")
+
+      // when
+      await hook["chat.message"](input, output)
+
+      // then
+      expect(updateSpy).toHaveBeenCalledWith(sessionID, "baize")
     })
   })
 
@@ -327,6 +356,34 @@ describe("createAutoSlashCommandHook", () => {
           arguments: "arg1 arg2 arg3",
         })
       )
+    })
+
+    it("should update session agent to dayu for start-dayu command", async () => {
+      //#given
+      const updateSpy = spyOn(sessionState, "updateSessionAgent")
+      const hook = createAutoSlashCommandHook()
+      const input = createCommandInput("start-dayu", "some goal")
+      const output = createCommandOutput("original")
+
+      //#when
+      await hook["command.execute.before"](input, output)
+
+      //#then
+      expect(updateSpy).toHaveBeenCalledWith(input.sessionID, "dayu")
+    })
+
+    it("should update session agent to baize for start-baize command", async () => {
+      //#given
+      const updateSpy = spyOn(sessionState, "updateSessionAgent")
+      const hook = createAutoSlashCommandHook()
+      const input = createCommandInput("start-baize", "some goal")
+      const output = createCommandOutput("original")
+
+      //#when
+      await hook["command.execute.before"](input, output)
+
+      //#then
+      expect(updateSpy).toHaveBeenCalledWith(input.sessionID, "baize")
     })
   })
 })

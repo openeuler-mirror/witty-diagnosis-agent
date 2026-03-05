@@ -6,6 +6,8 @@ import { STOP_CONTINUATION_TEMPLATE } from "./templates/stop-continuation"
 import { REFACTOR_TEMPLATE } from "./templates/refactor"
 import { START_WORK_TEMPLATE } from "./templates/start-work"
 import { HANDOFF_TEMPLATE } from "./templates/handoff"
+import { START_DAYU_TEMPLATE } from "./templates/start-dayu"
+import { START_BAIZE_TEMPLATE } from "./templates/start-baize"
 
 const BUILTIN_COMMAND_DEFINITIONS: Record<BuiltinCommandName, Omit<CommandDefinition, "name">> = {
   "init-deep": {
@@ -71,6 +73,22 @@ Timestamp: $TIMESTAMP
 $ARGUMENTS
 </user-request>`,
     argumentHint: "[plan-name]",
+  },
+  "start-dayu": {
+    description: "(builtin) Switch current session to Dayu agent",
+    agent: "dayu",
+    template: `<command-instruction>
+${START_DAYU_TEMPLATE}
+</command-instruction>`,
+    argumentHint: "[goal-or-notes]",
+  },
+  "start-baize": {
+    description: "(builtin) Switch current session to Baize agent",
+    agent: "baize",
+    template: `<command-instruction>
+${START_BAIZE_TEMPLATE}
+</command-instruction>`,
+    argumentHint: "[goal-or-notes]",
   },
   "stop-continuation": {
     description: "(builtin) Stop all continuation mechanisms (ralph loop, todo continuation, boulder) for this session",
