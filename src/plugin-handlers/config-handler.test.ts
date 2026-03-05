@@ -447,7 +447,7 @@ describe("default_agent behavior with Sisyphus orchestration", () => {
     expect(config.default_agent).toBe(displayName)
   })
 
-  test("sets default_agent to sisyphus when missing", async () => {
+  test("sets default_agent to fuxi when missing", async () => {
     // #given
     const pluginConfig: OhMyOpenCodeConfig = {}
     const config: Record<string, unknown> = {
@@ -467,10 +467,10 @@ describe("default_agent behavior with Sisyphus orchestration", () => {
     await handler(config)
 
     // #then
-    expect(config.default_agent).toBe(getAgentDisplayName("sisyphus"))
+    expect(config.default_agent).toBe(getAgentDisplayName("fuxi"))
   })
 
-  test("sets default_agent to sisyphus when configured default_agent is empty after trim", async () => {
+  test("sets default_agent to fuxi when configured default_agent is empty after trim", async () => {
     // given
     const pluginConfig: OhMyOpenCodeConfig = {}
     const config: Record<string, unknown> = {
@@ -491,7 +491,7 @@ describe("default_agent behavior with Sisyphus orchestration", () => {
     await handler(config)
 
     // then
-    expect(config.default_agent).toBe(getAgentDisplayName("sisyphus"))
+    expect(config.default_agent).toBe(getAgentDisplayName("fuxi"))
   })
 
   test("preserves custom default_agent names while trimming whitespace", async () => {

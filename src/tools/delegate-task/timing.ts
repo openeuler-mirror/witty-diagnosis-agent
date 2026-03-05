@@ -3,7 +3,9 @@ let MIN_STABILITY_TIME_MS = 10000
 let STABILITY_POLLS_REQUIRED = 3
 let WAIT_FOR_SESSION_INTERVAL_MS = 100
 let WAIT_FOR_SESSION_TIMEOUT_MS = 30000
-let MAX_POLL_TIME_MS = 10 * 60 * 1000
+// Max total time to wait for a sync delegated session (e.g. Dayu → Kuafu orchestration).
+// Increased from 10 minutes to 30 minutes to better accommodate long-running diagnostic flows.
+let MAX_POLL_TIME_MS = 30 * 60 * 1000
 let SESSION_CONTINUATION_STABILITY_MS = 5000
 
 export function getTimingConfig() {
@@ -24,7 +26,7 @@ export function __resetTimingConfig(): void {
   STABILITY_POLLS_REQUIRED = 3
   WAIT_FOR_SESSION_INTERVAL_MS = 100
   WAIT_FOR_SESSION_TIMEOUT_MS = 30000
-  MAX_POLL_TIME_MS = 10 * 60 * 1000
+  MAX_POLL_TIME_MS = 30 * 60 * 1000
   SESSION_CONTINUATION_STABILITY_MS = 5000
 }
 
