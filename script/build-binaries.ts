@@ -42,6 +42,14 @@ async function buildPlatform(platform: PlatformTarget): Promise<boolean> {
 
     await $`bun build --compile --minify --sourcemap --bytecode --target=${platform.target} ${ENTRY_POINT} --outfile=${outfile}`;
 
+    // Copy skills directory to platform package
+    const skillsSrc = join(PKG_ROOT, "skills");
+    const skillsDest = join(pkgDir, "skills");
+    if (existsSync(skillsSrc)) {
+      console.log(`   📂 Copying skills to ${skillsDest}...`);
+      await $`cp -r ${skillsSrc} ${pkgDir}`;
+    }
+
     // Verify binary exists
     if (!existsSync(outfile)) {
       console.error(`   ❌ Binary not found after build: ${outfile}`);
@@ -60,7 +68,8 @@ async function buildPlatform(platform: PlatformTarget): Promise<boolean> {
         "witty-diagnosis-agent": `bin/${platform.binary}`
       },
       files: [
-        "bin"
+        "bin",
+        "skills"
       ],
       license: "MIT",
       repository: {
