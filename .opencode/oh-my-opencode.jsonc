@@ -1,0 +1,6 @@
+{
+  "sisyphus_agent": {
+    "planner_enabled": true,
+    "replace_plan": false             // 保留原生 plan
+  }
+}

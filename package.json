@@ -1,12 +1,25 @@
 {
   "name": "witty-diagnosis-agent",
-  "version": "1.0.0",
+  "version": "1.0.2",
   "description": "Witty Diagnosis Agent - OpenCode Plugin",
+  "keywords": [
+    "witty-diagnosis-agent"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://atomgit.com/huangqz2022/witty-diagnosis-agent.git"
+  },
+  "license": "MIT",
+  "author": "qzh",
+  "type": "module",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
-  "type": "module",
   "bin": {
     "witty-diagnosis-agent": "bin/witty-diagnosis-agent.js"
+  },
+  "directories": {
+    "doc": "docs",
+    "test": "test"
   },
   "files": [
     "dist",
@@ -14,22 +27,40 @@
     "postinstall.mjs"
   ],
   "scripts": {
-    "build": "bun build src/index.ts --outdir dist --target bun --format esm && tsc --emitDeclarationOnly && bun build src/cli/index.ts --outdir dist/cli --target bun --format esm",
+    "build": "tsup src/index.ts src/cli/index.ts --format esm --out-dir dist --external bun --dts && npm run build:schema",
     "build:binaries": "bun run script/build-binaries.ts",
     "clean": "rm -rf dist",
     "postinstall": "node postinstall.mjs",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "build:schema": "tsx script/build-schema.ts"
   },
   "dependencies": {
+    "@ast-grep/cli": "^0.40.0",
+    "@ast-grep/napi": "^0.40.0",
     "@clack/prompts": "^1.0.1",
+    "@code-yeongyu/comment-checker": "^0.6.1",
+    "@modelcontextprotocol/sdk": "^1.25.2",
     "@opencode-ai/plugin": "^1.1.19",
-    "commander": "^12.0.0",
+    "@opencode-ai/sdk": "^1.1.19",
+    "better-sqlite3": "^12.6.2",
+    "commander": "^14.0.2",
+    "detect-libc": "^2.0.0",
+    "diff": "^8.0.3",
+    "js-yaml": "^4.1.1",
+    "jsonc-parser": "^3.3.1",
     "picocolors": "^1.1.1",
-    "zod": "^3.22.4"
+    "picomatch": "^4.0.2",
+    "vscode-jsonrpc": "^8.2.0",
+    "zod": "^4.1.8"
   },
   "devDependencies": {
+    "@types/better-sqlite3": "^7.6.13",
+    "@types/js-yaml": "^4.0.9",
     "@types/node": "^25.3.3",
+    "@types/picomatch": "^3.0.2",
     "bun-types": "latest",
+    "tsup": "^8.5.1",
+    "tsx": "^4.21.0",
     "typescript": "^5.3.3"
   },
   "optionalDependencies": {
@@ -37,5 +68,10 @@
     "witty-diagnosis-agent-darwin-x64": "1.0.0",
     "witty-diagnosis-agent-linux-x64": "1.0.0",
     "witty-diagnosis-agent-windows-x64": "1.0.0"
-  }
+  },
+  "trustedDependencies": [
+    "@ast-grep/cli",
+    "@ast-grep/napi",
+    "@code-yeongyu/comment-checker"
+  ]
 }
