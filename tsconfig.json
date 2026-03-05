@@ -8,8 +8,22 @@
     "strict": true,
     "skipLibCheck": true,
     "esModuleInterop": true,
-    "types": ["bun-types"]
+    "types": [
+      "bun-types"
+    ],
+    "resolveJsonModule": true,
+    "forceConsistentCasingInFileNames": true,
+    "rootDir": "src",
+    "declarationDir": "dist",
+    "lib": [
+      "ESNext"
+    ]
   },
-  "include": ["src/**/*", "script/**/*"],
-  "exclude": ["node_modules", "dist"]
+  "include": [
+    "src/**/*"
+  ],
+  "exclude": [
+    "node_modules",
+    "dist"
+  ]
 }
