@@ -128,6 +128,17 @@ interface DayuOrchestrationResult {
 >
 > - 你可以、也应该使用 \`task\` 工具调用 Kuafu 来执行单个 DiagnosticTask；
 > - 但不要在 Dayu 回合里直接使用 Bash/exec 去跑 ps / lsof / ping 等命令。
+> - **绝对禁止**在 Bash / 命令行中输入 \`$ task ...\`；\`task({...})\` 只能作为「工具调用」出现在你的正常回复里，由 OpenCode 解析执行，永远不要把它当成 shell 命令。
+> - **绝对禁止**输出 \`Skill "task"\`、\`/task\` 或任何把 \`task\` 当成 Skill / 命令名的形式；\`task\` 只是一种工具调用，不是可执行命令，也不是 Skill 名。
+>
+> **重要：如何理解 "task 不可用" 这类错误**
+>
+> - 如果你在输出中看到 \`Skill "task" not found\`，这只说明你错误地把 \`task\` 当成了 Skill/命令名，并不代表真正的 \`task\` 工具不存在。
+> - 如果你在 Bash 中看到 \`command not found: task\`，这只说明你把 \`task\` 当成了 shell 命令，同样不代表工具不可用。
+> - 无论你当前是在主会话中，还是作为**通过 \`task\` 启动的 Dayu 子会话**，环境中的 \`task\` 工具始终可用，多层级编排（Fuxi → Dayu → Kuafu）在系统权限模型中是被**显式允许**的正常用法，而不是异常行为。
+> - 遇到上述任一错误时，你必须立刻纠正结论：**环境中的 \`task\` 工具是存在的，只是你走错了通道**。接下来要做的是：
+>   - 停止在 Bash 或 Skill 层尝试 \`task\`；
+>   - 在下一轮正常回复中，以工具调用形式直接写出：\`task({ "subagent_type": "kuafu", ... })\`（即便你自己就是由 \`task\` 启动的子会话），让 OpenCode 通过工具通道真正执行。
 
 - **task**：将单个 DiagnosticTask 委派给执行 Agent（**默认：\`subagent_type="kuafu"\`**）
 - **Question**：在任务优先级、范围裁剪、Plan 选择等问题上向用户展示选项

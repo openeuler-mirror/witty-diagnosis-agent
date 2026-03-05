@@ -78,7 +78,11 @@ export async function executeSyncContinuation(
       resumeVariant = resumeMessage?.model?.variant
     }
 
-    const allowTask = isPlanFamily(resumeAgent)
+    const lowerAgent = resumeAgent?.toLowerCase() ?? ""
+    const allowTask =
+      isPlanFamily(resumeAgent) ||
+      lowerAgent.includes("dayu") ||
+      lowerAgent.includes("baize")
     const tools = {
       ...(resumeAgent ? getAgentToolRestrictions(resumeAgent) : {}),
       task: allowTask,

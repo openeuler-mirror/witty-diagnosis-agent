@@ -35,6 +35,7 @@ export function createKeywordDetectorHook(ctx: PluginInput, _collector?: Context
       }
 
       const currentAgent = getSessionAgent(input.sessionID) ?? input.agent
+      const normalizedAgent = currentAgent?.toLowerCase() ?? ""
 
       // Remove system-reminder content to prevent automated system messages from triggering mode keywords
       const cleanText = removeSystemReminders(promptText)
@@ -43,6 +44,11 @@ export function createKeywordDetectorHook(ctx: PluginInput, _collector?: Context
 
       if (isPlannerAgent(currentAgent)) {
         detectedKeywords = detectedKeywords.filter((k) => k.type !== "ultrawork")
+      }
+
+      // Fuxi 专用：仅在 Fuxi 会话中启用 wittywork 模式关键字
+      if (!normalizedAgent.includes("fuxi")) {
+        detectedKeywords = detectedKeywords.filter((k) => k.type !== "wittywork")
       }
 
       if (detectedKeywords.length === 0) {
@@ -60,7 +66,11 @@ export function createKeywordDetectorHook(ctx: PluginInput, _collector?: Context
       const isNonMainSession = mainSessionID && input.sessionID !== mainSessionID
 
       if (isNonMainSession) {
-        detectedKeywords = detectedKeywords.filter((k) => k.type === "ultrawork")
+        detectedKeywords = detectedKeywords.filter((k) => {
+          if (k.type === "ultrawork") return true
+          if (k.type === "wittywork" && normalizedAgent.includes("fuxi")) return true
+          return false
+        })
         if (detectedKeywords.length === 0) {
           log(`[keyword-detector] Skipping non-ultrawork keywords in non-main session`, {
             sessionID: input.sessionID,

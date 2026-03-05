@@ -9,6 +9,7 @@ import {
   AUTO_SLASH_COMMAND_TAG_CLOSE,
   AUTO_SLASH_COMMAND_TAG_OPEN,
 } from "./constants"
+import { updateSessionAgent } from "../../features/claude-code-session-state"
 import type {
   AutoSlashCommandHookInput,
   AutoSlashCommandHookOutput,
@@ -84,6 +85,12 @@ export function createAutoSlashCommandHook(options?: AutoSlashCommandHookOptions
         return
       }
 
+      if (parsed.command === "start-dayu") {
+        updateSessionAgent(input.sessionID, "dayu")
+      } else if (parsed.command === "start-baize") {
+        updateSessionAgent(input.sessionID, "baize")
+      }
+
       const taggedContent = `${AUTO_SLASH_COMMAND_TAG_OPEN}\n${result.replacementText}\n${AUTO_SLASH_COMMAND_TAG_CLOSE}`
       output.parts[idx].text = taggedContent
 
@@ -134,6 +141,12 @@ export function createAutoSlashCommandHook(options?: AutoSlashCommandHookOptions
         output.parts[idx].text = taggedContent
       } else {
         output.parts.unshift({ type: "text", text: taggedContent })
+      }
+
+      if (input.command === "start-dayu") {
+        updateSessionAgent(input.sessionID, "dayu")
+      } else if (input.command === "start-baize") {
+        updateSessionAgent(input.sessionID, "baize")
       }
 
       log(`[auto-slash-command] command.execute.before - injected template`, {
