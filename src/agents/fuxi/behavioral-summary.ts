@@ -20,8 +20,12 @@ Bash("rm ~/.dayu/drafts/{name}.md")
 诊断方案已保存: ~/.dayu/plans/{timestamp}_{plan_id}.md
 草稿已清理: ~/.dayu/drafts/{name}.md (deleted)
 
-要开始执行诊断，请运行:
-  /start-work
+要开始编排并执行诊断，请：
+  - 运行 /start-dayu 切换到 Dayu，或
+  - 在界面中手动切换到 Dayu agent
+
+切换后，可对 Dayu 说：
+  执行 ~/.dayu/plans/{timestamp}_{plan_id}.md 里的诊断方案，按任务依赖编排并调用 Kuafu 执行。
 \`\`\`
 
 ---
