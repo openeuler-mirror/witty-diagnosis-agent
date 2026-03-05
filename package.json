@@ -1,6 +1,6 @@
 {
   "name": "witty-diagnosis-agent",
-  "version": "1.0.2",
+  "version": "1.0.11",
   "description": "Witty Diagnosis Agent - OpenCode Plugin",
   "keywords": [
     "witty-diagnosis-agent"
@@ -12,8 +12,7 @@
   "license": "MIT",
   "author": "qzh",
   "type": "module",
-  "main": "dist/index.js",
-  "types": "dist/index.d.ts",
+  "main": "bin/witty-diagnosis-agent.js",
   "bin": {
     "witty-diagnosis-agent": "bin/witty-diagnosis-agent.js"
   },
@@ -22,7 +21,7 @@
     "test": "test"
   },
   "files": [
-    "dist",
+    "packages",
     "bin",
     "postinstall.mjs"
   ],
@@ -64,10 +63,10 @@
     "typescript": "^5.3.3"
   },
   "optionalDependencies": {
-    "witty-diagnosis-agent-darwin-arm64": "1.0.0",
-    "witty-diagnosis-agent-darwin-x64": "1.0.0",
-    "witty-diagnosis-agent-linux-x64": "1.0.0",
-    "witty-diagnosis-agent-windows-x64": "1.0.0"
+    "witty-diagnosis-agent-darwin-arm64": "1.0.11",
+    "witty-diagnosis-agent-darwin-x64": "1.0.11",
+    "witty-diagnosis-agent-linux-x64": "1.0.11",
+    "witty-diagnosis-agent-windows-x64": "1.0.11"
   },
   "trustedDependencies": [
     "@ast-grep/cli",
