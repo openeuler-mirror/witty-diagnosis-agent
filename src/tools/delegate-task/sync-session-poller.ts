@@ -119,5 +119,10 @@ export async function pollSyncSession(
     log("[task] Poll timeout reached", { sessionID: input.sessionID, pollCount })
   }
 
-  return timedOut ? `Poll timeout reached after ${maxPollTimeMs}ms for session ${input.sessionID}` : null
+  return timedOut
+    ? `Poll timeout reached after ${maxPollTimeMs}ms for session ${input.sessionID}.
+
+The delegated agent session may still be running. Do NOT fall back to re-executing the same diagnostic or shell commands yourself.
+Instead, inform the user about the timeout, consider narrowing the task or resuming the delegated session, and keep execution within the appropriate subagent (e.g., Dayu/Kuafu).`
+    : null
 }

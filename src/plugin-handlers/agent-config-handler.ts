@@ -135,7 +135,7 @@ export async function applyAgentConfig(params: {
         getAgentDisplayName(configuredDefaultAgent);
     } else {
       (params.config as { default_agent?: string }).default_agent =
-        getAgentDisplayName("sisyphus");
+        getAgentDisplayName("fuxi");
     }
 
     const agentConfig: Record<string, unknown> = {
@@ -263,8 +263,23 @@ export async function applyAgentConfig(params: {
   }
 
   if (params.config.agent) {
+    // 隐藏核心编排 Agent（仅用于内部，不在 OpenCode /agent 列表中展示）
+    const hiddenCoreAgents = new Set([
+      "sisyphus",
+      "hephaestus",
+      "prometheus",
+      "atlas",
+      "sisyphus-junior",
+    ]);
+
+    const visibleAgents = Object.fromEntries(
+      Object.entries(params.config.agent as Record<string, unknown>).filter(
+        ([key]) => !hiddenCoreAgents.has(key.toLowerCase()),
+      ),
+    );
+
     params.config.agent = remapAgentKeysToDisplayNames(
-      params.config.agent as Record<string, unknown>,
+      visibleAgents as Record<string, unknown>,
     );
     params.config.agent = reorderAgentsByPriority(
       params.config.agent as Record<string, unknown>,

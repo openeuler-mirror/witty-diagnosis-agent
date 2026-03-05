@@ -83,7 +83,7 @@ export async function checkSystem(): Promise<CheckResult> {
     issues.push({
       title: "oh-my-opencode is not registered",
       description: "Plugin entry is missing from OpenCode configuration.",
-      fix: "Run: bunx oh-my-opencode install",
+      fix: "Add the oh-my-opencode plugin entry to your OpenCode configuration (see project README for details).",
       severity: "error",
       affects: ["all agents"],
     })
