@@ -12,7 +12,10 @@
   "license": "MIT",
   "author": "qzh",
   "type": "module",
-  "main": "bin/witty-diagnosis-agent.js",
+  "main": "dist/index.js",
+  "exports": {
+    ".": "./dist/index.js"
+  },
   "bin": {
     "witty-diagnosis-agent": "bin/witty-diagnosis-agent.js"
   },
@@ -21,6 +24,7 @@
     "test": "test"
   },
   "files": [
+    "dist",
     "packages",
     "bin",
     "postinstall.mjs",
