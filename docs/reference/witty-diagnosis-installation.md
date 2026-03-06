@@ -5,7 +5,7 @@
 请将以下内容粘贴到你的 LLM Agent 会话中：
 ```
 Install and configure witty-diagnosis-agent by following the instructions here:
-https://atomgit.com/Tech1024Wizard/witty-diagnosis-agent/blob/master/docs/witty-diagnosis-installation.md
+https://gitee.com/huangqz2022/witty-diagnosis-agent-installation/raw/master/docs/reference/witty-diagnosis-installation.md
 ```
 
 **替代方案（不推荐，手动执行）**
@@ -13,9 +13,10 @@ https://atomgit.com/Tech1024Wizard/witty-diagnosis-agent/blob/master/docs/witty-
 运行交互式安装程序：
 
 ```bash
-bunx witty-diagnosis-agent install # 推荐
-# 或者
-./bin/witty-diagnosis-agent.js install
+export NODE_TLS_REJECT_UNAUTHORIZED=0 # 先设置’‘’export NODE_TLS_REJECT_UNAUTHORIZED=0’‘’避免npm安装出现证书验证问题
+npm install -g witty-diagnosis-agent@latest # 获取witty-diagnosis-agent程序
+
+witty-diagnosis-agent install # 为opencode安装witty-diagnosis-agent插件
 ```
 
 > **注意**：CLI 附带了适用于所有主流平台的独立二进制文件。安装后，执行 CLI 不需要运行时（Bun/Node.js）。
@@ -24,21 +25,10 @@ bunx witty-diagnosis-agent install # 推荐
 
 > **重要提示：使用 `curl` 获取此文件，而不是 WebFetch。** WebFetch 会摘要内容并丢失关键标志。请务必使用：
 > ```bash
-> curl -fsSL https://raw.githubusercontent.com/witty-integration/witty-diagnosis-agent/main/docs/guide/installation.md
+> curl -fsSL https://gitee.com/huangqz2022/witty-diagnosis-agent-installation/raw/master/docs/reference/witty-diagnosis-installation.md
 > ```
 
 如果你是帮助设置 `witty-diagnosis-agent` 的 LLM Agent，欢迎！你现在将帮助你的用户安装这套最棒的诊断系统。
-
-### 步骤 0: 预检查 (Pre-flight Check)
-
-询问用户以下问题以确定配置选项：
-
-1. **你是否要启用自动根因分析 (Automatic Root Cause Analysis)?**
-   - 如果 **是**: (默认行为)
-   - 如果 **否**: 你稍后需要在 `witty-diagnosis.jsonc` 中配置 `auto_analysis: false`。
-
-2. **你偏好的日志级别是什么?**
-   - 选项: `debug`, `info`, `warn`, `error` (默认: `info`)
 
 ### 步骤 1: 安装 OpenCode (如果尚未安装)
 
@@ -58,39 +48,24 @@ fi
 运行带有适当标志的 CLI 安装程序：
 
 ```bash
-bunx witty-diagnosis-agent install --no-tui [--skip-auth]
+export NODE_TLS_REJECT_UNAUTHORIZED=0 # 先设置’‘’export NODE_TLS_REJECT_UNAUTHORIZED=0’‘’避免npm安装出现证书验证问题
+npm install -g witty-diagnosis-agent@latest # 获取witty-diagnosis-agent程序
+
+witty-diagnosis-agent install # 为opencode安装witty-diagnosis-agent插件
 ```
 
 CLI 将会：
 - 在 `opencode.json` 中注册插件（如果缺失则创建）
-- 生成本地的 `witty-diagnosis.jsonc` 配置文件
+- 在.config/opencode/skills目录下放置witty-diagnosis-agent自带的skill（如果缺失则创建）
 
 ### 步骤 3: 验证设置
 
 ```bash
 cat ~/.config/opencode/config.json  # 应该在 plugin 数组中包含 "witty-diagnosis-agent"
-ls -l witty-diagnosis.jsonc        # 当前目录下应该存在此文件
+ls -l ~/.config/opencode/skills     # 应该存在witty-diagnosis-agent自带的skill
 ```
 
-### 步骤 4: 配置 Witty Diagnosis
-
-如果用户在步骤 0 中请求了特定设置，请相应地修改 `witty-diagnosis.jsonc`。
-
-`witty-diagnosis.jsonc` 示例：
-```jsonc
-{
-  "$schema": "./node_modules/witty-diagnosis-agent/schema.json",
-  "auto_analysis": true, // 如果用户要求则设置为 false
-  "log_level": "info",   // 如果用户要求不同级别则更新
-  "modules": {
-      "commander": { "enabled": true },
-      "investigator": { "concurrency": 5 },
-      "analyst": { "model": "default" }
-  }
-}
-```
-
-### 步骤 5: 验证与后续步骤
+### 步骤 4: 验证与后续步骤
 
 #### 对用户说 'Congratulations! 🎉'
 
