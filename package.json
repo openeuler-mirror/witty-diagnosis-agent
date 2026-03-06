@@ -1,6 +1,6 @@
 {
   "name": "witty-diagnosis-agent",
-  "version": "1.0.11",
+  "version": "1.0.12",
   "description": "Witty Diagnosis Agent - OpenCode Plugin",
   "keywords": [
     "witty-diagnosis-agent"
@@ -27,7 +27,8 @@
     "dist",
     "packages",
     "bin",
-    "postinstall.mjs"
+    "postinstall.mjs",
+    "skills"
   ],
   "scripts": {
     "build": "tsup src/index.ts src/cli/index.ts --format esm --out-dir dist --external bun --dts && npm run build:schema",

@@ -13,6 +13,8 @@ import {
 import { detectedToInitialValues, formatConfigSummary, SYMBOLS } from "./install-validators"
 import { promptInstallConfig } from "./tui-install-prompts"
 
+import { installSkills } from "./install-skills"
+
 export async function runTuiInstaller(args: InstallArgs, version: string): Promise<number> {
   if (!process.stdin.isTTY || !process.stdout.isTTY) {
     console.error("Error: Interactive installer requires a TTY. Use --non-interactive or set environment variables directly.")
@@ -53,6 +55,14 @@ export async function runTuiInstaller(args: InstallArgs, version: string): Promi
     return 1
   }
   spinner.stop(`Plugin added to ${color.cyan(pluginResult.configPath)}`)
+
+  spinner.start("Bundling witty-diagnosis-agent skills")
+  const skillsResult = await installSkills()
+  if (!skillsResult.success) {
+    spinner.stop(`Skills update skipped: ${skillsResult.error} ${color.yellow("[!]")}`)
+  } else {
+    spinner.stop(`Skills updated to ${color.cyan(skillsResult.targetPath ?? "")} ${color.green("[OK]")}`)
+  }
 
   if (config.hasGemini) {
     spinner.start("Adding auth plugins (fetching latest versions)")
