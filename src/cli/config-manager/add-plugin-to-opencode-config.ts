@@ -6,8 +6,16 @@ import { formatErrorWithSuggestion } from "./format-error-with-suggestion"
 import { detectConfigFormat } from "./opencode-config-format"
 import { parseOpenCodeConfigFileWithError, type OpenCodeConfig } from "./parse-opencode-config-file"
 import { getPluginNameWithVersion } from "./plugin-name-with-version"
+import { resolveLocalPluginPath } from "./resolve-local-plugin-path"
 
 const PACKAGE_NAME = "witty-diagnosis-agent"
+
+function isOurPluginEntry(entry: string, pluginEntry: string): boolean {
+  if (entry === pluginEntry) return true
+  if (entry === PACKAGE_NAME || entry.startsWith(`${PACKAGE_NAME}@`)) return true
+  if (pluginEntry.startsWith("file:") && entry.startsWith("file:") && entry.includes("dist/index.js")) return true
+  return false
+}
 
 export async function addPluginToOpenCodeConfig(currentVersion: string): Promise<ConfigMergeResult> {
   try {
@@ -21,7 +29,8 @@ export async function addPluginToOpenCodeConfig(currentVersion: string): Promise
   }
 
   const { format, path } = detectConfigFormat()
-  const pluginEntry = await getPluginNameWithVersion(currentVersion)
+  const pluginEntry =
+    resolveLocalPluginPath() ?? (await getPluginNameWithVersion(currentVersion))
 
   try {
     if (format === "none") {
@@ -41,7 +50,7 @@ export async function addPluginToOpenCodeConfig(currentVersion: string): Promise
 
     const config = parseResult.config
     const plugins = config.plugin ?? []
-    const existingIndex = plugins.findIndex((p) => p === PACKAGE_NAME || p.startsWith(`${PACKAGE_NAME}@`))
+    const existingIndex = plugins.findIndex((p) => isOurPluginEntry(p, pluginEntry))
 
     if (existingIndex !== -1) {
       if (plugins[existingIndex] === pluginEntry) {
