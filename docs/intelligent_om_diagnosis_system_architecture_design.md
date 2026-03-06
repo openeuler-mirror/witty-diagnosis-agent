@@ -99,37 +99,21 @@
     └─ 结果闭环: 全程无人工干预，直至产出最终诊断报告 (~/.baize/report/*_report.md)
 ```
 
+### 0.3 诊断方式差异 (Diagnosis Methods Comparison)
+
+```text
+├─ 在线诊断 (Online):
+│   ├─ 定义: Agent 通过 SSH/API 实时连接目标系统，主动探测环境、采集实时指标。
+│   ├─ 优势: 实时性强，可交互，能获取动态上下文 (e.g., top, netstat)。
+│   └─ 约束: 需网络连通，需凭证授权，操作需谨慎避免影响业务。
+└─ 离线分析 (Offline):
+    ├─ 定义: Agent 仅分析用户上传的静态文件包 (日志/Dump)，不直接连接生产环境。
+    ├─ 优势: 安全性高 (Air-gapped)，无需生产环境权限，适合事后复盘。
+    └─ 约束: 依赖数据完整性，无法获取缺失的上下文信息。
+```
+
 ## 1. 核心架构与阶段设计 (Core Architecture & Phases)
 > **设计理念**: 采用流水线式 (Pipeline) 架构，将复杂诊断过程解耦为五个标准化阶段，各阶段 Agent 职责单一、边界清晰。
-
-### 1.0 Agent 协作流程图 (Workflow Diagram)
-
-```mermaid
-graph TD
-    User([用户 User]) -->|1. 发起诊断请求| Xuanyuan[轩辕 Xuanyuan<br>总控 Controller]
-    
-    subgraph "Phase 1: 诊断规划 (Planning)"
-        Xuanyuan -->|2. 唤醒| Fuxi[伏羲 Fuxi]
-        Fuxi <-->|3. 交互澄清 & 准入检查| User
-        Fuxi -->|4. 生成诊断方案 Plan| PlanFile[(Plan.md)]
-    end
-    
-    subgraph "Phase 2: 编排与执行 (Orchestration & Execution)"
-        Xuanyuan -->|5. 调度| Dayu[大禹 Dayu]
-        Dayu -->|6. 读取方案| PlanFile
-        Dayu -->|7. 拆解任务 Task| Kuafu[夸父 Kuafu<br>执行 Execution]
-        Kuafu -->|8. 工具调用 & 数据采集| System[目标系统 Target System]
-        Kuafu -->|9. 反馈执行结果| Dayu
-    end
-    
-    subgraph "Phase 3: 分析与报告 (Analysis & Reporting)"
-        Dayu -->|10. 提交结果| Baize[白泽 Baize<br>知识 Knowledge]
-        Baize -->|11. 根因分析 & RAG检索| KnowledgeBase[(知识库 KB)]
-        Baize -->|12. 生成报告| Report[(Report.md)]
-    end
-    
-    Report -->|13. 推送最终报告| User
-```
 
 ### Agent 角色一览表
 
@@ -144,96 +128,97 @@ graph TD
 ### 1.0 轩辕总控实现机制 (Xuanyuan Controller Mechanism)
 > **寓意**: “轩辕黄帝，人文初祖” — 作为全链路智能总控，统筹伏羲、大禹、夸父、白泽诸神，协调各阶段流水线作业。
 
-├─ **触发入口**:
+```text
+├─ 触发入口:
 │   ├─ 关键词监听: 监听用户输入中的 `autopilot`, `auto-diag`, `全自动排查` 等指令
 │   └─ 显式调用: 用户直接 @Xuanyuan Agent
-├─ **状态机管理 (State Machine)**:
-│   ├─ **Idle**: 等待用户指令
-│   ├─ **Planning (Phase 1)**: 唤醒伏羲 (Fuxi)，监控 Plan 生成状态
-│   ├─ **Dispatching (Phase 2)**: 唤醒大禹 (Dayu)，验证任务拆解正确性
-│   ├─ **Executing (Phase 3)**: 监控夸父 (Kuafu) 集群执行进度，处理超时与异常
-│   ├─ **Analyzing (Phase 4)**: 唤醒白泽 (Baize)，聚合结果并生成报告
-│   └─ **Done**: 推送最终报告连接，释放所有 Agent 资源
-└─ **异常接管 (Exception Handling)**:
+├─ 状态机管理 (State Machine):
+│   ├─ Idle: 等待用户指令
+│   ├─ Planning (Phase 1): 唤醒伏羲 (Fuxi)，监控 Plan 生成状态
+│   ├─ Dispatching (Phase 2): 唤醒大禹 (Dayu)，验证任务拆解正确性
+│   ├─ Executing (Phase 3): 监控夸父 (Kuafu) 集群执行进度，处理超时与异常
+│   ├─ Analyzing (Phase 4): 唤醒白泽 (Baize)，聚合结果并生成报告
+│   └─ Done: 推送最终报告连接，释放所有 Agent 资源
+└─ 异常接管 (Exception Handling):
     ├─ 若某阶段 Agent 失败 (e.g., 伏羲无法生成 Plan)，轩辕自动降级为“分阶段交互模式”，请求人工介入
     └─ 若执行超时，自动触发熔断，保存当前已完成的中间状态
+```
 
 ### 1.1 场景识别与诊断建模 (伏羲 / Fuxi - 诊断规划)
 > **寓意**: “演八卦，定乾坤” — 识别故障场景与环境上下文，完成信息准入检查，构建初步诊断模型与排查策略。
 
-*   **1.1 场景识别 (Scenario Identification)**
-    *   **在线诊断 (Online Diagnosis)**：需要用户提供在线环境的 IP、账号和密码，实时接入系统进行非侵入式探测
-    *   **离线分析 (Offline Analysis)**：需要提供日志路径、日志类型（若存在离线分析环境，也需提供离线分析的 IP、账号和密码），基于日志包进行事后分析
-
-*   **1.2 故障澄清与关键信息确认 (Issue Clarification & Verification)**
-    *   **核心职责**：通过交互式提问还原故障现场，澄清模糊描述（如“系统慢”的具体表现）
-    *   **关键要素确认**：明确故障发生时间 (Time)、具体现象 (Symptom)
-    *   **准入检查 (Clearance Check)**：验证信息是否完整，避免在缺乏上下文时盲目诊断
-        *   **1) 故障对象明确 (Entity)**：具体是哪个组件、进程或系统模块？
-        *   **2) 时间窗口清晰 (Time Window)**：是当前正在发生(Ongoing)还是历史追溯？具体时间段？
-        *   **3) 现象可观测 (Observability)**：
-            *   **异常特征**：是否有具体的报错日志、监控指标异常或内核堆栈？
-            *   **离线数据确认 (Offline Artifacts)**：
-                *   **日志类型 (Log Type)**：明确是 Syslog, Dmesg, 业务日志 (App Log) 还是 审计日志？
-                *   **Dump 类型 (Dump Type)**：明确是 Kernel Vmcore, User Core, Java Heap Dump 还是 Thread Dump？
-
-*   **1.3 诊断可行性评估 (Diagnostic Feasibility Assessment)**
-    *   **在线场景 (Online)**：
-        *   **免密配置 (SSH Key Setup)**：根据用户输入的 IP/账号/密码，尝试配置免密登录 (`ssh-copy-id`)。
-        *   **环境探测 (Environment Probe)**：若配置成功，仅执行登录验证和查询 Linux 版本 (`uname -a`, `cat /etc/os-release`)。**严禁** 执行任何其他故障检测命令或收集其他信息。
-    *   **离线场景 (Offline)**：
-        *   **远程分析服务器 (Remote Analysis Server)**：
-            *   **免密配置**：尝试配置免密登录 (`ssh-copy-id`)。
-            *   **路径校验**：登录服务器校验日志路径是否存在 (`ls -lh`)。
-        *   **本地日志 (Local Log)**：直接校验本地日志路径是否存在。
-
-*   **1.4 诊断模型构建 (Diagnostic Model Construction)**
-    *   **核心目标**：整合前期信息，构建“现象-模式-根因”假设树，并生成标准化诊断排查计划 (Plan)。
-    *   **1) 模型构建逻辑 (Model Logic)**：
-        *   **方法论指导 (Methodology)**：
-            *   **核心思想**：现象驱动 → 假设收敛 → 验证闭环 (SHMVR 框架)。
-            *   **构建原则**：
-                *   **MECE 原则**：故障模式相互独立、整体穷尽。
-                *   **层次限制**：现象 → 模式 → 根因 (不超 3 层)。
-                *   **优先顺序**：优先高可能+低成本验证的假设。
-            *   **收敛策略**：输出 Top 5 可能性最高的故障模型。
-        *   **假设树生成 (Hypothesis Tree Generation)**：
-            *   **根节点**：故障现象 (Symptom, e.g., SSH 响应慢)
-            *   **中间节点**：故障模式 (Failure Mode, e.g., CPU 饱和 / 软死锁)
-            *   **叶子节点**：潜在根因 (Root Cause, e.g., 进程死循环 / 驱动 Bug)
-    *   **2) 计划内容输出 (Plan Output)**：
-        *   **存储路径**：`~/.dayu/plans/{timestamp}_{plan_id}.md`
-        *   **计划内容结构 (Plan Structure)**：
-            1.  故障场景 (Fault Scenario)
-                *   场景类型 (Mode)：在线诊断 (Online) / 离线分析 (Offline)
-                *   连接信息 (Connection)：
-                    *   在线：目标 IP、SSH 端口、用户 (凭证脱敏)
-                    *   离线：日志文件路径、分析环境登录信息 (若有)
-            2.  故障澄清 (Issue Clarification)
-                *   用户原始描述 (User Query)
-                *   经过交互确认的完整故障现象 (Verified Symptom)
-            3.  前期检测结果 (Pre-check Results)
-                *   环境可达性 (Reachability)：SSH 登录是否成功
-                *   基础环境信息 (Basic Info)：OS 发行版、内核版本、关键资源概览
-                *   数据完备性 (Data Availability)：
-                    *   故障日志是否存在 (Yes/No)
-                    *   日志/Dump 类型描述 (e.g., "CentOS 7.9 Syslog", "Java Heap Dump")
-            4.  诊断模型 (Diagnostic Model - Top 5)
-                *   基于 SHMVR 方法论生成的假设树表格 (按优先级降序)：
-                    | 优先级 (Priority) | 故障模式 (Failure Mode) | 潜在根因 (Root Cause) | 验证手段 (Verification) |
-                    | :--- | :--- | :--- | :--- |
-                    | P1 (High) | CPU 饱和 / 软死锁 | 进程死循环 / 驱动 Bug | `top -b -n 1`, `dmesg` |
-                    | P2 (Medium) | 内存泄漏 | Java Heap OOM | `jmap -heap`, `free -m` |
-
-                *   **[关键]** 必须在 Markdown 末尾附加 JSON 格式的任务元数据，供阶段2程序解析：
-                    ```json
-                    {
-                      "plan_id": "20240320_001",
-                      "tasks": [
-                        { "id": "T1", "mode": "CPU 饱和", "root_cause": "进程死循环", "priority": "P1" }
-                      ]
-                    }
-                    ```
+```text
+├─ 1.1 场景识别 (Scenario Identification)
+│   ├─ 在线诊断 (Online Diagnosis)：需要用户提供在线环境的 IP、账号和密码，实时接入系统进行非侵入式探测
+│   └─ 离线分析 (Offline Analysis)：需要提供日志路径、日志类型（若存在离线分析环境，也需提供离线分析的 IP、账号和密码），基于日志包进行事后分析
+├─ 1.2 故障澄清与关键信息确认 (Issue Clarification & Verification)
+│   ├─ 核心职责：通过交互式提问还原故障现场，澄清模糊描述（如“系统慢”的具体表现）
+│   ├─ 关键要素确认：明确故障发生时间 (Time)、具体现象 (Symptom)
+│   └─ 准入检查 (Clearance Check)：验证信息是否完整，避免在缺乏上下文时盲目诊断
+│       ├─ 1) 故障对象明确 (Entity)：具体是哪个组件、进程或系统模块？
+│       ├─ 2) 时间窗口清晰 (Time Window)：是当前正在发生(Ongoing)还是历史追溯？具体时间段？
+│       └─ 3) 现象可观测 (Observability)：
+│           ├─ 异常特征：是否有具体的报错日志、监控指标异常或内核堆栈？
+│           └─ 离线数据确认 (Offline Artifacts)：
+│               ├─ 日志类型 (Log Type)：明确是 Syslog, Dmesg, 业务日志 (App Log) 还是 审计日志？
+│               └─ Dump 类型 (Dump Type)：明确是 Kernel Vmcore, User Core, Java Heap Dump 还是 Thread Dump？
+├─ 1.3 诊断可行性评估 (Diagnostic Feasibility Assessment)
+│   ├─ 在线场景 (Online)：
+│   │   ├─ 免密配置 (SSH Key Setup)：根据用户输入的 IP/账号/密码，尝试配置免密登录 (`ssh-copy-id`)。
+│   │   └─ 环境探测 (Environment Probe)：若配置成功，仅执行登录验证和查询 Linux 版本 (`uname -a`, `cat /etc/os-release`)。**严禁** 执行任何其他故障检测命令或收集其他信息。
+│   └─ 离线场景 (Offline)：
+│       ├─ 远程分析服务器 (Remote Analysis Server)：
+│       │   ├─ 免密配置：尝试配置免密登录 (`ssh-copy-id`)。
+│       │   └─ 路径校验：登录服务器校验日志路径是否存在 (`ls -lh`)。
+│       └─ 本地日志 (Local Log)：直接校验本地日志路径是否存在。
+└─ 1.4 诊断模型构建 (Diagnostic Model Construction)
+    ├─ 核心目标：整合前期信息，构建“现象-模式-根因”假设树，并生成标准化诊断排查计划 (Plan)。
+    ├─ 1) 模型构建逻辑 (Model Logic)：
+    │   ├─ 方法论指导 (Methodology)：
+    │   │   ├─ 核心思想：现象驱动 → 假设收敛 → 验证闭环 (SHMVR 框架)。
+    │   │   ├─ 构建原则：
+    │   │   │   ├─ MECE 原则：故障模式相互独立、整体穷尽。
+    │   │   │   ├─ 层次限制：现象 → 模式 → 根因 (不超 3 层)。
+    │   │   │   └─ 优先顺序：优先高可能+低成本验证的假设。
+    │   │   └─ 收敛策略：输出 Top 5 可能性最高的故障模型。
+    │   ├─ 假设树生成 (Hypothesis Tree Generation)：
+    │   │   ├─ 根节点：故障现象 (Symptom, e.g., SSH 响应慢)
+    │   │   ├─ 中间节点：故障模式 (Failure Mode, e.g., CPU 饱和 / 软死锁)
+    │   │   └─ 叶子节点：潜在根因 (Root Cause, e.g., 进程死循环 / 驱动 Bug)
+    └─ 2) 计划内容输出 (Plan Output)：
+        ├─ 存储路径：`~/.dayu/plans/{timestamp}_{plan_id}.md`
+        └─ 计划内容结构 (Plan Structure)：
+            1. 故障场景 (Fault Scenario)
+               - 场景类型 (Mode)：在线诊断 (Online) / 离线分析 (Offline)
+               - 连接信息 (Connection)：
+                 - 在线：目标 IP、SSH 端口、用户 (凭证脱敏)
+                 - 离线：日志文件路径、分析环境登录信息 (若有)
+            2. 故障澄清 (Issue Clarification)
+               - 用户原始描述 (User Query)
+               - 经过交互确认的完整故障现象 (Verified Symptom)
+            3. 前期检测结果 (Pre-check Results)
+               - 环境可达性 (Reachability)：SSH 登录是否成功
+               - 基础环境信息 (Basic Info)：OS 发行版、内核版本、关键资源概览
+               - 数据完备性 (Data Availability)：
+                 - 故障日志是否存在 (Yes/No)
+                 - 日志/Dump 类型描述 (e.g., "CentOS 7.9 Syslog", "Java Heap Dump")
+            4. 诊断模型 (Diagnostic Model - Top 5)
+                - 基于 SHMVR 方法论生成的假设树表格 (按优先级降序)：
+                | 优先级 (Priority) | 故障模式 (Failure Mode) | 潜在根因 (Root Cause) | 验证手段 (Verification) |
+                | :--- | :--- | :--- | :--- |
+                | P1 (High) | CPU 饱和 / 软死锁 | 进程死循环 / 驱动 Bug | `top -b -n 1`, `dmesg` |
+                | P2 (Medium) | 内存泄漏 | Java Heap OOM | `jmap -heap`, `free -m` |
+                
+                - **[关键]** 必须在 Markdown 末尾附加 JSON 格式的任务元数据，供阶段2程序解析：
+                  ```json
+                  {
+                    "plan_id": "20240320_001",
+                    "tasks": [
+                      { "id": "T1", "mode": "CPU 饱和", "root_cause": "进程死循环", "priority": "P1" }
+                    ]
+                  }
+                  ```
+```
 
 *   **1.5 多维上下文透视 (Deep Context Gathering) [可选 / 未来规划]**
     *   **说明**：当前版本暂未实现，计划未来接入 RAG 知识库与全链路拓扑感知能力。
@@ -241,6 +226,7 @@ graph TD
         *   **知识检索 (Librarian)**：从 RAG 知识库中召回历史 SOP 和 相似根因模式
         *   **实时勘测 (Explore)**：以只读方式获取系统拓扑、依赖树及关键配置指纹
         *   **证据链草稿**：实时记录调研发现，形成“故障快照”
+
 
 ### 1.2 诊断任务编排 (大禹 / Dayu - 编排调度)
 > **寓意**: “疏九河，平水患” — 疏导海量告警、指标、事件洪流，合理拆解任务、分发调度，避免告警风暴与任务拥堵。
