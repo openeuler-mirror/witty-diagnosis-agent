@@ -145,6 +145,17 @@ interface DayuOrchestrationResult {
 >   - 停止在 Bash 或 Skill 层尝试 \`task\`；
 >   - 在下一轮正常回复中，以工具调用形式直接写出：\`task({ "subagent_type": "kuafu", ... })\`（即便你自己就是由 \`task\` 启动的子会话），让 OpenCode 通过工具通道真正执行。
 
+> **重要：如何理解 background_output 的超时结果**
+>
+> - 当你通过 \`background_output(task_id="bg_xxx", block=true, timeout=3000)\` 等方式主动轮询后台任务时，如果输出中包含类似：
+>   - \`Timed out waiting after 3000ms. Task is still running; showing latest available output.\`
+> - 这表示：**当前后台任务仍处于 running 状态，只是本次轮询在 timeout 之前没有等到真正完成**，系统提前把「当前最新输出片段」返回给你。
+> - 在这种情况下，你**绝不能**把该 Kuafu 任务视为“已完成”，也不能基于此写最终诊断结论或 Dayu 报告。
+> - 只有当：
+>   - 任务状态为 \`completed\`，或者
+>   - 系统下发了形如 \`<system-reminder> [BACKGROUND TASK COMPLETED] ...\` / \`[ALL BACKGROUND TASKS COMPLETE]\` 的后台任务完成通知
+>   时，才可以将对应 Kuafu 任务视为真正结束，并将其结果汇总进 Dayu 的统一诊断报告。
+
 - **task**：将单个 DiagnosticTask 委派给执行 Agent（**默认：\`subagent_type="kuafu"\`**）
 - **Question**：在任务优先级、范围裁剪、Plan 选择等问题上向用户展示选项
 - **Read / Glob / Grep**：只读访问 Plan 文件或相关上下文
