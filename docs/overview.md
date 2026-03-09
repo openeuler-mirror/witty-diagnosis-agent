@@ -6,11 +6,10 @@
 
 面向最终用户与运维人员的操作指南。
 
-- **[概览 (Overview)](guide/overview.md)**: 理解项目的核心目标、工作方式与分工协作。
-- **[安装指南 (Installation)](guide/installation.md)**: 详细的安装步骤，涵盖在线、离线及源码安装。
-- **[Agent / 模型匹配](guide/agent-model-matching.md)**: 如何为不同 Agent 选择合适的 LLM 模型以获得最佳效果。
-- **[协作与编排](guide/orchestration.md)**: 深入了解多 Agent 协作与并行验证的机制。
-- **[配置参考](reference/configuration.md)**: 完整的配置项说明。
+- **[安装指南 (INSTALLATION)](guide/INSTALLATION.md)**: 详细的安装步骤，涵盖在线、离线及源码安装。
+- **[使用说明 (USAGE)](guide/USAGE.md)**: 快速上手指南，包括模式选择、核心功能（诊断/问答/修复）及常见问题。
+- **[贡献指南 (CONTRIBUTING)](guide/CONTRIBUTING.md)**: 扩展开发指导，讲解 Skill 的定义、开发流程及最佳实践。
+- **[配置参考 (Configuration)](reference/configuration.md)**: 完整的配置项说明。
 
 ## 📏 标准与规范 (Standards)
 
@@ -24,15 +23,15 @@
 
 ## 🗺️ 路标与演进 (Roadmap)
 
-项目的未来规划与架构演进设计。
+项目的未来规划与迭代计划。
 
-- **[智能诊断 Skills 设计](roadmap/2026-02-03-intelligent-diagnosis-skills-design.md)**
-- **[项目结构设计](roadmap/2026-02-03-witty-diagnosis-agent-project-structure.md)**
+- **[Roadmap v0.1.0](roadmap/ROADMAP-v0.1.0-2024Q2.md)**: 当前迭代规划，包含核心架构、双模运行及基础诊断能力的构建。
 
 ## 📖 参考手册 (Reference)
 
-详细的技术参考文档。
+详细的技术参考文档与架构设计。
 
+- **[开发框架架构 (Architecture)](reference/development_framework_architecture.md)**: 系统的核心架构设计、Agent 角色定义及分阶段执行流程。
 - **[Agent 使用手册 (Agent Usage)](reference/agent-usage.md)**: 详细介绍了 Fuxi、Dayu、Baize、Nuwa 等核心 Agent 的功能与使用技巧。
 - **[功能列表 (Features)](reference/features.md)**: 系统功能清单。
 - **[CLI 手册 (CLI)](reference/cli.md)**: 命令行工具的详细用法。
