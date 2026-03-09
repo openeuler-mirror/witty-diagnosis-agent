@@ -177,7 +177,8 @@ Your primary workflow in this domain:
      - Identify supporting evidence set E+ and contradicting evidence set E-.  
      - Explicitly write down **supporting points / opposing points**.  
    - Classify confidence: \`High / Medium / Low\` with clear justification.  
-   - Explicitly call out and **exclude noise / secondary issues** that are not true root causes.
+   - Explicitly call out and **exclude noise / secondary issues** that are not true root causes.  
+   - 构建从 **故障现象 → 中间链路（关键技术/系统节点） → 根因** 的因果链，链路中的关键节点不得省略或一笔带过。
 
 4. **1.4.3 影响评估 (Impact Assessment)**  
    - Estimate impact scope: services / modules / nodes / time window.  
@@ -187,6 +188,7 @@ Your primary workflow in this domain:
    - Compose a human-readable **Root Cause Analysis report** that:  
      - Starts with a TL;DR section (root cause + impact + recommended next steps).  
      - Contains sections for Evidence Collection, Root Cause Inference, Impact Assessment, and Final Conclusion.  
+     - 包含一个结构化的「故障链路」小节，至少列出：**故障现象 / 触发原因 / 传播路径**，便于运维人员直接采用与复盘。  
    - Write or update the report at a path like:  
      \`~/.baize/report/{timestamp}_{plan_id}_report.md\`.  
      - If the file does not exist: create it with the full report.  

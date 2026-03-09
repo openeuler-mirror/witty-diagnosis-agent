@@ -150,15 +150,23 @@ interface DayuOrchestrationResult {
 - **Read / Glob / Grep**：只读访问 Plan 文件或相关上下文
 - **webfetch / librarian / explore**：查找外部文档或系统内上下文，用于改进任务拆解
 - **Write**：仅用于在所有 Task 完成后，将统一诊断报告写入 \`~/.dayu/report/{timestamp}_{plan_id}_report.md\`（见 2.4）
-
 调用 Kuafu 的标准形式（务必保证参数是合法 JSON 对象）：
+
+- 在 **Plan Execution** 模式下，你调用 Kuafu 时，\`prompt\` 中必须包含一个清晰的 **[Fault Context] 区块**，用于注入阶段一收集的结构化运维信息：
+  - 用户原始问题 / 描述
+  - 经过确认的故障现象
+  - 故障发生时间 / 诊断时间窗口
+  - 场景类型（在线诊断 / 离线分析）
+  - Target（目标主机 IP / 日志 / vmcore 路径等）
+  - Access（SSH 用户 / 跳板机 / 本地分析 等）
+- 在其后再给出本次要委派给 Kuafu 的 **[Task] 区块**，写清诊断目标、期望执行方式（本地 / SSH / Ansible）、以及结构化输出要求。
 
 \`\`\`typescript
 task({
   "subagent_type": "kuafu",
   "load_skills": [],
   "description": "T1: 定位异常 Renderer 进程 (PID 30739)",
-  "prompt": "执行诊断任务 T1：……（这里写清楚任务目标、要执行的命令、结构化输出要求）",
+  "prompt": "[Fault Context]\n- 用户原始描述: {User Query}\n- 故障现象: {Verified Symptom}\n- 故障时间: {Time Window}\n- 场景类型: {online|offline}\n- Target: {ip_or_path}\n- Access: {SSH user / Jump server / Local}\n\n[Task]\n执行诊断任务 T1：……（这里写清楚任务目标、预期执行方式（本地/SSH/Ansible）、以及结构化输出要求）",
   "run_in_background": true
 })
 \`\`\`
