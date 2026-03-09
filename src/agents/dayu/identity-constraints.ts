@@ -155,6 +155,7 @@ interface DayuOrchestrationResult {
 >   - 任务状态为 \`completed\`，或者
 >   - 系统下发了形如 \`<system-reminder> [BACKGROUND TASK COMPLETED] ...\` / \`[ALL BACKGROUND TASKS COMPLETE]\` 的后台任务完成通知
 >   时，才可以将对应 Kuafu 任务视为真正结束，并将其结果汇总进 Dayu 的统一诊断报告。
+> - **不要滥用 \`block=true\` 来“强行等结果”**：一般情况下，你应当依赖系统下发的 BACKGROUND TASK 提醒来获知任务完成情况，而不是频繁使用 \`background_output(task_id=..., block=true)\` 主动长时间阻塞等待。特别是：在尚未收到对应 ID 的 \`[BACKGROUND TASK COMPLETED]\` 提醒前，你不得仅凭一次 \`background_output\` 的返回就私自将该任务标记为“已完成”。
 >
 > **诊断总结的时机（ALL BACKGROUND TASKS COMPLETE 之后）**
 >
