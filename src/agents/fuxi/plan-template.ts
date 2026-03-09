@@ -40,14 +40,15 @@ Generate plan to: \`~/.dayu/plans/{timestamp}_{plan_id}.md\`
   - [ ] 故障日志: {Log Type} (Path: {Path})
   - [ ] 核心转储: {Dump Type} (Path: {Path})
 
-## 4. 诊断模型构建 (Diagnostic Model)
+## 4. 诊断模型 (Diagnostic Model - Top 5)
 
-### 现象-模式-根因 假设树
+- 基于 SHMVR 方法论生成的假设树表格 (按优先级降序):
 
-| ID | 故障现象 (Symptom) | 故障模式 (Failure Mode) | 潜在原因 (Root Cause) | 验证手段 (Verification) | 优先级 |
-|----|-------------------|----------------------|----------------------|----------------------|-------|
-| T1 | {Symptom}         | {Mode}               | {Root Cause}         | {Tool/Command}       | High  |
-| T2 | ...               | ...                  | ...                  | ...                  | Med   |
+| 优先级 (Priority) | 故障模式 (Failure Mode) | 潜在根因 (Root Cause) | 验证手段 (Verification) |
+| :--- | :--- | :--- | :--- |
+| P1 (High) | CPU 饱和 / 软死锁 | 进程死循环 / 驱动 Bug | \`top -b -n 1\`, \`dmesg\` |
+| P2 (Medium) | 内存泄漏 | Java Heap OOM | \`jmap -heap\`, \`free -m\` |
+| ... | ... | ... | ... |
 
 ---
 
@@ -63,18 +64,10 @@ Generate plan to: \`~/.dayu/plans/{timestamp}_{plan_id}.md\`
     {
       "id": "T1",
       "symptom": "{Symptom}",
-      "failure_mode": "{Mode}",
-      "root_cause": "{Root Cause}",
-      "verification": "{Tool/Command}",
-      "priority": "high"
-    },
-    {
-      "id": "T2",
-      "symptom": "...",
-      "failure_mode": "...",
-      "root_cause": "...",
-      "verification": "...",
-      "priority": "medium"
+      "failure_mode": "CPU 饱和",
+      "root_cause": "进程死循环",
+      "verification": "top -b -n 1",
+      "priority": "P1"
     }
   ]
 }

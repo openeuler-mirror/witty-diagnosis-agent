@@ -1,32 +1,36 @@
 /**
  * Fuxi Plan Generation
  *
- * Phase 1.3: Preliminary Hypothesis Generation (初步假设生成)
+ * Phase 1.4: Diagnostic Model Construction (诊断模型构建)
  * 
  * Logic for matching knowledge base, generating hypotheses, and producing the diagnostic plan.
  */
 
-export const FUXI_PLAN_GENERATION = `# PHASE 1.3: 诊断模型构建 (Diagnostic Model Construction)
+export const FUXI_PLAN_GENERATION = `# PHASE 1.4: 诊断模型构建 (Diagnostic Model Construction)
 
 ## 触发条件 (Trigger Conditions)
 
-当所有必要信息（1.1 & 1.2）都已收集完毕，且准入检查 (Clearance Check) 通过时，进入此阶段。
+当所有必要信息（1.1 ~ 1.3）都已收集完毕，且准入检查 (Clearance Check) 与可行性评估 (Feasibility Assessment) 都通过时，进入此阶段。
 
 ## 核心流程 (Workflow)
 
 在生成最终方案之前，你必须执行以下思考过程：
 
-### 1. 假设生成 (Hypothesis Generation)
+### 1) 模型构建逻辑 (Model Logic)
+- **方法论指导 (Methodology)**:
+  - 核心思想: 现象驱动 → 假设收敛 → 验证闭环 (SHMVR 框架)。
+  - 构建原则:
+    - **MECE 原则**: 故障模式相互独立、整体穷尽。
+    - **层次限制**: 现象 → 模式 → 根因 (不超 3 层)。
+    - **优先顺序**: 优先高可能+低成本验证的假设。
+  - 收敛策略: 输出 **Top 5** 可能性最高的故障模型。
 
-基于收集到的信息，**构建“现象-模式-根因”假设树**。
+- **假设树生成 (Hypothesis Tree Generation)**:
+  - **根节点**: 故障现象 (Symptom, e.g., SSH 响应慢)
+  - **中间节点**: 故障模式 (Failure Mode, e.g., CPU 饱和 / 软死锁)
+  - **叶子节点**: 潜在根因 (Root Cause, e.g., 进程死循环 / 驱动 Bug)
 
-- **每个假设必须包含**：
-  - **故障模式 (Failure Mode)**: 例如 CPU 饱和、软死锁、OOM
-  - **潜在原因 (Root Cause)**: 例如 进程死循环、驱动 Bug、内存泄漏
-  - **验证手段 (Verification)**: 具体的命令或工具 (e.g., \`top\`, \`jmap\`)
-
-### 2. 生成诊断方案 (Generate Diagnostic Plan)
-
+### 2) 计划内容输出 (Plan Output)
 将上述思考整合成一份 **《诊断排查方案》**，保存为 \`~/.dayu/plans/{timestamp}_{plan_id}.md\`。
 
 ---
