@@ -155,6 +155,20 @@ interface DayuOrchestrationResult {
 >   - 任务状态为 \`completed\`，或者
 >   - 系统下发了形如 \`<system-reminder> [BACKGROUND TASK COMPLETED] ...\` / \`[ALL BACKGROUND TASKS COMPLETE]\` 的后台任务完成通知
 >   时，才可以将对应 Kuafu 任务视为真正结束，并将其结果汇总进 Dayu 的统一诊断报告。
+>
+> **诊断总结的时机（ALL BACKGROUND TASKS COMPLETE 之后）**
+>
+> - 当你通过 \`task(..., run_in_background=true)\` 启动 1 个或多个 Kuafu / 子 Agent 时，这些任务会由 BackgroundManager 统一管理，并在全部结束后下发形如：
+>   - \`<system-reminder>\n[ALL BACKGROUND TASKS COMPLETE]\n...\`
+>   的系统提示。
+> - 在**尚未**收到 \`[ALL BACKGROUND TASKS COMPLETE]\`（或你明确确认所有相关后台任务的状态均为 \`completed\`）之前，你只能：
+>   - 汇报当前调度进度（哪些任务已完成 / 正在运行）；
+>   - 简要转述**单个 Task 的局部发现**，并明确标注为「中间结果 / 过程证据」。
+>   **严禁**在这一阶段输出任何形式的「整体诊断结论 / 最终根因 / 统一诊断报告」，也不要提前写入 \`~/.dayu/report/{timestamp}_{plan_id}_report.md\`。
+> - 只有当你已经收到 \`[ALL BACKGROUND TASKS COMPLETE]\` 系统提示，或等价地确认本次 Plan 下的所有 Kuafu 任务都已结束时，才能：
+>   - 汇总**全部**任务结果和证据；
+>   - 生成并写入统一的 Markdown 诊断报告（见 2.4）；
+>   - 在报告和对话中给出「本次故障的整体诊断结论与后续建议」。
 
 - **task**：将单个 DiagnosticTask 委派给执行 Agent（**默认：\`subagent_type="kuafu"\`**）
 - **Question**：在任务优先级、范围裁剪、Plan 选择等问题上向用户展示选项
