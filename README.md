@@ -1,90 +1,151 @@
 # witty-diagnosis-agent
 
-witty-diagnosis-agent 是一个自动化诊断系统，旨在为复杂的系统问题提供标准化的分析和故障排除。当前版本兼容支持 **OpenCode** 运行环境。
+面向运维故障诊断的多 Agent 自动化诊断系统，围绕标准化流程组织协作分工，将“生成诊断计划、任务拆解、执行验证、根因分析、解决方案生成”串成可复用的执行链路。
 
-## 核心设计理念 (Core Philosophy)
+## 安装
 
-本方案严格遵循 **"发现→收集→定位→根因→方案→实施→验证"** 的标准化运维作业流程，结合**多模块协作 (Multi-Module)** 架构，实现全生命周期的自动化管理。
+### 1. 安装 OpenCode
 
-### 核心流程图解
+使用本项目之前，需要先安装 OpenCode：
 
-`1.问题输入/采集` → `2.收集信息` → `3.定位故障` → `4.分析根因` → `5.制定方案` → `6.实施修复` → `7.验证效果`
+- OpenCode 安装说明：https://opencode.ai/docs/zh-cn/#%E5%AE%89%E8%A3%85
 
-## 核心组件功能 (Core Components & Functions)
+### 2. 安装 witty-diagnosis-agent
 
-| 组件名称 | 功能描述 (Function) |
-| :--- | :--- |
-| **Commander** | **1. 发现问题 & 全局统筹**。作为系统入口接收告警或用户输入，初始化故障上下文，**路由请求**，**调度**各功能模块。 |
-| **Investigator** | **2. 收集信息 & 3. 定位故障**。**并发执行**多个采集任务收集数据，并按“应用→系统→网络→硬件”逻辑进行分层定位。 |
-| **Analyst** | **4. 分析根因**。基于收集的信息进行**逻辑分析**，确定 Root Cause。 |
-| **Strategist** | **5. 制定方案**。生成修复计划，包含临时止血措施和永久修复方案，并评估风险。 |
-| **Guardian** | **风险控制**。在 Step 5/6 阶段审查修复方案的风险，执行审批策略，防止二次故障。 |
-| **Operator** | **6. 实施修复**。执行 Strategist 制定的修复脚本（需通过 Guardian 审批）。 |
-| **Auditor** | **7. 验证效果**。执行冒烟测试 (Smoke Test) 和指标回归检查。 |
+在 OpenCode 环境就绪后，你可以选择以下两种方式之一来安装 `witty-diagnosis-agent`：
 
-## 功能扩展机制 (Functional Extensibility)
+**方式 A：通过 Agent 自动化安装（推荐）**
 
-系统支持高度的扩展性，允许在标准流程中灵活插入或替换**功能插件**。
+把下面这段提示词直接发给你的 OpenCode Agent，它会自动完成下载与配置：
 
-### 1. 阶段扩展 (Phase Extensions)
-支持在任意标准阶段（如 `Investigator` 之后，`Analyst` 之前）挂载**自定义插件 (Hook Plugins)**。
-*   **用途**: 针对特定技术栈（如 Redis, Kafka）增加专用的信息收集或分析步骤。
-*   **机制**: **执行引擎**会自动检测并执行注册的 `pre-step` 或 `post-step` **扩展插件**。
-
-### 2. 端到端接管 (End-to-End Override)
-支持跳过标准的 7 步流程，直接调用专用的**端到端流程 (Dedicated Workflows)**。
-*   **用途**: 针对已知的高频特定故障模式（如 "K8s Pod OOM" 或 "MySQL 死锁"），直接执行固化的诊断与修复剧本。
-*   **机制**: `Commander` 在第一步识别场景后，可直接路由至**专用流程**，绕过通用的分层排查流程。
-
-
-
-
-## 安装与使用 (Installation & Usage)
-
-### 前置要求 (Prerequisites)
-
-本系统依赖 **OpenCode** 运行时环境。请参考 [OpenCode 官方文档](https://github.com/anomalyco/opencode) 完成安装。
-
-### 安装 (Installation)
-
-推荐使用 `bunx` 或 `npx` 进行快速安装：
-
-```bash
-bunx witty-diagnosis-agent install # recommended
-# or
-npx witty-diagnosis-agent install
+```
+Install and configure witty-diagnosis-agent by following the instructions here:
+https://atomgit.com/openeuler/witty-diagnosis-agent/tree/master/docs/reference/witty-diagnosis-installation.md
 ```
 
-### 快速开始 (Quick Start)
+**方式 B：手动安装**
 
-通过 CLI 交互，体验基于核心组件协作的全流程诊断：
+如果你更习惯手动操作或进行本地调试，请参考详细文档：[手动安装指南](docs/guide/installation.md)。
 
-1.  **启动诊断 (Commander)**
-    初始化故障上下文，自动触发信息收集：
-    ```bash
-    witty-diagnosis start --incident-id <ID> --desc "API响应慢"
-    ```
-    *系统将调度 `Investigator` 并行采集数据，并由 `Analyst` 产出根因分析报告。*
+### 3. 验证安装
 
-2.  **审批修复方案 (Guardian)**
-    当 `Strategist` 生成修复方案后，系统会暂停并等待确认：
-    ```bash
-    witty-diagnosis approve --plan-id <PLAN_ID>
-    ```
-    *`Guardian` 组件将拦截所有高危操作，确保人工确认后才由 `Operator` 执行修复。*
+安装完成后，请在 Shell 终端执行以下命令验证是否成功：
 
-3.  **验证结果 (Auditor)**
-    修复完成后，自动运行回归测试：
-    ```bash
-    witty-diagnosis verify --incident-id <ID>
-    ```
-    *由 `Auditor` 确认核心指标恢复基线。*
+```bash
+witty-diagnosis-agent -V
+# 预期输出：
+# 1.0.0
+```
+
+## 架构与组件
 
 
+详细架构设计请参阅：[Overview](docs/guide/overview.md) | [Orchestration](docs/guide/orchestration.md)
 
-## 功能扩展 (Extending Functionality)
-参考前文“功能扩展机制”，编写自定义插件配置。
+## 运行模式与 Agents
 
+为实现精准的故障诊断，系统采用了**四层多 Agent 协作**架构，从诊断规划、任务编排、根因分析到方案修复，通过专职分工模拟资深运维团队的排查链路。
 
+### Agent 分层体系
 
+我们以中国神话命名各阶段 Agent，按职责划分为四个核心层次：
 
+#### 1. 诊断规划层 (Diagnosis Planning)
+负责故障的顶层认知、上下文理解及全局战略制定。
+- **伏羲 (Fuxi)**: **诊断规划**。识别故障场景，澄清上下文，生成标准诊断计划 (Plan)。
+
+#### 2. 任务编排与执行层 (Task Orchestration & Execution)
+负责将高层计划转化为计算机可执行的指令序列，并执行具体的现场数据采集与验证。
+- **大禹 (Dayu)**: **任务编排**。解析计划，拆解任务，并行调度执行 Agent。
+- **夸父 (Kuafu)**: **执行验证**。追踪线索，执行通用工具 (Skill) 进行数据采集与验证。
+
+#### 3. 根因分析层 (Root Cause Analysis)
+负责深度逻辑推理与证据链关联，穿透表象定位根本原因。
+- **白泽 (Baize)**: **根因分析**。穿透表象推理根因，关联证据链，生成最终报告。
+
+#### 4. 方案修复层 (Remediation & Repair)
+负责故障处理的闭环，生成并实施修复方案。
+- **女娲 (Nuwa)**: **方案修复**。(可选) 生成修复方案，修补系统裂痕。
+
+### 运行模式
+
+为满足不同运维场景，系统设计了两种运行模式。
+
+#### 1. 分阶段交互模式 (Interactive Mode)
+**适用场景**：疑难故障排查，需要专家介入确认关键决策（推荐默认）。
+
+- **使用流程**：
+  1. 用户触发诊断。
+  2. **伏羲** 生成计划 -> **暂停** -> 专家审核。
+  3. **大禹** 任务编排与执行 -> **暂停** -> 专家确认结果。
+  4. **白泽** 生成报告 -> **暂停** -> 专家确认根因。
+  5. **女娲** (可选) 生成修复方案 -> **暂停** -> 专家确认执行。
+
+#### 2. 全自动端到端模式 (End-to-End Mode)
+**适用场景**：标准化故障自动检测与修复。
+
+- **使用方式**（任选其一）：
+  1. **关键指令触发**：使用 `autopilot` 关键字（如 "autopilot 排查..."）。
+  2. **特定 Agent**：直接呼叫 **Xuanyuan (轩辕)**。
+- **执行流程**：
+  - 触发 -> **伏羲** 规划 -> **大禹** 编排与执行 -> **白泽** 分析 -> **女娲** (可选) 修复 -> 输出报告。
+
+## 使用说明
+
+1. **选择 Agent**：在 OpenCode 中选择具体的 Agent（如 **Fuxi/Dayu**）。
+2. **输入故障诊断**：描述故障现象（如 "排查 API 响应超时"），Agent 将自动启动诊断流程。
+
+![alt text](docs/assets/699631f4-b818-4512-b606-845c2ffd6fac.png)
+
+更详细的每个 Agent 的使用说明，请参考对应的文档：
+- [Features](docs/reference/features.md)
+- [CLI](docs/reference/cli.md)
+- [Configuration](docs/reference/configuration.md)
+
+- **安装插件**：参考上文安装步骤。
+- **触发诊断**：在 OpenCode 中直接使用自然语言描述故障（如“排查 API 响应慢”）。
+- **查看报告**：诊断完成后会自动生成 Markdown 报告。
+
+## 扩展开发
+
+OpenCode 支持通过 **Skills** 和 **MCP (Model Context Protocol)** 进行灵活扩展。详细扩展方式请参阅：[Skill 接口规范](docs/standards/skill-interfaces.md)
+
+### 1. Skills 扩展 (自定义能力)
+Skills 是特定的任务指令集，支持 Markdown 格式定义。
+
+- **存放位置**：
+  - **项目级**：`.opencode/skills/*.md` (仅当前项目可用)
+  - **全局级**：`~/.opencode/skills/*.md` (所有项目可用)
+
+- **定义示例** (`hello.md`)：
+  ```markdown
+  ---
+  name: hello
+  description: Say hello to the user
+  ---
+  # Instruction
+  When the user says hello, reply with a friendly greeting and the current time.
+  ```
+
+### 2. MCP 扩展 (外部工具集成)
+支持集成标准 MCP Server，赋予 Agent 操作外部系统（如数据库、API）的能力。
+
+- **配置方式**：在 Skill 的 Frontmatter 中添加 `mcp` 配置。
+- **示例** (集成 SQLite MCP)：
+  ```markdown
+  ---
+  name: database-tool
+  description: Access local SQLite database
+  mcp:
+    sqlite:
+      command: uvx
+      args:
+        - mcp-server-sqlite
+        - --db-path
+        - ./my-data.db
+  ---
+  You can now use the `sqlite` tool to query the database.
+  ```
+## 故障排查
+
+遇到问题？请查看：[Troubleshooting](docs/troubleshooting/opencode.md)

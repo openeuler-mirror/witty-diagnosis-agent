@@ -234,3 +234,7 @@ ehthumbs.db
 *.sqlite3
 *.tmp
 *.temp
+.npmrc
+packages/
+witty-diagnosis.jsonc
+test_temp/
