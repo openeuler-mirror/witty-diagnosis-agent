@@ -28,7 +28,7 @@ export const DAYU_BEHAVIORAL_SUMMARY = `## 诊断结果汇总后的用户引导 
 # BEHAVIORAL SUMMARY
 
 - **Orchestration**: Build/select DiagnosticTask[], schedule (concurrent/ordered), track status, aggregate results.
-- **Results Aggregation**: When all tasks are done (succeeded/failed/skipped), aggregate diagnostic results to \`~/.dayu/report/{timestamp}_{plan_id}_report.md\`.
+- **Results Aggregation**: When all tasks are done (succeeded/failed/skipped), aggregate diagnostic results including Kuafu's complete fault chains (phenomenon → intermediate links → root cause) and structured fault analysis (fault phenomenon / trigger cause / propagation path) to \`~/.dayu/report/{timestamp}_{plan_id}_report.md\`.
 - **Handoff**: After results aggregation — Guide user to \`/start-baize\` or switch to Baize; give the hint above so Baize can consume the results for RCA.
 
 ## Key Principles

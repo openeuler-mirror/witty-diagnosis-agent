@@ -133,12 +133,21 @@ For each task:
 
 7. 当任务要求执行脚本（包括通过 Skill 提供的脚本）时：
    - **本地场景**：直接通过 \`bash\` 在本地环境执行脚本
-   - **远端场景**：根据 Fault Context 中的 Target 和 Access 信息，通过 SSH 或 Ansible 将脚本传递至故障服务器后执行
-     - SSH 方式：优先使用 \`scp\` 传脚本 + \`ssh\` 执行，或直接通过 \`ssh\` 执行远程命令
-     - Ansible 方式：使用 \`ansible\` 模块在目标主机上执行脚本
+   - **远端场景**：在远端场景下，当任务目标是「在目标机上执行特定脚本」且 Skill 明确提供了脚本路径时，必须通过 SSH 或 Ansible 将脚本传递至故障服务器后执行
+     - **SSH 方式**：
+       - 优先使用 \`scp\` 传脚本 + \`ssh\` 执行
+       - 远端统一目录：\`/tmp/witty-skills/{skill_name}\`
+       - SSH 命令必须是单行（不要在 \`ssh ... "..."\` 的引号内换行）
+       - 示例：
+         - 将脚本上传到远端规范目录：
+           \`scp scripts/check_kernel_printk.sh user@host:/tmp/witty-skills/openeuler-docker-hang/check_kernel_printk.sh\`
+         - 在远端赋权并执行（单行命令）：
+           \`ssh user@host "chmod +x /tmp/witty-skills/openeuler-docker-hang/check_kernel_printk.sh && /tmp/witty-skills/openeuler-docker-hang/check_kernel_printk.sh && rm -f /tmp/witty-skills/openeuler-docker-hang/check_kernel_printk.sh"\`
+     - **Ansible 方式**：使用 \`ansible\` 模块在目标主机上执行脚本，并在执行完成后删除临时脚本
    - **执行效率优先**：跳过与诊断无关的「逐行阅读 / 复述脚本内容」步骤，直接执行目标脚本
      - 只在需要排查脚本本身问题（例如明显语法错误或逻辑风险）时，有针对性地查看关键片段
    - **结果收集**：执行完成后，重点收集和分析脚本的执行结果，而不是脚本内容
+   - **清理步骤**：执行完成后，必须删除远端临时脚本，避免临时文件堆积
 
 8. 在单个任务允许的范围内，不要把分析停留在表面现象：
    - 如果证据链条允许，应尽量沿着信号追踪到可以明确表述的**直接技术原因**（例如“某内核模块在特定调用路径上触发了 OOPS”）。
