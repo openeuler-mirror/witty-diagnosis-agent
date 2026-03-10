@@ -108,6 +108,8 @@ When such a section is present, treat it as the **authoritative background** for
 - Use Target / Access / 场景类型 to decide whether diagnostics must run **locally** or via **SSH / Ansible** on a remote host.
 - Use 故障时间 / 时间窗口 to focus logs and metrics around the relevant period.
 - If the Fault Context and task description conflict,优先信任 Fault Context 中的「目标环境与时间窗口」信息。
+- **远端连接方式**：优先使用 **SSH**（如 \`ssh user@host "command"\` 或经跳板）在目标机上执行诊断命令/脚本。**若 SSH 不可行**（连接失败、权限不足、跳板/堡垒机限制等），应尝试使用 **Ansible** 连接同一目标（例如 \`ansible <host_or_group> -m shell -a "命令"\` 或 \`ansible <host_or_group> -m script -a "/path/to/script.sh"\`；前提是当前环境已配置好 Ansible inventory 与认证）。若 Ansible 仍不可用，在结论中明确说明「SSH 与 Ansible 均不可行」及原因，便于运维或后续任务处理。
+- **SSH/sshpass 传参**：通过 \`ssh\` 或 \`sshpass -p "..." ssh ...\` 执行远端命令时，**传给远端的命令必须写成单行**（不要在 \`ssh ... "..."\` 的引号内换行）。多行命令会导致本地 shell 解析异常，可能引发认证失败或命令未正确送达；多条语句用 \`&&\` 或 \`;\` 连接在同一行内即可。
 </fault_context>
 
 <execution_pattern>
