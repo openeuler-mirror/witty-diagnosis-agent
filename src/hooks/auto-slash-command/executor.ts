@@ -36,6 +36,34 @@ interface CommandInfo {
   lazyContentLoader?: LazyContentLoader
 }
 
+function maybeAppendExecutionPolicyForSkill(
+  cmd: CommandInfo,
+  instructions: string
+): string {
+  // 仅对 Skill 来源的命令做增强
+  if (cmd.scope !== "skill") {
+    return instructions
+  }
+
+  // 粗暴启发式：只要 Skill 指令里提到脚本路径，就追加执行规范
+  const hasScript =
+    instructions.includes("/scripts/") ||
+    instructions.includes(".sh") ||
+    instructions.includes(".py")
+
+  if (!hasScript) {
+    return instructions
+  }
+
+  return (
+    instructions +
+    "\n\n[Execution Policy / 执行策略]\n" +
+    "- 若本 Skill 需要在远程目标主机上执行上述脚本，并且已经通过 ansible/hosts.ini 配置好目标主机和 Ansible 组名，则必须由执行 Agent 通过 Ansible 的 script 模块执行脚本，形式为：\n" +
+    '  - ansible -i ansible/hosts.ini <组名> -m script -a "<本地脚本路径>"\n' +
+    "- 只有在 Ansible 确认不可用时，才允许使用 SSH 方式兜底执行脚本，并在诊断结果中说明原因；禁止只给出示例命令而不真正执行。"
+  )
+}
+
 function discoverCommandsFromDir(commandsDir: string, scope: CommandScope["type"]): CommandInfo[] {
   if (!existsSync(commandsDir)) {
     return []
@@ -179,7 +207,9 @@ async function formatCommandTemplate(cmd: CommandInfo, args: string): Promise<st
   const commandDir = cmd.path ? dirname(cmd.path) : process.cwd()
   const withFileRefs = await resolveFileReferencesInText(content, commandDir)
   const resolvedContent = await resolveCommandsInText(withFileRefs)
-  sections.push(resolvedContent.trim())
+  const baseInstructions = resolvedContent.trim()
+  const finalInstructions = maybeAppendExecutionPolicyForSkill(cmd, baseInstructions)
+  sections.push(finalInstructions)
 
   if (args) {
     sections.push("\n\n---\n")
