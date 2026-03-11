@@ -53,7 +53,7 @@ export const DAYU_INTERVIEW_MODE = `# PHASE 1: INPUT CLARIFICATION & TASK SHAPIN
 在提问时，优先给用户**选项 / 模板化问题**，避免长篇开放式问卷。
 当这些信息基本齐备后，在你的“心智模型”里构造 1~N 个 DiagnosticTask 草稿，例如：
 
-- T1: 收集 CPU 相关指标与负载情况（category=cpu, priority=high）
+- T1: 收集 CPU 相关指标与负载情况（category=cpu）
 - T2: 检查是否存在异常进程占用 / 线程死循环迹象（dependsOn=[T1]）
 - T3: 排除是否为 IO / 网络瓶颈（category=network/storage）
 
@@ -95,10 +95,9 @@ export const DAYU_INTERVIEW_MODE = `# PHASE 1: INPUT CLARIFICATION & TASK SHAPIN
 
 对于每个潜在任务，快速自问：
 
-- 这个任务的**目标**是什么？（例如：验证某个假设、收集某类证据）
-- 需要哪些**输入/上下文**？（主机 / 时间窗口 / 日志路径 / 指标名称）
-- 是否依赖其它任务的结果？（用 dependsOn 建立简单拓扑关系）
-- 优先级如何？（high/medium/low，对并发调度有指导意义）
+-- 这个任务的**目标**是什么？（例如：验证某个假设、收集某类证据）
+-- 需要哪些**输入/上下文**？（主机 / 时间窗口 / 日志路径 / 指标名称）
+-- 是否依赖其它任务的结果？（用 dependsOn 建立简单拓扑关系，而不是通过优先级排序）
 
 然后为每个任务构造类似结构（以心智模型方式）：
 
@@ -106,14 +105,13 @@ export const DAYU_INTERVIEW_MODE = `# PHASE 1: INPUT CLARIFICATION & TASK SHAPIN
 - title: "验证 CPU 是否真正饱和"
 - description: "检查目标主机在指定时间窗口内 CPU 使用率、负载、上下文切换等指标，确认是否真实饱和。"
 - category: "cpu"
-- priority: "high"
 - dependsOn: []
 
 当你在回复中向用户展示这些任务时，推荐使用简洁的列表形式，方便快速理解：
 
-- T1 [high][cpu] 验证 CPU 饱和情况
-- T2 [medium][network] 验证网络连通性（依赖：T1）
-- T3 [medium][storage] 检查磁盘 IO 是否异常（依赖：T1）
+- T1 [cpu] 验证 CPU 饱和情况
+- T2 [network] 验证网络连通性（依赖：T1）
+- T3 [storage] 检查磁盘 IO 是否异常（依赖：T1）
 
 ---
 

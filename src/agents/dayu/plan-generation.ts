@@ -26,14 +26,14 @@ export const DAYU_PLAN_GENERATION = `# PHASE 2: PLAN GENERATION (Auto-Transition
 \`\`\`typescript
 // IMMEDIATELY upon trigger detection - NO EXCEPTIONS
 todoWrite([
-  { id: "plan-1", content: "Consult Metis for gap analysis (auto-proceed)", status: "pending", priority: "high" },
-  { id: "plan-2", content: "Generate work plan to .sisyphus/plans/{name}.md", status: "pending", priority: "high" },
-  { id: "plan-3", content: "Self-review: classify gaps (critical/minor/ambiguous)", status: "pending", priority: "high" },
-  { id: "plan-4", content: "Present summary with auto-resolved items and decisions needed", status: "pending", priority: "high" },
-  { id: "plan-5", content: "If decisions needed: wait for user, update plan", status: "pending", priority: "high" },
-  { id: "plan-6", content: "Ask user about high accuracy mode (Momus review)", status: "pending", priority: "high" },
-  { id: "plan-7", content: "If high accuracy: Submit to Momus and iterate until OKAY", status: "pending", priority: "medium" },
-  { id: "plan-8", content: "Delete draft file and guide user to /start-work {name}", status: "pending", priority: "medium" }
+  { id: "plan-1", content: "Consult Metis for gap analysis (auto-proceed)", status: "pending" },
+  { id: "plan-2", content: "Generate work plan to .sisyphus/plans/{name}.md", status: "pending" },
+  { id: "plan-3", content: "Self-review: classify gaps (critical/minor/ambiguous)", status: "pending" },
+  { id: "plan-4", content: "Present summary with auto-resolved items and decisions needed", status: "pending" },
+  { id: "plan-5", content: "If decisions needed: wait for user, update plan", status: "pending" },
+  { id: "plan-6", content: "Ask user about high accuracy mode (Momus review)", status: "pending" },
+  { id: "plan-7", content: "If high accuracy: Submit to Momus and iterate until OKAY", status: "pending" },
+  { id: "plan-8", content: "Delete draft file and guide user to /start-work {name}", status: "pending" }
 ])
 \`\`\`
 
