@@ -108,9 +108,9 @@ When such a section is present, treat it as the **authoritative background** for
 - Use Target / Access / 场景类型 to decide whether diagnostics must run **locally** or via **Ansible / SSH** on a remote host。
 - Use 故障时间 / 时间窗口 to focus logs and metrics around the relevant period.
 - If the Fault Context and task description conflict,优先信任 Fault Context 中的「目标环境与时间窗口」信息。
-- **远端连接方式（先配置 Inventory，再只用 Ansible）**：
-  - 当 [Fault Context] 或用户消息中给出**远端主机的 IP / 用户名 / 密码**时，你必须**先**用 Read 检查 \`ansible/hosts.ini\`，若该主机尚未在对应组下，则用 Write/Bash 将条目（\`<IP> ansible_user=<用户名> ansible_ssh_pass=<密码>\`）写入 \`ansible/hosts.ini\` 的合适组（组名仅用字母、数字、下划线，如 \`session_cache_server\`，勿用连字符），**然后**所有远端诊断一律使用 \`ansible -i ansible/hosts.ini <组名>\` 执行，**禁止**在未先配置 inventory 的情况下使用 \`sshpass -p "密码" ssh ...\` 等将密码写在命令行中的方式。
-  - 在远端诊断场景下，应**优先通过 Ansible** 在目标主机上执行命令/脚本；仅当 Ansible 明确不可用（命令不存在、认证失败且无法通过更新 inventory 解决）时，才在结论中说明原因并退回到 SSH，且不得在对话或命令中明文暴露密码。
+- **远端连接方式（先配置 Inventory，优先使用 Ansible）**：
+  - 当 [Fault Context] 或用户消息中给出**远端主机的 IP / 用户名 / 密码**时，你必须**先**用 Read 检查 \`ansible/hosts.ini\`，若该主机尚未在对应组下，则用 Write/Bash 将条目（\`<IP> ansible_user=<用户名> ansible_ssh_pass=<密码>\`）写入 \`ansible/hosts.ini\` 的合适组（组名仅用字母、数字、下划线，如 \`session_cache_server\`，勿用连字符），**然后**所有远端诊断优先使用 \`ansible -i ansible/hosts.ini <组名>\` 执行。
+  - 在远端诊断场景下，**必须优先通过 Ansible** 在目标主机上执行命令/脚本，特别是执行 Skill 脚本时，必须使用 \`script\` 模块；仅当 Ansible 实在执行不了的情况下（例如 Ansible 命令不存在、inventory 配置失败、认证失败且无法修复），才可以考虑使用 SSH 方式，并在结论中说明原因，且不得在对话或命令中明文暴露密码。
 - **SSH/sshpass 传参**（仅在不得不用 SSH 时适用）：通过 \`ssh\` 或 \`sshpass -p "..." ssh ...\` 执行远端命令时，**传给远端的命令必须写成单行**（不要在 \`ssh ... "..."\` 的引号内换行）。多行命令会导致本地 shell 解析异常，可能引发认证失败或命令未正确送达；多条语句用 \`&&\` 或 \`;\` 连接在同一行内即可。
 </fault_context>
 
@@ -135,30 +135,26 @@ For each task:
 
 7. 当任务要求执行脚本（包括通过 Skill 提供的脚本）时：
    - **本地场景**：直接通过 \`bash\` 在本地环境执行脚本。
-   - **远端场景（统一优先 Ansible）**：在远端场景下，当任务目标是「在目标机上执行特定脚本」且 Skill 明确提供了脚本路径时，必须通过 **Ansible** 将脚本传递至故障服务器后执行，SSH 仅作为兜底方案。
-     - **Ansible 方式（推荐 & 默认）**：
-       - 远端统一临时目录：\`/tmp/witty-skills/{skill_name}\`。
+   - **远端场景（优先使用 Ansible script 模块）**：在远端场景下，当任务目标是「在目标机上执行特定脚本」且 Skill 明确提供了脚本路径时，**必须优先**使用 Ansible 的 \`script\` 模块将本地脚本远程执行到服务器上。
+     - **Ansible script 模块执行要求**：
        - Inventory 约定：使用仓库内唯一的 \`ansible/hosts.ini\`，并在 \`Access\` 中提供主机组名（由上游给定或根据场景自取，如 \`<组名>\`）。
-       - 可以通过 \`ansible\` 的 \`copy\` + \`shell\` 组合，或 \`script\` 模块来执行 Skill 脚本，例如（以 \`openeuler-docker-hang\` Skill 为例）：
-         - 使用 \`script\` 模块直接传输并执行本地脚本（\`<组名>\` 由上游给定或你根据场景自取）：
-           \`ansible -i ansible/hosts.ini <组名> -m script -a ".opencode/skills/openeuler-docker-hang/scripts/check_kernel_printk.sh"\`
-         - 或使用 \`copy\` 上传脚本并赋权：
-           \`ansible -i ansible/hosts.ini <组名> -m copy -a "src=.opencode/skills/openeuler-docker-hang/scripts/check_kernel_printk.sh dest=/tmp/witty-skills/openeuler-docker-hang/check_kernel_printk.sh mode=0755"\`
-         - 再用 \`shell\` 在远端执行并清理脚本（单行命令）：
-           \`ansible -i ansible/hosts.ini <组名> -m shell -a "chmod +x /tmp/witty-skills/openeuler-docker-hang/check_kernel_printk.sh && /tmp/witty-skills/openeuler-docker-hang/check_kernel_printk.sh && rm -f /tmp/witty-skills/openeuler-docker-hang/check_kernel_printk.sh"\`
+       - **强制使用 script 模块**：必须使用 \`ansible -i ansible/hosts.ini <组名> -m script -a "<本地脚本路径>"\` 的形式执行 Skill 脚本，例如（以 \`openeuler-docker-hang\` Skill 为例）：
+         - \`ansible -i ansible/hosts.ini <组名> -m script -a ".opencode/skills/openeuler-docker-hang/scripts/check_kernel_printk.sh"\`
+       - **严格执行 Skill 流程**：如果 Skill 的流程里指定了使用工具或者脚本来完成操作，**必须严格执行**，不得自行修改执行方式。
        - 所有 Ansible 调用都应通过 OpenCode 的 \`bash\` 工具真实执行，不得只在回答中给出“示例命令”而不执行。
-     - **SSH 方式（仅在 Ansible 不可用时）**：
-       - 统一仍使用 \`/tmp/witty-skills/{skill_name}\` 作为远端临时目录。
+     - **SSH 方式（仅在 Ansible 不可用时）**：只有在 Ansible 实在执行不了的情况下（例如 Ansible 命令不存在、inventory 配置失败、认证失败且无法修复），才可以考虑使用 SSH 方式执行脚本。
+       - 统一使用 \`/tmp/witty-skills/{skill_name}\` 作为远端临时目录。
        - 通过 \`scp\` 传脚本 + \`ssh\` 执行，且 SSH 命令必须是单行（不要在 \`ssh ... "..."\` 的引号内换行）。
        - 示例：
          - 将脚本上传到远端规范目录：
-           \`scp scripts/check_kernel_printk.sh user@host:/tmp/witty-skills/openeuler-docker-hang/check_kernel_printk.sh\`
+           \`scp .opencode/skills/openeuler-docker-hang/scripts/check_kernel_printk.sh user@host:/tmp/witty-skills/openeuler-docker-hang/check_kernel_printk.sh\`
          - 在远端赋权并执行（单行命令）：
            \`ssh user@host "chmod +x /tmp/witty-skills/openeuler-docker-hang/check_kernel_printk.sh && /tmp/witty-skills/openeuler-docker-hang/check_kernel_printk.sh && rm -f /tmp/witty-skills/openeuler-docker-hang/check_kernel_printk.sh"\`
+
    - **执行效率优先**：跳过与诊断无关的「逐行阅读 / 复述脚本内容」步骤，直接执行目标脚本。
      - 只在需要排查脚本本身问题（例如明显语法错误或逻辑风险）时，有针对性地查看关键片段。
    - **结果收集**：执行完成后，重点收集和分析脚本的执行结果，而不是脚本内容。
-   - **清理步骤**：执行完成后，必须删除远端临时脚本（无论通过 Ansible 还是 SSH），避免临时文件堆积。
+   - **清理步骤**：使用 Ansible 的 script 模块执行脚本时，临时文件会自动清理；使用 SSH 方式时，必须在执行完成后删除远端临时脚本，避免临时文件堆积。
 
 8. 在单个任务允许的范围内，不要把分析停留在表面现象：
    - 如果证据链条允许，应尽量沿着信号追踪到可以明确表述的**直接技术原因**（例如“某内核模块在特定调用路径上触发了 OOPS”）。
