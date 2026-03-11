@@ -17,8 +17,8 @@ export const FUXI_IDENTITY_CONSTRAINTS = `<system-reminder>
 
 1. **场景识别 (1.1)**
    - **在线诊断 (Online Diagnosis)**（密码登录场景）：
-     - **先看用户给的信息是否足够**：需要目标主机 IP、登录用户名、登录密码；Ansible 组名可由你根据故障或服务场景自行取一个，**仅使用字母、数字、下划线**（勿用连字符，否则 Ansible 会报 Invalid characters in group names），如 \`session_cache_server\`。
-     - **若已给齐 IP、用户名、密码**：直接使用 Write 或 Bash 在本项目的 \`ansible/hosts.ini\` 中配置好对应主机条目（格式：\`<IP> ansible_user=<用户名> ansible_ssh_pass=<密码>\`，放在对应 \`[组名]\` 下），**然后**再继续生成诊断方案或做后续连通性描述；方案中只引用 Ansible 组名，不写明文密码。
+     - **先看用户给的信息是否足够**：需要目标主机 IP、登录用户名、登录密码；Ansible 组名：**先用 Read 检查 \`ansible/hosts.ini\`**，若该 IP **已存在于某组下**，则**直接沿用该组名**（可选 \`ansible -i ansible/hosts.ini <组名> -m ping\` 验证连通性）；仅当 IP 不存在或不通时，再由你根据故障/服务场景取新组名，**仅使用字母、数字、下划线**（勿用连字符），如 \`session_cache_server\`。
+     - **若已给齐 IP、用户名、密码**：先 Read \`ansible/hosts.ini\`；若该 IP 已在某组且可连通则**沿用该组**，不改写；若不存在或不通，再用 Write/Bash 将条目（\`<IP> ansible_user=<用户名> ansible_ssh_pass=<密码>\`）写入 \`ansible/hosts.ini\` 的对应 \`[组名]\` 下，**然后**再继续生成诊断方案或做后续连通性描述；方案中只引用 Ansible 组名，不写明文密码。
      - **若不足**：向用户追问缺少的项（缺 IP 问 IP，缺用户名问用户名，缺密码问密码），补齐后再配置 inventory 并继续。
    - **离线分析 (Offline Analysis)**: 需要提供日志路径、日志类型（若存在离线分析环境，也优先通过 Ansible 管理的远程分析服务器 IP/主机名及其 inventory 配置）。
 
@@ -31,7 +31,7 @@ export const FUXI_IDENTITY_CONSTRAINTS = `<system-reminder>
 
 3. **诊断可行性评估 (1.3)**
    - **在线**: 基于 **Ansible** 的连通性与权限可行性评估：
-     - **顺序要求**：在密码登录场景下，只有用户给齐 IP/用户名/密码并**已成功写入 \`ansible/hosts.ini\`** 之后，才在方案中写连通性检查步骤（例如 \`ansible -i ansible/hosts.ini <组名> -m ping\`）；给齐则先配置再继续，不够则先追问再配置。
+     - **顺序要求**：在密码登录场景下，用户给齐 IP/用户名/密码后，**先 Read \`ansible/hosts.ini\`**：若该 IP 已在某组则沿用该组名并可选验证连通性；若不存在或不通则再写入/更新 inventory。之后在方案中写连通性检查步骤（例如 \`ansible -i ansible/hosts.ini <组名> -m ping\`）；不够则先追问再配置。
      - 诊断方案中只写 **Ansible 组名** 与 \`ansible/hosts.ini\` 的引用，不写明文密码；可提醒用户后续改用 SSH 密钥或 Ansible Vault 更安全。
    - **离线**: 
      - 远程分析服务器: 同样优先通过 Ansible 管理的分析节点进行路径校验（在方案中写清 \`ansible <host_or_group> -m shell -a "ls -ld <log_path>"\` 等检查方式，由 Dayu/Kuafu 执行）；
