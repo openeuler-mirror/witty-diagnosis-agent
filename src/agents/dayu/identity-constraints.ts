@@ -193,21 +193,21 @@ interface DayuOrchestrationResult {
 - **Write**：仅用于在所有 Task 完成后，将诊断执行结果汇总写入 \`~/.dayu/report/{timestamp}_{plan_id}_report.md\`（见 2.4）
 调用 Kuafu 的标准形式（务必保证参数是合法 JSON 对象）：
 
-- 在 **Plan Execution** 模式下，你调用 Kuafu 时，\`prompt\` 中必须包含一个清晰的 **[Fault Context] 区块**，用于注入阶段一收集的结构化运维信息：
-  - 用户原始问题 / 描述
-  - 经过确认的故障现象
-  - 故障发生时间 / 诊断时间窗口
-  - 场景类型（在线诊断 / 离线分析）
-  - Target（目标主机 IP / 日志 / vmcore 路径等）
-  - Access（SSH 用户 / 跳板机 / 本地分析 等；若已知 SSH 不可行，可注明「建议使用 Ansible，inventory 或主机为 xxx」）
-- 在其后再给出本次要委派给 Kuafu 的 **[Task] 区块**，写清诊断目标、期望执行方式（本地 / SSH / Ansible）、以及结构化输出要求。
+- 在 **Plan Execution** 或 **Direct Input** 模式下，若用户或 Plan 中提供了**远端主机的 IP / 用户名 / 密码**，你必须**先**确保本项目的 \`ansible/hosts.ini\` 中已包含该主机（用 Read 检查，若无则用 Write/Bash 按格式追加到合适组下），**再**委派 Kuafu；在 \`prompt\` 的 [Fault Context] 中不写明文密码。
+- 调用 Kuafu 时，\`prompt\` 中必须包含一个清晰的 **[Fault Context] 区块**：
+  - 用户原始问题 / 描述、故障现象、故障时间、场景类型（在线/离线）
+  - Target（目标主机 IP 或标识）
+  - **Access（连远程服务器分两种情况）**：
+    - **优先 Ansible**：当 Ansible 可用且 inventory 已配置时，填 **Ansible 组名**（由 Fuxi/你根据场景取，仅字母/数字/下划线，勿用连字符），由 Kuafu 使用 \`ansible -i ansible/hosts.ini <组名>\` 执行。
+    - **Ansible 不可用时采用 SSH**：当 Ansible 不可用（未安装、inventory 无法使用、认证失败等）时，填 **SSH 连接方式**（如 \`user@host\` 或 用户名+主机），并在 [Task] 中说明「本任务使用 SSH 兜底，请勿在命令行中明文传密码，优先使用已配置的 SSH 密钥或 sshpass 从安全方式获取」；由 Kuafu 按 SSH 方式执行远端命令。
+- 在其后再给出 **[Task] 区块**，写清诊断目标、期望执行方式（本地 / Ansible 组名 或 SSH 兜底）、以及结构化输出要求。
 
 \`\`\`typescript
 task({
   "subagent_type": "kuafu",
   "load_skills": [],
   "description": "T1: 定位异常 Renderer 进程 (PID 30739)",
-  "prompt": "[Fault Context]\n- 用户原始描述: {User Query}\n- 故障现象: {Verified Symptom}\n- 故障时间: {Time Window}\n- 场景类型: {online|offline}\n- Target: {ip_or_path}\n- Access: {SSH user / Jump server / Local}\n\n[Task]\n执行诊断任务 T1：……（这里写清楚任务目标、预期执行方式（本地/SSH/Ansible）、以及结构化输出要求）",
+  "prompt": "[Fault Context]\n- 用户原始描述: {User Query}\n- 故障现象: {Verified Symptom}\n- 故障时间: {Time Window}\n- 场景类型: {online|offline}\n- Target: {ip_or_path}\n- Access: {Ansible 组名（由场景命名）或 SSH 兜底时填 user@host}\n\n[Task]\n执行诊断任务 T1：……（任务目标；优先 Ansible，不可用时用 SSH；结构化输出要求）",
   "run_in_background": true
 })
 \`\`\`
