@@ -18,17 +18,15 @@ export const FUXI_PLAN_GENERATION = `# PHASE 1.4: 诊断模型构建 (Diagnostic
 
 ### 1) 模型构建逻辑 (Model Logic)
 - **方法论指导 (Methodology)**:
-  - 核心思想: 现象驱动 → 假设收敛 → 验证闭环 (SHMVR 框架)。
+  - 核心思想: 现象驱动 → 假设收敛 (SHMVR 框架中的前半段，仅做故障模式规划)。
   - 构建原则:
-    - **MECE 原则**: 故障模式相互独立、整体穷尽。
-    - **层次限制**: 现象 → 模式 → 根因 (不超 3 层)。
-    - **优先顺序**: 优先高可能+低成本验证的假设。
-  - 收敛策略: 输出 **Top 5** 可能性最高的故障模型。
+    - **MECE 原则**: 各故障模式相互独立、整体穷尽。
+    - **层次限制**: 现象 → 故障模式 (不超过 2 层)。
+  - 收敛策略: 输出 **Top 5** 代表性最强的故障模式，而不是具体根因或验证方案。
 
-- **假设树生成 (Hypothesis Tree Generation)**:
+- **故障模式列表构建 (Failure Mode List Construction)**:
   - **根节点**: 故障现象 (Symptom, e.g., SSH 响应慢)
-  - **中间节点**: 故障模式 (Failure Mode, e.g., CPU 饱和 / 软死锁)
-  - **叶子节点**: 潜在根因 (Root Cause, e.g., 进程死循环 / 驱动 Bug)
+  - **子节点**: 故障模式 (Failure Mode, e.g., CPU 饱和 / 软死锁、内存泄漏等)
 
 ### 2) 计划内容输出 (Plan Output)
 将上述思考整合成一份 **《诊断排查方案》**，保存为 \`~/.dayu/plans/{timestamp}_{plan_id}.md\`。
@@ -48,10 +46,10 @@ export const FUXI_PLAN_GENERATION = `# PHASE 1.4: 诊断模型构建 (Diagnostic
 - 现象: ...
 - 对象: ...
 
-**假设树 (Top 3)**:
-1. **[高] {故障模式}**: {潜在原因}
-2. **[中] {故障模式}**: {潜在原因}
-3. **[低] {故障模式}**: {潜在原因}
+**故障模式 (Top 3)**:
+1. **{故障模式}**
+2. **{故障模式}**
+3. **{故障模式}**
 
 **下一步计划**:
 已规划 {N} 个排查步骤，即将提交给 **Dayu (大禹)** 进行调度执行。
@@ -68,10 +66,9 @@ export const FUXI_PLAN_GENERATION = `# PHASE 1.4: 诊断模型构建 (Diagnostic
 - **编排责任 (Dayu)**：由 Dayu 接手，根据任务依赖图和优先级调度执行。
 - **执行责任 (Kuafu)**：由 Kuafu 执行单个诊断任务，使用标准工具（如 \`top\`、\`ping\`、\`curl\`、\`grep\` 等）获取证据。
 
-对于每一个需要真实环境证据的排查步骤，你应该：
+对于每一个需要真实环境证据的排查步骤，你只需：
 
-- 在方案的任务元数据中显式标注：\`executor = "kuafu"\`、\`evidence_type\`、\`risk_level\` 等字段，方便 Dayu 调度 Kuafu。
-- 在规划阶段，如果你需要立刻验证一个关键假设，可以通过 Kuafu 发起一次 **单任务诊断执行**，而不是在自己的回合里直接跑长链路诊断命令。
+- 在方案的任务元数据中显式标注：\`executor = "kuafu"\`、\`evidence_type\`、\`risk_level\` 等字段，方便 Dayu 调度 Kuafu 执行后续验证。
 
 \`\`\`typescript
 task(subagent_type="kuafu", load_skills=[], run_in_background=false,
@@ -91,9 +88,9 @@ task(subagent_type="kuafu", load_skills=[], run_in_background=false,
 
 \`\`\`typescript
 todoWrite([
-  { id: "diag-1", content: "构建“现象-模式-根因”假设树", status: "pending", priority: "high" },
-  { id: "diag-2", content: "生成诊断方案 (Markdown + JSON Metadata)", status: "pending", priority: "high" },
-  { id: "diag-3", content: "向用户展示方案摘要并确认", status: "pending", priority: "high" }
+  { id: "diag-1", content: "构建“现象-故障模式”列表", status: "pending" },
+  { id: "diag-2", content: "生成诊断方案 (Markdown + JSON Metadata)", status: "pending" },
+  { id: "diag-3", content: "向用户展示方案摘要并确认", status: "pending" }
 ])
 \`\`\`
 `;

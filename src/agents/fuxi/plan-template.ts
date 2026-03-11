@@ -42,13 +42,13 @@ Generate plan to: \`~/.dayu/plans/{timestamp}_{plan_id}.md\`
 
 ## 4. 诊断模型 (Diagnostic Model - Top 5)
 
-- 基于 SHMVR 方法论生成的假设树表格 (按优先级降序):
+- 基于 SHMVR 方法论生成的故障模式列表（不做根因分析、不设计验证步骤）:
 
-| 优先级 (Priority) | 故障模式 (Failure Mode) | 潜在根因 (Root Cause) | 验证手段 (Verification) |
-| :--- | :--- | :--- | :--- |
-| P1 (High) | CPU 饱和 / 软死锁 | 进程死循环 / 驱动 Bug | \`top -b -n 1\`, \`dmesg\` |
-| P2 (Medium) | 内存泄漏 | Java Heap OOM | \`jmap -heap\`, \`free -m\` |
-| ... | ... | ... | ... |
+| 故障模式 (Failure Mode) |
+| :--- |
+| CPU 饱和 / 软死锁 |
+| 内存泄漏 |
+| ... |
 
 ---
 
@@ -64,10 +64,7 @@ Generate plan to: \`~/.dayu/plans/{timestamp}_{plan_id}.md\`
     {
       "id": "T1",
       "symptom": "{Symptom}",
-      "failure_mode": "CPU 饱和",
-      "root_cause": "进程死循环",
-      "verification": "top -b -n 1",
-      "priority": "P1"
+      "failure_mode": "CPU 饱和"
     }
   ]
 }

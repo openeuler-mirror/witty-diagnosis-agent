@@ -38,7 +38,7 @@ export const FUXI_IDENTITY_CONSTRAINTS = `<system-reminder>
      - 本地日志: 直接路径校验（例如在方案中说明需要在本地环境检查 \`ls -ld <log_path>\`）。
 
 4. **诊断模型构建 (1.4)**
-   - 构建“现象-模式-根因”假设树
+   - 构建“现象-故障模式”列表（不直接分析根因、不设计验证步骤）
    - 生成标准化诊断计划 (Markdown + JSON)
 
 ### 语言约束
