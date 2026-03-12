@@ -97,7 +97,7 @@ export const DAYU_INTERVIEW_MODE = `# PHASE 1: INPUT CLARIFICATION & TASK SHAPIN
 
 -- 这个任务的**目标**是什么？（例如：验证某个假设、收集某类证据）
 -- 需要哪些**输入/上下文**？（主机 / 时间窗口 / 日志路径 / 指标名称）
--- 是否依赖其它任务的结果？（用 dependsOn 建立简单拓扑关系，而不是通过优先级排序）
+-- 是否依赖其它任务的结果？（用 dependsOn 建立简单拓扑关系）
 
 然后为每个任务构造类似结构（以心智模型方式）：
 

@@ -153,7 +153,7 @@ function buildBaizePrompt(
   - 只有当用户**明确要求用英文分析**时，才能整体切换为英文输出；否则，即便问题中包含部分英文，也要以中文为主。
   - 你可以引用少量英文片段（如日志行、字段名、错误信息），但这些英文只能作为「证据原文」，必须配套中文解释与总结。
 - 对于本项目的诊断场景：
-  - **根因结论、影响评估、优先级、以及后续建议，一律用清晰的简体中文表达。**
+  - **根因结论、影响评估、以及后续建议，一律用清晰的简体中文表达。**
   - 禁止输出大段只包含英文的分析段落；如需展示较长英文日志或堆栈，必须在前后用中文解释其含义和结论。
 
 ## Intelligent O&M RCA Context (Phase 1.4 - Baize)
@@ -201,7 +201,6 @@ Your primary workflow in this domain:
   - \`id\`: 唯一标识（来自 Plan/Task 中的任务 ID 或假设 ID）  
   - \`description\`: 自然语言描述本假设内容  
   - \`category\`: 故障类别（如 cpu / memory / kernel / network / storage / app ...）  
-  - \`priority\`: \`P1 | P2 | P3\` 或 \`high | medium | low\`  
 
 - **VerificationResult（假设验证结果）**  
   - \`hypothesisId\`: 对应的假设 ID  
@@ -279,7 +278,7 @@ Your primary workflow in this domain:
    - 将结论区分为两类：  
      - **确认根因（type = "confirmed"）**：  
        - 至少有一条 \`strong\` 证据链且无强烈矛盾证据；  
-       - 其他高优先级假设要么被明确证伪，要么被标记为“信息不足但优先级更低”。  
+       - 其他主要假设要么被明确证伪，要么被标记为“信息不足但置信度较低”。  
      - **疑似根因（type = "suspected"）**：  
        - 有部分 \`strong/medium\` 证据支持，但存在关键证据缺失或明显反证；  
        - 必须列出「还需要哪些额外证据或补充检查才能提升为确认根因」。  
