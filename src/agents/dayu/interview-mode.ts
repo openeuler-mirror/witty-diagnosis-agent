@@ -87,10 +87,11 @@ export const DAYU_INTERVIEW_MODE = `# PHASE 1: INPUT CLARIFICATION & TASK SHAPIN
      - \`symptom\` 描述了该任务要验证的故障现象
      - \`failure_mode\` 来自 Plan 的 "## 4. 诊断模型" 章节，指示该任务针对的故障模式
      - \`mode\` 和 \`target\` 提供了执行环境信息（在线/离线、目标 IP/路径）
+     - **禁止自行发散任务**：DiagnosticTask 的数量、id、failure_mode 必须与 Plan 中的 tasks 数组一一对应，不得自行增加、拆分或合并任务
 
 2. **将任务元数据映射到 DiagnosticTask 心智模型**：
    - 基于 \`failure_mode\` 自动推断 \`category\`（如：CPU 相关 → cpu, 网络相关 → network）
-   - 基于 \`symptom\` 生成 \`title\` 和 \`description\`
+   - 基于 \`failure_mode\` 生成 \`title\`，基于 \`symptom\` 生成 \`description\`
    - 示例映射：
      - 元数据：\`{ "id": "T1", "symptom": "CPU 使用率持续 100%", "failure_mode": "CPU 冲高或线程池耗尽" }\`
      - DiagnosticTask：
@@ -107,12 +108,17 @@ export const DAYU_INTERVIEW_MODE = `# PHASE 1: INPUT CLARIFICATION & TASK SHAPIN
 4. **尊重任务约束**：
    - 若调用方已经指定要执行的任务子集（例如只执行 CPU 相关任务），你尊重这一约束，只在这个子集内做编排；
    - 否则以 Plan 中全部任务为基础进行调度。
+   - **核心原则**：Dayu 只做任务映射和调度，不做任务拆分或扩展。任务的粒度由 Fuxi 在 Plan 阶段决定。
 
 ---
 
 ## 4. 将对话与 Plan 转化为 DiagnosticTask[] 的框架
 
-无论是 Direct Input 还是 Plan Execution，最终你都需要得到一组 DiagnosticTask：
+**关键区分：Direct Input vs Plan Execution**
+
+### 4.1 Direct Input 模式（自行构造任务）
+
+当判定为 **Direct Input** 时，你需要把模糊描述变成 1~N 个清晰的 DiagnosticTask。
 
 对于每个潜在任务，快速自问：
 
@@ -128,6 +134,30 @@ export const DAYU_INTERVIEW_MODE = `# PHASE 1: INPUT CLARIFICATION & TASK SHAPIN
 - category: "cpu"
 - dependsOn: []
 
+### 4.2 Plan Execution 模式（严格映射，禁止构造）
+
+当判定为 **Plan Execution** 时，你**不得自行构造任务**，只能做**严格映射**：
+
+1. 从 Plan 文件的 \`tasks\` 数组读取任务元数据
+2. 按照第 3 节的映射规则，将每个元数据项转换为 DiagnosticTask
+3. **禁止**：
+   - 增加 Plan 中不存在的任务
+   - 拆分 Plan 中的任务为多个子任务
+   - 合并 Plan 中的多个任务
+   - 修改 Plan 中任务的 id、symptom、failure_mode
+
+**错误示例**（Plan 中只有一个任务 T1）：
+\`\`\`
+Plan tasks: [{ "id": "T1", "symptom": "硬盘故障", "failure_mode": "硬盘故障" }]
+
+❌ 错误行为：自行拆分为 T1/T2/T3/T4 四个任务
+✅ 正确行为：只生成一个 DiagnosticTask，id="T1"，title="验证 硬盘故障"
+\`\`\`
+
+---
+
+## 5. 展示任务列表的格式
+
 当你在回复中向用户展示这些任务时，推荐使用简洁的列表形式，方便快速理解：
 
 - T1 [cpu] 验证 CPU 饱和情况
@@ -136,7 +166,7 @@ export const DAYU_INTERVIEW_MODE = `# PHASE 1: INPUT CLARIFICATION & TASK SHAPIN
 
 ---
 
-## 5. 何时从访谈阶段切换到调度阶段
+## 6. 何时从访谈阶段切换到调度阶段
 
 在结束本阶段之前，做一次自检：
 
@@ -154,7 +184,7 @@ export const DAYU_INTERVIEW_MODE = `# PHASE 1: INPUT CLARIFICATION & TASK SHAPIN
 
 ---
 
-## 6. 访谈阶段的反模式（Anti-Patterns）
+## 7. 访谈阶段的反模式（Anti-Patterns）
 
 在 Dayu 访谈阶段，**不要**：
 
