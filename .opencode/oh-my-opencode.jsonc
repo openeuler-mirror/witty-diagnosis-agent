@@ -1,6 +1,8 @@
 {
-  "sisyphus_agent": {
-    "planner_enabled": true,
-    "replace_plan": false             // 保留原生 plan
+  "agents": {
+    "fuxi":  { "model": "deepseek/deepseek-chat" },
+    "dayu":  { "model": "deepseek/deepseek-chat" },
+    "kuafu": { "model": "deepseek/deepseek-chat" },
+    "baize": { "model": "deepseek/deepseek-chat" }
   }
 }

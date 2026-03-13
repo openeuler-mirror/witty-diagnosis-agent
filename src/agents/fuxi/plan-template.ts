@@ -24,8 +24,12 @@ Generate plan to: \`~/.dayu/plans/{timestamp}_{plan_id}.md\`
 - **用户原始描述**:
   > {User Query}
 
-- **经过交互确认的完整故障现象 (Verified Symptom)**:
+- **经过交互确认的关键故障现象 (Key Verified Symptoms)**:
   > {Detailed Symptom Description}
+
+> 说明：
+> - 若用户在早期交互中**已明确给出故障模式名称集合**（如"硬盘故障""OOM""网络不通"等），此处只需记录能支撑这些模式判断的**关键现象与触发场景**，不必穷举所有细节性症状；
+> - 若用户仅给出"现象级"描述，则在本节中适度展开现象，保证信息足以支撑 1.4 阶段的故障模式构建。
 
 - **影响范围 (Impact)**:
   - {Scope Description}
@@ -40,15 +44,32 @@ Generate plan to: \`~/.dayu/plans/{timestamp}_{plan_id}.md\`
   - [ ] 故障日志: {Log Type} (Path: {Path})
   - [ ] 核心转储: {Dump Type} (Path: {Path})
 
-## 4. 诊断模型 (Diagnostic Model - Top 5)
+## 4. 诊断模型 (Diagnostic Model - Failure Modes, *up to* Top 5)
 
-- 基于 SHMVR 方法论生成的假设树表格 (按优先级降序):
+⛔️ **【强制短路规则】**：若用户已明确给出故障模式（如"硬盘故障"），**直接使用该模式**，禁止派生子模式或补齐到 Top 5。
 
-| 优先级 (Priority) | 故障模式 (Failure Mode) | 潜在根因 (Root Cause) | 验证手段 (Verification) |
-| :--- | :--- | :--- | :--- |
-| P1 (High) | CPU 饱和 / 软死锁 | 进程死循环 / 驱动 Bug | \`top -b -n 1\`, \`dmesg\` |
-| P2 (Medium) | 内存泄漏 | Java Heap OOM | \`jmap -heap\`, \`free -m\` |
-| ... | ... | ... | ... |
+- 本节只包含**故障模式列表**：即系统或组件发生故障时的具体异常形态（例如：硬盘故障、OOM、网络不通、CPU 冲高、TCP 丢包等），**不包含根因结论或验证步骤**。
+- 故障模式列表来源于 Phase 1.4 的模型构建结果，且**最多不超过 5 条，可以少于 5 条**：
+  - 若用户在描述中已明确给出故障模式（如"硬盘故障""OOM""网络不通"等），则**直接以这些模式为主**构建列表，**禁止强行扩展或拆分为多个子模式**：
+    - ✅ 正确示例：用户给出的故障模式为"硬盘故障"，则本表仅为：
+      - \`| 故障模式 (Failure Mode) |\`
+      - \`| :--- |\`
+      - \`| 硬盘故障 |\`
+    - ❌ 错误示例：用户给出"硬盘故障"，却输出：
+      - \`| 故障模式 (Failure Mode) |\`
+      - \`| :--- |\`
+      - \`| 硬盘物理故障 |\`
+      - \`| RAID控制器故障 |\`
+      - \`| 硬盘连接问题 |\`
+      （违规派生子模式）
+  - 若仅有"现象级"描述（如"应用卡顿"），则根据现象**适度**推断出可能的故障模式并写入表格（同样最多 Top 5）：
+    - 示例：现象为"应用卡顿"，可推断为：
+      - \`| 故障模式 (Failure Mode) |\`
+      - \`| :--- |\`
+      - \`| CPU 冲高或线程池耗尽 |\`
+      - \`| 内存不足 / 频繁换页 |\`
+      - \`| 磁盘 I/O 抖动 |\`
+      - \`| 网络不通或网络抖动 |\`
 
 ---
 
@@ -64,13 +85,12 @@ Generate plan to: \`~/.dayu/plans/{timestamp}_{plan_id}.md\`
     {
       "id": "T1",
       "symptom": "{Symptom}",
-      "failure_mode": "CPU 饱和",
-      "root_cause": "进程死循环",
-      "verification": "top -b -n 1",
-      "priority": "P1"
+      "failure_mode": "{Failure Mode from Section 4}"
     }
   ]
 }
 \`\`\`
+
+**注意**：Fuxi 只负责生成到故障模式列表为止的内容，诊断步骤规划、预期输出和风险与约束等内容将由后续的 Dayu 和 Baize Agent 生成。
 \`\`\`
 `
