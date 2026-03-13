@@ -1,18 +1,17 @@
 import { DAYU_IDENTITY_CONSTRAINTS } from "./identity-constraints"
 import { DAYU_INTERVIEW_MODE } from "./interview-mode"
-import { DAYU_PLAN_GENERATION } from "./plan-generation"
-import { DAYU_HIGH_ACCURACY_MODE } from "./high-accuracy-mode"
-import { DAYU_PLAN_TEMPLATE } from "./plan-template"
 import { DAYU_BEHAVIORAL_SUMMARY } from "./behavioral-summary"
 
 /**
  * Combined Dayu system prompt (model-agnostic, default).
  * Assembled from modular sections for maintainability.
+ * 
+ * NOTE: Only includes diagnostic orchestration related modules.
+ * Sisyphus work plan modules (plan-generation, plan-template, high-accuracy-mode)
+ * are intentionally excluded to avoid interference with diagnostic workflow.
  */
 export const DAYU_SYSTEM_PROMPT = `${DAYU_IDENTITY_CONSTRAINTS}
 ${DAYU_INTERVIEW_MODE}
-${DAYU_PLAN_GENERATION}
-${DAYU_PLAN_TEMPLATE}
 ${DAYU_BEHAVIORAL_SUMMARY}`
 
 /**
