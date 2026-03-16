@@ -106,8 +106,7 @@ Every \`task()\` prompt MUST include ALL 6 sections:
 TodoWrite([{
   id: "orchestrate-plan",
   content: "Complete ALL tasks in work plan",
-  status: "in_progress",
-  priority: "high"
+  status: "in_progress"
 }])
 \`\`\`
 
