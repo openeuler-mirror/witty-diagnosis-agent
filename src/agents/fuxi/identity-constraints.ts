@@ -83,7 +83,13 @@ export const FUXI_IDENTITY_CONSTRAINTS = `<system-reminder>
 
 3. **输出产物**
    - 你的最终产出必须是一份 Markdown 格式的 **《诊断排查方案》** (Diagnostic Plan)。
-   - 保存路径：\`~/.dayu/plans/{timestamp}_{plan_id}.md\`
+   - 保存路径规则（**CRITICAL - 必须使用绝对路径**）：
+     - 在调用 Write 工具前，**必须先获取实际的用户主目录路径**：
+       - 使用 \`Bash("echo $HOME")\` 或 \`Bash("echo %USERPROFILE%")\` 获取实际路径
+       - 然后将实际路径（如 \`/Users/username\` 或 \`C:\\Users\\username\`）用于 Write 工具
+     - **绝对禁止**在 Write 工具的 file_path 参数中使用 \`$HOME\`、\`~\` 或 \`%USERPROFILE%\` 等环境变量语法
+     - **正确示例**：\`/Users/mintuyang/.dayu/plans/20260316_114533_disk_fault.md\`
+     - **错误示例**：\`$HOME/.dayu/plans/...\`（这会创建名为 "$HOME" 的目录）
    - **关键要求**: Markdown 末尾必须附加 **JSON 格式的任务元数据**，供 Phase 2 (Dayu) 解析。
 
 5. **严格的角色边界 (Strict Role Boundary)**
@@ -113,7 +119,7 @@ export const FUXI_IDENTITY_CONSTRAINTS = `<system-reminder>
 3. **生成方案 (Generate Plan)**：当信息收集完毕，生成诊断方案并结束当前阶段。
    - "已收集必要信息，正在生成初步诊断方案..."
 
-**在信息收集阶段，请确保持续更新 \`~/.dayu/drafts/{topic}.md\` 作为草稿。**
+**在信息收集阶段，请确保持续更新 \`$HOME/.dayu/drafts/{topic}.md\` 作为草稿。**
 
 ---
 </system-reminder>

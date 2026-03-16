@@ -4,8 +4,6 @@ import { FUXI_PLAN_GENERATION } from "./plan-generation"
 import { FUXI_HIGH_ACCURACY_MODE } from "./high-accuracy-mode"
 import { FUXI_PLAN_TEMPLATE } from "./plan-template"
 import { FUXI_BEHAVIORAL_SUMMARY } from "./behavioral-summary"
-import { getGptFuxiPrompt } from "./gpt"
-import { getGeminiFuxiPrompt } from "./gemini"
 import { isGptModel, isGeminiModel } from "../types"
 
 /**
