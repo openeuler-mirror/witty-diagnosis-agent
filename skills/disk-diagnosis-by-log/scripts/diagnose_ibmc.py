@@ -246,24 +246,33 @@ def check_ibmc_faults(root_dir, extra_keywords=None, **kwargs):
                      print(f"  {issue}")
 
 def main():
-    parser = argparse.ArgumentParser(description="iBMC Log Diagnosis Tool")
+    parser = argparse.ArgumentParser(
+        description="iBMC Log Diagnosis Tool (SEL/Fault Analysis)",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog="""
+Usage Examples:
+  python3 %(prog)s ./ibmc_logs/ -o
+  python3 %(prog)s ./ibmc_logs/ -k "Drive Fault" -d "Mar 16"
+  python3 %(prog)s ./ibmc_logs/ -s "2026-03-15 01:00:00" -e "2026-03-15 23:59:59"
+        """
+    )
     
-    parser.add_argument("log_dir", help="Path to the directory containing iBMC logs")
+    parser.add_argument("log_dir", help="Path to the directory containing iBMC logs (e.g., exported .tar.gz content)")
     
-    parser.add_argument("-k", "--keywords", nargs="+", 
-                        help="Additional keywords to search for")
+    parser.add_argument("-k", "--keywords", nargs="+", metavar="WORD",
+                        help="Additional keywords to search for in SEL and alarm logs")
     
-    parser.add_argument("-d", "--date", 
-                        help="Filter logs by specific date string")
+    parser.add_argument("-d", "--date", metavar="DATE_STR",
+                        help="Filter logs by specific date string (e.g., 'Mar 5' or '2023-03-05')")
     
-    parser.add_argument("-s", "--start-time", 
-                        help="Start time for filtering (Format: 'YYYY-MM-DD HH:MM:SS')")
+    parser.add_argument("-s", "--start-time", metavar="'YYYY-MM-DD HH:MM:SS'",
+                        help="Start time for precise time filtering")
     
-    parser.add_argument("-e", "--end-time", 
-                        help="End time for filtering (Format: 'YYYY-MM-DD HH:MM:SS')")
+    parser.add_argument("-e", "--end-time", metavar="'YYYY-MM-DD HH:MM:SS'",
+                        help="End time for precise time filtering")
                         
     parser.add_argument("-o", "--overview", action="store_true",
-                        help="Show global overview")
+                        help="Show high-level overview (Time range, SEL count, Error summary) instead of detailed logs")
 
     args = parser.parse_args()
     

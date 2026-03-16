@@ -396,24 +396,33 @@ def check_system_events(root_dir, extra_keywords=None, **kwargs):
             print("  No critical storage errors found.")
 
 def main():
-    parser = argparse.ArgumentParser(description="One-click Disk Diagnosis Tool for Server Logs")
+    parser = argparse.ArgumentParser(
+        description="Detailed Disk Diagnosis Tool (SMART/RAID/iostat Analysis)",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog="""
+Usage Examples:
+  python3 %(prog)s ./infocollect_logs/ -o
+  python3 %(prog)s ./infocollect_logs/ -k "sda" "error"
+  python3 %(prog)s ./infocollect_logs/ -d "2023-03-05" -k "FAILED"
+        """
+    )
     
-    parser.add_argument("log_dir", help="Path to the directory containing collected logs")
+    parser.add_argument("log_dir", help="Path to the directory containing InfoCollect logs")
     
-    parser.add_argument("-k", "--keywords", nargs="+", 
-                        help="Additional keywords to search for (e.g. 'sda', 'error')")
+    parser.add_argument("-k", "--keywords", nargs="+", metavar="WORD",
+                        help="Additional keywords to search for (e.g., 'sda', 'Critical')")
     
-    parser.add_argument("-d", "--date", 
-                        help="Filter logs by specific date string (e.g. 'Mar 5' or '2023-03-05'). Matches substring.")
+    parser.add_argument("-d", "--date", metavar="DATE_STR",
+                        help="Filter logs by specific date string (e.g., '2023-03-05'). Matches substring.")
     
-    parser.add_argument("-s", "--start-time", 
-                        help="Start time for filtering (Format: 'YYYY-MM-DD HH:MM:SS')")
+    parser.add_argument("-s", "--start-time", metavar="'YYYY-MM-DD HH:MM:SS'",
+                        help="Start time for filtering (e.g., '2023-03-05 10:00:00')")
     
-    parser.add_argument("-e", "--end-time", 
-                        help="End time for filtering (Format: 'YYYY-MM-DD HH:MM:SS')")
+    parser.add_argument("-e", "--end-time", metavar="'YYYY-MM-DD HH:MM:SS'",
+                        help="End time for filtering (e.g., '2023-03-05 12:00:00')")
                         
     parser.add_argument("-o", "--overview", action="store_true",
-                        help="Show global overview: time range, hardware info, error summary")
+                        help="Show global health summary (SMART healthy, RAID status, I/O bottlenecks) instead of detailed logs")
 
     args = parser.parse_args()
     

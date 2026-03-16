@@ -77,12 +77,25 @@ def run_diagnose_script(script_name, log_dir, args_str=""):
         return f"Error running {script_name}: {e}"
 
 def main():
-    parser = argparse.ArgumentParser(description="Integrated Disk Diagnosis Summary Tool")
-    parser.add_argument("root_dir", help="Root directory containing ibmc_logs, infocollect_logs, and messages")
-    parser.add_argument("-k", "--keywords", nargs="+", help="Additional keywords")
-    parser.add_argument("-d", "--date", help="Filter by date")
-    parser.add_argument("-s", "--start-time", help="Start time")
-    parser.add_argument("-e", "--end-time", help="End time")
+    parser = argparse.ArgumentParser(
+        description="Integrated Disk Diagnosis Summary Tool",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog="""
+Usage Examples:
+  python3 %(prog)s ./logs/ -k "disk_fail" "slot0"
+  python3 %(prog)s ./logs/ -d "Mar 16"
+  python3 %(prog)s ./logs/ -s "2026-03-10 08:00:00" -e "2026-03-10 12:00:00"
+        """
+    )
+    parser.add_argument("root_dir", help="Root directory containing 'ibmc_logs', 'infocollect_logs', and 'messages' folders")
+    parser.add_argument("-k", "--keywords", nargs="+", metavar="WORD",
+                        help="Additional keywords to search for (e.g., 'fail', 'sdb', 'slot 1')")
+    parser.add_argument("-d", "--date", metavar="DATE_STR",
+                        help="Filter logs by a date string (e.g., 'Mar 16' or '2026-03-10')")
+    parser.add_argument("-s", "--start-time", metavar="'YYYY-MM-DD HH:MM:SS'",
+                        help="Start time for filtering (e.g., '2026-03-10 08:00:00')")
+    parser.add_argument("-e", "--end-time", metavar="'YYYY-MM-DD HH:MM:SS'",
+                        help="End time for filtering (e.g., '2026-03-10 12:00:00')")
     
     args = parser.parse_args()
     root_dir = args.root_dir

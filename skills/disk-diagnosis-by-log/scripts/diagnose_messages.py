@@ -223,24 +223,33 @@ def check_kernel_panics(root_dir, **kwargs):
             print("  No kernel panics found.")
 
 def main():
-    parser = argparse.ArgumentParser(description="OS System Log Diagnosis Tool")
+    parser = argparse.ArgumentParser(
+        description="OS System Log Diagnosis Tool (Messages/Dmesg Analysis)",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog="""
+Usage Examples:
+  python3 %(prog)s ./messages/ -o
+  python3 %(prog)s ./messages/ -k "I/O error" "sector"
+  python3 %(prog)s ./messages/ -s "2026-03-10 09:00:00" -k "panic"
+        """
+    )
     
-    parser.add_argument("log_dir", help="Path to the directory containing system logs")
+    parser.add_argument("log_dir", help="Path to the directory containing OS system logs (e.g., /var/log/ copy)")
     
-    parser.add_argument("-k", "--keywords", nargs="+", 
-                        help="Additional keywords to search for")
+    parser.add_argument("-k", "--keywords", nargs="+", metavar="WORD",
+                        help="Additional keywords to search for (e.g., 'rejecting I/O', 'EXT4-fs')")
     
-    parser.add_argument("-d", "--date", 
-                        help="Filter logs by specific date string")
+    parser.add_argument("-d", "--date", metavar="DATE_STR",
+                        help="Filter logs by specific date string (e.g., 'Mar 10' or '2026-03-10')")
     
-    parser.add_argument("-s", "--start-time", 
-                        help="Start time for filtering (Format: 'YYYY-MM-DD HH:MM:SS')")
+    parser.add_argument("-s", "--start-time", metavar="'YYYY-MM-DD HH:MM:SS'",
+                        help="Start time for filtering (e.g., '2026-03-10 09:00:00')")
     
-    parser.add_argument("-e", "--end-time", 
-                        help="End time for filtering (Format: 'YYYY-MM-DD HH:MM:SS')")
+    parser.add_argument("-e", "--end-time", metavar="'YYYY-MM-DD HH:MM:SS'",
+                        help="End time for filtering (e.g., '2026-03-10 10:00:00')")
                         
     parser.add_argument("-o", "--overview", action="store_true",
-                        help="Show global overview")
+                        help="Show system log overview (Time range, Error frequency) instead of detailed trace")
 
     args = parser.parse_args()
     
