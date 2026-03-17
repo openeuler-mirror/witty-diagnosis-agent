@@ -93,7 +93,13 @@ export const FUXI_PLAN_GENERATION = `# PHASE 1.4: 诊断模型构建 (Diagnostic
   - ❌ 用户输入: "CPU冲高" → 输出: CPU冲高、内存不足、磁盘IO抖动...（违规补齐）
 
 ### 2) 计划内容输出 (Plan Output)
-将上述思考整合成一份 **《诊断排查方案》**，保存为 \`~/.dayu/plans/{timestamp}_{plan_id}.md\`。
+将上述思考整合成一份 **《诊断排查方案》**，保存到用户主目录（**CRITICAL - 必须使用绝对路径**）：
+- 在调用 Write 工具前，**必须先获取实际的用户主目录路径**：
+  - 使用 \`Bash("echo $HOME")\` 或 \`Bash("echo %USERPROFILE%")\` 获取实际路径
+  - 然后将实际路径用于 Write 工具
+- **绝对禁止**在 Write 工具中使用 \`$HOME\`、\`~\` 或环境变量语法
+- **正确示例**：\`/Users/username/.dayu/plans/{timestamp}_{plan_id}.md\`
+- **错误示例**：\`$HOME/.dayu/plans/...\`（会创建名为 "$HOME" 的目录）
 
 **重要约束**：
 - 只生成到故障模式列表（第6节）为止的内容
@@ -112,6 +118,15 @@ export const FUXI_PLAN_GENERATION = `# PHASE 1.4: 诊断模型构建 (Diagnostic
   - 诊断步骤规划（如"## 诊断步骤规划""## 6. 诊断步骤规划"等）
   - 预期输出（如"## 预期输出 (Expected Output)"）
   - 风险与约束（如"## 风险与约束 (Risks & Constraints)"）
+
+**⛔️ 【强制约束 - 故障模式与任务一一对应】**：
+- **故障模式列表与任务元数据列表必须严格一一对应**。
+- **一个故障模式 = 一个任务，绝无例外**。
+- **严禁**将一个故障模式拆分为多个任务。
+- **严禁**为一个故障模式创建多个日志分析任务。
+- **错误示例**：故障模式为"硬盘故障"，却创建 T1(iBMC日志分析) 和 T2(messages日志分析) 两个任务 → **绝对禁止**。
+- **正确示例**：故障模式为"硬盘故障"，创建 T1(硬盘故障日志分析) 一个任务 → **唯一正确做法**。
+- **此约束具有最高优先级，任何情况下都不可违反。**
 
 ---
 
@@ -136,7 +151,7 @@ export const FUXI_PLAN_GENERATION = `# PHASE 1.4: 诊断模型构建 (Diagnostic
 **下一步计划**:
 已规划 {N} 个排查步骤，即将提交给 **Dayu (大禹)** 进行调度执行。
 
-方案路径: \`~/.dayu/plans/{timestamp}_{plan_id}.md\`
+方案路径: \`$HOME/.dayu/plans/{timestamp}_{plan_id}.md\`
 \`\`\`
 
 ---

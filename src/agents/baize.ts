@@ -97,15 +97,16 @@ function buildTodoDisciplineSection(useTaskSystem: boolean): string {
  * This agent is the Phase 1.4 "Baize / 白泽 - 根因分析" component in the
  * Intelligent O&M Diagnosis System architecture:
  *
- *   - 输入: Dayu / Kuafu 聚合生成的诊断报告
- *           `~/.dayu/report/{timestamp}_{plan_id}_report.md`
+ *   - 输入: Dayu / Kuafu 聚合生成的诊断报告（跨平台路径）：
+ *           Linux/macOS: `$HOME/.dayu/report/{timestamp}_{plan_id}_report.md`
+ *           Windows: `%USERPROFILE%\.dayu\report\{timestamp}_{plan_id}_report.md`
  *   - 职责: 基于 Phase 1–3 的诊断结果进行
  *           1.4.1 证据收集与关联 (Evidence Collection)
  *           1.4.2 根因推断 (Root Cause Inference)
  *           1.4.3 影响评估 (Impact Assessment)
  *           1.4.4 诊断报告生成 (Report Generation)
  *   - 输出: 覆盖 / 追加生成最终根因诊断报告
- *           `~/.baize/report/{timestamp}_{plan_id}_report.md`
+ *           `$HOME/.baize/report/{timestamp}_{plan_id}_report.md`
  *
  * 同时继承 Hephaestus 风格的执行特性：自主、深度探索、端到端完成任务。
  */
@@ -160,11 +161,12 @@ function buildBaizePrompt(
 
 Your primary workflow in this domain:
 
-1. **输入 Dayu 报告 (Input Report)**  
-   - Read the consolidated diagnostic report produced by Dayu / Kuafu at a path like  
-     \`~/.dayu/report/{timestamp}_{plan_id}_report.md\`.  
-   - The user will either give you the **full report path** or at least \`plan_id\` / \`timestamp\`.  
-   - Locate and parse the **structured JSON metadata** at the end of that Markdown (tasks, artifacts, hypotheses, alerts, etc.).
+1. **输入 Dayu 报告 **  
+   - Read the consolidated diagnostic report produced by Dayu / Kuafu from user home directory.
+   - **必须使用绝对路径**：先用 \`Bash("echo $HOME")\` 获取实际路径，再用于 Read 工具
+   - **正确示例**：\`/Users/username/.dayu/report/{timestamp}_{plan_id}_report.md\`
+   - **错误示例**：\`$HOME/.dayu/report/...\`（环境变量语法不会被展开）
+   - The user will either give you the **full report path** or at least \`plan_id\` / \`timestamp\`.
 
 2. **1.4.1 证据收集与关联 (Evidence Collection)**  
    - Normalize all evidence from upstream agents (Fuxi / Dayu / Kuafu / specialty agents) into an internal schema, e.g.:  
@@ -188,9 +190,11 @@ Your primary workflow in this domain:
      - Starts with a TL;DR section (root cause + impact + recommended next steps).  
      - Contains sections for Evidence Collection, Root Cause Inference, Impact Assessment, and Final Conclusion.  
      - 包含一个结构化的「故障链路」小节，至少列出：**故障现象 / 触发原因 / 传播路径**，便于运维人员直接采用与复盘。  
-   - Write or update the report at a path like:  
-     \`~/.baize/report/{timestamp}_{plan_id}_report.md\`.  
-     - If the file does not exist: create it with the full report.  
+   - Write or update the report at user home directory:
+     - **必须使用绝对路径**：先用 \`Bash("echo $HOME")\` 获取实际路径，再用于 Write 工具
+     - **正确示例**：\`/Users/username/.baize/report/{timestamp}_{plan_id}_report.md\`
+     - **错误示例**：\`$HOME/.baize/report/...\`（环境变量语法不会被展开）
+     - If the file does not exist: create it with the full report.
      - If it exists: append a new \`## Root Cause Analysis (Baize)\` section instead of deleting history.
 
 ### 1.4.0 内部数据模型（Mental Model，非真实类型定义）
@@ -245,7 +249,9 @@ Your primary workflow in this domain:
 ### 1.4.x 标准工作流程（场景无关，一律遵守）
 
 1. **输入 Dayu 报告 (Input Report)**  
-   - 从 Dayu / Kuafu 生成的诊断报告（通常类似路径：\`~/.dayu/report/{timestamp}_{plan_id}_report.md\`）中读取全部内容。  
+   - 从 Dayu / Kuafu 生成的诊断报告中读取全部内容（跨平台路径）：
+     - Linux/macOS：\`$HOME/.dayu/report/{timestamp}_{plan_id}_report.md\`
+     - Windows：\`%USERPROFILE%\\.dayu\\report\\{timestamp}_{plan_id}_report.md\`（CMD）或 \`$HOME\\.dayu\\report\\{timestamp}_{plan_id}_report.md\`（PowerShell）
    - 用户会提供完整路径，或至少 \`plan_id\` / \`timestamp\`，你负责通过只读工具找到最合适的报告文件。  
    - 在 Markdown 尾部定位并解析结构化 JSON 元数据（\`tasks\`、\`artifacts\`、\`hypotheses\`、\`alerts\` 等），将其归一化为上述实体。  
 
@@ -290,7 +296,7 @@ Your primary workflow in this domain:
    - 产出一个结构化的 \`impact\` 对象（即使只是在文本中描述其字段：severity / affected_entities / time_window / business_impact）。  
 
 7. **1.4.6 诊断报告生成 (Report Generation - Structured Output)**  
-   - 生成一份面向人类可读的「根因分析报告」，并写入或更新：\`~/.baize/report/{timestamp}_{plan_id}_report.md\`。  
+   - 生成一份面向人类可读的「根因分析报告」，并写入或更新：\`$HOME/.baize/report/{timestamp}_{plan_id}_report.md\`。  
    - 报告正文中必须显式包含以下章节（使用清晰的 Markdown 标题，如 \`##\` / \`###\`）：  
      1. **结果汇总（Results Aggregation）** —— 汇总所有子 Agent 的诊断结果，按假设 / 任务维度列出验证状态。  
      2. **时间线重建（Timeline Reconstruction）** —— 按时间顺序列出关键事件，并标注其在因果判断中的角色。  
@@ -687,7 +693,7 @@ export function createBaizeAgent(
 
   return {
     description:
-      "Baize (Root Cause Analysis) — Phase 1.4 \"白泽 / Baize - 根因分析\" agent for the Intelligent O&M Diagnosis System. Reads Dayu/Kuafu reports from ~/.dayu/report, aggregates evidence, infers root cause, assesses impact, and writes final RCA reports to ~/.baize/report. (Baize - OhMyOpenCode)",
+      "Baize (Root Cause Analysis) — Phase 1.4 \"白泽 / Baize - 根因分析\" agent for the Intelligent O&M Diagnosis System. Reads Dayu/Kuafu reports from $HOME/.dayu/report, aggregates evidence, infers root cause, assesses impact, and writes final RCA reports to $HOME/.baize/report. (Baize - OhMyOpenCode)",
     mode: MODE,
     model,
     maxTokens: 32000,

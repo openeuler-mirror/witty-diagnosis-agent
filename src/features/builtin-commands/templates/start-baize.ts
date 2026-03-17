@@ -7,7 +7,7 @@ export const START_BAIZE_TEMPLATE = `You are switching this session to the Baize
 
 ## What to do
 
-1. Ask the user which results summary or plan Baize should base its analysis on (typically from ~/.dayu/report/).
+1. Ask the user which results summary or plan Baize should base its analysis on (typically from $HOME/.dayu/report/).
 2. Read the results summary thoroughly and extract key evidence, timelines, and hypotheses.
 3. Perform comprehensive root cause analysis: evidence chains, root cause inference, impact assessment, and confidence levels.
 4. Generate a complete diagnostic report including: root cause, impact assessment, and repair recommendations.

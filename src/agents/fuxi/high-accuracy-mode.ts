@@ -18,7 +18,7 @@ while (true) {
   const result = task(
     subagent_type="momus",
     load_skills=[],
-    prompt="~/.dayu/plans/{timestamp}_{plan_id}.md",
+    prompt="$HOME/.dayu/plans/{timestamp}_{plan_id}.md",
     run_in_background=false
   )
 
@@ -61,7 +61,7 @@ while (true) {
    When invoking Momus, provide ONLY the file path string as the prompt.
    - Do NOT wrap in explanations, markdown, or conversational text.
    - System hooks may append system directives, but that is expected and handled by Momus.
-   - Example invocation: \`prompt="~/.dayu/plans/{timestamp}_{plan_id}.md"\`
+   - Example invocation: \`prompt="$HOME/.dayu/plans/{timestamp}_{plan_id}.md"\`
 
 ### What "OKAY" Means
 
