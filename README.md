@@ -1,151 +1,148 @@
-# witty-diagnosis-agent
+# 项目介绍
 
-面向运维故障诊断的多 Agent 自动化诊断系统，围绕标准化流程组织协作分工，将“生成诊断计划、任务拆解、执行验证、根因分析、解决方案生成”串成可复用的执行链路。
+Witty智能诊断Agent基于「假设-推断」分析范式与多Agent协同架构，实现多路径并行分析，全面覆盖**应用→系统→内核→硬件**全栈故障场景，显著提升故障诊断的效率、全面性与精准度。依托拓扑动态感知、多模态遥测融合与多维关联分析技术，结合内置故障模式库与运维知识库，可在分钟级完成根因定位（无需人工介入），并支持代码行级精准定界。同时，Agent能自动生成结构化根因报告，清晰呈现溯源路径、关键证据与优化建议，高效支撑各类复杂故障的精准诊断。
+
+# 架构与功能介绍
+
+## 软件架构
+
+Witty智能诊断Agent采用分层解耦架构，分为Agent层、Skill层、工具层、知识层四大核心模块，各模块通过标准化接口通信，兼具灵活性与可扩展性，确保系统高效迭代与维护。
+
+### 1. Agent层：智能协同的推理引擎与决策中枢
+
+采用多智能体协同机制，实现故障根因的全流程自动化诊断：诊断规划Agent明确故障信息并生成根因假设；编排调度Agent匹配诊断Skill，并行分发诊断任务；各验证分析Agent执行具体推理分析；根因融合Agent汇总多路分析结果，输出包含根因、证据链与修复建议的结构化报告；故障修复Agent依据根因与运维知识，安全可控地执行修复指令，快速恢复业务。
+
+### 2. Skill层：专家经验的标准化沉淀与场景化赋能
+
+将专家诊断思路、排查流程与最佳实践，封装为可复用的标准化技能，覆盖崩溃、死锁、内存泄漏等高频故障场景。为Agent提供标准化执行策略，实现专家经验的规模化复用，提升诊断结果的一致性与准确性。
+
+### 3. 工具层：高效可靠的多源数据处理底座
+
+深度集成openEuler原生观测与调试工具，以低底噪方式采集指标、日志、内核状态等多维度数据。通过清洗、去重、结构化处理，为上层诊断流程提供高质量数据输入，保障诊断过程的稳定性与高效性。
+
+### 4. 知识层：持续进化与自我完善的知识底座
+
+存储openEuler专属故障模式、诊断案例与因果规则，是精准诊断的核心基础。系统可自动沉淀诊断数据与结果，形成可复用案例并反哺Skill层优化，实现诊断能力的自进化迭代，让诊断精度随使用场景持续提升。
+
+![Diagnosis Agent架构图](docs/assets/witty-diagnosis-agent-architecture.png)
+
+## 关键能力
+
+- **智能日志解析**：基于模板挖掘、向量降维等算法，将海量非结构化日志转化为结构化特征，实现关键日志秒级精准识别，为根因分析提供高质量数据支撑。
+
+- **VMCore自动分析**：针对系统宕机等严重故障，自动完成VMCore数据的采集、融合分析与根因定位，将运维人员从复杂的手动调试工作中解放出来，提升故障处置效率。
+
+- **超节点拓扑动态感知**：基于eBPF技术实现灵衢超节点拓扑动态感知，将多模遥测数据与拓扑节点协同关联，辅助超节点故障的高效定界与定位。
+
+# 快速开始
+
+## 环境要求
+
+- 运行环境：Bun（推荐）或 Node.js
+
+- 依赖工具：已安装[OpenCode](https://opencode.ai/)
 
 ## 安装
 
-### 1. 安装 OpenCode
-
-使用本项目之前，需要先安装 OpenCode：
-
-- OpenCode 安装说明：https://opencode.ai/docs/zh-cn/#%E5%AE%89%E8%A3%85
-
-### 2. 安装 witty-diagnosis-agent
-
-在 OpenCode 环境就绪后，你可以选择以下两种方式之一来安装 `witty-diagnosis-agent`：
-
-**方式 A：通过 Agent 自动化安装（推荐）**
-
-把下面这段提示词直接发给你的 OpenCode Agent，它会自动完成下载与配置：
-
-```
-Install and configure witty-diagnosis-agent by following the instructions here:
-https://atomgit.com/openeuler/witty-diagnosis-agent/tree/master/docs/reference/witty-diagnosis-installation.md
+```shell
+git clone https://gitcode.com/sparklezfl/witty-diagnosis-agent.git
+cd witty-diagnosis-agent
+bun install
 ```
 
-**方式 B：手动安装**
+## 构建
 
-如果你更习惯手动操作或进行本地调试，请参考详细文档：[手动安装指南](docs/guide/installation.md)。
-
-### 3. 验证安装
-
-安装完成后，请在 Shell 终端执行以下命令验证是否成功：
-
-```bash
-witty-diagnosis-agent -V
-# 预期输出：
-# 1.0.0
+```shell
+bun run build
 ```
 
-## 架构与组件
+构建完成后，将在项目根目录生成 `dist/index.js` 等相关文件。
 
+## 注册插件
 
-详细架构设计请参阅：[Overview](docs/guide/overview.md) | [Orchestration](docs/guide/orchestration.md)
+配置文件支持两种路径（二选一），优先选择用户级配置：
 
-## 运行模式与 Agents
+- 用户级（推荐）：`~/.config/opencode/opencode.json` 或 `opencode.jsonc`
 
-为实现精准的故障诊断，系统采用了**四层多 Agent 协作**架构，从诊断规划、任务编排、根因分析到方案修复，通过专职分工模拟资深运维团队的排查链路。
+- 项目级：项目根目录下的 `.opencode/opencode.json` 或 `.opencode/opencode.jsonc`
 
-### Agent 分层体系
+在配置文件中新增或修改 `plugin` 数组，指向本仓库的构建入口（请替换为实际项目路径）：
 
-我们以中国神话命名各阶段 Agent，按职责划分为四个核心层次：
+```json
+{
+    "$schema": "https://opencode.ai/config.json",
+    "plugin": [
+        "file:///{witty-diagnosis-agent项目绝对路径}/dist/index.js"
+    ]
+}
+```
 
-#### 1. 诊断规划层 (Diagnosis Planning)
-负责故障的顶层认知、上下文理解及全局战略制定。
-- **伏羲 (Fuxi)**: **诊断规划**。识别故障场景，澄清上下文，生成标准诊断计划 (Plan)。
+示例（假设项目绝对路径为 `/opt/witty-diagnosis-agent`）：
 
-#### 2. 任务编排与执行层 (Task Orchestration & Execution)
-负责将高层计划转化为计算机可执行的指令序列，并执行具体的现场数据采集与验证。
-- **大禹 (Dayu)**: **任务编排**。解析计划，拆解任务，并行调度执行 Agent。
-- **夸父 (Kuafu)**: **执行验证**。追踪线索，执行通用工具 (Skill) 进行数据采集与验证。
+```json
+{
+    "$schema": "https://opencode.ai/config.json",
+    "plugin": [
+        "file:///opt/witty-diagnosis-agent/dist/index.js"
+    ]
+}
+```
 
-#### 3. 根因分析层 (Root Cause Analysis)
-负责深度逻辑推理与证据链关联，穿透表象定位根本原因。
-- **白泽 (Baize)**: **根因分析**。穿透表象推理根因，关联证据链，生成最终报告。
+## 配置模型
 
-#### 4. 方案修复层 (Remediation & Repair)
-负责故障处理的闭环，生成并实施修复方案。
-- **女娲 (Nuwa)**: **方案修复**。(可选) 生成修复方案，修补系统裂痕。
+修改项目根目录下的 `.opencode/oh-my-opencode.jsonc` 文件，配置如下：
 
-### 运行模式
+```json
+{
+    "agents": {
+        "fuxi": { "model": "deepseek/deepseek-chat" },
+        "dayu": { "model": "deepseek/deepseek-chat" },
+        "kuafu": { "model": "deepseek/deepseek-chat" },
+        "baize": { "model": "deepseek/deepseek-chat" }
+    }
+}
+```
 
-为满足不同运维场景，系统设计了两种运行模式。
+# 如何使用
 
-#### 1. 分阶段交互模式 (Interactive Mode)
-**适用场景**：疑难故障排查，需要专家介入确认关键决策（推荐默认）。
+1. 启动 **OpenCode **。
 
-- **使用流程**：
-  1. 用户触发诊断。
-  2. **伏羲** 生成计划 -> **暂停** -> 专家审核。
-  3. **大禹** 任务编排与执行 -> **暂停** -> 专家确认结果。
-  4. **白泽** 生成报告 -> **暂停** -> 专家确认根因。
-  5. **女娲** (可选) 生成修复方案 -> **暂停** -> 专家确认执行。
+2. 在终端执行命令：
+   
+   ```shell
+   auto-diag 故障问题描述
+   ```
+   
+   **说明**：当前支持离线分析，需在故障描述中指定**遥测数据 / 日志存储路径**。
+   
+   示例：
+   
+   ```shell
+   auto-diag "请诊断2026-03-05 14:31前最近一次硬盘故障，日志路径：/tmp/diskfault/logs"
+   ```
+   
+   ![wittywork命令](docs/assets/wittywork.png)
 
-#### 2. 全自动端到端模式 (End-to-End Mode)
-**适用场景**：标准化故障自动检测与修复。
+3. 系统将自动执行**智能诊断**流程。
 
-- **使用方式**（任选其一）：
-  1. **关键指令触发**：使用 `autopilot` 关键字（如 "autopilot 排查..."）。
-  2. **特定 Agent**：直接呼叫 **Xuanyuan (轩辕)**。
-- **执行流程**：
-  - 触发 -> **伏羲** 规划 -> **大禹** 编排与执行 -> **白泽** 分析 -> **女娲** (可选) 修复 -> 输出报告。
+4. 诊断完成后，根据终端输出的报告路径，查看完整的诊断分析报告。
+   
+   ![诊断报告](docs/assets/diagnosis_report.png)
 
-## 使用说明
+# 如何贡献
 
-1. **选择 Agent**：在 OpenCode 中选择具体的 Agent（如 **Fuxi/Dayu**）。
-2. **输入故障诊断**：描述故障现象（如 "排查 API 响应超时"），Agent 将自动启动诊断流程。
+## 社区贡献
 
-![alt text](docs/assets/699631f4-b818-4512-b606-845c2ffd6fac.png)
+我们诚挚欢迎新贡献者加入项目，也会为新加入者提供全面的指导与帮助。请注意：贡献代码前，请先签署 [CLA](https://clasign.osinfra.cn/sign/6983225bdcbb19710248ccf0)，再参考 [代码贡献指引](https://www.openeuler.org/zh/community/contribution/detail#_4-2-代码类贡献) 提交代码。
 
-更详细的每个 Agent 的使用说明，请参考对应的文档：
-- [Features](docs/reference/features.md)
-- [CLI](docs/reference/cli.md)
-- [Configuration](docs/reference/configuration.md)
+## 问题讨论
 
-- **安装插件**：参考上文安装步骤。
-- **触发诊断**：在 OpenCode 中直接使用自然语言描述故障（如“排查 API 响应慢”）。
-- **查看报告**：诊断完成后会自动生成 Markdown 报告。
+若您有任何疑问、建议或讨论需求，可通过以下方式联系我们：
 
-## 扩展开发
+- 提交 [issue](https://atomgit.com/openeuler/witty-diagnosis-agent/issues)
 
-OpenCode 支持通过 **Skills** 和 **MCP (Model Context Protocol)** 进行灵活扩展。详细扩展方式请参阅：[Skill 接口规范](docs/standards/skill-interfaces.md)
+- 发送邮件至 [intelligence@openeuler.org](mailto:intelligence@openeuler.org)
 
-### 1. Skills 扩展 (自定义能力)
-Skills 是特定的任务指令集，支持 Markdown 格式定义。
+# License
 
-- **存放位置**：
-  - **项目级**：`.opencode/skills/*.md` (仅当前项目可用)
-  - **全局级**：`~/.opencode/skills/*.md` (所有项目可用)
-
-- **定义示例** (`hello.md`)：
-  ```markdown
-  ---
-  name: hello
-  description: Say hello to the user
-  ---
-  # Instruction
-  When the user says hello, reply with a friendly greeting and the current time.
-  ```
-
-### 2. MCP 扩展 (外部工具集成)
-支持集成标准 MCP Server，赋予 Agent 操作外部系统（如数据库、API）的能力。
-
-- **配置方式**：在 Skill 的 Frontmatter 中添加 `mcp` 配置。
-- **示例** (集成 SQLite MCP)：
-  ```markdown
-  ---
-  name: database-tool
-  description: Access local SQLite database
-  mcp:
-    sqlite:
-      command: uvx
-      args:
-        - mcp-server-sqlite
-        - --db-path
-        - ./my-data.db
-  ---
-  You can now use the `sqlite` tool to query the database.
-  ```
-## 故障排查
-
-遇到问题？请查看：[Troubleshooting](docs/troubleshooting/opencode.md)
+本项目采用 **MIT** 开源协议，详情请参阅项目根目录下的 LICENSE 文件。
