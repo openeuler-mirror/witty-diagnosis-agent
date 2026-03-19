@@ -1,3 +1,4 @@
+import which from "which";
 import { spawnWithWindowsHide } from "../../../shared/spawn-with-windows-hide"
 
 export interface GhCliInfo {
@@ -12,7 +13,7 @@ export interface GhCliInfo {
 
 async function checkBinaryExists(binary: string): Promise<{ exists: boolean; path: string | null }> {
   try {
-    const binaryPath = Bun.which(binary)
+    const binaryPath = which.sync(binary, { nothrow: true })
     return { exists: Boolean(binaryPath), path: binaryPath ?? null }
   } catch {
     return { exists: false, path: null }

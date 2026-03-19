@@ -1,6 +1,7 @@
+import { promises as fsPromises } from "fs";
 import { chmodSync, existsSync, mkdirSync, unlinkSync } from "node:fs";
 import * as path from "node:path";
-import { spawn } from "bun";
+import { spawn } from "node:child_process";
 import { extractZip } from "./zip-extractor";
 
 export function getCachedBinaryPath(cacheDir: string, binaryName: string): string | null {
@@ -21,7 +22,7 @@ export async function downloadArchive(downloadUrl: string, archivePath: string):
   }
 
   const arrayBuffer = await response.arrayBuffer();
-  await Bun.write(archivePath, arrayBuffer);
+  await fsPromises.writeFile(archivePath, Buffer.from(arrayBuffer));
 }
 
 export async function extractTarGz(
@@ -30,15 +31,19 @@ export async function extractTarGz(
   options?: { args?: string[]; cwd?: string }
 ): Promise<void> {
   const args = options?.args ?? ["tar", "-xzf", archivePath, "-C", destDir];
-  const proc = spawn(args, {
+  const [cmd, ...cmdArgs] = args;
+  const proc = spawn(cmd, cmdArgs, {
     cwd: options?.cwd,
-    stdout: "pipe",
-    stderr: "pipe",
+    stdio: ["pipe", "pipe", "pipe"],
   });
 
-  const exitCode = await proc.exited;
+  const exitCode = await new Promise<number | null>((resolve) => proc.on("exit", resolve));
   if (exitCode !== 0) {
-    const stderr = await new Response(proc.stderr).text();
+    const stderr = await new Promise<string>((resolve) => {
+      let data = "";
+      proc.stderr?.on("data", (chunk) => data += chunk);
+      proc.stderr?.on("end", () => resolve(data));
+    });
     throw new Error(`tar extraction failed (exit ${exitCode}): ${stderr}`);
   }
 }

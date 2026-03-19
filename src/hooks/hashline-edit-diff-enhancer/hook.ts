@@ -1,3 +1,4 @@
+import { promises as fsPromises } from "fs";
 import { log } from "../../shared"
 import { generateUnifiedDiff, countLineDiffs } from "../../tools/hashline-edit/diff-utils"
 
@@ -79,7 +80,7 @@ export function createHashlineEditDiffEnhancerHook(config: HashlineEditDiffEnhan
 
 			let newContent: string
 			try {
-				newContent = await Bun.file(filePath).text()
+				newContent = await fsPromises.readFile(filePath, 'utf-8')
 			} catch {
 				log("[hashline-edit-diff-enhancer] failed to read new content", { filePath })
 				return

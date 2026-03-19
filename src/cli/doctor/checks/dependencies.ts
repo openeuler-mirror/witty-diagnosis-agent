@@ -1,3 +1,4 @@
+import which from "which";
 import { existsSync } from "node:fs"
 import { createRequire } from "node:module"
 import { dirname, join } from "node:path"
@@ -7,7 +8,7 @@ import { spawnWithWindowsHide } from "../../../shared/spawn-with-windows-hide"
 
 async function checkBinaryExists(binary: string): Promise<{ exists: boolean; path: string | null }> {
   try {
-    const path = Bun.which(binary)
+    const path = which.sync(binary, { nothrow: true })
     if (path) {
       return { exists: true, path }
     }

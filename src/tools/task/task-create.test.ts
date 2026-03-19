@@ -1,3 +1,4 @@
+import { promises as fsPromises } from "fs";
 import { describe, test, expect, beforeEach, afterEach } from "bun:test"
 import { existsSync, rmSync, mkdirSync } from "fs"
 import { join } from "path"
@@ -84,7 +85,7 @@ describe("task_create tool", () => {
       //#then
       const taskFile = join(TEST_DIR, `${taskId}.json`)
       expect(existsSync(taskFile)).toBe(true)
-      const taskContent = JSON.parse(await Bun.file(taskFile).text())
+      const taskContent = JSON.parse(await fsPromises.readFile(taskFile, 'utf-8'))
       expect(taskContent.threadID).toBe(TEST_SESSION_ID)
     })
 
@@ -101,7 +102,7 @@ describe("task_create tool", () => {
 
       //#then
       const taskFile = join(TEST_DIR, `${taskId}.json`)
-      const taskContent = JSON.parse(await Bun.file(taskFile).text())
+      const taskContent = JSON.parse(await fsPromises.readFile(taskFile, 'utf-8'))
       expect(taskContent.status).toBe("pending")
     })
 
@@ -118,7 +119,7 @@ describe("task_create tool", () => {
 
       //#then
       const taskFile = join(TEST_DIR, `${taskId}.json`)
-      const taskContent = JSON.parse(await Bun.file(taskFile).text())
+      const taskContent = JSON.parse(await fsPromises.readFile(taskFile, 'utf-8'))
       expect(taskContent.blocks).toEqual([])
       expect(taskContent.blockedBy).toEqual([])
     })
@@ -137,7 +138,7 @@ describe("task_create tool", () => {
 
       //#then
       const taskFile = join(TEST_DIR, `${taskId}.json`)
-      const taskContent = JSON.parse(await Bun.file(taskFile).text())
+      const taskContent = JSON.parse(await fsPromises.readFile(taskFile, 'utf-8'))
       expect(taskContent.description).toBe("This is a test description")
     })
 
@@ -155,7 +156,7 @@ describe("task_create tool", () => {
 
       //#then
       const taskFile = join(TEST_DIR, `${taskId}.json`)
-      const taskContent = JSON.parse(await Bun.file(taskFile).text())
+      const taskContent = JSON.parse(await fsPromises.readFile(taskFile, 'utf-8'))
       expect(taskContent.activeForm).toBe("Implementing authentication")
     })
 
@@ -173,7 +174,7 @@ describe("task_create tool", () => {
 
       //#then
       const taskFile = join(TEST_DIR, `${taskId}.json`)
-      const taskContent = JSON.parse(await Bun.file(taskFile).text())
+      const taskContent = JSON.parse(await fsPromises.readFile(taskFile, 'utf-8'))
       expect(taskContent.metadata).toEqual({ priority: "high", tags: ["urgent"] })
     })
 
@@ -191,7 +192,7 @@ describe("task_create tool", () => {
 
       //#then
       const taskFile = join(TEST_DIR, `${taskId}.json`)
-      const taskContent = JSON.parse(await Bun.file(taskFile).text())
+      const taskContent = JSON.parse(await fsPromises.readFile(taskFile, 'utf-8'))
       expect(taskContent.blockedBy).toEqual(["T-123", "T-456"])
     })
 
@@ -209,7 +210,7 @@ describe("task_create tool", () => {
 
       //#then
       const taskFile = join(TEST_DIR, `${taskId}.json`)
-      const taskContent = JSON.parse(await Bun.file(taskFile).text())
+      const taskContent = JSON.parse(await fsPromises.readFile(taskFile, 'utf-8'))
       expect(taskContent.blocks).toEqual(["T-789", "T-101"])
     })
 
@@ -227,7 +228,7 @@ describe("task_create tool", () => {
 
       //#then
       const taskFile = join(TEST_DIR, `${taskId}.json`)
-      const taskContent = JSON.parse(await Bun.file(taskFile).text())
+      const taskContent = JSON.parse(await fsPromises.readFile(taskFile, 'utf-8'))
       expect(taskContent.repoURL).toBe("https://github.com/example/repo")
     })
 
@@ -245,7 +246,7 @@ describe("task_create tool", () => {
 
       //#then
       const taskFile = join(TEST_DIR, `${taskId}.json`)
-      const taskContent = JSON.parse(await Bun.file(taskFile).text())
+      const taskContent = JSON.parse(await fsPromises.readFile(taskFile, 'utf-8'))
       expect(taskContent.parentID).toBe("T-parent-123")
     })
 
@@ -292,7 +293,7 @@ describe("task_create tool", () => {
       //#then
       const taskFile = join(TEST_DIR, `${taskId}.json`)
       expect(existsSync(taskFile)).toBe(true)
-      const taskContent = JSON.parse(await Bun.file(taskFile).text())
+      const taskContent = JSON.parse(await fsPromises.readFile(taskFile, 'utf-8'))
       expect(taskContent.id).toBe(taskId)
       expect(taskContent.subject).toBe("Test task")
       expect(taskContent.description).toBe("Test description")

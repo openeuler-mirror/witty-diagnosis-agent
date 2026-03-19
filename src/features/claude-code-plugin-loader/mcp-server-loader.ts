@@ -1,3 +1,4 @@
+import { promises as fsPromises } from "fs";
 import { existsSync } from "fs"
 import type { McpServerConfig } from "../claude-code-mcp-loader/types"
 import { expandEnvVarsInObject } from "../claude-code-mcp-loader/env-expander"
@@ -16,7 +17,7 @@ export async function loadPluginMcpServers(
     if (!plugin.mcpPath || !existsSync(plugin.mcpPath)) continue
 
     try {
-      const content = await Bun.file(plugin.mcpPath).text()
+      const content = await fsPromises.readFile(plugin.mcpPath, 'utf-8')
       let config = JSON.parse(content) as ClaudeCodeMcpConfig
 
       config = resolvePluginPaths(config, plugin.installPath)

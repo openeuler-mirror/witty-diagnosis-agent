@@ -1,3 +1,4 @@
+import { promises as fsPromises } from "fs";
 import { join } from "path"
 import { existsSync } from "fs"
 import { getClaudeConfigDir } from "../../shared"
@@ -89,7 +90,7 @@ export async function loadClaudeHooksConfig(
   for (const settingsPath of paths) {
     if (existsSync(settingsPath)) {
       try {
-        const content = await Bun.file(settingsPath).text()
+        const content = await fsPromises.readFile(settingsPath, 'utf-8')
         const settings = JSON.parse(content) as { hooks?: RawClaudeHooksConfig }
         if (settings.hooks) {
           const normalizedHooks = normalizeHooksConfig(settings.hooks)

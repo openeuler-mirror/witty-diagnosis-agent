@@ -1,3 +1,4 @@
+import which from "which";
 import { describe, expect, it } from "bun:test"
 import { delimiter, join } from "node:path"
 import {
@@ -8,7 +9,7 @@ import {
 } from "./opencode-binary-resolver"
 
 describe("collectCandidateBinaryPaths", () => {
-  it("includes Bun.which results first and removes duplicates", () => {
+  it("includes ((cmd: string) => which.sync(cmd, { nothrow: true })) results first and removes duplicates", () => {
     // given
     const pathEnv = ["/bad", "/good"].join(delimiter)
     const which = (command: string): string | undefined => {

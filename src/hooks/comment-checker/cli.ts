@@ -1,4 +1,4 @@
-import { spawn } from "bun"
+import { spawn } from "node:child_process"
 import { createRequire } from "module"
 import { dirname, join } from "path"
 import { existsSync } from "fs"
@@ -172,10 +172,8 @@ export async function runCommentChecker(input: HookInput, cliPath?: string, cust
       args.push("--prompt", customPrompt)
     }
 
-    const proc = spawn(args, {
-      stdin: "pipe",
-      stdout: "pipe",
-      stderr: "pipe",
+    const proc = spawn(args[0], args.slice(1), {
+      stdio: ["pipe", "pipe", "pipe"],
     })
 
     let timeoutId: ReturnType<typeof setTimeout> | null = null
@@ -196,7 +194,7 @@ export async function runCommentChecker(input: HookInput, cliPath?: string, cust
           }
         }, 1000)
         try {
-          await proc.exited
+          await new Promise((resolve) => proc.on("exit", resolve))
         } catch {
         }
         clearTimeout(graceTimer)
@@ -209,9 +207,17 @@ export async function runCommentChecker(input: HookInput, cliPath?: string, cust
       proc.stdin.write(jsonInput)
       proc.stdin.end()
 
-      const stdoutPromise = new Response(proc.stdout).text()
-      const stderrPromise = new Response(proc.stderr).text()
-      const exitCodePromise = proc.exited
+      const stdoutPromise = new Promise<string>((resolve) => {
+        let data = ""
+        proc.stdout?.on("data", chunk => data += chunk)
+        proc.stdout?.on("end", () => resolve(data))
+      })
+      const stderrPromise = new Promise<string>((resolve) => {
+        let data = ""
+        proc.stderr?.on("data", chunk => data += chunk)
+        proc.stderr?.on("end", () => resolve(data))
+      })
+      const exitCodePromise = new Promise<number | null>((resolve) => proc.on("exit", resolve))
 
       const raceResult = await Promise.race([
         Promise.all([stdoutPromise, stderrPromise, exitCodePromise] as const),

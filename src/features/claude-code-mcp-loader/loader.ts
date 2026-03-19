@@ -1,3 +1,4 @@
+import { promises as fsPromises } from "fs";
 import { existsSync, readFileSync } from "fs"
 import { join } from "path"
 import { homedir } from "os"
@@ -36,7 +37,7 @@ async function loadMcpConfigFile(
   }
 
   try {
-    const content = await Bun.file(filePath).text()
+    const content = await fsPromises.readFile(filePath, 'utf-8')
     return JSON.parse(content) as ClaudeCodeMcpConfig
   } catch (error) {
     log(`Failed to load MCP config from ${filePath}`, error)
