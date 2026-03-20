@@ -12,16 +12,18 @@ description: 通过 crash 工具深度分析 Linux vmcore 文件，解决各类�
 用户提供的 vmcore 文件的具体路径，目录结构里面的内容是标准的，参考如下：
 
 ```text
-pcie_panic/   # 故障文件夹 
-├── src       # 可选，源码路径，如果存在则要针对问题进行源码分析 
-├── vmcore # 核心vmcore文件 
-└── vmlinux # vmlinux命令 
+pcie_panic/     # 故障文件夹 
+├── src/        # 可选，源码路径，如果存在则要针对问题进行源码分析 
+├── crash       # crash命令 
+├── vmlinux     # vmlinux命令  
+└── vmcore_log/ # 包含vmcore文件以及其他文件的目录
+    └── vmcore  # 崩溃转储文件
 ```
 
 **执行命令：**
 
 ```bash
-cd pcie_panic && crash ./vmlinux vmcore
+cd pcie_panic && ./crash ./vmlinux vmcore_log/vmcore
 ```
 
 ## 核心理念：区分分析场景
@@ -321,6 +323,229 @@ crash> struct task_struct.state,comm,parent <addr> # [推荐] 只看关键字段
 一旦确定了问题区域，再结合 `dis -l <function>` 反汇编代码，完成从“数据”到“逻辑”的闭环。
 
 使用 `scripts/analyze_struct.py` 进行自动化结构体分析。
+
+### 第四阶段 B：源代码分析 (Source Code Analysis)
+
+**适用场景：** 当用户提供了 `src` 目录（内核源码）时，必须结合源码进行深度分析。
+
+**⚠️ 重要原则：**
+- 源码分析是**证据验证**的重要手段，不是猜测的依据
+- 每一个从源码得出的结论，都必须有 crash dump 中的数据作为佐证
+- 当 crash 数据与源码矛盾时，**以 crash 数据为准**
+- 场景条件不确认时，**不要乱给结论**，标注为"待验证假设"
+
+#### 4B-1. 源码目录识别
+
+标准目录结构如下：
+
+```
+故障文件夹/
+├── src                              # 可选，内核源码目录
+│   └── <kernel_version>/            # 内核版本目录 (如 linux-4.19.90-xxx)
+│       ├── arch/                    # 架构相关代码 (x86, arm, aarch64 等)
+│       ├── block/                    # 块设备驱动
+│       ├── certs/                    # 证书签名相关
+│       ├── crypto/                   # 加密子系统
+│       ├── Documentation/            # 内核文档
+│       ├── drivers/                  # 设备驱动程序
+│       ├── firmware/                 # 固件 blob
+│       ├── fs/                       # 文件系统
+│       ├── include/                  # 头文件
+│       ├── init/                     # 初始化代码
+│       ├── ipc/                      # 进程间通信
+│       ├── kernel/                   # 内核核心代码
+│       ├── lib/                      # 通用库
+│       ├── mm/                       # 内存管理
+│       ├── net/                      # 网络协议栈
+│       ├── samples/                  # 示例代码
+│       ├── scripts/                  # 编译脚本
+│       ├── security/                 # 安全模块
+│       ├── sound/                    # 声音子系统
+│       ├── tools/                    # 工具
+│       ├── usr/                      # 用户空间初始化
+│       ├── virt/                     # 虚拟化
+│       ├── Makefile                  # 顶层 Makefile
+│       └── Kconfig                   # 配置定义
+├── crash                             # crash 命令
+├── vmlinux                           # 内核镜像
+└── vmcore_log/
+    └── vmcore                        # 崩溃转储文件
+```
+
+#### 4B-2. 源码分析的核心价值
+
+| 价值 | 说明 |
+|------|------|
+| **代码逻辑验证** | 验证 crash 数据中的调用路径是否符合源码逻辑 |
+| **初始化路径追踪** | 追踪指针/变量的初始化路径，找出未初始化的根因 |
+| **错误处理审计** | 检查错误路径是否正确释放资源 |
+| **锁顺序验证** | 验证死锁场景中的锁获取顺序 |
+| **版本匹配确认** | 确认 vmlinux 与源码版本一致 |
+
+#### 4B-3. 源码分析工作流
+
+**步骤 1：确认源码版本匹配**
+
+```bash
+# 从 vmcore 获取内核版本
+crash> sys | grep -i "kernel"
+
+# 从源码获取版本
+head -20 src/Makefile | grep "VERSION"
+cat src/include/generated/uapi/linux/version.h 2>/dev/null || \
+grep -E "UTS_VERSION|linux_banner" src/version.h 2>/dev/null || \
+grep -r "Linux version" src --include="*.c" | head -5
+```
+
+⚠️ **必须验证**：如果源码版本与 vmlinux 不匹配，源码分析的结论**无效**。
+
+**步骤 2：定位崩溃函数源码**
+
+```bash
+# 从 bt 获取崩溃函数名
+crash> bt | head -20
+# #0  [<ffffffff81234567>] driver_function+0x23/0x100 at driver.c:456
+
+# 在源码中定位
+grep -rn "driver_function" src/
+# src/drivers/net/ethernet/example/driver.c:123: static int driver_function(...)
+```
+
+**步骤 3：追踪变量初始化路径**
+
+这是源码分析**最重要**的任务之一。当发现空指针解引用时：
+
+```
+分析模板：
+1. 崩溃点：哪个指针为 NULL？
+2. 该指针应该在哪里被初始化？
+3. 追踪从创建到使用的完整路径
+4. 在哪一步出现了问题？
+```
+
+**示例分析：**
+
+```
+崩溃点：driver.c:456, request->ptr 为 NULL
+
+源码追踪：
+1. request 在 driver.c:100 创建 (kzalloc)
+2. driver_function 在 driver.c:200 调用 process_request
+3. process_request 在 driver.c:300 分支：
+   - 正常路径：ptr 被正确初始化 (line 350)
+   - 错误路径：ptr 未初始化直接返回 (line 380)
+4. 崩溃发生在 driver_function 调用时 (line 456)
+
+结论：错误路径(line 380)缺少初始化，是根本原因
+```
+
+**步骤 4：验证错误处理路径**
+
+```bash
+# 查找函数的错误处理分支
+grep -n "error\|fail\|NULL\|return.*-E" src/driver.c | head -30
+
+# 使用 cflow 或其他工具追踪调用图
+cflow -d 50 src/driver.c 2>/dev/null | head -50
+```
+
+**步骤 5：分析锁竞争场景**
+
+```bash
+# 查找所有锁操作
+grep -rn "mutex_lock\|spin_lock\|rwlock" src/ | grep "function_name"
+
+# 检查锁顺序
+# 在源码中标记锁获取顺序，验证是否存在 ABBA 死锁
+```
+
+#### 4B-4. 源码分析的证据要求
+
+**⚠️ 强制要求：源码结论必须有 crash 数据佐证**
+
+| 源码结论 | 必须的 crash 证据 |
+|----------|-------------------|
+| "错误路径未初始化" | `struct` 显示该成员为 NULL/未定义值 |
+| "锁顺序错误" | `bt -l` 显示两个进程持有相反的锁 |
+| "资源泄漏" | `kmem -s` 显示对应 slab 增长 |
+| "竞态条件" | `bt -a` 显示多 CPU 同时执行同一代码路径 |
+| "函数调用顺序异常" | `bt` 显示的调用栈与源码逻辑矛盾 |
+
+#### 4B-5. 源码分析检查清单
+
+在完成源码分析后，必须验证：
+
+□ 源码版本与 vmlinux 版本一致
+□ 崩溃函数在源码中可定位
+□ 源码逻辑与 crash bt 路径匹配
+□ 每个源码结论都有 crash 数据佐证
+□ 标注了所有"待验证"的假设
+□ 当矛盾时，以 crash 数据为准
+
+#### 4B-6. 常见源码分析模式
+
+**模式 A：空指针解引用**
+
+```
+源码分析方法：
+1. 定位崩溃函数
+2. 追踪问题指针的来源
+3. 找出所有可能设置该指针的位置
+4. 确定哪个路径漏掉了初始化
+
+示例命令：
+grep -rn "ptr\s*=" src/ --include="*.c" | grep -v "ptr = ptr"
+```
+
+**模式 B：内存泄漏**
+
+```
+源码分析方法：
+1. 从 kmem -s 定位泄漏的 cache 名称
+2. 在源码中查找所有对该 cache 的 alloc/free 调用
+3. 验证每个 alloc 都有对应的 free
+4. 找出未配对的错误路径
+
+示例命令：
+grep -rn "kmem_cache_alloc\|kmalloc" src/driver.c
+grep -rn "kmem_cache_free\|kfree" src/driver.c
+```
+
+**模式 C：死锁**
+
+```
+源码分析方法：
+1. 从 bt 获取涉及的锁地址
+2. 在源码中定位锁的定义位置
+3. 分析涉及的函数调用路径
+4. 验证锁获取顺序是否在所有路径中一致
+
+示例命令：
+grep -rn "DEFINE_MUTEX\|static.*mutex" src/
+```
+
+**模式 D：use-after-free**
+
+```
+源码分析方法：
+1. 从 rd 读取问题地址，检查是否有 poison 值 (0x6b6b6b6b)
+2. 在源码中查找该对象的 free 调用点
+3. 追踪是否有代码路径在 free 后继续使用该指针
+
+示例命令：
+grep -rn "kfree\|kmem_cache_free" src/ | grep -B5 -A5 "object_name"
+```
+
+#### 4B-7. 当源码不存在时的处理
+
+如果用户**未提供** src 目录：
+
+1. 使用 `dis -l <function>` 进行反汇编分析
+2. 使用 `crash> files` / `crash> mod` 获取更多上下文
+3. 在结论中明确标注："由于缺少源码，无法进行代码逻辑验证"
+4. 侧重于 crash 数据分析，给出基于 crash 证据的结论
+
+---
 
 ### 第五阶段：根本原因分析与验证
 
@@ -688,12 +913,14 @@ ps → bt <pid> → bt -l → waitq
 - `references/analysis_patterns.md` - 常见的故障模式和特征
 - `references/troubleshooting.md` - 环境问题和符号解析
 - `references/root_cause_analysis.md` - **关键：深度 RCA 方法论和案例研究**
+- `references/source_code_structure.md` - 内核源码目录结构参考
 
 **何时阅读：**
 - `crash_commands.md` - 当你需要特定 crash 命令的语法时
 - `analysis_patterns.md` - 当识别故障特征 (NULL 解引用, OOM, 死锁) 时
 - `troubleshooting.md` - 当 crash 工具本身出现问题时
 - `root_cause_analysis.md` - **当从阶段 4 进入阶段 5 时务必阅读**
+- `source_code_structure.md` - **当需要进行源码分析时**
 
 ## 最佳实践
 
@@ -707,6 +934,8 @@ ps → bt <pid> → bt -l → waitq
 8. **上下文很重要** - 负载类型影响解释
 9. **符号验证** - 不匹配的符号会产生垃圾输出
 10. **渐进式聚焦** - 从宽泛开始，根据发现缩小范围
+11. **源码佐证** - 当有 src 时，源码结论必须由 crash 数据佐证
+12. **版本匹配** - 源码版本必须与 vmlinux 版本一致，否则结论无效
 
 ## 分析思维模式
 
