@@ -46,9 +46,9 @@ export function createKeywordDetectorHook(ctx: PluginInput, _collector?: Context
         detectedKeywords = detectedKeywords.filter((k) => k.type !== "ultrawork")
       }
 
-      // Fuxi 专用：仅在 Fuxi 会话中启用 wittywork 模式关键字
+      // Fuxi 专用：仅在 Fuxi 会话中启用 auto-diag 模式关键字
       if (!normalizedAgent.includes("fuxi")) {
-        detectedKeywords = detectedKeywords.filter((k) => k.type !== "wittywork")
+        detectedKeywords = detectedKeywords.filter((k) => k.type !== "auto-diag")
       }
 
       if (detectedKeywords.length === 0) {
@@ -68,7 +68,7 @@ export function createKeywordDetectorHook(ctx: PluginInput, _collector?: Context
       if (isNonMainSession) {
         detectedKeywords = detectedKeywords.filter((k) => {
           if (k.type === "ultrawork") return true
-          if (k.type === "wittywork" && normalizedAgent.includes("fuxi")) return true
+          if (k.type === "auto-diag" && normalizedAgent.includes("fuxi")) return true
           return false
         })
         if (detectedKeywords.length === 0) {
