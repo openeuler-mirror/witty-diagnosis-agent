@@ -1,9 +1,5 @@
 <div align="center">
-<<<<<<< HEAD
-<img src="docs/assets/witty-diagnosis-agent_logo.png" alt="Witty Diagnosis Agent Logo" width="600" />
-=======
   <img src="docs/assets/witty-diagnosis-agent_logo.png" alt="Witty Diagnosis Agent Logo" width="600" />
->>>>>>> 80944dd (docs: 统一 readme 标题层级，优化排版结构)
 </div>
 
 Witty 智能诊断 Agent 基于「假设-验证」（Hypothetico-Deductive）故障排查范式与 Multi-Agent 协同架构，提供分钟级、代码行级的全自动故障诊断能力。
