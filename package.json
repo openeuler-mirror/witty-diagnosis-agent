@@ -1,16 +1,16 @@
 {
   "name": "witty-diagnosis-agent",
-  "version": "1.0.19",
+  "version": "0.1.0-beta",
   "description": "Witty Diagnosis Agent - OpenCode Plugin",
   "keywords": [
     "witty-diagnosis-agent"
   ],
   "repository": {
     "type": "git",
-    "url": "https://atomgit.com/huangqz2022/witty-diagnosis-agent.git"
+    "url": "https://gitcode.com/openeuler/witty-diagnosis-agent.git"
   },
   "license": "MIT",
-  "author": "qzh",
+  "author": "witty-diagnosis-agent",
   "type": "module",
   "main": "dist/index.js",
   "exports": {
@@ -61,7 +61,6 @@
     "@types/node": "^25.3.3",
     "@types/picomatch": "^3.0.2",
     "@types/which": "^3.0.4",
-    "bun-types": "^1.3.11",
     "tsup": "^8.5.1",
     "tsx": "^4.21.0",
     "typescript": "^5.3.3"

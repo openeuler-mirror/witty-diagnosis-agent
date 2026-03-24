@@ -3,10 +3,18 @@ import { createHashlineChunkFormatter } from "./hashline-chunk-formatter"
 
 const RE_SIGNIFICANT = /[\p{L}\p{N}]/u
 
+function hash32(str: string, seed: number): number {
+  let h = seed >>> 0;
+  for (let i = 0; i < str.length; i++) {
+    h = Math.imul(31, h) + (str.charCodeAt(i) | 0) | 0;
+  }
+  return (h >>> 0);
+}
+
 export function computeLineHash(lineNumber: number, content: string): string {
   const stripped = content.endsWith("\r") ? content.slice(0, -1).replace(/\s+/g, "") : content.replace(/\s+/g, "")
   const seed = RE_SIGNIFICANT.test(stripped) ? 0 : lineNumber
-  const hash = Bun.hash.xxHash32(stripped, seed)
+  const hash = hash32(stripped, seed)
   const index = hash % 256
   return HASHLINE_DICT[index]
 }
