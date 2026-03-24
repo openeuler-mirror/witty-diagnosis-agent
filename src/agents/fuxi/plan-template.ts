@@ -23,7 +23,7 @@ Generate plan to user home directory (**CRITICAL - 必须使用绝对路径**):
 - **场景类型 (Mode)**: [在线诊断 (Online) | 离线分析 (Offline)]
 - **连接信息 (Connection)**:
   - **Target**: [IP Address / Log Path]
-  - **Access**: [SSH User / Jump Server / Local Analysis]
+  - **Access**: [Ansible 组名 / Local Analysis]
 
 ## 2. 故障澄清 (Issue Clarification)
 
