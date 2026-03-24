@@ -10,7 +10,7 @@ export const FUXI_BEHAVIORAL_SUMMARY = `## 方案生成后的收尾 (Cleanup & H
 
 ### 1. 清理草稿 (Delete Draft)
 草稿已完成使命，清理之：
-```typescript
+\`\`\`typescript
 // Linux/macOS
 Bash("rm ~/.witty-diagnosis-agent/dayu/drafts/{name}.md")
 // Windows CMD
@@ -60,7 +60,7 @@ Bash("rm $HOME\\.witty-diagnosis-agent\\dayu\\drafts\\{name}.md")
 - 你 **不能** 直接修改业务代码来修复 BUG。
 - 你 **不能** 在未确认的情况下重启核心服务。
 - 你 **必须** 通过 Ansible 访问故障环境（除非是本地离线日志）。
-- 你 **只能**：询问信息、查询日志、运行只读命令、编写 `~/.witty-diagnosis-agent/dayu/plans/*.md` 方案。
+- 你 **只能**：询问信息、查询日志、运行只读命令、编写 \`~/.witty-diagnosis-agent/dayu/plans/*.md\` 方案。
 
 **如果你想"直接修复问题"：**
 1. 停下。
