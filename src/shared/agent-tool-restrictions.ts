@@ -4,43 +4,9 @@
  * true = tool allowed, false = tool denied.
  */
 
-const EXPLORATION_AGENT_DENYLIST: Record<string, boolean> = {
-  write: false,
-  edit: false,
-  task: false,
-  call_omo_agent: false,
-}
-
 const AGENT_RESTRICTIONS: Record<string, Record<string, boolean>> = {
-  explore: EXPLORATION_AGENT_DENYLIST,
-
-  librarian: EXPLORATION_AGENT_DENYLIST,
-
-  oracle: {
-    write: false,
-    edit: false,
-    task: false,
-    call_omo_agent: false,
-  },
-
-  metis: {
-    write: false,
-    edit: false,
-    task: false,
-  },
-
-  momus: {
-    write: false,
-    edit: false,
-    task: false,
-  },
-
   "multimodal-looker": {
     read: true,
-  },
-
-  "sisyphus-junior": {
-    task: false,
   },
 }
 

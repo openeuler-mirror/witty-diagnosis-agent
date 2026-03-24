@@ -502,8 +502,8 @@ describe("Sisyphus-Junior agent override", () => {
     expect(result.success).toBe(true)
     if (result.success) {
       expect(result.data.agents?.sisyphus?.temperature).toBe(0.1)
-      expect(result.data.agents?.atlas?.temperature).toBe(0.2)
-      expect(result.data.agents?.prometheus?.temperature).toBe(0.3)
+      expect(result.data.agents?.fuxi?.temperature).toBe(0.2)
+      expect(result.data.agents?.dayu?.temperature).toBe(0.3)
     }
   })
 

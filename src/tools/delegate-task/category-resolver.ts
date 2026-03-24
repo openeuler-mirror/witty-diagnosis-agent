@@ -3,12 +3,13 @@ import type { DelegateTaskArgs } from "./types"
 import type { ExecutorContext } from "./executor-types"
 import type { FallbackEntry } from "../../shared/model-requirements"
 import { mergeCategories } from "../../shared/merge-categories"
-import { SISYPHUS_JUNIOR_AGENT } from "./sisyphus-junior-agent"
 import { resolveCategoryConfig } from "./categories"
 import { parseModelString } from "./model-string-parser"
 import { CATEGORY_MODEL_REQUIREMENTS } from "../../shared/model-requirements"
 import { getAvailableModelsForDelegateTask } from "./available-models"
 import { resolveModelForDelegateTask } from "./model-selection"
+
+const DEFAULT_CATEGORY_AGENT = "hephaestus"
 
 export interface CategoryResolutionResult {
   agentToUse: string
@@ -18,7 +19,7 @@ export interface CategoryResolutionResult {
   modelInfo: ModelFallbackInfo | undefined
   actualModel: string | undefined
   isUnstableAgent: boolean
-  fallbackChain?: FallbackEntry[]  // For runtime retry on model errors
+  fallbackChain?: FallbackEntry[]
   error?: string
 }
 
@@ -28,7 +29,7 @@ export async function resolveCategoryExecution(
   inheritedModel: string | undefined,
   systemDefaultModel: string | undefined
 ): Promise<CategoryResolutionResult> {
-  const { client, userCategories, sisyphusJuniorModel } = executorCtx
+  const { client, userCategories } = executorCtx
 
   const availableModels = await getAvailableModelsForDelegateTask(client)
 
@@ -83,22 +84,18 @@ Available categories: ${allCategoryNames}`,
   let modelInfo: ModelFallbackInfo | undefined
   let categoryModel: { providerID: string; modelID: string; variant?: string } | undefined
 
-  const overrideModel = sisyphusJuniorModel
   const explicitCategoryModel = userCategories?.[args.category!]?.model
 
   if (!requirement) {
-    // Precedence: explicit category model > sisyphus-junior default > category resolved model
-    // This keeps `sisyphus-junior.model` useful as a global default while allowing
-    // per-category overrides via `categories[category].model`.
-    actualModel = explicitCategoryModel ?? overrideModel ?? resolved.model
+    actualModel = explicitCategoryModel ?? resolved.model
     if (actualModel) {
-      modelInfo = explicitCategoryModel || overrideModel
+      modelInfo = explicitCategoryModel
         ? { model: actualModel, type: "user-defined", source: "override" }
         : { model: actualModel, type: "system-default", source: "system-default" }
     }
   } else {
     const resolution = resolveModelForDelegateTask({
-      userModel: explicitCategoryModel ?? overrideModel,
+      userModel: explicitCategoryModel,
       categoryDefaultModel: resolved.model,
       fallbackChain: requirement.fallbackChain,
       availableModels,
@@ -123,7 +120,7 @@ Available categories: ${allCategoryNames}`,
       }
 
       const type: "user-defined" | "inherited" | "category-default" | "system-default" =
-        (explicitCategoryModel || overrideModel)
+        explicitCategoryModel
           ? "user-defined"
           : (systemDefaultModel && actualModel === systemDefaultModel)
               ? "system-default"
@@ -179,13 +176,12 @@ Available categories: ${categoryNames.join(", ")}`,
   const isUnstableAgent = resolved.config.is_unstable_agent === true || [unstableModel, categoryConfigModel].some(m => m ? m.includes("gemini") || m.includes("minimax") || m.includes("kimi") : false)
 
   return {
-    agentToUse: SISYPHUS_JUNIOR_AGENT,
+    agentToUse: DEFAULT_CATEGORY_AGENT,
     categoryModel,
     categoryPromptAppend,
     maxPromptTokens: resolved.config.max_prompt_tokens,
     modelInfo,
     actualModel,
     isUnstableAgent,
-    fallbackChain: requirement?.fallbackChain,
   }
 }

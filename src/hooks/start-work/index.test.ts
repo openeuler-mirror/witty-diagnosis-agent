@@ -12,7 +12,6 @@ import {
 import type { BoulderState } from "../../features/boulder-state"
 import * as sessionState from "../../features/claude-code-session-state"
 import * as worktreeDetector from "./worktree-detector"
-import * as worktreeDetector from "./worktree-detector"
 
 describe("start-work hook", () => {
   let testDir: string
@@ -385,7 +384,7 @@ describe("start-work hook", () => {
   })
 
   describe("session agent management", () => {
-    test("should update session agent to Atlas when start-work command is triggered", async () => {
+    test("should update session agent to Fuxi when start-work command is triggered", async () => {
       // given
       const updateSpy = spyOn(sessionState, "updateSessionAgent")
       
@@ -401,7 +400,7 @@ describe("start-work hook", () => {
       )
 
       // then
-      expect(updateSpy).toHaveBeenCalledWith("ses-prometheus-to-sisyphus", "atlas")
+      expect(updateSpy).toHaveBeenCalledWith("ses-prometheus-to-sisyphus", "fuxi")
       updateSpy.mockRestore()
     })
   })

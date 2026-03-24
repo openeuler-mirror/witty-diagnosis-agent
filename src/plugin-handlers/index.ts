@@ -6,7 +6,6 @@ export * from "./mcp-config-handler";
 export * from "./command-config-handler";
 export * from "./plugin-components-loader";
 export * from "./category-config-resolver";
-export * from "./prometheus-agent-config-builder";
 export * from "./fuxi-agent-config-builder";
 export * from "./dayu-agent-config-builder";
 export * from "./kuafu-agent-config-builder";

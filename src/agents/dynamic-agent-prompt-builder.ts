@@ -102,44 +102,9 @@ export function buildToolSelectionTable(
   }
 
   rows.push("")
-  rows.push("**Default flow**: explore/librarian (background) + tools → oracle (if required)")
+  rows.push("**Default flow**: tools → categories (if required)")
 
   return rows.join("\n")
-}
-
-export function buildExploreSection(agents: AvailableAgent[]): string {
-  const exploreAgent = agents.find((a) => a.name === "explore")
-  if (!exploreAgent) return ""
-
-  const useWhen = exploreAgent.metadata.useWhen || []
-  const avoidWhen = exploreAgent.metadata.avoidWhen || []
-
-  return `### Explore Agent = Contextual Grep
-
-Use it as a **peer tool**, not a fallback. Fire liberally.
-
-**Use Direct Tools when:**
-${avoidWhen.map((w) => `- ${w}`).join("\n")}
-
-**Use Explore Agent when:**
-${useWhen.map((w) => `- ${w}`).join("\n")}`
-}
-
-export function buildLibrarianSection(agents: AvailableAgent[]): string {
-  const librarianAgent = agents.find((a) => a.name === "librarian")
-  if (!librarianAgent) return ""
-
-  const useWhen = librarianAgent.metadata.useWhen || []
-
-  return `### Librarian Agent = Reference Grep
-
-Search **external references** (docs, OSS, web). Fire proactively when unfamiliar libraries are involved.
-
-**Contextual Grep (Internal)** — search OUR codebase, find patterns in THIS repo, project-specific logic.
-**Reference Grep (External)** — search EXTERNAL resources, official API docs, library best practices, OSS implementation examples.
-
-**Trigger phrases** (fire librarian immediately):
-${useWhen.map((w) => `- "${w}"`).join("\n")}`
 }
 
 export function buildDelegationTable(agents: AvailableAgent[]): string {
@@ -250,41 +215,6 @@ task(category="...", load_skills=[], run_in_background=false, prompt="...")  // 
 \`\`\``
 }
 
-export function buildOracleSection(agents: AvailableAgent[]): string {
-  const oracleAgent = agents.find((a) => a.name === "oracle")
-  if (!oracleAgent) return ""
-
-  const useWhen = oracleAgent.metadata.useWhen || []
-  const avoidWhen = oracleAgent.metadata.avoidWhen || []
-
-  return `<Oracle_Usage>
-## Oracle — Read-Only High-IQ Consultant
-
-Oracle is a read-only, expensive, high-quality reasoning model for debugging and architecture. Consultation only.
-
-### WHEN to Consult (Oracle FIRST, then implement):
-
-${useWhen.map((w) => `- ${w}`).join("\n")}
-
-### WHEN NOT to Consult:
-
-${avoidWhen.map((w) => `- ${w}`).join("\n")}
-
-### Usage Pattern:
-Briefly announce "Consulting Oracle for [reason]" before invocation.
-
-**Exception**: This is the ONLY case where you announce before acting. For all other work, start immediately without status updates.
-
-### Oracle Background Task Policy:
-
-**Collect Oracle results before your final answer. No exceptions.**
-
-- Oracle takes minutes. When done with your own work: **end your response** — wait for the \`<system-reminder>\`.
-- Do NOT poll \`background_output\` on a running Oracle. The notification will come.
-- Never cancel Oracle.
-</Oracle_Usage>`
-}
-
 export function buildHardBlocksSection(): string {
   const blocks = [
     "- Type error suppression (`as any`, `@ts-ignore`) — **Never**",
@@ -292,7 +222,6 @@ export function buildHardBlocksSection(): string {
     "- Speculate about unread code — **Never**",
     "- Leave code in broken state after failures — **Never**",
     "- `background_cancel(all=true)` — **Never.** Always cancel individually by taskId.",
-    "- Delivering final answer before collecting Oracle result — **Never.**",
   ]
 
   return `## Hard Blocks (NEVER violate)
@@ -308,7 +237,6 @@ export function buildAntiPatternsSection(): string {
     "- **Search**: Firing agents for single-line typos or obvious syntax errors",
     "- **Debugging**: Shotgun debugging, random changes",
     "- **Background Tasks**: Polling `background_output` on running tasks — end response and wait for notification",
-    "- **Oracle**: Delivering answer without collecting Oracle results",
   ]
 
   return `## Anti-Patterns (BLOCKING violations)
@@ -389,21 +317,10 @@ export function buildUltraworkSection(
   }
 
   if (agents.length > 0) {
-    const ultraworkAgentPriority = ["explore", "librarian", "plan", "oracle"]
-    const sortedAgents = [...agents].sort((a, b) => {
-      const aIdx = ultraworkAgentPriority.indexOf(a.name)
-      const bIdx = ultraworkAgentPriority.indexOf(b.name)
-      if (aIdx === -1 && bIdx === -1) return 0
-      if (aIdx === -1) return 1
-      if (bIdx === -1) return -1
-      return aIdx - bIdx
-    })
-
     lines.push("**Agents** (for specialized consultation/exploration):")
-    for (const agent of sortedAgents) {
+    for (const agent of agents) {
       const shortDesc = agent.description.length > 120 ? agent.description.slice(0, 120) + "..." : agent.description
-      const suffix = agent.name === "explore" || agent.name === "librarian" ? " (multiple)" : ""
-      lines.push(`- \`${agent.name}${suffix}\`: ${shortDesc}`)
+      lines.push(`- \`${agent.name}\`: ${shortDesc}`)
     }
   }
 

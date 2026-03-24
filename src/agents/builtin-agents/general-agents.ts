@@ -6,7 +6,6 @@ import type { AvailableAgent } from "../dynamic-agent-prompt-builder"
 import { AGENT_MODEL_REQUIREMENTS, isModelAvailable } from "../../shared"
 import { buildAgent, isFactory } from "../agent-builder"
 import { applyOverrides } from "./agent-overrides"
-import { applyEnvironmentContext } from "./environment-context"
 import { applyModelResolution } from "./model-resolution"
 
 export function collectPendingBuiltinAgents(input: {
@@ -47,9 +46,6 @@ export function collectPendingBuiltinAgents(input: {
   for (const [name, source] of Object.entries(agentSources)) {
     const agentName = name as BuiltinAgentName
 
-    if (agentName === "sisyphus") continue
-    if (agentName === "hephaestus") continue
-    if (agentName === "atlas") continue
     if (disabledAgents.some((name) => name.toLowerCase() === agentName.toLowerCase())) continue
 
     const override = agentOverrides[agentName]
@@ -77,18 +73,13 @@ export function collectPendingBuiltinAgents(input: {
 
     let config = buildAgent(source, model, mergedCategories, gitMasterConfig, browserProvider, disabledSkills)
 
-    // Apply resolved variant from model fallback chain
     if (resolvedVariant) {
       config = { ...config, variant: resolvedVariant }
     }
 
-    if (agentName === "librarian") {
-      config = applyEnvironmentContext(config, directory, { disableOmoEnv })
-    }
-
     config = applyOverrides(config, override, mergedCategories, directory)
 
-    // Store for later - will be added after sisyphus and hephaestus
+    // Store for later - will be added after hephaestus
     pendingAgentConfigs.set(name, config)
 
     const metadata = agentMetadata[agentName]

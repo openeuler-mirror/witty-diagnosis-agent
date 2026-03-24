@@ -76,7 +76,7 @@ export function createStartWorkHook(ctx: PluginInput) {
       if (!promptText.includes("<session-context>")) return
 
       log(`[${HOOK_NAME}] Processing start-work command`, { sessionID: input.sessionID })
-      updateSessionAgent(input.sessionID, "atlas")
+  updateSessionAgent(input.sessionID, "fuxi")
 
       const existingState = readBoulderState(ctx.directory)
       const sessionId = input.sessionID
