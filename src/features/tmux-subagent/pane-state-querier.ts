@@ -1,4 +1,4 @@
-import { spawn } from "child_process"
+import { spawnWithWindowsHide as spawn } from "../../shared/spawn-with-windows-hide"
 import type { WindowState, TmuxPaneInfo } from "./types"
 import { getTmuxPath } from "../../tools/interactive-bash/tmux-path-resolver"
 import { log } from "../../shared"

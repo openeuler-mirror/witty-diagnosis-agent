@@ -1,4 +1,5 @@
 import type { PluginInput } from "@opencode-ai/plugin"
+import { promises as fsPromises } from "fs"
 import { computeLineHash } from "../../tools/hashline-edit/hash-computation"
 
 const WRITE_SUCCESS_MARKER = "File written successfully."
@@ -156,12 +157,12 @@ async function appendWriteHashlineOutput(output: { output: string; metadata: unk
     return
   }
 
-  const file = Bun.file(filePath)
-  if (!(await file.exists())) {
+  let content = ""
+  try {
+    content = await fsPromises.readFile(filePath, "utf-8")
+  } catch {
     return
   }
-
-  const content = await file.text()
   const lineCount = content === "" ? 0 : content.split("\n").length
   output.output = `${WRITE_SUCCESS_MARKER} ${lineCount} lines written.`
 }

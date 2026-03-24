@@ -39,9 +39,11 @@ function extractFilePath(args: Record<string, unknown>): string | undefined {
 
 async function captureOldContent(filePath: string): Promise<string> {
 	try {
-		const file = Bun.file(filePath)
-		if (await file.exists()) {
-			return await file.text()
+		try {
+			await fsPromises.access(filePath);
+			return await fsPromises.readFile(filePath, 'utf-8')
+		} catch {
+			// file doesn't exist or is unreadable
 		}
 	} catch {
 		log("[hashline-edit-diff-enhancer] failed to read old content", { filePath })

@@ -90,7 +90,7 @@ Examples:
 Agent resolution order:
   1) --agent flag
   2) OPENCODE_DEFAULT_AGENT
-  3) oh-my-opencode.json "default_run_agent"
+  3) witty-diagnosis-agent.json "default_run_agent"
   4) Sisyphus (fallback)
 
 Available core agents:

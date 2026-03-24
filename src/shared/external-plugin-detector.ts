@@ -133,5 +133,5 @@ Both oh-my-opencode and ${pluginName} listen to session.idle events.
 
    To use oh-my-opencode's notifications instead, either:
    1. Remove ${pluginName} from your opencode.json plugins
-   2. Or set "notification": { "force_enable": true } in oh-my-opencode.json`
+   2. Or set "notification": { "force_enable": true } in witty-diagnosis-agent.json`
 }

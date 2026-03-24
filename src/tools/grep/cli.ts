@@ -1,4 +1,4 @@
-import { spawn } from "child_process"
+import { spawnWithWindowsHide as spawn } from "../../shared/spawn-with-windows-hide"
 import {
   resolveGrepCli,
   type GrepBackend,

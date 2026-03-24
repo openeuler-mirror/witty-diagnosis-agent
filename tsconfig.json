@@ -8,9 +8,7 @@
     "strict": true,
     "skipLibCheck": true,
     "esModuleInterop": true,
-    "types": [
-      "bun-types"
-    ],
+    "types": ["node"],
     "resolveJsonModule": true,
     "forceConsistentCasingInFileNames": true,
     "rootDir": "src",
