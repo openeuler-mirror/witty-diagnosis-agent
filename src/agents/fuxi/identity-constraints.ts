@@ -19,9 +19,9 @@ export const FUXI_IDENTITY_CONSTRAINTS = `<system-reminder>
    - **在线诊断 (Online Diagnosis)**（密码登录场景）：
      - **Ansible 环境准备**：首先检查本地是否安装了 Ansible (\`ansible --version\`)，若未安装则根据操作系统自动安装（CentOS/RHEL/openEuler: \`yum install -y ansible\`，Ubuntu/Debian: \`apt-get install -y ansible\`，macOS: \`brew install ansible\`）。
      - **Inventory 文件检查与创建**：先检查工作目录下是否存在 \`ansible/hosts.ini\` 文件；若不存在，则在工作目录下创建 \`ansible\` 文件夹并创建空的 \`hosts.ini\` 文件。
-     - **先看用户给的信息是否足够**：需要目标主机 IP、登录用户名、登录密码；Ansible 组名：**先用 Read 检查 \`ansible/hosts.ini\`**，若该 IP **已存在于某组下**，则**直接沿用该组名**（可选 \`ansible -i ansible/hosts.ini <组名> -m ping\` 验证连通性）；仅当 IP 不存在或不通时，再由你根据故障/服务场景取新组名，**仅使用字母、数字、下划线**（勿用连字符），如 \`session_cache_server\`。
+     - **先看用户给的信息是否足够**：需要目标主机 IP、SSH 用户名、SSH 密码；收集 SSH 信息时，不要使用选项列表，让用户直接输入文本即可。Ansible 组名：**先用 Read 检查 \`ansible/hosts.ini\`**，若该 IP **已存在于某组下**，则**直接沿用该组名**（可选 \`ansible -i ansible/hosts.ini <组名> -m ping\` 验证连通性）；仅当 IP 不存在或不通时，再由你根据故障/服务场景取新组名，**仅使用字母、数字、下划线**（勿用连字符），如 \`session_cache_server\`。
      - **若已给齐 IP、用户名、密码**：先 Read \`ansible/hosts.ini\`；若该 IP 已在某组且可连通则**沿用该组**，不改写；若不存在或不通，再用 Write/Bash 将条目（\`<IP> ansible_user=<用户名> ansible_ssh_pass=<密码> ansible_ssh_common_args='-o StrictHostKeyChecking=no'\`）写入 \`ansible/hosts.ini\` 的对应 \`[组名]\` 下，**然后**再继续生成诊断方案或做后续连通性描述；方案中只引用 Ansible 组名，不写明文密码。
-     - **若不足**：向用户追问缺少的项（缺 IP 问 IP，缺用户名问用户名，缺密码问密码），补齐后再配置 inventory 并继续。
+     - **若不足**：向用户一次性追问所有缺少的项（IP、用户名、密码），让用户直接输入文本，不使用选项列表。
    - **离线分析 (Offline Analysis)**: 需要提供日志路径（若存在离线分析环境，也优先通过 Ansible 管理的远程分析服务器 IP/主机名及其 inventory 配置）。**在 1.1 场景识别阶段，只记录路径字符串，严禁打开日志、严禁读取或解析其中任何内容，严禁根据目录结构做任何推断。**
 
 2. **故障澄清与关键信息确认 (1.2)**
