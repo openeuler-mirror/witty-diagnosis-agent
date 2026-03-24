@@ -18,11 +18,7 @@ import {
   createDelegateTaskRetryHook,
   createTaskResumeInfoHook,
   createStartWorkHook,
-  createPrometheusMdOnlyHook,
   createFuxiMdOnlyHook,
-  createSisyphusJuniorNotepadHook,
-  createNoSisyphusGptHook,
-  createNoHephaestusNonGptHook,
   createQuestionLabelTruncatorHook,
   createPreemptiveCompactionHook,
   createRuntimeFallbackHook,
@@ -53,11 +49,7 @@ export type SessionHooks = {
   editErrorRecovery: ReturnType<typeof createEditErrorRecoveryHook> | null
   delegateTaskRetry: ReturnType<typeof createDelegateTaskRetryHook> | null
   startWork: ReturnType<typeof createStartWorkHook> | null
-  prometheusMdOnly: ReturnType<typeof createPrometheusMdOnlyHook> | null
   fuxiMdOnly: ReturnType<typeof createFuxiMdOnlyHook> | null
-  sisyphusJuniorNotepad: ReturnType<typeof createSisyphusJuniorNotepadHook> | null
-  noSisyphusGpt: ReturnType<typeof createNoSisyphusGptHook> | null
-  noHephaestusNonGpt: ReturnType<typeof createNoHephaestusNonGptHook> | null
   questionLabelTruncator: ReturnType<typeof createQuestionLabelTruncatorHook> | null
   taskResumeInfo: ReturnType<typeof createTaskResumeInfoHook> | null
   anthropicEffort: ReturnType<typeof createAnthropicEffortHook> | null
@@ -153,8 +145,6 @@ export function createSessionHooks(args: {
     }
   }
 
-  // Model fallback hook (configurable via model_fallback config + disabled_hooks)
-  // This handles automatic model switching when model errors occur
   const isModelFallbackConfigEnabled = pluginConfig.model_fallback ?? false
   const modelFallback = isModelFallbackConfigEnabled && isHookEnabled("model-fallback")
     ? safeHook("model-fallback", () =>
@@ -184,7 +174,6 @@ export function createSessionHooks(args: {
     ? safeHook("auto-update-checker", () =>
         createAutoUpdateCheckerHook(ctx, {
           showStartupToast: isHookEnabled("startup-toast"),
-          isSisyphusEnabled: pluginConfig.sisyphus_agent?.disabled !== true,
           autoUpdate: pluginConfig.auto_update ?? true,
         }))
     : null
@@ -221,27 +210,8 @@ export function createSessionHooks(args: {
     ? safeHook("start-work", () => createStartWorkHook(ctx))
     : null
 
-  const prometheusMdOnly = isHookEnabled("prometheus-md-only")
-    ? safeHook("prometheus-md-only", () => createPrometheusMdOnlyHook(ctx))
-    : null
-
   const fuxiMdOnly = isHookEnabled("fuxi-md-only")
     ? safeHook("fuxi-md-only", () => createFuxiMdOnlyHook(ctx))
-    : null
-
-  const sisyphusJuniorNotepad = isHookEnabled("sisyphus-junior-notepad")
-    ? safeHook("sisyphus-junior-notepad", () => createSisyphusJuniorNotepadHook(ctx))
-    : null
-
-  const noSisyphusGpt = isHookEnabled("no-sisyphus-gpt")
-    ? safeHook("no-sisyphus-gpt", () => createNoSisyphusGptHook(ctx))
-    : null
-
-  const noHephaestusNonGpt = isHookEnabled("no-hephaestus-non-gpt")
-    ? safeHook("no-hephaestus-non-gpt", () =>
-      createNoHephaestusNonGptHook(ctx, {
-        allowNonGptModel: pluginConfig.agents?.hephaestus?.allow_non_gpt_model,
-      }))
     : null
 
   const questionLabelTruncator = isHookEnabled("question-label-truncator")
@@ -283,11 +253,7 @@ export function createSessionHooks(args: {
     editErrorRecovery,
     delegateTaskRetry,
     startWork,
-    prometheusMdOnly,
     fuxiMdOnly,
-    sisyphusJuniorNotepad,
-    noSisyphusGpt,
-    noHephaestusNonGpt,
     questionLabelTruncator,
     taskResumeInfo,
     anthropicEffort,

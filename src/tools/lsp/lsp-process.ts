@@ -1,11 +1,6 @@
-import { spawn as bunSpawn } from "child_process"
 import { spawn as nodeSpawn, type ChildProcess } from "node:child_process"
 import { existsSync, statSync } from "fs"
 import { log } from "../../shared/logger"
-// Bun spawn segfaults on Windows (oven-sh/bun#25798) — unfixed as of v1.3.8+
-function shouldUseNodeSpawn(): boolean {
-  return process.platform === "win32"
-}
 // Prevents segfaults when libuv gets a non-existent cwd (oven-sh/bun#25798)
 export function validateCwd(cwd: string): { valid: boolean; error?: string } {
   try {
@@ -138,24 +133,13 @@ export function spawnProcess(
   if (!cwdValidation.valid) {
     throw new Error(`[LSP] ${cwdValidation.error}`)
   }
-  if (shouldUseNodeSpawn()) {
-    const [cmd, ...args] = command
-    log("[LSP] Using Node.js child_process on Windows to avoid Bun spawn segfault")
-    const proc = nodeSpawn(cmd, args, {
-      cwd: options.cwd,
-      env: options.env as NodeJS.ProcessEnv,
-      stdio: ["pipe", "pipe", "pipe"],
-      windowsHide: true,
-      shell: true,
-    })
-    return wrapNodeProcess(proc)
-  }
-  const proc = bunSpawn(command, {
-    stdin: "pipe",
-    stdout: "pipe",
-    stderr: "pipe",
+  const [cmd, ...args] = command
+  const proc = nodeSpawn(cmd, args, {
     cwd: options.cwd,
-    env: options.env,
+    env: options.env as NodeJS.ProcessEnv,
+    stdio: ["pipe", "pipe", "pipe"],
+    windowsHide: true,
+    shell: true,
   })
-  return proc as unknown as UnifiedProcess
+  return wrapNodeProcess(proc)
 }

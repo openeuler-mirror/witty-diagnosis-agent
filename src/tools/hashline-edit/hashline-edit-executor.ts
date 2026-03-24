@@ -1,4 +1,4 @@
-import { promises as fsPromises } from "fs";
+import { promises as fsPromises, existsSync } from "fs";
 import type { ToolContext } from "@opencode-ai/plugin/tool"
 import { storeToolMetadata } from "../../features/tool-metadata-store"
 import { applyHashlineEditsWithReport } from "./edit-operations"
@@ -100,8 +100,7 @@ export async function executeHashlineEditTool(args: HashlineEditArgs, context: T
 
     const edits = deleteMode ? [] : normalizeHashlineEdits(args.edits)
 
-    const file = Bun.file(filePath)
-    const exists = await file.exists()
+    const exists = existsSync(filePath)
     if (!exists && !deleteMode && !canCreateFromMissingFile(edits)) {
       return `Error: File not found: ${filePath}`
     }
@@ -112,7 +111,7 @@ export async function executeHashlineEditTool(args: HashlineEditArgs, context: T
       return `Successfully deleted ${filePath}`
     }
 
-    const rawOldContent = exists ? Buffer.from(await file.arrayBuffer()).toString("utf8") : ""
+    const rawOldContent = exists ? Buffer.from(await fsPromises.readFile(filePath)).toString("utf8") : ""
     const oldEnvelope = canonicalizeFileText(rawOldContent)
 
     const applyResult = applyHashlineEditsWithReport(oldEnvelope.content, edits)

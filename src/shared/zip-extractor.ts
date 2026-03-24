@@ -1,4 +1,5 @@
-import { spawn, spawnSync } from "child_process"
+import { spawnSync } from "node:child_process"
+import { spawnWithWindowsHide as spawn } from "./spawn-with-windows-hide"
 import { release } from "os"
 
 const WINDOWS_BUILD_WITH_TAR = 17134
@@ -16,8 +17,8 @@ function getWindowsBuildNumber(): number | null {
 
 function isPwshAvailable(): boolean {
   if (process.platform !== "win32") return false
-  const result = spawnSync(["where", "pwsh"], { stdout: "pipe", stderr: "pipe" })
-  return result.exitCode === 0
+  const result = spawnSync("where", ["pwsh"], { stdio: "pipe" })
+  return result.status === 0
 }
 
 function escapePowerShellPath(path: string): string {

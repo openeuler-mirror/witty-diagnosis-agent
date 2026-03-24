@@ -1,4 +1,4 @@
-import which from "which";
+import which, { sync as whichSync } from "which";
 import { delimiter, dirname, join } from "node:path"
 import { spawnWithWindowsHide } from "../../shared/spawn-with-windows-hide"
 
@@ -15,7 +15,7 @@ function getCommandCandidates(platform: NodeJS.Platform): string[] {
 
 export function collectCandidateBinaryPaths(
   pathEnv: string | undefined,
-  which: (command: string) => string | null | undefined = ((cmd: string) => which.sync(cmd, { nothrow: true })),
+  which: (command: string) => string | null | undefined = ((cmd: string) => whichSync(cmd, { nothrow: true })),
   platform: NodeJS.Platform = process.platform,
 ): string[] {
   const seen = new Set<string>()
@@ -57,7 +57,7 @@ export async function canExecuteBinary(binaryPath: string): Promise<boolean> {
 export async function findWorkingOpencodeBinary(
   pathEnv: string | undefined = process.env.PATH,
   probe: (binaryPath: string) => Promise<boolean> = canExecuteBinary,
-  which: (command: string) => string | null | undefined = ((cmd: string) => which.sync(cmd, { nothrow: true })),
+  which: (command: string) => string | null | undefined = ((cmd: string) => whichSync(cmd, { nothrow: true })),
   platform: NodeJS.Platform = process.platform,
 ): Promise<string | null> {
   const candidates = collectCandidateBinaryPaths(pathEnv, which, platform)

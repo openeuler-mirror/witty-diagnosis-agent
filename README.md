@@ -90,7 +90,7 @@ bun run build
 
 ## 配置模型
 
-修改项目根目录下的 `.opencode/oh-my-opencode.jsonc` 文件，配置如下：
+修改项目根目录下的 `.opencode/witty-diagnosis-agent.jsonc` 文件，配置如下：
 
 ```json
 {

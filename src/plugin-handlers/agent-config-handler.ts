@@ -1,5 +1,4 @@
 import { createBuiltinAgents } from "../agents";
-import { createSisyphusJuniorAgentWithOverrides } from "../agents/sisyphus-junior";
 import type { OhMyOpenCodeConfig } from "../config";
 import { log, migrateAgentConfig } from "../shared";
 import { AGENT_NAME_MAP } from "../shared/migration";
@@ -15,12 +14,10 @@ import { loadProjectAgents, loadUserAgents } from "../features/claude-code-agent
 import type { PluginComponents } from "./plugin-components-loader";
 import { reorderAgentsByPriority } from "./agent-priority-order";
 import { remapAgentKeysToDisplayNames } from "./agent-key-remapper";
-import { buildPrometheusAgentConfig } from "./prometheus-agent-config-builder";
 import { buildFuxiAgentConfig } from "./fuxi-agent-config-builder";
 import { buildDayuAgentConfig } from "./dayu-agent-config-builder";
 import { buildKuafuAgentConfig } from "./kuafu-agent-config-builder";
 import { buildBaizeAgentConfig } from "./baize-agent-config-builder";
-import { buildPlanDemoteConfig } from "./plan-model-inheritance";
 
 type AgentConfigRecord = Record<string, Record<string, unknown> | undefined> & {
   build?: Record<string, unknown>;
@@ -119,163 +116,96 @@ export async function applyAgentConfig(params: {
       Object.entries(agents).filter(([name]) => !disabledAgentNames.has(name.toLowerCase()))
     );
 
-  const isSisyphusEnabled = params.pluginConfig.sisyphus_agent?.disabled !== true;
-  const builderEnabled =
-    params.pluginConfig.sisyphus_agent?.default_builder_enabled ?? false;
-  const plannerEnabled = params.pluginConfig.sisyphus_agent?.planner_enabled ?? true;
-  const replacePlan = params.pluginConfig.sisyphus_agent?.replace_plan ?? false;
+  const plannerEnabled = true;
+  const replacePlan = false;
   const shouldDemotePlan = plannerEnabled && replacePlan;
   const configuredDefaultAgent = getConfiguredDefaultAgent(params.config);
 
   const configAgent = params.config.agent as AgentConfigRecord | undefined;
 
-  if (isSisyphusEnabled && builtinAgents.sisyphus) {
-    if (configuredDefaultAgent) {
-      (params.config as { default_agent?: string }).default_agent =
-        getAgentDisplayName(configuredDefaultAgent);
-    } else {
-      (params.config as { default_agent?: string }).default_agent =
-        getAgentDisplayName("fuxi");
-    }
+  if (configuredDefaultAgent) {
+    (params.config as { default_agent?: string }).default_agent =
+      getAgentDisplayName(configuredDefaultAgent);
+  } else {
+    (params.config as { default_agent?: string }).default_agent =
+      getAgentDisplayName("fuxi");
+  }
 
-    const agentConfig: Record<string, unknown> = {
-      sisyphus: builtinAgents.sisyphus,
-    };
+  const agentConfig: Record<string, unknown> = {};
 
-    agentConfig["sisyphus-junior"] = createSisyphusJuniorAgentWithOverrides(
-      params.pluginConfig.agents?.["sisyphus-junior"],
-      undefined,
-      useTaskSystem,
-    );
-
-    if (builderEnabled) {
-      const { name: _buildName, ...buildConfigWithoutName } =
-        configAgent?.build ?? {};
-      const migratedBuildConfig = migrateAgentConfig(
-        buildConfigWithoutName as Record<string, unknown>,
-      );
-      const override = params.pluginConfig.agents?.["OpenCode-Builder"];
-      const base = {
-        ...migratedBuildConfig,
-        description: `${(configAgent?.build?.description as string) ?? "Build agent"} (OpenCode default)`,
-      };
-      agentConfig["OpenCode-Builder"] = override ? { ...base, ...override } : base;
-    }
-
-    if (plannerEnabled) {
-      const prometheusOverride = params.pluginConfig.agents?.["prometheus"] as
-        | (Record<string, unknown> & { prompt_append?: string })
-        | undefined;
-
-      agentConfig["prometheus"] = await buildPrometheusAgentConfig({
-        configAgentPlan: configAgent?.plan,
-        pluginPrometheusOverride: prometheusOverride,
-        userCategories: params.pluginConfig.categories,
-        currentModel,
-      });
-
-      const fuxiOverride = params.pluginConfig.agents?.["fuxi"] as
-        | (Record<string, unknown> & { prompt_append?: string })
-        | undefined;
-
-      agentConfig["fuxi"] = await buildFuxiAgentConfig({
-        configAgentPlan: configAgent?.plan,
-        pluginFuxiOverride: fuxiOverride,
-        userCategories: params.pluginConfig.categories,
-        currentModel,
-      });
-
-      const dayuOverride = params.pluginConfig.agents?.["dayu"] as
-        | (Record<string, unknown> & { prompt_append?: string })
-        | undefined;
-
-      agentConfig["dayu"] = await buildDayuAgentConfig({
-        configAgentPlan: configAgent?.plan,
-        pluginDayuOverride: dayuOverride,
-        userCategories: params.pluginConfig.categories,
-        currentModel,
-      });
-
-      const baizeOverride = params.pluginConfig.agents?.["baize"];
-
-      agentConfig["baize"] = await buildBaizeAgentConfig({
-        pluginBaizeOverride: baizeOverride,
-        currentModel,
-      });
-    }
-
-    const kuafuOverride = params.pluginConfig.agents?.["kuafu"] as
+  if (plannerEnabled) {
+    const fuxiOverride = params.pluginConfig.agents?.["fuxi"] as
       | (Record<string, unknown> & { prompt_append?: string })
       | undefined;
 
-    agentConfig["kuafu"] = await buildKuafuAgentConfig({
-      pluginKuafuOverride: kuafuOverride,
+    agentConfig["fuxi"] = await buildFuxiAgentConfig({
+      configAgentPlan: configAgent?.plan,
+      pluginFuxiOverride: fuxiOverride,
+      userCategories: params.pluginConfig.categories,
       currentModel,
     });
 
-    const filteredConfigAgents = configAgent
-      ? Object.fromEntries(
-          Object.entries(configAgent)
-            .filter(([key]) => {
-              if (key === "build") return false;
-              if (key === "plan" && shouldDemotePlan) return false;
-              if (key in builtinAgents) return false;
-              return true;
-            })
-            .map(([key, value]) => [
-              key,
-              value ? migrateAgentConfig(value as Record<string, unknown>) : value,
-            ]),
-        )
-      : {};
+    const dayuOverride = params.pluginConfig.agents?.["dayu"] as
+      | (Record<string, unknown> & { prompt_append?: string })
+      | undefined;
 
-    const migratedBuild = configAgent?.build
-      ? migrateAgentConfig(configAgent.build as Record<string, unknown>)
-      : {};
+    agentConfig["dayu"] = await buildDayuAgentConfig({
+      configAgentPlan: configAgent?.plan,
+      pluginDayuOverride: dayuOverride,
+      userCategories: params.pluginConfig.categories,
+      currentModel,
+    });
 
-    const planDemoteConfig = shouldDemotePlan
-      ? buildPlanDemoteConfig(
-          agentConfig["prometheus"] as Record<string, unknown> | undefined,
-          params.pluginConfig.agents?.plan as Record<string, unknown> | undefined,
-        )
-      : undefined;
+    const baizeOverride = params.pluginConfig.agents?.["baize"];
 
-    params.config.agent = {
-      ...agentConfig,
-      ...Object.fromEntries(
-        Object.entries(builtinAgents).filter(([key]) => key !== "sisyphus"),
-      ),
-      ...filterDisabledAgents(userAgents),
-      ...filterDisabledAgents(projectAgents),
-      ...filterDisabledAgents(pluginAgents),
-      ...filteredConfigAgents,
-      build: { ...migratedBuild, mode: "primary" },
-      ...(planDemoteConfig ? { plan: planDemoteConfig } : {}),
-    };
-  } else {
-    params.config.agent = {
-      ...builtinAgents,
-      ...filterDisabledAgents(userAgents),
-      ...filterDisabledAgents(projectAgents),
-      ...filterDisabledAgents(pluginAgents),
-      ...configAgent,
-    };
+    agentConfig["baize"] = await buildBaizeAgentConfig({
+      pluginBaizeOverride: baizeOverride,
+      currentModel,
+    });
   }
 
-  if (params.config.agent) {
-    // 隐藏核心编排 Agent（仅用于内部，不在 OpenCode /agent 列表中展示）
-    const hiddenCoreAgents = new Set([
-      "sisyphus",
-      "hephaestus",
-      "prometheus",
-      "atlas",
-      "sisyphus-junior",
-    ]);
+  const kuafuOverride = params.pluginConfig.agents?.["kuafu"] as
+    | (Record<string, unknown> & { prompt_append?: string })
+    | undefined;
 
+  agentConfig["kuafu"] = await buildKuafuAgentConfig({
+    pluginKuafuOverride: kuafuOverride,
+    currentModel,
+  });
+
+  const filteredConfigAgents = configAgent
+    ? Object.fromEntries(
+        Object.entries(configAgent)
+          .filter(([key]) => {
+            if (key === "build") return false;
+            if (key === "plan" && shouldDemotePlan) return false;
+            if (key in builtinAgents) return false;
+            return true;
+          })
+          .map(([key, value]) => [
+            key,
+            value ? migrateAgentConfig(value as Record<string, unknown>) : value,
+          ]),
+      )
+    : {};
+
+  const migratedBuild = configAgent?.build
+    ? migrateAgentConfig(configAgent.build as Record<string, unknown>)
+    : {};
+
+  params.config.agent = {
+    ...agentConfig,
+    ...builtinAgents,
+    ...filterDisabledAgents(userAgents),
+    ...filterDisabledAgents(projectAgents),
+    ...filterDisabledAgents(pluginAgents),
+    ...filteredConfigAgents,
+    build: { ...migratedBuild, mode: "primary" },
+  };
+
+  if (params.config.agent) {
     const visibleAgents = Object.fromEntries(
-      Object.entries(params.config.agent as Record<string, unknown>).filter(
-        ([key]) => !hiddenCoreAgents.has(key.toLowerCase()),
-      ),
+      Object.entries(params.config.agent as Record<string, unknown>)
     );
 
     params.config.agent = remapAgentKeysToDisplayNames(

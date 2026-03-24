@@ -41,7 +41,6 @@ export function createToolExecuteAfterHandler(args: {
     await hooks.interactiveBashSession?.["tool.execute.after"]?.(input, output)
     await hooks.editErrorRecovery?.["tool.execute.after"]?.(input, output)
     await hooks.delegateTaskRetry?.["tool.execute.after"]?.(input, output)
-    await hooks.atlasHook?.["tool.execute.after"]?.(input, output)
     await hooks.taskResumeInfo?.["tool.execute.after"]?.(input, output)
     await hooks.readImageResizer?.["tool.execute.after"]?.(input, output)
     await hooks.hashlineReadEnhancer?.["tool.execute.after"]?.(input, output)

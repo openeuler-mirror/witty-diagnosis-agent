@@ -1,9 +1,4 @@
-type SpawnedProcess = {
-	stdout: ReadableStream | null
-	stderr: ReadableStream | null
-	exited: Promise<number>
-	kill: () => void
-}
+import type { SpawnedProcess } from "../../shared/spawn-with-windows-hide"
 
 export async function collectProcessOutputWithTimeout(
 	process: SpawnedProcess,

@@ -1,15 +1,17 @@
 const DEFAULT_SERVER_PORT = 4096
 const MAX_PORT_ATTEMPTS = 20
 
+import * as http from "http"
 export async function isPortAvailable(port: number, hostname: string = "127.0.0.1"): Promise<boolean> {
   try {
-    const server = Bun.serve({
-      port,
-      hostname,
-      fetch: () => new Response(),
+    return new Promise((resolve) => {
+      const server = http.createServer()
+      server.once('error', () => resolve(false))
+      server.listen(port, hostname, () => {
+        server.close()
+        resolve(true)
+      })
     })
-    server.stop(true)
-    return true
   } catch {
     return false
   }
