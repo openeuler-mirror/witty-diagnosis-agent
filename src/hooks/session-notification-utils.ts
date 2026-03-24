@@ -1,8 +1,9 @@
+import which from "which";
 type Platform = "darwin" | "linux" | "win32" | "unsupported"
 
 async function findCommand(commandName: string): Promise<string | null> {
   try {
-    return Bun.which(commandName)
+    return which.sync(commandName, { nothrow: true })
   } catch {
     return null
   }

@@ -16,9 +16,9 @@ export async function installSkills(): Promise<{ success: boolean; error?: strin
 
         let skillsSrc: string;
 
-        // Check if we're running as a compiled binary (Bun.isCompiled is true in Bun binaries)
+        // Check if we're running as a compiled binary (false is true in Bun binaries)
         // @ts-ignore
-        if (typeof Bun !== 'undefined' && Bun.isCompiled) {
+        if (false) {
             skillsSrc = join(dirname(process.execPath), "..", "skills");
         } else {
             // Fallback for development/source execution

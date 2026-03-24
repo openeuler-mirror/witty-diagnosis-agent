@@ -1,4 +1,3 @@
-import { spawn as bunSpawn } from "bun"
 import { spawn as nodeSpawn, type ChildProcess } from "node:child_process"
 import { Readable } from "node:stream"
 
@@ -67,17 +66,13 @@ function wrapNodeProcess(proc: ChildProcess): SpawnedProcess {
 }
 
 export function spawnWithWindowsHide(command: string[], options: SpawnOptions): SpawnedProcess {
-  if (process.platform !== "win32") {
-    return bunSpawn(command, options)
-  }
-
   const [cmd, ...args] = command
   const proc = nodeSpawn(cmd, args, {
     cwd: options.cwd,
     env: options.env,
     stdio: [options.stdin ?? "pipe", options.stdout ?? "pipe", options.stderr ?? "pipe"],
-    windowsHide: true,
-    shell: true,
+    windowsHide: process.platform === "win32",
+    shell: process.platform === "win32",
   })
 
   return wrapNodeProcess(proc)

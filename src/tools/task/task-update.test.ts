@@ -1,3 +1,4 @@
+import { promises as fsPromises } from "fs";
 import { describe, test, expect, beforeEach, afterEach } from "bun:test"
 import { existsSync, rmSync, mkdirSync } from "fs"
 import { join } from "path"
@@ -53,7 +54,7 @@ describe("task_update tool", () => {
         blockedBy: [],
         threadID: TEST_SESSION_ID,
       }
-      await Bun.write(taskPath, JSON.stringify(initialTask))
+      await fsPromises.writeFile(taskPath, JSON.stringify(initialTask))
 
       //#when
       const args = {
@@ -82,7 +83,7 @@ describe("task_update tool", () => {
         blockedBy: [],
         threadID: TEST_SESSION_ID,
       }
-      await Bun.write(taskPath, JSON.stringify(initialTask))
+      await fsPromises.writeFile(taskPath, JSON.stringify(initialTask))
 
       //#when
       const args = {
@@ -109,7 +110,7 @@ describe("task_update tool", () => {
         blockedBy: [],
         threadID: TEST_SESSION_ID,
       }
-      await Bun.write(taskPath, JSON.stringify(initialTask))
+      await fsPromises.writeFile(taskPath, JSON.stringify(initialTask))
 
       //#when
       const args = {
@@ -136,7 +137,7 @@ describe("task_update tool", () => {
         blockedBy: [],
         threadID: TEST_SESSION_ID,
       }
-      await Bun.write(taskPath, JSON.stringify(initialTask))
+      await fsPromises.writeFile(taskPath, JSON.stringify(initialTask))
 
       //#when
       const args = {
@@ -166,7 +167,7 @@ describe("task_update tool", () => {
         blockedBy: [],
         threadID: TEST_SESSION_ID,
       }
-      await Bun.write(taskPath, JSON.stringify(initialTask))
+      await fsPromises.writeFile(taskPath, JSON.stringify(initialTask))
 
       //#when
       const args = {
@@ -195,7 +196,7 @@ describe("task_update tool", () => {
         blockedBy: ["T-blocker-1"],
         threadID: TEST_SESSION_ID,
       }
-      await Bun.write(taskPath, JSON.stringify(initialTask))
+      await fsPromises.writeFile(taskPath, JSON.stringify(initialTask))
 
       //#when
       const args = {
@@ -229,7 +230,7 @@ describe("task_update tool", () => {
         },
         threadID: TEST_SESSION_ID,
       }
-      await Bun.write(taskPath, JSON.stringify(initialTask))
+      await fsPromises.writeFile(taskPath, JSON.stringify(initialTask))
 
       //#when
       const args = {
@@ -266,7 +267,7 @@ describe("task_update tool", () => {
         },
         threadID: TEST_SESSION_ID,
       }
-      await Bun.write(taskPath, JSON.stringify(initialTask))
+      await fsPromises.writeFile(taskPath, JSON.stringify(initialTask))
 
       //#when
       const args = {
@@ -297,7 +298,7 @@ describe("task_update tool", () => {
         blockedBy: [],
         threadID: TEST_SESSION_ID,
       }
-      await Bun.write(taskPath, JSON.stringify(initialTask))
+      await fsPromises.writeFile(taskPath, JSON.stringify(initialTask))
 
       //#when
       const args = {
@@ -324,7 +325,7 @@ describe("task_update tool", () => {
         blockedBy: [],
         threadID: TEST_SESSION_ID,
       }
-      await Bun.write(taskPath, JSON.stringify(initialTask))
+      await fsPromises.writeFile(taskPath, JSON.stringify(initialTask))
 
       //#when
       const args = {
@@ -381,7 +382,7 @@ describe("task_update tool", () => {
         blockedBy: [],
         threadID: TEST_SESSION_ID,
       }
-      await Bun.write(taskPath, JSON.stringify(initialTask))
+      await fsPromises.writeFile(taskPath, JSON.stringify(initialTask))
 
       //#when
       const args = {
@@ -391,7 +392,7 @@ describe("task_update tool", () => {
       await tool.execute(args, TEST_CONTEXT)
 
       //#then
-      const savedContent = await Bun.file(taskPath).text()
+      const savedContent = await fsPromises.readFile(taskPath, 'utf-8')
       const savedTask = JSON.parse(savedContent)
       expect(savedTask.subject).toBe("Updated subject")
     })
@@ -409,7 +410,7 @@ describe("task_update tool", () => {
         blockedBy: [],
         threadID: TEST_SESSION_ID,
       }
-      await Bun.write(taskPath, JSON.stringify(initialTask))
+      await fsPromises.writeFile(taskPath, JSON.stringify(initialTask))
 
       //#when
       const args = {

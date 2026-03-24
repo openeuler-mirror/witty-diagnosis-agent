@@ -43,7 +43,7 @@ export async function gatherSystemInfo(): Promise<SystemInfo> {
     opencodePath: binaryInfo?.path ?? null,
     pluginVersion,
     loadedVersion: loadedInfo.loadedVersion,
-    bunVersion: Bun.version,
+    bunVersion: process.version,
     configPath: pluginInfo.configPath,
     configValid: isConfigValid(pluginInfo.configPath),
     isLocalDev: pluginInfo.isLocalDev,

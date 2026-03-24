@@ -1,3 +1,4 @@
+import { promises as fsPromises } from "fs";
 import { existsSync } from "fs"
 import { join } from "path"
 import type { ClaudeHookEvent } from "./types"
@@ -28,7 +29,7 @@ async function loadConfigFromPath(path: string): Promise<PluginExtendedConfig | 
   }
 
   try {
-    const content = await Bun.file(path).text()
+    const content = await fsPromises.readFile(path, 'utf-8')
     return JSON.parse(content) as PluginExtendedConfig
   } catch (error) {
     log("Failed to load config", { path, error })

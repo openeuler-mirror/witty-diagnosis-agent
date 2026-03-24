@@ -1,3 +1,4 @@
+import which from "which";
 import { existsSync } from "node:fs"
 import { homedir } from "node:os"
 import { join } from "node:path"
@@ -96,7 +97,7 @@ export function findDesktopBinary(
 
 export async function findOpenCodeBinary(): Promise<OpenCodeBinaryInfo | null> {
   for (const binary of OPENCODE_BINARIES) {
-    const path = Bun.which(binary)
+    const path = which.sync(binary, { nothrow: true })
     if (path) {
       return { binary, path }
     }

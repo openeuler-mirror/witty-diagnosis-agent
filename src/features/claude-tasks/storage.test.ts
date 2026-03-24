@@ -1,3 +1,4 @@
+import { promises as fsPromises } from "fs";
 import { describe, test, expect, beforeEach, afterEach } from "bun:test"
 import { existsSync, mkdirSync, rmSync, writeFileSync } from "fs"
 import { join, basename } from "path"
@@ -434,7 +435,7 @@ describe("writeJsonAtomic", () => {
 
     //#then
     expect(existsSync(filePath)).toBe(true)
-    const content = await Bun.file(filePath).text()
+    const content = await fsPromises.readFile(filePath, 'utf-8')
     expect(JSON.parse(content)).toEqual(data)
   })
 
@@ -449,7 +450,7 @@ describe("writeJsonAtomic", () => {
     writeJsonAtomic(filePath, newData)
 
     //#then
-    const content = await Bun.file(filePath).text()
+    const content = await fsPromises.readFile(filePath, 'utf-8')
     expect(JSON.parse(content)).toEqual(newData)
   })
 })

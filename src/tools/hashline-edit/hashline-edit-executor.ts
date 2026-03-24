@@ -1,3 +1,4 @@
+import { promises as fsPromises } from "fs";
 import type { ToolContext } from "@opencode-ai/plugin/tool"
 import { storeToolMetadata } from "../../features/tool-metadata-store"
 import { applyHashlineEditsWithReport } from "./edit-operations"
@@ -107,7 +108,7 @@ export async function executeHashlineEditTool(args: HashlineEditArgs, context: T
 
     if (deleteMode) {
       if (!exists) return `Error: File not found: ${filePath}`
-      await Bun.file(filePath).delete()
+      await fsPromises.rm(filePath, { force: true })
       return `Successfully deleted ${filePath}`
     }
 
@@ -127,11 +128,11 @@ export async function executeHashlineEditTool(args: HashlineEditArgs, context: T
 
     const writeContent = restoreFileText(canonicalNewContent, oldEnvelope)
 
-    await Bun.write(filePath, writeContent)
+    await fsPromises.writeFile(filePath, writeContent)
 
     if (rename && rename !== filePath) {
-      await Bun.write(rename, writeContent)
-      await Bun.file(filePath).delete()
+      await fsPromises.writeFile(rename, writeContent)
+      await fsPromises.rm(filePath, { force: true })
     }
 
     const effectivePath = rename && rename !== filePath ? rename : filePath
