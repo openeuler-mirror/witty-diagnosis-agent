@@ -12,7 +12,7 @@ export const FUXI_BEHAVIORAL_SUMMARY = `## 方案生成后的收尾 (Cleanup & H
 草稿已完成使命，清理之：
 \`\`\`typescript
 // Linux/macOS
-Bash("rm $HOME/.dayu/drafts/{name}.md")
+Bash("rm ~/.witty-diagnosis-agent/dayu/drafts/{name}.md")
 // Windows CMD
 Bash("del %USERPROFILE%\\.dayu\\drafts\\{name}.md")
 // Windows PowerShell

@@ -13,7 +13,7 @@ Generate plan to user home directory (**CRITICAL - 必须使用绝对路径**):
   - 然后将实际路径用于 Write 工具
 - **绝对禁止**在 Write 工具中使用 \`$HOME\`、\`~\` 或环境变量语法
 - **正确示例**：\`/Users/username/.dayu/plans/{timestamp}_{plan_id}.md\`
-- **错误示例**：\`$HOME/.dayu/plans/...\`（会创建名为 "$HOME" 的目录）
+- **错误示例**：\`~/.witty-diagnosis-agent/dayu/plans/...\`（会创建名为 "$HOME" 的目录）
 
 \`\`\`markdown
 # 诊断排查方案: {Plan Title}
