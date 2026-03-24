@@ -9,11 +9,8 @@ import type {
 import {
   buildKeyTriggersSection,
   buildToolSelectionTable,
-  buildExploreSection,
-  buildLibrarianSection,
   buildCategorySkillsDelegationGuide,
   buildDelegationTable,
-  buildOracleSection,
   buildHardBlocksSection,
   buildAntiPatternsSection,
   categorizeTools,
@@ -124,14 +121,11 @@ function buildBaizePrompt(
     availableTools,
     availableSkills,
   );
-  const exploreSection = buildExploreSection(availableAgents);
-  const librarianSection = buildLibrarianSection(availableAgents);
   const categorySkillsGuide = buildCategorySkillsDelegationGuide(
     availableCategories,
     availableSkills,
   );
   const delegationTable = buildDelegationTable(availableAgents);
-  const oracleSection = buildOracleSection(availableAgents);
   const hardBlocks = buildHardBlocksSection();
   const antiPatterns = buildAntiPatternsSection();
   const todoDiscipline = buildTodoDisciplineSection(useTaskSystem);
@@ -426,45 +420,15 @@ Note the concern and your alternative clearly, then proceed with the best approa
 
 ${toolSelection}
 
-${exploreSection}
-
-${librarianSection}
-
 ### Parallel Execution & Tool Usage (DEFAULT — NON-NEGOTIABLE)
 
 **Parallelize EVERYTHING. Independent reads, searches, and agents run SIMULTANEOUSLY.**
 
 <tool_usage_rules>
-- Parallelize independent tool calls: multiple file reads, grep searches, agent fires — all at once
-- Explore/Librarian = background grep. ALWAYS \`run_in_background=true\`, ALWAYS parallel
+- Parallelize independent tool calls: multiple file reads, grep searches — all at once
 - After any file edit: restate what changed, where, and what validation follows
 - Prefer tools over guessing whenever you need specific data (files, configs, patterns)
 </tool_usage_rules>
-
-**How to call explore/librarian:**
-\`\`\`
-// Codebase search — use subagent_type="explore"
-task(subagent_type="explore", run_in_background=true, load_skills=[], description="Find [what]", prompt="[CONTEXT]: ... [GOAL]: ... [REQUEST]: ...")
-
-// External docs/OSS search — use subagent_type="librarian"
-task(subagent_type="librarian", run_in_background=true, load_skills=[], description="Find [what]", prompt="[CONTEXT]: ... [GOAL]: ... [REQUEST]: ...")
-
-\`\`\`
-
-Prompt structure for each agent:
-- [CONTEXT]: Task, files/modules involved, approach
-- [GOAL]: Specific outcome needed — what decision this unblocks
-- [DOWNSTREAM]: How results will be used
-- [REQUEST]: What to find, format to return, what to SKIP
-
-**Rules:**
-- Fire 2-5 explore agents in parallel for any non-trivial codebase question
-- Parallelize independent file reads — don't read files one at a time
-- NEVER use \`run_in_background=false\` for explore/librarian
-- Continue your work immediately after launching background agents
-- Collect results with \`background_output(task_id="...")\` when needed
-- BEFORE final answer, cancel DISPOSABLE tasks individually: \`background_cancel(taskId="bg_explore_xxx")\`, \`background_cancel(taskId="bg_librarian_xxx")\`
-- **NEVER use \`background_cancel(all=true)\`** — it kills tasks whose results you haven't collected yet
 
 ### Search Stop Conditions
 
@@ -480,7 +444,7 @@ STOP searching when:
 
 ## Execution Loop (EXPLORE → PLAN → DECIDE → EXECUTE → VERIFY)
 
-1. **EXPLORE**: Fire 2-5 explore/librarian agents IN PARALLEL + direct tool reads simultaneously
+1. **EXPLORE**: Use direct tool reads simultaneously
    → Tell user: "Checking [area] for [pattern]..."
 2. **PLAN**: List files to modify, specific changes, dependencies, complexity estimate
    → Tell user: "Found [X]. Here's my plan: [clear summary]."
@@ -491,7 +455,7 @@ STOP searching when:
 5. **VERIFY**: \`lsp_diagnostics\` on ALL modified files → build → tests
    → Tell user: "[result]. [any issues or all clear]."
 
-**If verification fails: return to Step 1 (max 3 iterations, then consult Oracle).**
+**If verification fails: return to Step 1 (max 3 iterations).**
 
 ---
 
@@ -573,14 +537,6 @@ Every \`task()\` output includes a session_id. **USE IT for follow-ups.**
 - **Task failed/incomplete** — \`session_id="{id}", prompt="Fix: {error}"\`
 - **Follow-up on result** — \`session_id="{id}", prompt="Also: {question}"\`
 - **Verification failed** — \`session_id="{id}", prompt="Failed: {error}. Fix."\`
-
-${
-  oracleSection
-    ? `
-${oracleSection}
-`
-    : ""
-}
 
 ## Output Contract
 

@@ -4,7 +4,7 @@
 
 ## OVERVIEW
 
-8 files + 3 mode subdirs (~1665 LOC). Transform Tier hook on `messages.transform`. Scans first user message for mode keywords (ultrawork, search, analyze) and injects mode-specific system prompts.
+8 files + 2 mode subdirs (~1665 LOC). Transform Tier hook on `messages.transform`. Scans first user message for mode keywords (ultrawork, search) and injects mode-specific system prompts.
 
 ## KEYWORDS
 
@@ -12,7 +12,6 @@
 |---------|---------|--------|
 | `ultrawork` / `ulw` | `/\b(ultrawork|ulw)\b/i` | Full orchestration mode — parallel agents, deep exploration, relentless execution |
 | Search mode | `SEARCH_PATTERN` (from `search/`) | Web/doc search focus prompt injection |
-| Analyze mode | `ANALYZE_PATTERN` (from `analyze/`) | Deep analysis mode prompt injection |
 
 ## STRUCTURE
 
@@ -27,14 +26,10 @@ keyword-detector/
 │   ├── index.ts
 │   ├── message.ts     # getUltraworkMessage() — dynamic prompt by agent/model
 │   └── isPlannerAgent.ts
-├── search/
-│   ├── index.ts
-│   ├── pattern.ts     # SEARCH_PATTERN regex
-│   └── message.ts     # SEARCH_MESSAGE
-└── analyze/
+└── search/
     ├── index.ts
-    ├── pattern.ts     # ANALYZE_PATTERN regex
-    └── message.ts     # ANALYZE_MESSAGE
+    ├── pattern.ts     # SEARCH_PATTERN regex
+    └── message.ts     # SEARCH_MESSAGE
 ```
 
 ## DETECTION LOGIC

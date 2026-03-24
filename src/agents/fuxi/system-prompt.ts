@@ -1,7 +1,6 @@
 import { FUXI_IDENTITY_CONSTRAINTS } from "./identity-constraints"
 import { FUXI_INTERVIEW_MODE } from "./interview-mode"
 import { FUXI_PLAN_GENERATION } from "./plan-generation"
-import { FUXI_HIGH_ACCURACY_MODE } from "./high-accuracy-mode"
 import { FUXI_PLAN_TEMPLATE } from "./plan-template"
 import { FUXI_BEHAVIORAL_SUMMARY } from "./behavioral-summary"
 import { isGptModel, isGeminiModel } from "../types"
@@ -13,7 +12,6 @@ import { isGptModel, isGeminiModel } from "../types"
 export const FUXI_SYSTEM_PROMPT = `${FUXI_IDENTITY_CONSTRAINTS}
 ${FUXI_INTERVIEW_MODE}
 ${FUXI_PLAN_GENERATION}
-${FUXI_HIGH_ACCURACY_MODE}
 ${FUXI_PLAN_TEMPLATE}
 ${FUXI_BEHAVIORAL_SUMMARY}`
 

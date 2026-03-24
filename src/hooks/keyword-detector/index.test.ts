@@ -392,32 +392,6 @@ Please locate and scan the directory.
     expect(textPart!.text).toContain("<system-reminder>")
   })
 
-  test("should NOT trigger analyze mode from keywords inside <system-reminder> tags", async () => {
-    // given - message contains analyze keywords only inside system-reminder tags
-    const collector = new ContextCollector()
-    const hook = createKeywordDetectorHook(createMockPluginInput(), collector)
-    const sessionID = "test-session"
-    const output = {
-      message: {} as Record<string, unknown>,
-      parts: [{
-        type: "text",
-        text: `<system-reminder>
-You should investigate and examine the code carefully.
-Research the implementation details.
-</system-reminder>`
-      }],
-    }
-
-    // when - keyword detection runs on system-reminder content
-    await hook["chat.message"]({ sessionID }, output)
-
-    // then - should NOT trigger analyze mode
-    const textPart = output.parts.find(p => p.type === "text")
-    expect(textPart).toBeDefined()
-    expect(textPart!.text).not.toContain("[analyze-mode]")
-    expect(textPart!.text).toContain("<system-reminder>")
-  })
-
   test("should detect keywords in user text even when system-reminder is present", async () => {
     // given - message contains both system-reminder and user search keyword
     const collector = new ContextCollector()
@@ -473,7 +447,6 @@ Second reminder with investigate and examine keywords.
     const textPart = output.parts.find(p => p.type === "text")
     expect(textPart).toBeDefined()
     expect(textPart!.text).not.toContain("[search-mode]")
-    expect(textPart!.text).not.toContain("[analyze-mode]")
   })
 
   test("should handle case-insensitive system-reminder tags", async () => {
