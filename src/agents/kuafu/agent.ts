@@ -10,6 +10,7 @@
 
 import type { AgentConfig } from "@opencode-ai/sdk"
 import type { AgentMode, AgentPromptMetadata } from "../types"
+import { getSharedEnvPrompt } from "../shared-env-prompt"
 
 const MODE: AgentMode = "all"
 
@@ -186,14 +187,15 @@ it trivial for Baize (or another agent) to convert it into such an object.
 </execution_pattern>
 `
 
-export function createKuafuAgent(ctx: KuafuContext): AgentConfig {
+export async function createKuafuAgent(ctx: KuafuContext): Promise<AgentConfig> {
+  const extraPrompt = await getSharedEnvPrompt();
   const baseConfig: AgentConfig = {
     description:
       "Executes a single diagnostic task, gathers evidence with standard tools, and returns structured findings. (Kuafu - OhMyOpenCode)",
     mode: MODE,
     ...(ctx.model ? { model: ctx.model } : {}),
     temperature: 0.1,
-    prompt: KUAFU_SYSTEM_PROMPT,
+    prompt: KUAFU_SYSTEM_PROMPT + extraPrompt,
     color: "#F97316",
   }
 

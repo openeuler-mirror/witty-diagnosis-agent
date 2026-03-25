@@ -23,7 +23,7 @@ export async function buildKuafuAgentConfig(
 
   const baseModel = (pluginKuafuOverride?.model as string | undefined) ?? currentModel
 
-  const baseConfig = createKuafuAgent(
+  const baseConfig = await createKuafuAgent(
     baseModel ? { model: baseModel } : {}
   )
 
