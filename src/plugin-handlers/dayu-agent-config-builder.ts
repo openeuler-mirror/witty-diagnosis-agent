@@ -69,7 +69,7 @@ export async function buildDayuAgentConfig(params: {
     ...(resolvedModel ? { model: resolvedModel } : {}),
     ...(variantToUse ? { variant: variantToUse } : {}),
     mode: "all",
-    prompt: getDayuPrompt(resolvedModel),
+    prompt: await getDayuPrompt(resolvedModel),
     permission: DAYU_PERMISSION,
     description: `${(params.configAgentPlan?.description as string) ?? "Plan agent"} (Dayu - OhMyOpenCode)`,
     color: (params.configAgentPlan?.color as string) ?? "#2196F3",

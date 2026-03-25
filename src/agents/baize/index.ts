@@ -15,6 +15,7 @@ import {
   buildAntiPatternsSection,
   categorizeTools,
 } from "../dynamic-agent-prompt-builder";
+import { getSharedEnvPrompt } from "../shared-env-prompt";
 
 const MODE: AgentMode = "all";
 
@@ -626,18 +627,18 @@ This means:
 **Never**: Leave code broken, delete failing tests, shotgun debug`;
 }
 
-export function createBaizeAgent(
+export async function createBaizeAgent(
   model: string,
   availableAgents?: AvailableAgent[],
   availableToolNames?: string[],
   availableSkills?: AvailableSkill[],
   availableCategories?: AvailableCategory[],
   useTaskSystem = false,
-): AgentConfig {
+): Promise<AgentConfig> {
   const tools = availableToolNames ? categorizeTools(availableToolNames) : [];
   const skills = availableSkills ?? [];
   const categories = availableCategories ?? [];
-  const prompt = availableAgents
+  const basePrompt = availableAgents
     ? buildBaizePrompt(
         availableAgents,
         tools,
@@ -647,13 +648,15 @@ export function createBaizeAgent(
       )
     : buildBaizePrompt([], tools, skills, categories, useTaskSystem);
 
+  const extraPrompt = await getSharedEnvPrompt();
+
   return {
     description:
       "Baize (Root Cause Analysis) — Phase 1.4 \"白泽 / Baize - 根因分析\" agent for the Intelligent O&M Diagnosis System. Reads Dayu/Kuafu reports from ~/.witty-diagnosis-agent/dayu/report, aggregates evidence, infers root cause, assesses impact, and writes final RCA reports to ~/.witty-diagnosis-agent/baize/report. (Baize - OhMyOpenCode)",
     mode: MODE,
     model,
     maxTokens: 32000,
-    prompt,
+    prompt: basePrompt + extraPrompt,
     color: "#0D9488", // Teal - Bai Ze / report phase
     permission: {
       question: "allow",

@@ -53,7 +53,7 @@ export async function buildBaizeAgentConfig(
     currentModel ??
     "openai/gpt-5.3-codex"
 
-  let baseConfig = createBaizeAgent(baseModel)
+  let baseConfig = await createBaizeAgent(baseModel)
 
   const variantToUse = pluginBaizeOverride?.variant ?? resolvedVariant
   if (variantToUse) {

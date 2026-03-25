@@ -14,9 +14,7 @@ export async function showLocalDevToast(
   isSisyphusEnabled: boolean
 ): Promise<void> {
   const displayVersion = version ?? "dev"
-  const message = isSisyphusEnabled
-    ? "Sisyphus running in local development mode."
-    : "Running in local development mode. oMoMoMo..."
+  const message = "Running in local development mode."
   await showSpinnerToast(ctx, `${displayVersion} (dev)`, message)
   log(`[auto-update-checker] Local dev toast shown: v${displayVersion}`)
 }
