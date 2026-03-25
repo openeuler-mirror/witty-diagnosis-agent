@@ -71,7 +71,7 @@ export async function buildDayuAgentConfig(params: {
     mode: "all",
     prompt: await getDayuPrompt(resolvedModel),
     permission: DAYU_PERMISSION,
-    description: `${(params.configAgentPlan?.description as string) ?? "Plan agent"} (Dayu - OhMyOpenCode)`,
+    description: `${(params.configAgentPlan?.description as string) ?? "Plan agent"} (Dayu - WittyDiagnosisAgent)`,
     color: (params.configAgentPlan?.color as string) ?? "#2196F3",
     ...(temperatureToUse !== undefined ? { temperature: temperatureToUse } : {}),
     ...(topPToUse !== undefined ? { top_p: topPToUse } : {}),

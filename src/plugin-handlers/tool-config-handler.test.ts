@@ -1,6 +1,6 @@
 import { describe, it, expect } from "bun:test"
 import { applyToolConfig } from "./tool-config-handler"
-import type { OhMyOpenCodeConfig } from "../config"
+import type { WittyDiagnosisAgentConfig } from "../config"
 
 function createParams(overrides: {
   taskSystem?: boolean
@@ -15,7 +15,7 @@ function createParams(overrides: {
     config: { tools: {}, permission: {} } as Record<string, unknown>,
     pluginConfig: {
       experimental: { task_system: overrides.taskSystem ?? false },
-    } as OhMyOpenCodeConfig,
+    } as WittyDiagnosisAgentConfig,
     agentResult: agentResult as Record<string, unknown>,
   }
 }

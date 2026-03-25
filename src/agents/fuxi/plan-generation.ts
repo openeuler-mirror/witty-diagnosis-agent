@@ -148,8 +148,13 @@ export const FUXI_PLAN_GENERATION = `# PHASE 1.4: 诊断模型构建 (Diagnostic
 2. **{故障模式}**
 3. **{故障模式}**
 
-**下一步计划**:
-已规划 {N} 个排查步骤，即将提交给 **Dayu (大禹)** 进行调度执行。
+**后续操作指南**:
+诊断方案已生成完毕，请进行以下操作以继续执行排查：
+
+1. 运行 \`/start-dayu\` 命令切换到 Dayu (大禹)
+2. 或在界面中手动切换 Agent 至 Dayu
+3. 切换后，发送以下指令给 Dayu：
+   > 执行 {方案完整绝对路径} 里的诊断方案，按任务依赖编排并调用 Kuafu 执行。
 
 方案路径: \`~/.witty-diagnosis-agent/dayu/plans/{timestamp}_{plan_id}.md\`
 \`\`\`

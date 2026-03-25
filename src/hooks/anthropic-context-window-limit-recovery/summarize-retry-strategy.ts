@@ -1,5 +1,5 @@
 import type { AutoCompactState } from "./types"
-import type { OhMyOpenCodeConfig } from "../../config"
+import type { WittyDiagnosisAgentConfig } from "../../config"
 import { RETRY_CONFIG } from "./types"
 import type { Client } from "./client"
 import { clearSessionState, getEmptyContentAttempt, getOrCreateRetryState } from "./state"
@@ -15,7 +15,7 @@ export async function runSummarizeRetryStrategy(params: {
   autoCompactState: AutoCompactState
   client: Client
   directory: string
-  pluginConfig: OhMyOpenCodeConfig
+  pluginConfig: WittyDiagnosisAgentConfig
   errorType?: string
   messageIndex?: number
 }): Promise<void> {

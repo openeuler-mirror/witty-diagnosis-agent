@@ -1,4 +1,4 @@
-import type { OhMyOpenCodeConfig } from "../config";
+import type { WittyDiagnosisAgentConfig } from "../config";
 import { getAgentDisplayName } from "../shared/agent-display-names";
 import {
   loadUserCommands,
@@ -19,7 +19,7 @@ import type { PluginComponents } from "./plugin-components-loader";
 
 export async function applyCommandConfig(params: {
   config: Record<string, unknown>;
-  pluginConfig: OhMyOpenCodeConfig;
+  pluginConfig: WittyDiagnosisAgentConfig;
   ctx: { directory: string };
   pluginComponents: PluginComponents;
 }): Promise<void> {

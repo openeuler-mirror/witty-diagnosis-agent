@@ -8,7 +8,7 @@ import { getContinuationState } from "./continuation-state"
 const tempDirs: string[] = []
 
 function createTempDir(): string {
-  const directory = mkdtempSync(join(tmpdir(), "omo-run-cont-state-"))
+  const directory = mkdtempSync(join(tmpdir(), "wda-run-cont-state-"))
   tempDirs.push(directory)
   return directory
 }

@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, mock, test } from "bun:test"
 import { runSummarizeRetryStrategy } from "./summarize-retry-strategy"
 import type { AutoCompactState, ParsedTokenLimitError, RetryState } from "./types"
-import type { OhMyOpenCodeConfig } from "../../config"
+import type { WittyDiagnosisAgentConfig } from "../../config"
 
 type TimeoutCall = {
   delay: number
@@ -72,7 +72,7 @@ describe("runSummarizeRetryStrategy", () => {
       autoCompactState,
       client: client as never,
       directory,
-      pluginConfig: {} as OhMyOpenCodeConfig,
+      pluginConfig: {} as WittyDiagnosisAgentConfig,
     })
 
     //#then
@@ -111,7 +111,7 @@ describe("runSummarizeRetryStrategy", () => {
       autoCompactState,
       client: client as never,
       directory,
-      pluginConfig: {} as OhMyOpenCodeConfig,
+      pluginConfig: {} as WittyDiagnosisAgentConfig,
     })
 
     //#then

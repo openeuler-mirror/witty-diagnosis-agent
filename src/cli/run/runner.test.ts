@@ -1,10 +1,10 @@
 /// <reference types="bun-types" />
 
 import { describe, it, expect } from "bun:test"
-import type { OhMyOpenCodeConfig } from "../../config"
+import type { WittyDiagnosisAgentConfig } from "../../config"
 import { resolveRunAgent, waitForEventProcessorShutdown } from "./runner"
 
-const createConfig = (overrides: Partial<OhMyOpenCodeConfig> = {}): OhMyOpenCodeConfig => ({
+const createConfig = (overrides: Partial<WittyDiagnosisAgentConfig> = {}): WittyDiagnosisAgentConfig => ({
   ...overrides,
 })
 

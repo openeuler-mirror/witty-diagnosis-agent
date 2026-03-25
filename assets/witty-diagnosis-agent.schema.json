@@ -3671,7 +3671,7 @@
         "safe_hook_creation": {
           "type": "boolean"
         },
-        "disable_omo_env": {
+        "disable_wda_env": {
           "type": "boolean"
         },
         "hashline_edit": {

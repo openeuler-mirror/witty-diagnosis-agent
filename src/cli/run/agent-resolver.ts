@@ -1,6 +1,6 @@
 import pc from "picocolors"
 import type { RunOptions } from "./types"
-import type { OhMyOpenCodeConfig } from "../../config"
+import type { WittyDiagnosisAgentConfig } from "../../config"
 import { getAgentConfigKey, getAgentDisplayName } from "../../shared/agent-display-names"
 
 const CORE_AGENT_ORDER = ["sisyphus", "hephaestus", "prometheus", "fuxi", "dayu", "atlas"] as const
@@ -29,7 +29,7 @@ const normalizeAgentName = (agent?: string): ResolvedAgent | undefined => {
   }
 }
 
-const isAgentDisabled = (agentConfigKey: string, config: OhMyOpenCodeConfig): boolean => {
+const isAgentDisabled = (agentConfigKey: string, config: WittyDiagnosisAgentConfig): boolean => {
   const lowered = agentConfigKey.toLowerCase()
   if (lowered === DEFAULT_AGENT && config.sisyphus_agent?.disabled === true) {
     return true
@@ -39,7 +39,7 @@ const isAgentDisabled = (agentConfigKey: string, config: OhMyOpenCodeConfig): bo
   )
 }
 
-const pickFallbackAgent = (config: OhMyOpenCodeConfig): CoreAgentKey => {
+const pickFallbackAgent = (config: WittyDiagnosisAgentConfig): CoreAgentKey => {
   for (const agent of CORE_AGENT_ORDER) {
     if (!isAgentDisabled(agent, config)) {
       return agent
@@ -50,7 +50,7 @@ const pickFallbackAgent = (config: OhMyOpenCodeConfig): CoreAgentKey => {
 
 export const resolveRunAgent = (
   options: RunOptions,
-  pluginConfig: OhMyOpenCodeConfig,
+  pluginConfig: WittyDiagnosisAgentConfig,
   env: EnvVars = process.env
 ): string => {
   const cliAgent = normalizeAgentName(options.agent)

@@ -3,9 +3,9 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync, renameSync, unlinkS
 import { randomUUID } from "crypto"
 import { getOpenCodeConfigDir } from "../../shared/opencode-config-dir"
 import type { z } from "zod"
-import type { OhMyOpenCodeConfig } from "../../config/schema"
+import type { WittyDiagnosisAgentConfig } from "../../config/schema"
 
-export function getTaskDir(config: Partial<OhMyOpenCodeConfig> = {}): string {
+export function getTaskDir(config: Partial<WittyDiagnosisAgentConfig> = {}): string {
   const tasksConfig = config.sisyphus?.tasks
   const storagePath = tasksConfig?.storage_path
 
@@ -22,7 +22,7 @@ export function sanitizePathSegment(value: string): string {
   return value.replace(/[^a-zA-Z0-9_-]/g, "-") || "default"
 }
 
-export function resolveTaskListId(config: Partial<OhMyOpenCodeConfig> = {}): string {
+export function resolveTaskListId(config: Partial<WittyDiagnosisAgentConfig> = {}): string {
   const envId = process.env.ULTRAWORK_TASK_LIST_ID?.trim()
   if (envId) return sanitizePathSegment(envId)
 
@@ -88,7 +88,7 @@ export function generateTaskId(): string {
   return `T-${randomUUID()}`
 }
 
-export function listTaskFiles(config: Partial<OhMyOpenCodeConfig> = {}): string[] {
+export function listTaskFiles(config: Partial<WittyDiagnosisAgentConfig> = {}): string[] {
   const dir = getTaskDir(config)
   if (!existsSync(dir)) return []
   return readdirSync(dir)

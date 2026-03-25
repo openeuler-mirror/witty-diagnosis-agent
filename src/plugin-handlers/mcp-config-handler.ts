@@ -1,4 +1,4 @@
-import type { OhMyOpenCodeConfig } from "../config";
+import type { WittyDiagnosisAgentConfig } from "../config";
 import { loadMcpConfigs } from "../features/claude-code-mcp-loader";
 import { createBuiltinMcps } from "../mcp";
 import type { PluginComponents } from "./plugin-components-loader";
@@ -27,7 +27,7 @@ function captureUserDisabledMcps(
 
 export async function applyMcpConfig(params: {
   config: Record<string, unknown>;
-  pluginConfig: OhMyOpenCodeConfig;
+  pluginConfig: WittyDiagnosisAgentConfig;
   pluginComponents: PluginComponents;
 }): Promise<void> {
   const disabledMcps = params.pluginConfig.disabled_mcps ?? [];

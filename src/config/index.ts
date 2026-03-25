@@ -1,9 +1,9 @@
 export {
-  OhMyOpenCodeConfigSchema,
+  WittyDiagnosisAgentConfigSchema,
 } from "./schema"
 
 export type {
-  OhMyOpenCodeConfig,
+  WittyDiagnosisAgentConfig,
   AgentOverrideConfig,
   AgentOverrides,
   McpName,

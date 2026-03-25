@@ -1,6 +1,6 @@
 import { describe, expect, test, beforeEach, afterEach, spyOn } from "bun:test"
 import { createRuntimeFallbackHook } from "./index"
-import type { RuntimeFallbackConfig, OhMyOpenCodeConfig } from "../../config"
+import type { RuntimeFallbackConfig, WittyDiagnosisAgentConfig } from "../../config"
 import * as sharedModule from "../../shared"
 import { SessionCategoryRegistry } from "../../shared/session-category-registry"
 
@@ -62,7 +62,7 @@ describe("runtime-fallback", () => {
     }
   }
 
-  function createMockPluginConfigWithCategoryFallback(fallbackModels: string[]): OhMyOpenCodeConfig {
+  function createMockPluginConfigWithCategoryFallback(fallbackModels: string[]): WittyDiagnosisAgentConfig {
     return {
       categories: {
         test: {
@@ -1902,7 +1902,7 @@ describe("runtime-fallback", () => {
   })
 
   describe("fallback models configuration", () => {
-    function createMockPluginConfigWithAgentFallback(agentName: string, fallbackModels: string[]): OhMyOpenCodeConfig {
+    function createMockPluginConfigWithAgentFallback(agentName: string, fallbackModels: string[]): WittyDiagnosisAgentConfig {
       return {
         agents: {
           [agentName]: {

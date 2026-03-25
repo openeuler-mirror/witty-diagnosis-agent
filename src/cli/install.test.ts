@@ -18,7 +18,7 @@ describe("install CLI - binary check behavior", () => {
 
   beforeEach(() => {
     // given temporary config directory
-    tempDir = join(tmpdir(), `omo-test-${Date.now()}-${Math.random().toString(36).slice(2)}`)
+    tempDir = join(tmpdir(), `wda-test-${Date.now()}-${Math.random().toString(36).slice(2)}`)
     mkdirSync(tempDir, { recursive: true })
 
     originalEnv = process.env.OPENCODE_CONFIG_DIR
@@ -108,7 +108,7 @@ describe("install CLI - binary check behavior", () => {
     // then opencode.json should have plugin entry
     const config = JSON.parse(readFileSync(configPath, "utf-8"))
     expect(config.plugin).toBeDefined()
-    expect(config.plugin.some((p: string) => p.includes("oh-my-opencode"))).toBe(true)
+    expect(config.plugin.some((p: string) => p.includes("witty-diagnosis-agent"))).toBe(true)
 
     // then exit code should be 0 (success)
     expect(exitCode).toBe(0)

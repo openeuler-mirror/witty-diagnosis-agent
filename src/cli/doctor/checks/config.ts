@@ -1,13 +1,13 @@
 import { readFileSync } from "node:fs"
 import { join } from "node:path"
 
-import { OhMyOpenCodeConfigSchema } from "../../../config"
+import { WittyDiagnosisAgentConfigSchema } from "../../../config"
 import { detectConfigFile, getOpenCodeConfigDir, parseJsonc } from "../../../shared"
 import { CHECK_IDS, CHECK_NAMES, PACKAGE_NAME } from "../constants"
 import type { CheckResult, DoctorIssue } from "../types"
 import { loadAvailableModelsFromCache } from "./model-resolution-cache"
 import { getModelResolutionInfoWithOverrides } from "./model-resolution"
-import type { OmoConfig } from "./model-resolution-types"
+import type { WdaConfig } from "./model-resolution-types"
 
 const USER_CONFIG_BASE = join(getOpenCodeConfigDir({ binary: "opencode" }), PACKAGE_NAME)
 const PROJECT_CONFIG_BASE = join(process.cwd(), ".opencode", PACKAGE_NAME)
@@ -16,7 +16,7 @@ interface ConfigValidationResult {
   exists: boolean
   path: string | null
   valid: boolean
-  config: OmoConfig | null
+  config: WdaConfig | null
   errors: string[]
 }
 
@@ -38,8 +38,8 @@ function validateConfig(): ConfigValidationResult {
 
   try {
     const content = readFileSync(configPath, "utf-8")
-    const rawConfig = parseJsonc<OmoConfig>(content)
-    const schemaResult = OhMyOpenCodeConfigSchema.safeParse(rawConfig)
+    const rawConfig = parseJsonc<WdaConfig>(content)
+    const schemaResult = WittyDiagnosisAgentConfigSchema.safeParse(rawConfig)
 
     if (!schemaResult.success) {
       return {
@@ -63,7 +63,7 @@ function validateConfig(): ConfigValidationResult {
   }
 }
 
-function collectModelResolutionIssues(config: OmoConfig): DoctorIssue[] {
+function collectModelResolutionIssues(config: WdaConfig): DoctorIssue[] {
   const issues: DoctorIssue[] = []
   const availableModels = loadAvailableModelsFromCache()
   const resolution = getModelResolutionInfoWithOverrides(config)
