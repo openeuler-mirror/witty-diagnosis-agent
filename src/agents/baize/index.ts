@@ -1,11 +1,11 @@
 import type { AgentConfig } from "@opencode-ai/sdk";
-import type { AgentMode } from "./types";
+import type { AgentMode } from "../types";
 import type {
   AvailableAgent,
   AvailableTool,
   AvailableSkill,
   AvailableCategory,
-} from "./dynamic-agent-prompt-builder";
+} from "../dynamic-agent-prompt-builder";
 import {
   buildKeyTriggersSection,
   buildToolSelectionTable,
@@ -14,7 +14,7 @@ import {
   buildHardBlocksSection,
   buildAntiPatternsSection,
   categorizeTools,
-} from "./dynamic-agent-prompt-builder";
+} from "../dynamic-agent-prompt-builder";
 
 const MODE: AgentMode = "all";
 

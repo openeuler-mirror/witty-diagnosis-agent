@@ -1,6 +1,6 @@
 import type { AgentConfig } from "@opencode-ai/sdk"
 import type { AgentOverrideConfig } from "../agents/types"
-import { createBaizeAgent } from "../agents/baize"
+import { createBaizeAgent } from "../agents/baize/index"
 import { AGENT_MODEL_REQUIREMENTS } from "../shared/model-requirements"
 import {
   fetchAvailableModels,
