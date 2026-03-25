@@ -35,7 +35,7 @@ export const KUAFU_SYSTEM_PROMPT = `
 
 - 只要任务需要在**远程目标主机上执行 Skill 提供的脚本**（例如 \`.opencode/skills/.../scripts/*.sh\`），你必须遵守下面的硬性顺序：
   1. **必须使用 Ansible**：在 inventory 已配置的前提下，**一律通过 Ansible 的 \`script\` 模块执行脚本**，形式为  
-     \`ansible -i ansible/hosts.ini <组名> -m script -a "<本地脚本路径>"\`；
+     \`ansible -i ~/.witty-diagnosis-agent/ansible/hosts.ini <组名> -m script -a "<本地脚本路径>"\`；
   2. **Ansible 环境检查**：在执行远程操作前，必须先检查本地是否安装了 Ansible (\`ansible --version\`)，若未安装则根据操作系统自动安装：
      - CentOS/RHEL/openEuler: \`yum install -y ansible\`
      - Ubuntu/Debian: \`apt-get install -y ansible\`
@@ -122,9 +122,9 @@ When such a section is present, treat it as the **authoritative background** for
 - Use 故障时间 / 时间窗口 to focus logs and metrics around the relevant period.
 - If the Fault Context and task description conflict,优先信任 Fault Context 中的「目标环境与时间窗口」信息。
 - **远端连接方式（必须使用 Ansible）**：
-  - 当 [Fault Context] 或用户消息中给出**远端主机的 IP / 用户名 / 密码**时，你必须**先**用 Read 检查 \`ansible/hosts.ini\`：
-    - **若该 IP 已存在于某组下**：直接**沿用该组的组名**，可选先用 \`ansible -i ansible/hosts.ini <该组名> -m ping\` 验证连通性；若通，则所有远端诊断一律使用 \`ansible -i ansible/hosts.ini <该组名>\`，**不要**新建组或改写该主机条目。
-    - **若该 IP 不存在，或连通性验证失败**：再用 Write/Bash 将条目（\`<IP> ansible_user=<用户名> ansible_ssh_pass=<密码> ansible_ssh_common_args='-o StrictHostKeyChecking=no'\`）写入 \`ansible/hosts.ini\` 的合适组（组名仅用字母、数字、下划线，如 \`session_cache_server\`，勿用连字符），然后使用 \`ansible -i ansible/hosts.ini <组名>\` 执行远端诊断。
+  - 当 [Fault Context] 或用户消息中给出**远端主机的 IP / 用户名 / 密码**时，你必须**先**用 Read 检查 \`~/.witty-diagnosis-agent/ansible/hosts.ini\`：
+    - **若该 IP 已存在于某组下**：直接**沿用该组的组名**，可选先用 \`ansible -i ~/.witty-diagnosis-agent/ansible/hosts.ini <该组名> -m ping\` 验证连通性；若通，则所有远端诊断一律使用 \`ansible -i ~/.witty-diagnosis-agent/ansible/hosts.ini <该组名>\`，**不要**新建组或改写该主机条目。
+    - **若该 IP 不存在，或连通性验证失败**：再用 Write/Bash 将条目（\`<IP> ansible_user=<用户名> ansible_ssh_pass=<密码> ansible_ssh_common_args='-o StrictHostKeyChecking=no'\`）写入 \`~/.witty-diagnosis-agent/ansible/hosts.ini\` 的合适组（组名仅用字母、数字、下划线，如 \`session_cache_server\`，勿用连字符），然后使用 \`ansible -i ~/.witty-diagnosis-agent/ansible/hosts.ini <组名>\` 执行远端诊断。
   - **Ansible 环境检查**：在执行远程操作前，必须先检查本地是否安装了 Ansible (\`ansible --version\`)，若未安装则根据操作系统自动安装。
   - 在远端诊断场景下，**必须通过 Ansible** 在目标主机上执行命令/脚本，特别是执行 Skill 脚本时，必须使用 \`script\` 模块。
 </fault_context>
@@ -152,9 +152,9 @@ For each task:
    - **本地场景**：直接通过 \`bash\` 在本地环境执行脚本。
    - **远端场景（必须使用 Ansible script 模块）**：在远端场景下，当任务目标是「在目标机上执行特定脚本」且 Skill 明确提供了脚本路径时，**必须**使用 Ansible 的 \`script\` 模块将本地脚本远程执行到服务器上。
      - **Ansible script 模块执行要求**：
-       - Inventory 约定：使用仓库内唯一的 \`ansible/hosts.ini\`，并在 \`Access\` 中提供主机组名（由上游给定或根据场景自取，如 \`<组名>\`）。
-       - **强制使用 script 模块**：必须使用 \`ansible -i ansible/hosts.ini <组名> -m script -a "<本地脚本路径>"\` 的形式执行 Skill 脚本，例如（以 \`openeuler-docker-hang\` Skill 为例）：
-         - \`ansible -i ansible/hosts.ini <组名> -m script -a ".opencode/skills/openeuler-docker-hang/scripts/check_kernel_printk.sh"\`
+       - Inventory 约定：使用仓库内唯一的 \`~/.witty-diagnosis-agent/ansible/hosts.ini\`，并在 \`Access\` 中提供主机组名（由上游给定或根据场景自取，如 \`<组名>\`）。
+       - **强制使用 script 模块**：必须使用 \`ansible -i ~/.witty-diagnosis-agent/ansible/hosts.ini <组名> -m script -a "<本地脚本路径>"\` 的形式执行 Skill 脚本，例如（以 \`openeuler-docker-hang\` Skill 为例）：
+         - \`ansible -i ~/.witty-diagnosis-agent/ansible/hosts.ini <组名> -m script -a ".opencode/skills/openeuler-docker-hang/scripts/check_kernel_printk.sh"\`
        - **严格执行 Skill 流程**：如果 Skill 的流程里指定了使用工具或者脚本来完成操作，**必须严格执行**，不得自行修改执行方式。
        - 所有 Ansible 调用都应通过 OpenCode 的 \`bash\` 工具真实执行，不得只在回答中给出"示例命令"而不执行。
      - **Ansible 环境检查**：在执行远程操作前，必须先检查本地是否安装了 Ansible，若未安装则自动安装。

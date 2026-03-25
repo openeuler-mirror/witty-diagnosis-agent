@@ -58,8 +58,8 @@ function maybeAppendExecutionPolicyForSkill(
   return (
     instructions +
     "\n\n[Execution Policy / 执行策略]\n" +
-    "- 若本 Skill 需要在远程目标主机上执行上述脚本，并且已经通过 ansible/hosts.ini 配置好目标主机和 Ansible 组名，则必须由执行 Agent 通过 Ansible 的 script 模块执行脚本，形式为：\n" +
-    '  - ansible -i ansible/hosts.ini <组名> -m script -a "<本地脚本路径>"\n' +
+    "- 若本 Skill 需要在远程目标主机上执行上述脚本，并且已经通过 ~/.witty-diagnosis-agent/ansible/hosts.ini 配置好目标主机和 Ansible 组名，则必须由执行 Agent 通过 Ansible 的 script 模块执行脚本，形式为：\n" +
+    '  - ansible -i ~/.witty-diagnosis-agent/ansible/hosts.ini <组名> -m script -a "<本地脚本路径>"\n' +
     "- 在执行远程操作前，必须先检查本地是否安装了 Ansible，若未安装则自动安装；禁止只给出示例命令而不真正执行。"
   )
 }

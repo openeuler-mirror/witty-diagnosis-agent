@@ -32,6 +32,16 @@ export async function runTuiInstaller(args: InstallArgs, version: string): Promi
   }
 
   const spinner = p.spinner()
+
+  spinner.start("Initializing agent workspace")
+  try {
+    const { ensureAgentDirectoryExists } = await import("./config-manager/ensure-agent-directory-exists")
+    const workspacePath = ensureAgentDirectoryExists()
+    spinner.stop(`Workspace created in ${color.cyan(workspacePath)}`)
+  } catch (err) {
+    spinner.stop(`Workspace initialization skipped: ${err} ${color.yellow("[!]")}`)
+  }
+
   spinner.start("Checking OpenCode installation")
 
   const installed = await isOpenCodeInstalled()

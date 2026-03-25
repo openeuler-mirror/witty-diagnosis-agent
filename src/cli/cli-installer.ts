@@ -50,7 +50,16 @@ export async function runCliInstaller(args: InstallArgs, version: string): Promi
   const totalSteps = 7
   let step = 1
 
-  printStep(step++, totalSteps, "Checking OpenCode installation...")
+  printStep(step++, totalSteps + 1, "Initializing agent workspace...")
+  try {
+    const { ensureAgentDirectoryExists } = await import("./config-manager/ensure-agent-directory-exists")
+    const workspacePath = ensureAgentDirectoryExists()
+    printSuccess(`Workspace created ${SYMBOLS.arrow} ${color.dim(workspacePath)}`)
+  } catch (err) {
+    printWarning(`Failed to initialize workspace: ${err}`)
+  }
+
+  printStep(step++, totalSteps + 1, "Checking OpenCode installation...")
   const installed = await isOpenCodeInstalled()
   const openCodeVersion = await getOpenCodeVersion()
   if (!installed) {

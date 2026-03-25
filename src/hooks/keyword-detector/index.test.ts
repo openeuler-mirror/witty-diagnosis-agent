@@ -459,18 +459,19 @@ Second reminder with investigate and examine keywords.
       parts: [{
         type: "text",
         text: `<SYSTEM-REMINDER>
-System will search and find files.
+You should investigate and examine the code carefully.
 </SYSTEM-REMINDER>`
       }],
     }
 
-    // when - keyword detection runs on uppercase system-reminder
+    // when - keyword detection runs
     await hook["chat.message"]({ sessionID }, output)
 
-    // then - should NOT trigger search mode
+    // then - should NOT trigger analyze mode
     const textPart = output.parts.find(p => p.type === "text")
     expect(textPart).toBeDefined()
     expect(textPart!.text).not.toContain("[search-mode]")
+    expect(textPart!.text).toContain("<SYSTEM-REMINDER>")
   })
 
   test("should handle multiline system-reminder content with search keywords", async () => {
