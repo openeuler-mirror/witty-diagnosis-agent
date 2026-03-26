@@ -1,5 +1,4 @@
 import type { AgentConfig } from "@opencode-ai/sdk";
-import type { AgentMode } from "./types";
 import type {
   AvailableAgent,
   AvailableTool,
@@ -16,7 +15,7 @@ import {
   categorizeTools,
 } from "../dynamic-agent-prompt-builder";
 
-const MODE: AgentMode = "all";
+export const MODE = "all";
 
 function buildTodoDisciplineSection(useTaskSystem: boolean): string {
   if (useTaskSystem) {
