@@ -6,8 +6,13 @@ import { join } from "node:path"
 import { parseJsonc } from "../../shared/jsonc-parser"
 import type { InstallConfig } from "../types"
 import { resetConfigContext } from "./config-context"
+<<<<<<<< HEAD:src/cli/config-manager/write-witty-config.test.ts
 import { generateWittyConfig } from "./generate-witty-config"
 import { writeWittyConfig } from "./write-witty-config"
+========
+import { generateWdaConfig } from "./generate-wda-config"
+import { writeWdaConfig } from "./write-wda-config"
+>>>>>>>> origin/master:src/cli/config-manager/write-wda-config.test.ts
 
 const installConfig: InstallConfig = {
   hasClaude: true,
@@ -28,12 +33,20 @@ function getRecord(value: unknown): Record<string, unknown> {
   return {}
 }
 
+<<<<<<<< HEAD:src/cli/config-manager/write-witty-config.test.ts
 describe("writeWittyConfig", () => {
+========
+describe("writeWdaConfig", () => {
+>>>>>>>> origin/master:src/cli/config-manager/write-wda-config.test.ts
   let testConfigDir = ""
   let testConfigPath = ""
 
   beforeEach(() => {
+<<<<<<<< HEAD:src/cli/config-manager/write-witty-config.test.ts
     testConfigDir = join(tmpdir(), `witty-write-config-${Date.now()}-${Math.random().toString(36).slice(2)}`)
+========
+    testConfigDir = join(tmpdir(), `wda-write-config-${Date.now()}-${Math.random().toString(36).slice(2)}`)
+>>>>>>>> origin/master:src/cli/config-manager/write-wda-config.test.ts
     testConfigPath = join(testConfigDir, "witty-diagnosis-agent.json")
 
     mkdirSync(testConfigDir, { recursive: true })
@@ -59,10 +72,17 @@ describe("writeWittyConfig", () => {
     }
     writeFileSync(testConfigPath, JSON.stringify(existingConfig, null, 2) + "\n", "utf-8")
 
+<<<<<<<< HEAD:src/cli/config-manager/write-witty-config.test.ts
     const generatedDefaults = generateWittyConfig(installConfig)
 
     // when
     const result = writeWittyConfig(installConfig)
+========
+    const generatedDefaults = generateWdaConfig(installConfig)
+
+    // when
+    const result = writeWdaConfig(installConfig)
+>>>>>>>> origin/master:src/cli/config-manager/write-wda-config.test.ts
 
     // then
     expect(result.success).toBe(true)

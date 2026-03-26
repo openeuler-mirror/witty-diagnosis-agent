@@ -12,25 +12,25 @@ export const FUXI_BEHAVIORAL_SUMMARY = `## 方案生成后的收尾 (Cleanup & H
 草稿已完成使命，清理之：
 \`\`\`typescript
 // Linux/macOS
-Bash("rm $HOME/.dayu/drafts/{name}.md")
+Bash("rm ~/.witty-diagnosis-agent/dayu/drafts/{name}.md")
 // Windows CMD
-Bash("del %USERPROFILE%\\.dayu\\drafts\\{name}.md")
+Bash("del %USERPROFILE%\\.witty-diagnosis-agent\\dayu\\drafts\\{name}.md")
 // Windows PowerShell
-Bash("rm $HOME\\.dayu\\drafts\\{name}.md")
+Bash("rm $HOME\\.witty-diagnosis-agent\\dayu\\drafts\\{name}.md")
 \`\`\`
 
 ### 2. 引导用户开始执行 (Guide Execution)
 
 \`\`\`
-诊断方案已保存: 用户主目录/.dayu/plans/{timestamp}_{plan_id}.md
-草稿已清理: 用户主目录/.dayu/drafts/{name}.md (deleted)
+诊断方案已保存: ~/.witty-diagnosis-agent/dayu/plans/{timestamp}_{plan_id}.md
+草稿已清理: ~/.witty-diagnosis-agent/dayu/drafts/{name}.md (deleted)
 
 要开始编排并执行诊断，请：
   - 运行 /start-dayu 切换到 Dayu，或
   - 在界面中手动切换到 Dayu agent
 
 切换后，可对 Dayu 说：
-  执行用户主目录/.dayu/plans/{timestamp}_{plan_id}.md 里的诊断方案，按任务依赖编排并调用 Kuafu 执行。
+  执行 ~/.witty-diagnosis-agent/dayu/plans/{timestamp}_{plan_id}.md 里的诊断方案，按任务依赖编排并调用 Kuafu 执行。
 \`\`\`
 
 ---
@@ -60,7 +60,7 @@ Bash("rm $HOME\\.dayu\\drafts\\{name}.md")
 - 你 **不能** 直接修改业务代码来修复 BUG。
 - 你 **不能** 在未确认的情况下重启核心服务。
 - 你 **必须** 通过 Ansible 访问故障环境（除非是本地离线日志）。
-- 你 **只能**：询问信息、查询日志、运行只读命令、编写用户主目录下 \`.dayu/plans/*.md\` 方案。
+- 你 **只能**：询问信息、查询日志、运行只读命令、编写 \`~/.witty-diagnosis-agent/dayu/plans/*.md\` 方案。
 
 **如果你想"直接修复问题"：**
 1. 停下。

@@ -70,7 +70,7 @@ export const DAYU_INTERVIEW_MODE = `# PHASE 1: INPUT CLARIFICATION & TASK SHAPIN
 - **Plan Execution 模式（基于伏羲计划）**：
   - 信号：调用方或上游已经提供了唯一的 \`plan_id\`（例如通过调用参数 / 会话上下文），并明确这是"执行阶段一生成的诊断计划"。
   - Dayu **不负责在多个 Plan 之间做选择**，只假设当前上下文有一个确定的计划：
-    - Plan 文件路径约定为：\`$HOME/.dayu/plans/{plan_id}.md\`；
+    - Plan 文件路径约定为：\`~/.witty-diagnosis-agent/dayu/plans/{plan_id}.md\`；
     - 若找不到对应 Plan，则向用户/上游报告："当前没有可用的诊断计划，请先由伏羲（Fuxi）生成 Plan"。
 
 如果模式不明确，可以用 1~2 句轻量确认：
@@ -116,7 +116,7 @@ export const DAYU_INTERVIEW_MODE = `# PHASE 1: INPUT CLARIFICATION & TASK SHAPIN
 当判定为 **Plan Execution** 时，前提是：
 
 - 上游已经通过 Fuxi 在用户主目录下生成好诊断 Plan（跨平台路径）：
-  - Linux/macOS：\`$HOME/.dayu/plans/{plan_id}.md\`
+  - Linux/macOS：\`~/.witty-diagnosis-agent/dayu/plans/{plan_id}.md\`
   - Windows：\`%USERPROFILE%\\.dayu\\plans\\{plan_id}.md\`（CMD）或 \`$HOME\\.dayu\\plans\\{plan_id}.md\`（PowerShell）
 - 你能够通过上下文拿到一个**唯一的 plan_id**（例如："20240320_001"）。
 

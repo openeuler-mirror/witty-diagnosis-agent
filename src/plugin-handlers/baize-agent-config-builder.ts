@@ -1,6 +1,6 @@
 import type { AgentConfig } from "@opencode-ai/sdk"
 import type { AgentOverrideConfig } from "../agents/types"
-import { createBaizeAgent } from "../agents/baize"
+import { createBaizeAgent } from "../agents/baize/index"
 import { AGENT_MODEL_REQUIREMENTS } from "../shared/model-requirements"
 import {
   fetchAvailableModels,
@@ -53,7 +53,7 @@ export async function buildBaizeAgentConfig(
     currentModel ??
     "openai/gpt-5.3-codex"
 
-  let baseConfig = createBaizeAgent(baseModel)
+  let baseConfig = await createBaizeAgent(baseModel)
 
   const variantToUse = pluginBaizeOverride?.variant ?? resolvedVariant
   if (variantToUse) {

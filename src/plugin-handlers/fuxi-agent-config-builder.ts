@@ -69,7 +69,7 @@ export async function buildFuxiAgentConfig(params: {
     ...(resolvedModel ? { model: resolvedModel } : {}),
     ...(variantToUse ? { variant: variantToUse } : {}),
     mode: "all",
-    prompt: getFuxiPrompt(resolvedModel),
+    prompt: await getFuxiPrompt(resolvedModel),
     permission: FUXI_PERMISSION,
     description: `${(params.configAgentPlan?.description as string) ?? "Plan agent"} (Fuxi - WittyDiagnosisAgent)`,
     color: (params.configAgentPlan?.color as string) ?? "#FF5722",

@@ -17,7 +17,7 @@
     ".": "./dist/index.js"
   },
   "bin": {
-    "witty-diagnosis-agent": "dist/cli/index.js"
+    "witty-diagnosis-agent": "dist/cli.js"
   },
   "directories": {
     "doc": "docs",
@@ -29,7 +29,7 @@
     "skills"
   ],
   "scripts": {
-    "build": "tsup src/index.ts src/cli/index.ts --format esm --out-dir dist --dts && npm run build:schema",
+    "build": "tsup && npm run build:schema",
     "clean": "rm -rf dist",
     "postinstall": "node postinstall.mjs",
     "typecheck": "tsc --noEmit",

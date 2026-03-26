@@ -3,13 +3,6 @@ export type BooleanArg = "no" | "yes"
 
 export interface InstallArgs {
   tui: boolean
-  claude?: ClaudeSubscription
-  openai?: BooleanArg
-  gemini?: BooleanArg
-  copilot?: BooleanArg
-  opencodeZen?: BooleanArg
-  zaiCodingPlan?: BooleanArg
-  kimiForCoding?: BooleanArg
   skipAuth?: boolean
 }
 

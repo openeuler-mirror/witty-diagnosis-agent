@@ -2,15 +2,15 @@
  * Unified system directive prefix for witty-diagnosis-agent internal messages.
  * All system-generated messages should use this prefix for consistent filtering.
  *
- * Format: [SYSTEM DIRECTIVE: OH-MY-OPENCODE - {TYPE}]
+ * Format: [SYSTEM DIRECTIVE: WITTY-DIAGNOSIS-AGENT - {TYPE}]
  */
 
-export const SYSTEM_DIRECTIVE_PREFIX = "[SYSTEM DIRECTIVE: OH-MY-OPENCODE"
+export const SYSTEM_DIRECTIVE_PREFIX = "[SYSTEM DIRECTIVE: WITTY-DIAGNOSIS-AGENT"
 
 /**
  * Creates a system directive header with the given type.
  * @param type - The directive type (e.g., "TODO CONTINUATION", "RALPH LOOP")
- * @returns Formatted directive string like "[SYSTEM DIRECTIVE: OH-MY-OPENCODE - TODO CONTINUATION]"
+ * @returns Formatted directive string like "[SYSTEM DIRECTIVE: WITTY-DIAGNOSIS-AGENT - TODO CONTINUATION]"
  */
 export function createSystemDirective(type: string): string {
   return `${SYSTEM_DIRECTIVE_PREFIX} - ${type}]`

@@ -1,28 +1,26 @@
 import { existsSync } from "node:fs"
-import { dirname, join } from "node:path"
+import { join } from "node:path"
 import { pathToFileURL } from "node:url"
 
 /**
- * 当通过「仓库内编译的二进制」执行 install 时，返回指向本地 dist/index.js 的 file:// URL，
- * 这样 OpenCode 会加载本仓库的插件（含 auto-diag、start-dayu 等），而不是通过包名解析到 CLI 入口。
- * 若不在仓库二进制环境或 dist 不存在，返回 null。
+ * 动态获取当前运行的 CLI 所在的包的入口(dist/index.js)的绝对路径 (URI)。
+ * 这样 OpenCode 可以绕过按名解析，直接加载这个绝对路径的模块，避免全局安装时找不到包的问题。
  */
 export function resolveLocalPluginPath(): string | null {
   try {
-    const execPath = process.execPath
-    // 二进制路径形如: .../witty-diagnosis-agent/packages/darwin-x64/bin/witty-diagnosis-agent
-    if (!execPath || !execPath.includes("packages")) return null
+    // CLI is typically located at 'dist/cli.js' for a compiled environment
+    const distIndex = join(import.meta.dirname, "index.js")
+    if (existsSync(distIndex)) {
+      return pathToFileURL(distIndex).href
+    }
 
-    const binDir = dirname(execPath)
-    const platformDir = dirname(binDir)
-    const packagesDir = dirname(platformDir)
-    if (dirname(packagesDir) === packagesDir) return null // 避免根目录误判
-    const repoRoot = dirname(packagesDir)
+    // Fallback for development (e.g., executing tsx within src/cli/config-manager/)
+    const devIndex = join(import.meta.dirname, "..", "..", "..", "dist", "index.js")
+    if (existsSync(devIndex)) {
+      return pathToFileURL(devIndex).href
+    }
 
-    const distIndex = join(repoRoot, "dist", "index.js")
-    if (!existsSync(distIndex)) return null
-
-    return pathToFileURL(distIndex).href
+    return null
   } catch {
     return null
   }
