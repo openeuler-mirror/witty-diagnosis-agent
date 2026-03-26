@@ -26,13 +26,13 @@ Dayu / Fuxi 在构造 `[Fault Context]` 的 `Access` 字段时，应优先使用
 
 以 `openeuler-docker-hang` Skill 提供的脚本为例：
 
-- 本地脚本路径：`.witty-diagnosis-agent/skills/openeuler-docker-hang/scripts/check_kernel_printk.sh`
+- 本地脚本路径：`.opencode/skills/openeuler-docker-hang/scripts/check_kernel_printk.sh`
 - 推荐通过 Ansible `script` 模块在目标主机上执行：
 
 ```bash
 # 在 openeuler 组的所有主机上执行 check_kernel_printk.sh
 ansible -i ansible/hosts.ini openeuler \
-  -m script -a ".witty-diagnosis-agent/skills/openeuler-docker-hang/scripts/check_kernel_printk.sh"
+  -m script -a ".opencode/skills/openeuler-docker-hang/scripts/check_kernel_printk.sh"
 ```
 
 在 Kuafu 的执行逻辑中，建议优先使用上述 `script` 或 `copy + shell` 组合方式：

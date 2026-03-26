@@ -1,8 +1,8 @@
-# Installing witty-diagnosis-agent for witty-diagnosis-agent
+# Installing witty-diagnosis-agent for OpenCode
 
 ## Prerequisites
 
-- [witty-diagnosis-agent.ai](https://witty-diagnosis-agent.ai) installed
+- [OpenCode.ai](https://opencode.ai) installed
 - Git installed
 
 ## Installation Steps
@@ -10,32 +10,32 @@
 ### 1. Clone witty-diagnosis-agent
 
 ```bash
-git clone https://gitcode.com/openeuler/witty-diagnosis-agent.git ~/.config/witty-diagnosis-agent/witty-diagnosis-agent
+git clone https://gitcode.com/openeuler/witty-diagnosis-agent.git ~/.config/opencode/witty-diagnosis-agent
 ```
 
 ### 2. Register the Plugin
 
-Create a symlink so witty-diagnosis-agent discovers the plugin:
+Create a symlink so OpenCode discovers the plugin:
 
 ```bash
-mkdir -p ~/.config/witty-diagnosis-agent/plugins
-rm -f ~/.config/witty-diagnosis-agent/plugins/witty-diagnosis-agent.js
-ln -s ~/.config/witty-diagnosis-agent/witty-diagnosis-agent/.witty-diagnosis-agent/plugins/witty-diagnosis-agent.js ~/.config/witty-diagnosis-agent/plugins/witty-diagnosis-agent.js
+mkdir -p ~/.config/opencode/plugins
+rm -f ~/.config/opencode/plugins/witty-diagnosis-agent.js
+ln -s ~/.config/opencode/witty-diagnosis-agent/.opencode/plugins/witty-diagnosis-agent.js ~/.config/opencode/plugins/witty-diagnosis-agent.js
 ```
 
 ### 3. Symlink Skills
 
-Create a symlink so witty-diagnosis-agent's native skill tool discovers witty-diagnosis-agent skills:
+Create a symlink so OpenCode's native skill tool discovers witty-diagnosis-agent skills:
 
 ```bash
-mkdir -p ~/.config/witty-diagnosis-agent/skills
-rm -rf ~/.config/witty-diagnosis-agent/skills/witty-diagnosis-agent
-ln -s ~/.config/witty-diagnosis-agent/witty-diagnosis-agent/skills ~/.config/witty-diagnosis-agent/skills/witty-diagnosis-agent
+mkdir -p ~/.config/opencode/skills
+rm -rf ~/.config/opencode/skills/witty-diagnosis-agent
+ln -s ~/.config/opencode/witty-diagnosis-agent/skills ~/.config/opencode/skills/witty-diagnosis-agent
 ```
 
-### 4. Restart witty-diagnosis-agent
+### 4. Restart OpenCode
 
-Restart witty-diagnosis-agent. The plugin will automatically inject witty-diagnosis-agent context.
+Restart OpenCode. The plugin will automatically inject witty-diagnosis-agent context.
 
 Verify by asking: "do you have witty-diagnosis-agent skills?"
 
@@ -43,7 +43,7 @@ Verify by asking: "do you have witty-diagnosis-agent skills?"
 
 ### Finding Skills
 
-Use witty-diagnosis-agent's native `skill` tool to list available skills:
+Use OpenCode's native `skill` tool to list available skills:
 
 ```
 use skill tool to list skills
@@ -51,7 +51,7 @@ use skill tool to list skills
 
 ### Loading a Skill
 
-Use witty-diagnosis-agent's native `skill` tool to load a specific skill:
+Use OpenCode's native `skill` tool to load a specific skill:
 
 ```
 use skill tool to load witty-diagnosis-agent/data-collector
@@ -59,13 +59,13 @@ use skill tool to load witty-diagnosis-agent/data-collector
 
 ### Personal Skills
 
-Create your own skills in `~/.config/witty-diagnosis-agent/skills/`:
+Create your own skills in `~/.config/opencode/skills/`:
 
 ```bash
-mkdir -p ~/.config/witty-diagnosis-agent/skills/my-skill
+mkdir -p ~/.config/opencode/skills/my-skill
 ```
 
-Create `~/.config/witty-diagnosis-agent/skills/my-skill/SKILL.md`:
+Create `~/.config/opencode/skills/my-skill/SKILL.md`:
 
 ```markdown
 ---
@@ -80,14 +80,14 @@ description: Use when [condition] - [what it does]
 
 ### Project Skills
 
-Create project-specific skills in `.witty-diagnosis-agent/skills/` within your project.
+Create project-specific skills in `.opencode/skills/` within your project.
 
 **Skill Priority:** Project skills > Personal skills > witty-diagnosis-agent skills
 
 ## Updating
 
 ```bash
-cd ~/.config/witty-diagnosis-agent/witty-diagnosis-agent
+cd ~/.config/opencode/witty-diagnosis-agent
 git pull
 ```
 
@@ -95,14 +95,14 @@ git pull
 
 ### Plugin not loading
 
-1. Check plugin symlink: `ls -l ~/.config/witty-diagnosis-agent/plugins/witty-diagnosis-agent.js`
-2. Check source exists: `ls ~/.config/witty-diagnosis-agent/witty-diagnosis-agent/.witty-diagnosis-agent/plugins/witty-diagnosis-agent.js`
-3. Check witty-diagnosis-agent logs for errors
+1. Check plugin symlink: `ls -l ~/.config/opencode/plugins/witty-diagnosis-agent.js`
+2. Check source exists: `ls ~/.config/opencode/witty-diagnosis-agent/.opencode/plugins/witty-diagnosis-agent.js`
+3. Check OpenCode logs for errors
 
 ### Skills not found
 
-1. Check skills symlink: `ls -l ~/.config/witty-diagnosis-agent/skills/witty-diagnosis-agent`
-2. Verify it points to: `~/.config/witty-diagnosis-agent/witty-diagnosis-agent/skills`
+1. Check skills symlink: `ls -l ~/.config/opencode/skills/witty-diagnosis-agent`
+2. Verify it points to: `~/.config/opencode/witty-diagnosis-agent/skills`
 3. Use `skill` tool to list what's discovered
 
 ### Tool mapping
@@ -110,7 +110,7 @@ git pull
 When skills reference Claude Code tools:
 - `TodoWrite` → `update_plan`
 - `Task` with subagents → `@mention` syntax
-- `Skill` tool → witty-diagnosis-agent's native `skill` tool
+- `Skill` tool → OpenCode's native `skill` tool
 - File operations → your native tools
 
 ## Getting Help

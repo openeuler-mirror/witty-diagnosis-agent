@@ -8,7 +8,7 @@ Witty 智能诊断 Agent 支持多种安装方式，以适应不同的网络环�
 
 ### 方式 1: 使用 npm 全局安装 (推荐)
 
-通过 npm 全局安装 Witty 智能诊断 Agent，安装完成后可通过命令行一键为 witty-diagnosis-agent 注册插件及配置：
+通过 npm 全局安装 Witty 智能诊断 Agent，安装完成后可通过命令行一键为 OpenCode 注册插件及配置：
 
 ```bash
 npm install -g witty-diagnosis-agent@latest
@@ -23,10 +23,10 @@ witty-diagnosis-agent -V
 
 ### 方式 2: 使用 Agent 自动化安装
 
-复制如下内容到 witty-diagnosis-agent 对话框，由 Agent 引导您完成安装：
+复制如下内容到 OpenCode 对话框，由 Agent 引导您完成安装：
 
-```text
-请根据这里的说明安装并配置 witty-diagnosis-agent：
+```markdown
+请根据这里的说明安装并配置 OpenCode：
 https://atomgit.com/openeuler/witty-diagnosis-agent/blob/master/docs/reference/witty-diagnosis-installation.md
 ```
 
@@ -58,14 +58,14 @@ bun run build
 
 配置文件支持两种路径（二选一），优先选择用户级配置：
 
-- 用户级（推荐）：`~/.config/witty-diagnosis-agent/witty-diagnosis-agent.json` 或 `witty-diagnosis-agent.jsonc`
-- 项目级：项目根目录下的 `.witty-diagnosis-agent/witty-diagnosis-agent.json` 或 `.witty-diagnosis-agent/witty-diagnosis-agent.jsonc`
+- 用户级（推荐）：`~/.config/opencode/opencode.json` 或 `opencode.jsonc`
+- 项目级：项目根目录下的 `.opencode/opencode.json` 或 `.opencode/opencode.jsonc`
 
-在配置文件中新增或修改 `plugin` 数组，指向本仓库的构建入口（如果 `witty-diagnosis-agent.json` 文件不存在，请手动创建一个）：
+在配置文件中新增或修改 `plugin` 数组，指向本仓库的构建入口（如果 `opencode.json` 文件不存在，请手动创建一个）：
 
 ```json
 {
-    "$schema": "https://witty-diagnosis-agent.ai/config.json",
+    "$schema": "https://opencode.ai/config.json",
     "plugin": [
         "file:///{witty-diagnosis-agent项目绝对路径}/dist/index.js"
     ]
@@ -76,7 +76,7 @@ bun run build
 
 ```json
 {
-    "$schema": "https://witty-diagnosis-agent.ai/config.json",
+    "$schema": "https://opencode.ai/config.json",
     "plugin": [
         "file:///opt/witty-diagnosis-agent/dist/index.js"
     ]

@@ -196,7 +196,7 @@
 |--------|------|
 | `security/selinux/` | SELinux |
 | `security/apparmor/` | AppArmor |
-| `security/twitty-diagnosis-agentyo/` | TOMOYO |
+| `security/tomoyo/` | TOMOYO |
 | `security/smack/` | SMACK |
 | `security/keys/` | 密钥管理 |
 

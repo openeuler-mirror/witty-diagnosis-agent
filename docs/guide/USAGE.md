@@ -11,7 +11,7 @@
 # 在终端中启动
 witty-diagnosis-agent start
 
-# 或者在 witty-diagnosis-agent 中直接 @witty-diagnosis-agent
+# 或者在 OpenCode 中直接 @witty-diagnosis-agent
 ```
 
 ### 2. 选择运行模式
