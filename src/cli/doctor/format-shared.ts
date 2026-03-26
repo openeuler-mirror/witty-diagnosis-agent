@@ -27,7 +27,7 @@ export function stripAnsi(str: string): string {
 }
 
 export function formatHeader(): string {
-  return `\n${color.bgMagenta(color.white(" oMoMoMoMo Doctor "))}\n`
+  return `\n${color.bgMagenta(color.white(" wittyDiagnosisAgentMo Doctor "))}\n`
 }
 
 export function formatIssue(issue: DoctorIssue, index: number): string {

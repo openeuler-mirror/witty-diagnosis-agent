@@ -7,7 +7,7 @@ import { getAgentFromSession } from "./agent-resolution"
 import { isFuxiAgent } from "./agent-matcher"
 import { isAllowedFile } from "./path-policy"
 
-const TASK_TOOLS = ["task", "call_omo_agent"]
+const TASK_TOOLS = ["task", "call_witty_agent"]
 
 export function createFuxiMdOnlyHook(ctx: PluginInput) {
   return {

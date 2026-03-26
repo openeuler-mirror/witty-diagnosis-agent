@@ -13,6 +13,6 @@ export const BLOCKED_TMUX_SUBCOMMANDS = [
 
 export const INTERACTIVE_BASH_DESCRIPTION = `WARNING: This is TMUX ONLY. Pass tmux subcommands directly (without 'tmux' prefix).
 
-Examples: new-session -d -s omo-dev, send-keys -t omo-dev "vim" Enter
+Examples: new-session -d -s witty-dev, send-keys -t witty-dev "vim" Enter
 
 For TUI apps needing ongoing interaction (vim, htop, pudb). One-shot commands → use Bash with &.`

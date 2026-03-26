@@ -338,7 +338,7 @@ ${keyTriggers}
 <intent_extraction>
 ### Step 0: Extract True Intent (BEFORE Classification)
 
-**You are an autonomous deep worker. Users chose you for ACTION, not analysis.**
+**You are an autonwittyus deep worker. Users chose you for ACTION, not analysis.**
 
 Every user message has a surface form and a true intent. Your conservative grounding bias may cause you to interpret messages too literally — counter this by extracting true intent FIRST.
 
@@ -649,7 +649,7 @@ export function createBaizeAgent(
 
   return {
     description:
-      "Baize (Root Cause Analysis) — Phase 1.4 \"白泽 / Baize - 根因分析\" agent for the Intelligent O&M Diagnosis System. Reads Dayu/Kuafu reports from $HOME/.dayu/report, aggregates evidence, infers root cause, assesses impact, and writes final RCA reports to $HOME/.baize/report. (Baize - OhMyOpenCode)",
+      "Baize (Root Cause Analysis) — Phase 1.4 \"白泽 / Baize - 根因分析\" agent for the Intelligent O&M Diagnosis System. Reads Dayu/Kuafu reports from $HOME/.dayu/report, aggregates evidence, infers root cause, assesses impact, and writes final RCA reports to $HOME/.baize/report. (Baize - WittyDiagnosisAgent)",
     mode: MODE,
     model,
     maxTokens: 32000,
@@ -657,7 +657,7 @@ export function createBaizeAgent(
     color: "#0D9488", // Teal - Bai Ze / report phase
     permission: {
       question: "allow",
-      call_omo_agent: "deny",
+      call_witty_agent: "deny",
     } as AgentConfig["permission"],
     reasoningEffort: "medium",
   };

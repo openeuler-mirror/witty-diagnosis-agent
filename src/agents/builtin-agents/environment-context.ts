@@ -2,7 +2,7 @@ import type { AgentConfig } from "@opencode-ai/sdk"
 import { createEnvContext } from "../env-context"
 
 type ApplyEnvironmentContextOptions = {
-  disableOmoEnv?: boolean
+  disableWittyEnv?: boolean
 }
 
 export function applyEnvironmentContext(
@@ -10,7 +10,7 @@ export function applyEnvironmentContext(
   directory?: string,
   options: ApplyEnvironmentContextOptions = {}
 ): AgentConfig {
-  if (options.disableOmoEnv || !directory || !config.prompt) return config
+  if (options.disableWittyEnv || !directory || !config.prompt) return config
   const envContext = createEnvContext()
   return { ...config, prompt: config.prompt + envContext }
 }

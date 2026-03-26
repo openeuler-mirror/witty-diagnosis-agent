@@ -1,7 +1,7 @@
 import { describe, test, expect, beforeEach, afterEach } from "bun:test"
 import { existsSync, mkdirSync, rmSync, writeFileSync, readdirSync } from "fs"
 import { join } from "path"
-import type { OhMyOpenCodeConfig } from "../../config/schema"
+import type { WittyDiagnosisAgentConfig } from "../../config/schema"
 import {
   getSessionTaskDir,
   listSessionTaskFiles,
@@ -12,7 +12,7 @@ import {
 const TEST_DIR = ".test-session-storage"
 const TEST_DIR_ABS = join(process.cwd(), TEST_DIR)
 
-function makeConfig(storagePath: string): Partial<OhMyOpenCodeConfig> {
+function makeConfig(storagePath: string): Partial<WittyDiagnosisAgentConfig> {
   return {
     sisyphus: {
       tasks: { storage_path: storagePath, claude_code_compat: false },

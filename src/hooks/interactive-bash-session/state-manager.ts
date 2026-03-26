@@ -16,7 +16,7 @@ export function getOrCreateState(sessionID: string, sessionStates: Map<string, I
   return sessionStates.get(sessionID)!;
 }
 
-export function isOmoSession(sessionName: string | null): boolean {
+export function isWittySession(sessionName: string | null): boolean {
   return sessionName !== null && sessionName.startsWith(OMO_SESSION_PREFIX);
 }
 

@@ -47,12 +47,12 @@ export function getCacheDir(): string {
   if (process.platform === "win32") {
     const localAppData = process.env.LOCALAPPDATA || process.env.APPDATA
     const base = localAppData || join(homedir(), "AppData", "Local")
-    return join(base, "oh-my-opencode", "bin")
+    return join(base, "witty-diagnosis-agent", "bin")
   }
 
   const xdgCache = process.env.XDG_CACHE_HOME
   const base = xdgCache || join(homedir(), ".cache")
-  return join(base, "oh-my-opencode", "bin")
+  return join(base, "witty-diagnosis-agent", "bin")
 }
 
 export function getBinaryName(): string {
@@ -70,7 +70,7 @@ export async function downloadAstGrep(version: string = DEFAULT_VERSION): Promis
   const platformInfo = PLATFORM_MAP[platformKey]
 
   if (!platformInfo) {
-    log(`[oh-my-opencode] Unsupported platform for ast-grep: ${platformKey}`)
+    log(`[witty-diagnosis-agent] Unsupported platform for ast-grep: ${platformKey}`)
     return null
   }
 
@@ -86,7 +86,7 @@ export async function downloadAstGrep(version: string = DEFAULT_VERSION): Promis
   const assetName = `app-${arch}-${os}.zip`
   const downloadUrl = `https://github.com/${REPO}/releases/download/${version}/${assetName}`
 
-  log(`[oh-my-opencode] Downloading ast-grep binary...`)
+  log(`[witty-diagnosis-agent] Downloading ast-grep binary...`)
 
   try {
     const archivePath = join(cacheDir, assetName)
@@ -96,12 +96,12 @@ export async function downloadAstGrep(version: string = DEFAULT_VERSION): Promis
     cleanupArchive(archivePath)
     ensureExecutable(binaryPath)
 
-    log(`[oh-my-opencode] ast-grep binary ready.`)
+    log(`[witty-diagnosis-agent] ast-grep binary ready.`)
 
     return binaryPath
   } catch (err) {
     log(
-      `[oh-my-opencode] Failed to download ast-grep: ${err instanceof Error ? err.message : err}`
+      `[witty-diagnosis-agent] Failed to download ast-grep: ${err instanceof Error ? err.message : err}`
     )
     return null
   }

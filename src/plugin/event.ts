@@ -1,4 +1,4 @@
-import type { OhMyOpenCodeConfig } from "../config";
+import type { WittyDiagnosisAgentConfig } from "../config";
 import type { PluginContext } from "./types";
 
 import {
@@ -100,7 +100,7 @@ function extractProviderModelFromErrorMessage(message: string): { providerID?: s
 type EventInput = Parameters<NonNullable<NonNullable<CreatedHooks["writeExistingFileGuard"]>["event"]>>[0];
 export function createEventHandler(args: {
   ctx: PluginContext;
-  pluginConfig: OhMyOpenCodeConfig;
+  pluginConfig: WittyDiagnosisAgentConfig;
   firstMessageVariantGate: FirstMessageVariantGate;
   managers: Managers;
   hooks: CreatedHooks;

@@ -4,15 +4,15 @@ import { describe, test, expect } from "bun:test"
 import { createEnvContext } from "./env-context"
 
 describe("createEnvContext", () => {
-  test("returns omo-env block with timezone and locale", () => {
+  test("returns witty-env block with timezone and locale", () => {
     // #given - no setup needed
 
     // #when
     const result = createEnvContext()
 
     // #then
-    expect(result).toContain("<omo-env>")
-    expect(result).toContain("</omo-env>")
+    expect(result).toContain("<witty-env>")
+    expect(result).toContain("</witty-env>")
     expect(result).toContain("Timezone:")
     expect(result).toContain("Locale:")
     expect(result).not.toContain("Current date:")

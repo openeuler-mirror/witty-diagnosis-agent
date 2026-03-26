@@ -3,7 +3,7 @@ import type { AgentOverrideConfig } from "../agents/types"
 import { createKuafuAgent } from "../agents/kuafu"
 
 export interface BuildKuafuAgentConfigParams {
-  /** Plugin-level Kuafu override from oh-my-opencode config (if any) */
+  /** Plugin-level Kuafu override from witty-diagnosis-agent config (if any) */
   pluginKuafuOverride?: AgentOverrideConfig
   /** Currently selected UI model, if any */
   currentModel?: string

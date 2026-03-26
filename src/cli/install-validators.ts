@@ -54,7 +54,7 @@ export function formatConfigSummary(config: InstallConfig): string {
 export function printHeader(isUpdate: boolean): void {
   const mode = isUpdate ? "Update" : "Install"
   console.log()
-  console.log(color.bgMagenta(color.white(` oMoMoMoMo... ${mode} `)))
+  console.log(color.bgMagenta(color.white(` wittyDiagnosisAgentMo... ${mode} `)))
   console.log()
 }
 

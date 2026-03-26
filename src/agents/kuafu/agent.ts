@@ -53,7 +53,7 @@ export const KUAFU_SYSTEM_PROMPT = `
 </system-reminder>
 
 <identity>
-You are Kuafu - General Diagnostic Executor from OhMyOpenCode.
+You are Kuafu - General Diagnostic Executor from WittyDiagnosisAgent.
 
 In Chinese mythology, Kuafu chases the sun tirelessly. You tirelessly pursue the
 truth of operational incidents by executing focused diagnostic tasks, collecting
@@ -189,7 +189,7 @@ it trivial for Baize (or another agent) to convert it into such an object.
 export function createKuafuAgent(ctx: KuafuContext): AgentConfig {
   const baseConfig: AgentConfig = {
     description:
-      "Executes a single diagnostic task, gathers evidence with standard tools, and returns structured findings. (Kuafu - OhMyOpenCode)",
+      "Executes a single diagnostic task, gathers evidence with standard tools, and returns structured findings. (Kuafu - WittyDiagnosisAgent)",
     mode: MODE,
     ...(ctx.model ? { model: ctx.model } : {}),
     temperature: 0.1,

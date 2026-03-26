@@ -17,7 +17,7 @@ describe("migrateAgentNames", () => {
   test("migrates legacy OmO names to lowercase", () => {
     // given: Config with legacy OmO agent names
     const agents = {
-      omo: { model: "anthropic/claude-opus-4-6" },
+      witty: { model: "anthropic/claude-opus-4-6" },
       OmO: { temperature: 0.5 },
       "OmO-Plan": { prompt: "custom prompt" },
     }
@@ -29,7 +29,7 @@ describe("migrateAgentNames", () => {
     expect(changed).toBe(true)
     expect(migrated["sisyphus"]).toEqual({ temperature: 0.5 })
     expect(migrated["prometheus"]).toEqual({ prompt: "custom prompt" })
-    expect(migrated["omo"]).toBeUndefined()
+    expect(migrated["witty"]).toBeUndefined()
     expect(migrated["OmO"]).toBeUndefined()
     expect(migrated["OmO-Plan"]).toBeUndefined()
   })
@@ -123,15 +123,15 @@ describe("migrateAgentNames", () => {
     expect(migrated["Sisyphus"]).toBeUndefined()
   })
 
-  test("migrates omo key to sisyphus", () => {
-    // given agents config with "omo" key
+  test("migrates witty key to sisyphus", () => {
+    // given agents config with "witty" key
     // when migrateAgentNames called
     // then key becomes "sisyphus"
-    const agents = { "omo": { model: "test" } }
+    const agents = { "witty": { model: "test" } }
     const { migrated, changed } = migrateAgentNames(agents)
     expect(changed).toBe(true)
     expect(migrated["sisyphus"]).toEqual({ model: "test" })
-    expect(migrated["omo"]).toBeUndefined()
+    expect(migrated["witty"]).toBeUndefined()
   })
 
   test("migrates Atlas variants to lowercase", () => {
@@ -352,26 +352,26 @@ describe("migrateConfigFile", () => {
     expect(rawConfig.experimental).toBeUndefined()
   })
 
-  test("migrates omo_agent to sisyphus_agent", () => {
-    // given: Config with legacy omo_agent key
+  test("migrates witty_agent to sisyphus_agent", () => {
+    // given: Config with legacy witty_agent key
     const rawConfig: Record<string, unknown> = {
-      omo_agent: { disabled: false },
+      witty_agent: { disabled: false },
     }
 
     // when: Migrate config file
     const needsWrite = migrateConfigFile(testConfigPath, rawConfig)
 
-    // then: omo_agent should be migrated to sisyphus_agent
+    // then: witty_agent should be migrated to sisyphus_agent
     expect(needsWrite).toBe(true)
     expect(rawConfig.sisyphus_agent).toEqual({ disabled: false })
-    expect(rawConfig.omo_agent).toBeUndefined()
+    expect(rawConfig.witty_agent).toBeUndefined()
   })
 
   test("migrates legacy agent names in agents object", () => {
     // given: Config with legacy agent names
     const rawConfig: Record<string, unknown> = {
       agents: {
-        omo: { model: "test" },
+        witty: { model: "test" },
         OmO: { temperature: 0.5 },
       },
     }
@@ -420,9 +420,9 @@ describe("migrateConfigFile", () => {
    test("handles migration of all legacy items together", () => {
      // given: Config with all legacy items
      const rawConfig: Record<string, unknown> = {
-       omo_agent: { disabled: false },
+       witty_agent: { disabled: false },
        agents: {
-         omo: { model: "test" },
+         witty: { model: "test" },
          "OmO-Plan": { prompt: "custom" },
        },
        disabled_hooks: ["anthropic-auto-compact"],
@@ -434,7 +434,7 @@ describe("migrateConfigFile", () => {
      // then: All legacy items should be migrated
      expect(needsWrite).toBe(true)
      expect(rawConfig.sisyphus_agent).toEqual({ disabled: false })
-     expect(rawConfig.omo_agent).toBeUndefined()
+     expect(rawConfig.witty_agent).toBeUndefined()
      const agents = rawConfig.agents as Record<string, unknown>
      expect(agents["sisyphus"]).toBeDefined()
      expect(agents["prometheus"]).toBeDefined()
@@ -498,10 +498,10 @@ describe("migration maps", () => {
   test("AGENT_NAME_MAP contains all expected legacy mappings", () => {
     // given/#when: Check AGENT_NAME_MAP
     // then: Should contain all legacy → lowercase mappings
-    expect(AGENT_NAME_MAP["omo"]).toBe("sisyphus")
+    expect(AGENT_NAME_MAP["witty"]).toBe("sisyphus")
     expect(AGENT_NAME_MAP["OmO"]).toBe("sisyphus")
     expect(AGENT_NAME_MAP["OmO-Plan"]).toBe("prometheus")
-    expect(AGENT_NAME_MAP["omo-plan"]).toBe("prometheus")
+    expect(AGENT_NAME_MAP["witty-plan"]).toBe("prometheus")
     expect(AGENT_NAME_MAP["Planner-Sisyphus"]).toBe("prometheus")
     expect(AGENT_NAME_MAP["plan-consultant"]).toBe("metis")
   })
@@ -982,10 +982,10 @@ describe("migrateConfigFile with backup", () => {
   test("creates backup file with timestamp when legacy migration needed", () => {
     // given: Config file path with legacy agent names needing migration
     const testConfigPath = "/tmp/test-config-migration.json"
-    const testConfigContent = globalThis.JSON.stringify({ agents: { omo: { model: "test" } } }, null, 2)
+    const testConfigContent = globalThis.JSON.stringify({ agents: { witty: { model: "test" } } }, null, 2)
     const rawConfig: Record<string, unknown> = {
       agents: {
-        omo: { model: "test" },
+        witty: { model: "test" },
       },
     }
 

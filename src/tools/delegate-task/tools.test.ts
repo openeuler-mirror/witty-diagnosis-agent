@@ -117,13 +117,13 @@ describe("sisyphus-task", () => {
       expect(promptAppend).toContain("Strategic advisor")
     })
 
-    test("deep category has goal-oriented autonomous prompt", () => {
+    test("deep category has goal-oriented autonwittyus prompt", () => {
       // given
       const promptAppend = CATEGORY_PROMPT_APPENDS["deep"]
 
       // when / #then
       expect(promptAppend).toContain("GOAL-ORIENTED")
-      expect(promptAppend).toContain("autonomous")
+      expect(promptAppend).toContain("autonwittyus")
     })
   })
 
@@ -567,7 +567,7 @@ describe("sisyphus-task", () => {
        )
        
        // then proceeds without error - uses fallback chain
-       expect(result).not.toContain("oh-my-opencode requires a default model")
+       expect(result).not.toContain("witty-diagnosis-agent requires a default model")
     }, { timeout: 10000 })
 
     test("returns clear error when no model can be resolved", async () => {
@@ -2744,7 +2744,7 @@ describe("sisyphus-task", () => {
       const availableCategories = [
         {
           name: "deep",
-          description: "Goal-oriented autonomous problem-solving",
+          description: "Goal-oriented autonwittyus problem-solving",
           model: "openai/gpt-5.3-codex",
         },
       ]

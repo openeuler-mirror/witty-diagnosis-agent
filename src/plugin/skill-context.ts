@@ -1,5 +1,5 @@
 import type { AvailableSkill } from "../agents/dynamic-agent-prompt-builder"
-import type { OhMyOpenCodeConfig } from "../config"
+import type { WittyDiagnosisAgentConfig } from "../config"
 import type { BrowserAutomationProvider } from "../config/schema/browser-automation"
 import type {
   LoadedSkill,
@@ -34,7 +34,7 @@ function mapScopeToLocation(scope: SkillScope): AvailableSkill["location"] {
 
 export async function createSkillContext(args: {
   directory: string
-  pluginConfig: OhMyOpenCodeConfig
+  pluginConfig: WittyDiagnosisAgentConfig
 }): Promise<SkillContext> {
   const { directory, pluginConfig } = args
 

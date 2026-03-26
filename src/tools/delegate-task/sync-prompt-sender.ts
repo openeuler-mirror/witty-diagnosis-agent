@@ -49,7 +49,7 @@ export async function sendSyncPrompt(
     lowerAgent.includes("baize")
   const tools = {
     task: allowTask,
-    call_omo_agent: true,
+    call_witty_agent: true,
     question: false,
     ...getAgentToolRestrictions(input.agentToUse),
   }

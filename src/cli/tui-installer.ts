@@ -8,7 +8,7 @@ import {
   detectCurrentConfig,
   getOpenCodeVersion,
   isOpenCodeInstalled,
-  writeOmoConfig,
+  writeWittyConfig,
 } from "./config-manager"
 import { detectedToInitialValues, formatConfigSummary, SYMBOLS } from "./install-validators"
 import { promptInstallConfig } from "./tui-install-prompts"
@@ -24,7 +24,7 @@ export async function runTuiInstaller(args: InstallArgs, version: string): Promi
   const detected = detectCurrentConfig()
   const isUpdate = detected.isInstalled
 
-  p.intro(color.bgMagenta(color.white(isUpdate ? " oMoMoMoMo... Update " : " oMoMoMoMo... ")))
+  p.intro(color.bgMagenta(color.white(isUpdate ? " wittyDiagnosisAgentMo... Update " : " wittyDiagnosisAgentMo... ")))
 
   if (isUpdate) {
     const initial = detectedToInitialValues(detected)
@@ -47,7 +47,7 @@ export async function runTuiInstaller(args: InstallArgs, version: string): Promi
   const config = await promptInstallConfig(detected)
   if (!config) return 1
 
-  spinner.start("Adding oh-my-opencode to OpenCode config")
+  spinner.start("Adding witty-diagnosis-agent to OpenCode config")
   const pluginResult = await addPluginToOpenCodeConfig(version)
   if (!pluginResult.success) {
     spinner.stop(`Failed to add plugin: ${pluginResult.error}`)
@@ -84,14 +84,14 @@ export async function runTuiInstaller(args: InstallArgs, version: string): Promi
     spinner.stop(`Provider config added to ${color.cyan(providerResult.configPath)}`)
   }
 
-  spinner.start("Writing oh-my-opencode configuration")
-  const omoResult = writeOmoConfig(config)
-  if (!omoResult.success) {
-    spinner.stop(`Failed to write config: ${omoResult.error}`)
+  spinner.start("Writing witty-diagnosis-agent configuration")
+  const wittyResult = writeWittyConfig(config)
+  if (!wittyResult.success) {
+    spinner.stop(`Failed to write config: ${wittyResult.error}`)
     p.outro(color.red("Installation failed."))
     return 1
   }
-  spinner.stop(`Config written to ${color.cyan(omoResult.configPath)}`)
+  spinner.stop(`Config written to ${color.cyan(wittyResult.configPath)}`)
 
   return 0
 }

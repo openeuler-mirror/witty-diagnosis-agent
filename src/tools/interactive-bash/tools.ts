@@ -66,7 +66,7 @@ export const interactive_bash: ToolDefinition = tool({
       const subcommand = parts[0].toLowerCase()
       if (BLOCKED_TMUX_SUBCOMMANDS.includes(subcommand)) {
         const sessionIdx = parts.findIndex(p => p === "-t" || p.startsWith("-t"))
-        let sessionName = "omo-session"
+        let sessionName = "witty-session"
         if (sessionIdx !== -1) {
           if (parts[sessionIdx] === "-t" && parts[sessionIdx + 1]) {
             sessionName = parts[sessionIdx + 1]

@@ -8,7 +8,7 @@ import {
   ExperimentalConfigSchema,
   GitMasterConfigSchema,
   HookNameSchema,
-  OhMyOpenCodeConfigSchema,
+  WittyDiagnosisAgentConfigSchema,
 } from "./schema"
 
 describe("disabled_mcps schema", () => {
@@ -19,7 +19,7 @@ describe("disabled_mcps schema", () => {
     }
 
     // when
-    const result = OhMyOpenCodeConfigSchema.safeParse(config)
+    const result = WittyDiagnosisAgentConfigSchema.safeParse(config)
 
     // then
     expect(result.success).toBe(true)
@@ -35,7 +35,7 @@ describe("disabled_mcps schema", () => {
     }
 
     // when
-    const result = OhMyOpenCodeConfigSchema.safeParse(config)
+    const result = WittyDiagnosisAgentConfigSchema.safeParse(config)
 
     // then
     expect(result.success).toBe(true)
@@ -51,7 +51,7 @@ describe("disabled_mcps schema", () => {
     }
 
     // when
-    const result = OhMyOpenCodeConfigSchema.safeParse(config)
+    const result = WittyDiagnosisAgentConfigSchema.safeParse(config)
 
     // then
     expect(result.success).toBe(true)
@@ -67,7 +67,7 @@ describe("disabled_mcps schema", () => {
     }
 
     // when
-    const result = OhMyOpenCodeConfigSchema.safeParse(config)
+    const result = WittyDiagnosisAgentConfigSchema.safeParse(config)
 
     // then
     expect(result.success).toBe(true)
@@ -83,7 +83,7 @@ describe("disabled_mcps schema", () => {
     }
 
     // when
-    const result = OhMyOpenCodeConfigSchema.safeParse(config)
+    const result = WittyDiagnosisAgentConfigSchema.safeParse(config)
 
     // then
     expect(result.success).toBe(false)
@@ -94,7 +94,7 @@ describe("disabled_mcps schema", () => {
     const config = {}
 
     // when
-    const result = OhMyOpenCodeConfigSchema.safeParse(config)
+    const result = WittyDiagnosisAgentConfigSchema.safeParse(config)
 
     // then
     expect(result.success).toBe(true)
@@ -110,7 +110,7 @@ describe("disabled_mcps schema", () => {
     }
 
     // when
-    const result = OhMyOpenCodeConfigSchema.safeParse(config)
+    const result = WittyDiagnosisAgentConfigSchema.safeParse(config)
 
     // then
     expect(result.success).toBe(false)
@@ -129,7 +129,7 @@ describe("disabled_mcps schema", () => {
     }
 
     // when
-    const result = OhMyOpenCodeConfigSchema.safeParse(config)
+    const result = WittyDiagnosisAgentConfigSchema.safeParse(config)
 
     // then
     expect(result.success).toBe(true)
@@ -420,7 +420,7 @@ describe("Sisyphus-Junior agent override", () => {
     }
 
     // when
-    const result = OhMyOpenCodeConfigSchema.safeParse(config)
+    const result = WittyDiagnosisAgentConfigSchema.safeParse(config)
 
     // then
     expect(result.success).toBe(true)
@@ -442,7 +442,7 @@ describe("Sisyphus-Junior agent override", () => {
     }
 
     // when
-    const result = OhMyOpenCodeConfigSchema.safeParse(config)
+    const result = WittyDiagnosisAgentConfigSchema.safeParse(config)
 
     // then
     expect(result.success).toBe(true)
@@ -467,7 +467,7 @@ describe("Sisyphus-Junior agent override", () => {
     }
 
     // when
-    const result = OhMyOpenCodeConfigSchema.safeParse(config)
+    const result = WittyDiagnosisAgentConfigSchema.safeParse(config)
 
     // then
     expect(result.success).toBe(true)
@@ -496,7 +496,7 @@ describe("Sisyphus-Junior agent override", () => {
     }
 
     // when
-    const result = OhMyOpenCodeConfigSchema.safeParse(config)
+    const result = WittyDiagnosisAgentConfigSchema.safeParse(config)
 
     // then
     expect(result.success).toBe(true)
@@ -521,7 +521,7 @@ describe("Sisyphus-Junior agent override", () => {
     }
 
     // when
-    const result = OhMyOpenCodeConfigSchema.safeParse(config)
+    const result = WittyDiagnosisAgentConfigSchema.safeParse(config)
 
     // then
     expect(result.success).toBe(true)
@@ -616,7 +616,7 @@ describe("BrowserAutomationConfigSchema", () => {
   })
 })
 
-describe("OhMyOpenCodeConfigSchema - browser_automation_engine", () => {
+describe("WittyDiagnosisAgentConfigSchema - browser_automation_engine", () => {
   test("accepts browser_automation_engine config", () => {
     // given
     const input = {
@@ -626,7 +626,7 @@ describe("OhMyOpenCodeConfigSchema - browser_automation_engine", () => {
     }
 
     // when
-    const result = OhMyOpenCodeConfigSchema.safeParse(input)
+    const result = WittyDiagnosisAgentConfigSchema.safeParse(input)
 
     // then
     expect(result.success).toBe(true)
@@ -638,7 +638,7 @@ describe("OhMyOpenCodeConfigSchema - browser_automation_engine", () => {
     const input = {}
 
     // when
-    const result = OhMyOpenCodeConfigSchema.safeParse(input)
+    const result = WittyDiagnosisAgentConfigSchema.safeParse(input)
 
     // then
     expect(result.success).toBe(true)
@@ -650,7 +650,7 @@ describe("OhMyOpenCodeConfigSchema - browser_automation_engine", () => {
     const input = { browser_automation_engine: { provider: "playwright-cli" } }
 
     // when
-    const result = OhMyOpenCodeConfigSchema.safeParse(input)
+    const result = WittyDiagnosisAgentConfigSchema.safeParse(input)
 
     // then
     expect(result.success).toBe(true)
@@ -658,13 +658,13 @@ describe("OhMyOpenCodeConfigSchema - browser_automation_engine", () => {
   })
 })
 
-describe("OhMyOpenCodeConfigSchema - hashline_edit", () => {
+describe("WittyDiagnosisAgentConfigSchema - hashline_edit", () => {
   test("accepts hashline_edit as true", () => {
     //#given
     const input = { hashline_edit: true }
 
     //#when
-    const result = OhMyOpenCodeConfigSchema.safeParse(input)
+    const result = WittyDiagnosisAgentConfigSchema.safeParse(input)
 
     //#then
     expect(result.success).toBe(true)
@@ -676,7 +676,7 @@ describe("OhMyOpenCodeConfigSchema - hashline_edit", () => {
     const input = { hashline_edit: false }
 
     //#when
-    const result = OhMyOpenCodeConfigSchema.safeParse(input)
+    const result = WittyDiagnosisAgentConfigSchema.safeParse(input)
 
     //#then
     expect(result.success).toBe(true)
@@ -688,7 +688,7 @@ describe("OhMyOpenCodeConfigSchema - hashline_edit", () => {
     const input = { auto_update: true }
 
     //#when
-    const result = OhMyOpenCodeConfigSchema.safeParse(input)
+    const result = WittyDiagnosisAgentConfigSchema.safeParse(input)
 
     //#then
     expect(result.success).toBe(true)
@@ -700,7 +700,7 @@ describe("OhMyOpenCodeConfigSchema - hashline_edit", () => {
     const input = { hashline_edit: "true" }
 
     //#when
-    const result = OhMyOpenCodeConfigSchema.safeParse(input)
+    const result = WittyDiagnosisAgentConfigSchema.safeParse(input)
 
     //#then
     expect(result.success).toBe(false)
@@ -762,9 +762,9 @@ describe("ExperimentalConfigSchema feature flags", () => {
     }
   })
 
-  test("accepts disable_omo_env as true", () => {
+  test("accepts disable_witty_env as true", () => {
     //#given
-    const config = { disable_omo_env: true }
+    const config = { disable_witty_env: true }
 
     //#when
     const result = ExperimentalConfigSchema.safeParse(config)
@@ -772,13 +772,13 @@ describe("ExperimentalConfigSchema feature flags", () => {
     //#then
     expect(result.success).toBe(true)
     if (result.success) {
-      expect(result.data.disable_omo_env).toBe(true)
+      expect(result.data.disable_witty_env).toBe(true)
     }
   })
 
-  test("accepts disable_omo_env as false", () => {
+  test("accepts disable_witty_env as false", () => {
     //#given
-    const config = { disable_omo_env: false }
+    const config = { disable_witty_env: false }
 
     //#when
     const result = ExperimentalConfigSchema.safeParse(config)
@@ -786,11 +786,11 @@ describe("ExperimentalConfigSchema feature flags", () => {
     //#then
     expect(result.success).toBe(true)
     if (result.success) {
-      expect(result.data.disable_omo_env).toBe(false)
+      expect(result.data.disable_witty_env).toBe(false)
     }
   })
 
-  test("disable_omo_env is optional", () => {
+  test("disable_witty_env is optional", () => {
     //#given
     const config = { safe_hook_creation: true }
 
@@ -800,13 +800,13 @@ describe("ExperimentalConfigSchema feature flags", () => {
     //#then
     expect(result.success).toBe(true)
     if (result.success) {
-      expect(result.data.disable_omo_env).toBeUndefined()
+      expect(result.data.disable_witty_env).toBeUndefined()
     }
   })
 
-  test("rejects non-boolean disable_omo_env", () => {
+  test("rejects non-boolean disable_witty_env", () => {
     //#given
-    const config = { disable_omo_env: "true" }
+    const config = { disable_witty_env: "true" }
 
     //#when
     const result = ExperimentalConfigSchema.safeParse(config)
@@ -896,7 +896,7 @@ describe("skills schema", () => {
     }
 
     //#when
-    const result = OhMyOpenCodeConfigSchema.safeParse(config)
+    const result = WittyDiagnosisAgentConfigSchema.safeParse(config)
 
     //#then
     expect(result.success).toBe(true)

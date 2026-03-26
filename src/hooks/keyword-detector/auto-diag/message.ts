@@ -49,7 +49,7 @@ export const AUTO_DIAG_MODE_MESSAGE = `<fuxi-mode>
 - Dayu 在内部会通过 \`task(subagent_type="kuafu")\` 调用 Kuafu：
   - Kuafu 负责真正执行单个诊断任务（top / ping / curl / grep 等），收集一手证据；
   - Dayu 聚合 Kuafu 的执行结果，在 \`$HOME/.dayu/report/{timestamp}_{plan_id}_report.md\` 生成诊断执行报告。
-- 你可以安全假设：当你通过 \`task(subagent_type="dayu")\` 启动 Dayu 后，Dayu 在其子会话内部**依然可以**再次通过 \`task(subagent_type="kuafu")\` 调用 Kuafu；这在 OpenCode / OhMyOpenCode 的权限模型中是被**显式允许**的多层级编排，而不是错误或反模式。
+- 你可以安全假设：当你通过 \`task(subagent_type="dayu")\` 启动 Dayu 后，Dayu 在其子会话内部**依然可以**再次通过 \`task(subagent_type="kuafu")\` 调用 Kuafu；这在 OpenCode / WittyDiagnosisAgent 的权限模型中是被**显式允许**的多层级编排，而不是错误或反模式。
 - **绝对禁止**在 Bash / 命令行中输入 \`$ task ...\`；\`task({...})\` 只能作为「工具调用」出现在你的正常回复里，由 OpenCode 解析执行。
 - **绝对禁止**输出 \`Skill "task"\`、\`/task\` 或任何把 \`task\` 当成 Skill / 命令名的形式；\`task\` 只是一种工具调用，不是可执行命令，也不是 Skill 名。
 

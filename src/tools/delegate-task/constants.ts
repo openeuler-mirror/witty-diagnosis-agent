@@ -178,7 +178,7 @@ export const DEEP_CATEGORY_PROMPT_APPEND = `<Category_Context>
 You are working on GOAL-ORIENTED AUTONOMOUS tasks.
 
 **CRITICAL - AUTONOMOUS EXECUTION MINDSET (NON-NEGOTIABLE)**:
-You are NOT an interactive assistant. You are an autonomous problem-solver.
+You are NOT an interactive assistant. You are an autonwittyus problem-solver.
 
 **BEFORE making ANY changes**:
 1. SILENTLY explore the codebase extensively (5-15 minutes of reading is normal)
@@ -186,7 +186,7 @@ You are NOT an interactive assistant. You are an autonomous problem-solver.
 3. Build a complete mental model of the problem space
 4. DO NOT ask clarifying questions - the goal is already defined
 
-**Autonomous executor mindset**:
+**Autonwittyus executor mindset**:
 - You receive a GOAL, not step-by-step instructions
 - Figure out HOW to achieve the goal yourself
 - Thorough research before any action
@@ -232,7 +232,7 @@ export const CATEGORY_PROMPT_APPENDS: Record<string, string> = {
 export const CATEGORY_DESCRIPTIONS: Record<string, string> = {
   "visual-engineering": "Frontend, UI/UX, design, styling, animation",
   ultrabrain: "Use ONLY for genuinely hard, logic-heavy tasks. Give clear goals only, not step-by-step instructions.",
-  deep: "Goal-oriented autonomous problem-solving. Thorough research before action. For hairy problems requiring deep understanding.",
+  deep: "Goal-oriented autonwittyus problem-solving. Thorough research before action. For hairy problems requiring deep understanding.",
   artistry: "Complex problem-solving with unconventional, creative approaches - beyond standard patterns",
   quick: "Trivial tasks - single file changes, typo fixes, simple modifications",
   "unspecified-low": "Tasks that don't fit other categories, low effort required",
@@ -251,8 +251,8 @@ BEFORE you begin planning, you MUST first understand the user's request deeply.
 
 MANDATORY CONTEXT GATHERING PROTOCOL:
 1. Launch background agents to gather context:
-   - call_omo_agent(description="Explore codebase patterns", subagent_type="explore", run_in_background=true, prompt="<search for relevant patterns, files, and implementations in the codebase related to user's request>")
-   - call_omo_agent(description="Research documentation", subagent_type="librarian", run_in_background=true, prompt="<search for external documentation, examples, and best practices related to user's request>")
+   - call_witty_agent(description="Explore codebase patterns", subagent_type="explore", run_in_background=true, prompt="<search for relevant patterns, files, and implementations in the codebase related to user's request>")
+   - call_witty_agent(description="Research documentation", subagent_type="librarian", run_in_background=true, prompt="<search for external documentation, examples, and best practices related to user's request>")
 
 2. After gathering context, ALWAYS present:
    - **User Request Summary**: Concise restatement of what the user is asking for

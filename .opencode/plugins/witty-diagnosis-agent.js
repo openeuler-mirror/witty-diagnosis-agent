@@ -1,8 +1,8 @@
 /**
- * witty-diagnosis-agent plugin for OpenCode.ai
+ * witty-diagnosis-agent plugin for witty-diagnosis-agent.ai
  *
  * Injects witty-diagnosis-agent bootstrap context via system prompt transform.
- * Skills are discovered via OpenCode's native skill tool from symlinked directory.
+ * Skills are discovered via witty-diagnosis-agent's native skill tool from symlinked directory.
  */
 
 import path from 'path';
@@ -49,8 +49,8 @@ const normalizePath = (p, homeDir) => {
 export const WittyDiagnosisAgentPlugin = async ({ client, directory }) => {
   const homeDir = os.homedir();
   const wittyDiagnosisSkillsDir = path.resolve(__dirname, '../../skills');
-  const envConfigDir = normalizePath(process.env.OPENCODE_CONFIG_DIR, homeDir);
-  const configDir = envConfigDir || path.join(homeDir, '.config/opencode');
+  const envConfigDir = normalizePath(process.env.witty-diagnosis-agent_CONFIG_DIR, homeDir);
+  const configDir = envConfigDir || path.join(homeDir, '.config/witty-diagnosis-agent');
 
   // Helper to generate bootstrap content
   const getBootstrapContent = () => {
@@ -61,16 +61,16 @@ export const WittyDiagnosisAgentPlugin = async ({ client, directory }) => {
     const fullContent = fs.readFileSync(skillPath, 'utf8');
     const { content } = extractAndStripFrontmatter(fullContent);
 
-    const toolMapping = `**Tool Mapping for OpenCode:**
-When skills reference tools you don't have, substitute OpenCode equivalents:
+    const toolMapping = `**Tool Mapping for witty-diagnosis-agent:**
+When skills reference tools you don't have, substitute witty-diagnosis-agent equivalents:
 - \`TodoWrite\` → \`update_plan\`
-- \`Task\` tool with subagents → Use OpenCode's subagent system (@mention)
-- \`Skill\` tool → OpenCode's native \`skill\` tool
+- \`Task\` tool with subagents → Use witty-diagnosis-agent's subagent system (@mention)
+- \`Skill\` tool → witty-diagnosis-agent's native \`skill\` tool
 - \`Read\`, \`Write\`, \`Edit\`, \`Bash\` → Your native tools
 
 **Skills location:**
 witty-diagnosis-agent skills are in \`${configDir}/skills/witty-diagnosis-agent/\`
-Use OpenCode's native \`skill\` tool to list and load skills.`;
+Use witty-diagnosis-agent's native \`skill\` tool to list and load skills.`;
 
     return `<EXTREMELY_IMPORTANT>
 You have witty-diagnosis-agent skills for intelligent system diagnosis.

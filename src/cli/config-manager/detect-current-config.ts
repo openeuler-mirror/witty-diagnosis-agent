@@ -1,29 +1,29 @@
 import { existsSync, readFileSync } from "node:fs"
 import { parseJsonc } from "../../shared"
 import type { DetectedConfig } from "../types"
-import { getOmoConfigPath } from "./config-context"
+import { getWittyConfigPath } from "./config-context"
 import { detectConfigFormat } from "./opencode-config-format"
 import { parseOpenCodeConfigFileWithError } from "./parse-opencode-config-file"
 
-function detectProvidersFromOmoConfig(): {
+function detectProvidersFromWittyConfig(): {
   hasOpenAI: boolean
   hasOpencodeZen: boolean
   hasZaiCodingPlan: boolean
   hasKimiForCoding: boolean
 } {
-  const omoConfigPath = getOmoConfigPath()
-  if (!existsSync(omoConfigPath)) {
+  const wittyConfigPath = getWittyConfigPath()
+  if (!existsSync(wittyConfigPath)) {
     return { hasOpenAI: true, hasOpencodeZen: true, hasZaiCodingPlan: false, hasKimiForCoding: false }
   }
 
   try {
-    const content = readFileSync(omoConfigPath, "utf-8")
-    const omoConfig = parseJsonc<Record<string, unknown>>(content)
-    if (!omoConfig || typeof omoConfig !== "object") {
+    const content = readFileSync(wittyConfigPath, "utf-8")
+    const wittyConfig = parseJsonc<Record<string, unknown>>(content)
+    if (!wittyConfig || typeof wittyConfig !== "object") {
       return { hasOpenAI: true, hasOpencodeZen: true, hasZaiCodingPlan: false, hasKimiForCoding: false }
     }
 
-    const configStr = JSON.stringify(omoConfig)
+    const configStr = JSON.stringify(wittyConfig)
     const hasOpenAI = configStr.includes('"openai/')
     const hasOpencodeZen = configStr.includes('"opencode/')
     const hasZaiCodingPlan = configStr.includes('"zai-coding-plan/')
@@ -60,7 +60,7 @@ export function detectCurrentConfig(): DetectedConfig {
 
   const openCodeConfig = parseResult.config
   const plugins = openCodeConfig.plugin ?? []
-  result.isInstalled = plugins.some((p) => p.startsWith("oh-my-opencode"))
+  result.isInstalled = plugins.some((p) => p.startsWith("witty-diagnosis-agent"))
 
   if (!result.isInstalled) {
     return result
@@ -68,7 +68,7 @@ export function detectCurrentConfig(): DetectedConfig {
 
   result.hasGemini = plugins.some((p) => p.startsWith("opencode-antigravity-auth"))
 
-  const { hasOpenAI, hasOpencodeZen, hasZaiCodingPlan, hasKimiForCoding } = detectProvidersFromOmoConfig()
+  const { hasOpenAI, hasOpencodeZen, hasZaiCodingPlan, hasKimiForCoding } = detectProvidersFromWittyConfig()
   result.hasOpenAI = hasOpenAI
   result.hasOpencodeZen = hasOpencodeZen
   result.hasZaiCodingPlan = hasZaiCodingPlan

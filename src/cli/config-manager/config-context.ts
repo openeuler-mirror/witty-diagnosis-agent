@@ -44,6 +44,6 @@ export function getConfigJsonc(): string {
   return getConfigContext().paths.configJsonc
 }
 
-export function getOmoConfigPath(): string {
-  return getConfigContext().paths.omoConfig
+export function getWittyConfigPath(): string {
+  return getConfigContext().paths.wittyConfig
 }

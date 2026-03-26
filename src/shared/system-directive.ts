@@ -1,5 +1,5 @@
 /**
- * Unified system directive prefix for oh-my-opencode internal messages.
+ * Unified system directive prefix for witty-diagnosis-agent internal messages.
  * All system-generated messages should use this prefix for consistent filtering.
  *
  * Format: [SYSTEM DIRECTIVE: OH-MY-OPENCODE - {TYPE}]
@@ -17,7 +17,7 @@ export function createSystemDirective(type: string): string {
 }
 
 /**
- * Checks if a message starts with the oh-my-opencode system directive prefix.
+ * Checks if a message starts with the witty-diagnosis-agent system directive prefix.
  * Used by keyword-detector and other hooks to skip system-generated messages.
  * @param text - The message text to check
  * @returns true if the message is a system directive

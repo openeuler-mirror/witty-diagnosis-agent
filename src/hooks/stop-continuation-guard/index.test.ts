@@ -15,7 +15,7 @@ describe("stop-continuation-guard", () => {
   const tempDirs: string[] = []
 
   function createTempDir(): string {
-    const directory = mkdtempSync(join(tmpdir(), "omo-stop-guard-"))
+    const directory = mkdtempSync(join(tmpdir(), "witty-stop-guard-"))
     tempDirs.push(directory)
     return directory
   }

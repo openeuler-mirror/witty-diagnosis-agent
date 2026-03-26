@@ -9,7 +9,7 @@ import {
 } from "../shared"
 
 export interface BuildBaizeAgentConfigParams {
-  /** Plugin-level Baize override from oh-my-opencode config (if any) */
+  /** Plugin-level Baize override from witty-diagnosis-agent config (if any) */
   pluginBaizeOverride?: AgentOverrideConfig
   /** Currently selected UI model, if any */
   currentModel?: string

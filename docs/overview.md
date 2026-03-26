@@ -40,4 +40,4 @@
 
 遇到问题时的排查指引。
 
-- **[OpenCode 排查](troubleshooting/opencode.md)**: 常见问题与解决方案。
+- **[witty-diagnosis-agent 排查](troubleshooting/witty-diagnosis-agent.md)**: 常见问题与解决方案。

@@ -1,4 +1,4 @@
-import type { OhMyOpenCodeConfig } from "../../config"
+import type { WittyDiagnosisAgentConfig } from "../../config"
 import { AGENT_NAMES, agentPattern } from "./agent-resolver"
 import { HOOK_NAME } from "./constants"
 import { log } from "../../shared/logger"
@@ -8,7 +8,7 @@ import { normalizeFallbackModels } from "../../shared/model-resolver"
 export function getFallbackModelsForSession(
   sessionID: string,
   agent: string | undefined,
-  pluginConfig: OhMyOpenCodeConfig | undefined
+  pluginConfig: WittyDiagnosisAgentConfig | undefined
 ): string[] {
   if (!pluginConfig) return []
 

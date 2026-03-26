@@ -11,7 +11,7 @@ Agent factories following `createXXXAgent(model) → AgentConfig` pattern. Each 
 | Agent | Model | Temp | Mode | Fallback Chain | Purpose |
 |-------|-------|------|------|----------------|---------|
 | **Sisyphus** | claude-opus-4-6 | 0.1 | primary | kimi-k2.5 → glm-4.7 → gemini-3-pro | Main orchestrator, plans + delegates |
-| **Hephaestus** | gpt-5.3-codex | 0.1 | primary | NONE (required) | Autonomous deep worker |
+| **Hephaestus** | gpt-5.3-codex | 0.1 | primary | NONE (required) | Autonwittyus deep worker |
 | **Oracle** | gpt-5.2 | 0.1 | subagent | claude-opus-4-6 → gemini-3-pro | Read-only consultation |
 | **Librarian** | glm-4.7 | 0.1 | subagent | big-pickle → claude-sonnet-4-6 | External docs/code search |
 | **Explore** | grok-code-fast-1 | 0.1 | subagent | claude-haiku-4-5 → gpt-5-nano | Contextual grep |
@@ -26,11 +26,11 @@ Agent factories following `createXXXAgent(model) → AgentConfig` pattern. Each 
 
 | Agent | Denied Tools |
 |-------|-------------|
-| Oracle | write, edit, task, call_omo_agent |
-| Librarian | write, edit, task, call_omo_agent |
-| Explore | write, edit, task, call_omo_agent |
+| Oracle | write, edit, task, call_witty_agent |
+| Librarian | write, edit, task, call_witty_agent |
+| Explore | write, edit, task, call_witty_agent |
 | Multimodal-Looker | ALL except read |
-| Atlas | task, call_omo_agent |
+| Atlas | task, call_witty_agent |
 | Momus | write, edit, task |
 
 ## STRUCTURE
@@ -38,7 +38,7 @@ Agent factories following `createXXXAgent(model) → AgentConfig` pattern. Each 
 ```
 agents/
 ├── sisyphus.ts            # 559 LOC, main orchestrator
-├── hephaestus.ts          # 507 LOC, autonomous worker
+├── hephaestus.ts          # 507 LOC, autonwittyus worker
 ├── oracle.ts              # Read-only consultant
 ├── librarian.ts           # External search
 ├── explore.ts             # Codebase grep

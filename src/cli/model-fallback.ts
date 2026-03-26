@@ -4,7 +4,7 @@ import {
 } from "./model-fallback-requirements"
 import type { InstallConfig } from "./types"
 
-import type { AgentConfig, CategoryConfig, GeneratedOmoConfig } from "./model-fallback-types"
+import type { AgentConfig, CategoryConfig, GeneratedWittyConfig } from "./model-fallback-types"
 import { toProviderAvailability } from "./provider-availability"
 import {
 	getSisyphusFallbackChain,
@@ -14,16 +14,16 @@ import {
 	resolveModelFromChain,
 } from "./fallback-chain-resolution"
 
-export type { GeneratedOmoConfig } from "./model-fallback-types"
+export type { GeneratedWittyConfig } from "./model-fallback-types"
 
 const ZAI_MODEL = "zai-coding-plan/glm-4.7"
 
 const ULTIMATE_FALLBACK = "opencode/glm-4.7-free"
-const SCHEMA_URL = "https://raw.githubusercontent.com/code-yeongyu/oh-my-opencode/dev/assets/oh-my-opencode.schema.json"
+const SCHEMA_URL = "https://raw.githubusercontent.com/code-yeongyu/witty-diagnosis-agent/dev/assets/witty-diagnosis-agent.schema.json"
 
 
 
-export function generateModelConfig(config: InstallConfig): GeneratedOmoConfig {
+export function generateModelConfig(config: InstallConfig): GeneratedWittyConfig {
   const avail = toProviderAvailability(config)
   const hasAnyProvider =
     avail.native.claude ||

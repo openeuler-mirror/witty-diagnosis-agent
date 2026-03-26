@@ -1,5 +1,5 @@
 import { createBuiltinAgents } from "../agents";
-import type { OhMyOpenCodeConfig } from "../config";
+import type { WittyDiagnosisAgentConfig } from "../config";
 import { log, migrateAgentConfig } from "../shared";
 import { AGENT_NAME_MAP } from "../shared/migration";
 import { getAgentDisplayName } from "../shared/agent-display-names";
@@ -34,7 +34,7 @@ function getConfiguredDefaultAgent(config: Record<string, unknown>): string | un
 
 export async function applyAgentConfig(params: {
   config: Record<string, unknown>;
-  pluginConfig: OhMyOpenCodeConfig;
+  pluginConfig: WittyDiagnosisAgentConfig;
   ctx: { directory: string; client?: any };
   pluginComponents: PluginComponents;
 }): Promise<Record<string, unknown>> {
@@ -77,7 +77,7 @@ export async function applyAgentConfig(params: {
   const currentModel = params.config.model as string | undefined;
   const disabledSkills = new Set<string>(params.pluginConfig.disabled_skills ?? []);
   const useTaskSystem = params.pluginConfig.experimental?.task_system ?? false;
-  const disableOmoEnv = params.pluginConfig.experimental?.disable_omo_env ?? false;
+  const disableWittyEnv = params.pluginConfig.experimental?.disable_witty_env ?? false;
 
   const builtinAgents = await createBuiltinAgents(
     migratedDisabledAgents,
@@ -92,7 +92,7 @@ export async function applyAgentConfig(params: {
     currentModel,
     disabledSkills,
     useTaskSystem,
-    disableOmoEnv,
+    disableWittyEnv,
   );
 
   const includeClaudeAgents = params.pluginConfig.claude_code?.agents ?? true;

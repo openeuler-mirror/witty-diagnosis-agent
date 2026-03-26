@@ -3,13 +3,13 @@ import type { ToolDefinition } from "@opencode-ai/plugin"
 import type {
   AvailableCategory,
 } from "../agents/dynamic-agent-prompt-builder"
-import type { OhMyOpenCodeConfig } from "../config"
+import type { WittyDiagnosisAgentConfig } from "../config"
 import type { PluginContext, ToolsRecord } from "./types"
 
 import {
   builtinTools,
   createBackgroundTools,
-  createCallOmoAgent,
+  createCallWittyAgent,
   createLookAt,
   createSkillMcpTool,
   createSkillTool,
@@ -40,7 +40,7 @@ export type ToolRegistryResult = {
 
 export function createToolRegistry(args: {
   ctx: PluginContext
-  pluginConfig: OhMyOpenCodeConfig
+  pluginConfig: WittyDiagnosisAgentConfig
   managers: Pick<Managers, "backgroundManager" | "tmuxSessionManager" | "skillMcpManager">
   skillContext: SkillContext
   availableCategories: AvailableCategory[]
@@ -48,7 +48,7 @@ export function createToolRegistry(args: {
   const { ctx, pluginConfig, managers, skillContext, availableCategories } = args
 
   const backgroundTools = createBackgroundTools(managers.backgroundManager, ctx.client)
-  const callOmoAgent = createCallOmoAgent(ctx, managers.backgroundManager, pluginConfig.disabled_agents ?? [])
+  const callWittyAgent = createCallWittyAgent(ctx, managers.backgroundManager, pluginConfig.disabled_agents ?? [])
 
   const isMultimodalLookerEnabled = !(pluginConfig.disabled_agents ?? []).some(
     (agent) => agent.toLowerCase() === "multimodal-looker",
@@ -124,7 +124,7 @@ export function createToolRegistry(args: {
     ...createAstGrepTools(ctx),
     ...createSessionManagerTools(ctx),
     ...backgroundTools,
-    call_omo_agent: callOmoAgent,
+    call_witty_agent: callWittyAgent,
     ...(lookAt ? { look_at: lookAt } : {}),
     task: delegateTask,
     skill_mcp: skillMcpTool,

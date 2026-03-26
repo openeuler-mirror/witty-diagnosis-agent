@@ -71,7 +71,7 @@ export async function buildFuxiAgentConfig(params: {
     mode: "all",
     prompt: getFuxiPrompt(resolvedModel),
     permission: FUXI_PERMISSION,
-    description: `${(params.configAgentPlan?.description as string) ?? "Plan agent"} (Fuxi - OhMyOpenCode)`,
+    description: `${(params.configAgentPlan?.description as string) ?? "Plan agent"} (Fuxi - WittyDiagnosisAgent)`,
     color: (params.configAgentPlan?.color as string) ?? "#FF5722",
     ...(temperatureToUse !== undefined ? { temperature: temperatureToUse } : {}),
     ...(topPToUse !== undefined ? { top_p: topPToUse } : {}),

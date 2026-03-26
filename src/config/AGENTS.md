@@ -4,13 +4,13 @@
 
 ## OVERVIEW
 
-22 schema files composing `OhMyOpenCodeConfigSchema`. Zod v4 validation with `safeParse()`. All fields optional — omitted fields use plugin defaults.
+22 schema files composing `WittyDiagnosisAgentConfigSchema`. Zod v4 validation with `safeParse()`. All fields optional — omitted fields use plugin defaults.
 
 ## SCHEMA TREE
 
 ```
 config/schema/
-├── oh-my-opencode-config.ts    # ROOT: OhMyOpenCodeConfigSchema (composes all below)
+├── witty-diagnosis-agent-config.ts    # ROOT: WittyDiagnosisAgentConfigSchema (composes all below)
 ├── agent-names.ts              # BuiltinAgentNameSchema (11), OverridableAgentNameSchema (14)
 ├── agent-overrides.ts          # AgentOverrideConfigSchema (21 fields per agent)
 ├── categories.ts               # 8 built-in + custom categories
@@ -45,6 +45,6 @@ config/schema/
 ## HOW TO ADD CONFIG
 
 1. Create `src/config/schema/{name}.ts` with Zod schema
-2. Add field to `oh-my-opencode-config.ts` root schema
+2. Add field to `witty-diagnosis-agent-config.ts` root schema
 3. Reference via `z.infer<typeof YourSchema>` for TypeScript types
 4. Access in handlers via `pluginConfig.{name}`
