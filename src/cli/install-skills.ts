@@ -23,7 +23,7 @@ export async function installSkills(): Promise<{ success: boolean; error?: strin
         } else {
             // Fallback for development/source execution
             // From src/cli/install-skills.ts to root skills/
-            skillsSrc = join(import.meta.dirname, "..", "..", "skills");
+            skillsSrc = join(import.meta.dirname, "..", "skills");
         }
 
         if (!existsSync(skillsSrc)) {
