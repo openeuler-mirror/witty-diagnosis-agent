@@ -1,4 +1,5 @@
-import which, { sync as whichSync } from "which";
+import which from "which";
+const whichSync = which.sync;
 import { delimiter, dirname, join } from "node:path"
 import { spawnWithWindowsHide } from "../../shared/spawn-with-windows-hide"
 
