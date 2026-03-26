@@ -5,7 +5,7 @@ import type {
   AvailableTool,
   AvailableSkill,
   AvailableCategory,
-} from "./dynamic-agent-prompt-builder";
+} from "../dynamic-agent-prompt-builder";
 import {
   buildKeyTriggersSection,
   buildToolSelectionTable,
@@ -14,7 +14,7 @@ import {
   buildHardBlocksSection,
   buildAntiPatternsSection,
   categorizeTools,
-} from "./dynamic-agent-prompt-builder";
+} from "../dynamic-agent-prompt-builder";
 
 const MODE: AgentMode = "all";
 
