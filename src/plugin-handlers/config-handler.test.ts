@@ -3,7 +3,7 @@
 import { describe, test, expect, spyOn, beforeEach, afterEach } from "bun:test"
 import { resolveCategoryConfig, createConfigHandler } from "./config-handler"
 import type { CategoryConfig } from "../config/schema"
-import type { OhMyOpenCodeConfig } from "../config"
+import type { WittyDiagnosisAgentConfig } from "../config"
 import { getAgentDisplayName } from "../shared/agent-display-names"
 
 import * as agents from "../agents"
@@ -203,7 +203,7 @@ describe("resolveCategoryConfig", () => {
 describe("default_agent behavior with Sisyphus orchestration", () => {
   test("sets default_agent to fuxi when missing", async () => {
     // #given
-    const pluginConfig: OhMyOpenCodeConfig = {}
+    const pluginConfig: WittyDiagnosisAgentConfig = {}
     const config: Record<string, unknown> = {
       model: "anthropic/claude-opus-4-6",
       agent: {},
@@ -226,7 +226,7 @@ describe("default_agent behavior with Sisyphus orchestration", () => {
 
   test("sets default_agent to fuxi when configured default_agent is empty after trim", async () => {
     // given
-    const pluginConfig: OhMyOpenCodeConfig = {}
+    const pluginConfig: WittyDiagnosisAgentConfig = {}
     const config: Record<string, unknown> = {
       model: "anthropic/claude-opus-4-6",
       default_agent: "    ",
@@ -250,7 +250,7 @@ describe("default_agent behavior with Sisyphus orchestration", () => {
 
   test("preserves custom default_agent names while trimming whitespace", async () => {
     // given
-    const pluginConfig: OhMyOpenCodeConfig = {}
+    const pluginConfig: WittyDiagnosisAgentConfig = {}
     const config: Record<string, unknown> = {
       model: "anthropic/claude-opus-4-6",
       default_agent: "  Custom Agent  ",
@@ -281,7 +281,7 @@ describe("Deadlock prevention - fetchAvailableModels must not receive client", (
     // - Server waits for plugin init to complete before handling requests
     const fetchSpy = spyOn(shared, "fetchAvailableModels" as any).mockResolvedValue(new Set<string>())
 
-    const pluginConfig: OhMyOpenCodeConfig = {
+    const pluginConfig: WittyDiagnosisAgentConfig = {
       sisyphus_agent: {
         planner_enabled: true,
       },
@@ -321,7 +321,7 @@ describe("config-handler plugin loading error boundary (#1559)", () => {
     //#given
     ;(pluginLoader.loadAllPluginComponents as any).mockRestore?.()
     spyOn(pluginLoader, "loadAllPluginComponents" as any).mockRejectedValue(new Error("crash"))
-    const pluginConfig: OhMyOpenCodeConfig = {}
+    const pluginConfig: WittyDiagnosisAgentConfig = {}
     const config: Record<string, unknown> = {
       model: "anthropic/claude-opus-4-6",
       agent: {},
@@ -348,7 +348,7 @@ describe("config-handler plugin loading error boundary (#1559)", () => {
     spyOn(pluginLoader, "loadAllPluginComponents" as any).mockImplementation(
       () => new Promise(() => {})
     )
-    const pluginConfig: OhMyOpenCodeConfig = {
+    const pluginConfig: WittyDiagnosisAgentConfig = {
       experimental: { plugin_load_timeout_ms: 100 },
     }
     const config: Record<string, unknown> = {
@@ -376,7 +376,7 @@ describe("config-handler plugin loading error boundary (#1559)", () => {
     ;(pluginLoader.loadAllPluginComponents as any).mockRestore?.()
     spyOn(pluginLoader, "loadAllPluginComponents" as any).mockRejectedValue(new Error("crash"))
     const logSpy = shared.log as ReturnType<typeof spyOn>
-    const pluginConfig: OhMyOpenCodeConfig = {}
+    const pluginConfig: WittyDiagnosisAgentConfig = {}
     const config: Record<string, unknown> = {
       model: "anthropic/claude-opus-4-6",
       agent: {},
@@ -413,7 +413,7 @@ describe("config-handler plugin loading error boundary (#1559)", () => {
       plugins: [{ name: "test-plugin", version: "1.0.0" }],
       errors: [],
     })
-    const pluginConfig: OhMyOpenCodeConfig = {}
+    const pluginConfig: WittyDiagnosisAgentConfig = {}
     const config: Record<string, unknown> = {
       model: "anthropic/claude-opus-4-6",
       agent: {},
@@ -436,8 +436,8 @@ describe("config-handler plugin loading error boundary (#1559)", () => {
   })
 })
 
-describe("disable_omo_env pass-through", () => {
-  test("passes disable_omo_env=true to createBuiltinAgents", async () => {
+describe("disable_wda_env pass-through", () => {
+  test("passes disable_wda_env=true to createBuiltinAgents", async () => {
     //#given
     const createBuiltinAgentsMock = agents.createBuiltinAgents as unknown as {
       mockResolvedValue: (value: Record<string, unknown>) => void
@@ -447,8 +447,8 @@ describe("disable_omo_env pass-through", () => {
       sisyphus: { name: "sisyphus", prompt: "without-env", mode: "primary" },
     })
 
-    const pluginConfig: OhMyOpenCodeConfig = {
-      experimental: { disable_omo_env: true },
+    const pluginConfig: WittyDiagnosisAgentConfig = {
+      experimental: { disable_wda_env: true },
     }
     const config: Record<string, unknown> = {
       model: "anthropic/claude-opus-4-6",
@@ -473,7 +473,7 @@ describe("disable_omo_env pass-through", () => {
     expect(lastCall?.[12]).toBe(true)
   })
 
-  test("passes disable_omo_env=false to createBuiltinAgents when omitted", async () => {
+  test("passes disable_wda_env=false to createBuiltinAgents when omitted", async () => {
     //#given
     const createBuiltinAgentsMock = agents.createBuiltinAgents as unknown as {
       mockResolvedValue: (value: Record<string, unknown>) => void
@@ -483,7 +483,7 @@ describe("disable_omo_env pass-through", () => {
       sisyphus: { name: "sisyphus", prompt: "with-env", mode: "primary" },
     })
 
-    const pluginConfig: OhMyOpenCodeConfig = {}
+    const pluginConfig: WittyDiagnosisAgentConfig = {}
     const config: Record<string, unknown> = {
       model: "anthropic/claude-opus-4-6",
       agent: {},

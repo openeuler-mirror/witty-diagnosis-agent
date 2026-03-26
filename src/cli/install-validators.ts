@@ -54,7 +54,7 @@ export function formatConfigSummary(config: InstallConfig): string {
 export function printHeader(isUpdate: boolean): void {
   const mode = isUpdate ? "Update" : "Install"
   console.log()
-  console.log(color.bgMagenta(color.white(` oMoMoMoMo... ${mode} `)))
+  console.log(color.bgMagenta(color.white(` WittyDiagnosisAgent... ${mode} `)))
   console.log()
 }
 
@@ -111,55 +111,19 @@ export function printBox(content: string, title?: string): void {
 }
 
 export function validateNonTuiArgs(args: InstallArgs): { valid: boolean; errors: string[] } {
-  const errors: string[] = []
-
-  if (args.claude === undefined) {
-    errors.push("--claude is required (values: no, yes, max20)")
-  } else if (!["no", "yes", "max20"].includes(args.claude)) {
-    errors.push(`Invalid --claude value: ${args.claude} (expected: no, yes, max20)`)
-  }
-
-  if (args.gemini === undefined) {
-    errors.push("--gemini is required (values: no, yes)")
-  } else if (!["no", "yes"].includes(args.gemini)) {
-    errors.push(`Invalid --gemini value: ${args.gemini} (expected: no, yes)`)
-  }
-
-  if (args.copilot === undefined) {
-    errors.push("--copilot is required (values: no, yes)")
-  } else if (!["no", "yes"].includes(args.copilot)) {
-    errors.push(`Invalid --copilot value: ${args.copilot} (expected: no, yes)`)
-  }
-
-  if (args.openai !== undefined && !["no", "yes"].includes(args.openai)) {
-    errors.push(`Invalid --openai value: ${args.openai} (expected: no, yes)`)
-  }
-
-  if (args.opencodeZen !== undefined && !["no", "yes"].includes(args.opencodeZen)) {
-    errors.push(`Invalid --opencode-zen value: ${args.opencodeZen} (expected: no, yes)`)
-  }
-
-  if (args.zaiCodingPlan !== undefined && !["no", "yes"].includes(args.zaiCodingPlan)) {
-    errors.push(`Invalid --zai-coding-plan value: ${args.zaiCodingPlan} (expected: no, yes)`)
-  }
-
-  if (args.kimiForCoding !== undefined && !["no", "yes"].includes(args.kimiForCoding)) {
-    errors.push(`Invalid --kimi-for-coding value: ${args.kimiForCoding} (expected: no, yes)`)
-  }
-
-  return { valid: errors.length === 0, errors }
+  return { valid: true, errors: [] }
 }
 
 export function argsToConfig(args: InstallArgs): InstallConfig {
   return {
-    hasClaude: args.claude !== "no",
-    isMax20: args.claude === "max20",
-    hasOpenAI: args.openai === "yes",
-    hasGemini: args.gemini === "yes",
-    hasCopilot: args.copilot === "yes",
-    hasOpencodeZen: args.opencodeZen === "yes",
-    hasZaiCodingPlan: args.zaiCodingPlan === "yes",
-    hasKimiForCoding: args.kimiForCoding === "yes",
+    hasClaude: true,
+    isMax20: false,
+    hasOpenAI: false,
+    hasGemini: false,
+    hasCopilot: false,
+    hasOpencodeZen: false,
+    hasZaiCodingPlan: false,
+    hasKimiForCoding: false,
   }
 }
 

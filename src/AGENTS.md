@@ -10,7 +10,7 @@ Root source directory. Entry point `index.ts` orchestrates 4-step initialization
 
 | File | Purpose |
 |------|---------|
-| `index.ts` | Plugin entry, exports `OhMyOpenCodePlugin` |
+| `index.ts` | Plugin entry, exports `WittyDiagnosisAgentPlugin` |
 | `plugin-config.ts` | JSONC parse, multi-level merge (user → project → defaults), Zod validation |
 | `create-managers.ts` | TmuxSessionManager, BackgroundManager, SkillMcpManager, ConfigHandler |
 | `create-tools.ts` | SkillContext + AvailableCategories + ToolRegistry |

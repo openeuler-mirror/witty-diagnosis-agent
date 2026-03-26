@@ -1,4 +1,4 @@
-import type { OhMyOpenCodeConfig } from "../config";
+import type { WittyDiagnosisAgentConfig } from "../config";
 import { getAgentDisplayName } from "../shared/agent-display-names";
 
 type AgentWithPermission = { permission?: Record<string, unknown> };
@@ -11,7 +11,7 @@ function agentByKey(agentResult: Record<string, unknown>, key: string): AgentWit
 
 export function applyToolConfig(params: {
   config: Record<string, unknown>;
-  pluginConfig: OhMyOpenCodeConfig;
+  pluginConfig: WittyDiagnosisAgentConfig;
   agentResult: Record<string, unknown>;
 }): void {
   const denyTodoTools = params.pluginConfig.experimental?.task_system

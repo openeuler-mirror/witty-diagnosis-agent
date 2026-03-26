@@ -1,5 +1,5 @@
 import type { PluginContext, PluginInterface, ToolsRecord } from "./plugin/types"
-import type { OhMyOpenCodeConfig } from "./config"
+import type { WittyDiagnosisAgentConfig } from "./config"
 
 import { createChatParamsHandler } from "./plugin/chat-params"
 import { createChatHeadersHandler } from "./plugin/chat-headers"
@@ -15,7 +15,7 @@ import type { Managers } from "./create-managers"
 
 export function createPluginInterface(args: {
   ctx: PluginContext
-  pluginConfig: OhMyOpenCodeConfig
+  pluginConfig: WittyDiagnosisAgentConfig
   firstMessageVariantGate: {
     shouldOverride: (sessionID: string) => boolean
     markApplied: (sessionID: string) => void

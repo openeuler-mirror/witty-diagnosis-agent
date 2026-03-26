@@ -1,4 +1,4 @@
-import type { HookName, OhMyOpenCodeConfig } from "../../config"
+import type { HookName, WittyDiagnosisAgentConfig } from "../../config"
 import type { BackgroundManager } from "../../features/background-agent"
 import type { PluginContext } from "../types"
 
@@ -28,7 +28,7 @@ type SessionRecovery = {
 
 export function createContinuationHooks(args: {
   ctx: PluginContext
-  pluginConfig: OhMyOpenCodeConfig
+  pluginConfig: WittyDiagnosisAgentConfig
   isHookEnabled: (hookName: HookName) => boolean
   safeHookEnabled: boolean
   backgroundManager: BackgroundManager

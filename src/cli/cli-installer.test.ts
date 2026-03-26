@@ -51,7 +51,7 @@ describe("runCliInstaller", () => {
         success: true,
         configPath: "/tmp/opencode.jsonc",
       }),
-      spyOn(configManager, "writeOmoConfig").mockReturnValue({
+      spyOn(configManager, "writeWdaConfig").mockReturnValue({
         success: true,
         configPath: "/tmp/witty-diagnosis-agent.jsonc",
       }),

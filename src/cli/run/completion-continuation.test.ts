@@ -17,7 +17,7 @@ afterEach(() => {
 })
 
 function createTempDir(): string {
-  const dir = mkdtempSync(join(tmpdir(), "omo-run-continuation-"))
+  const dir = mkdtempSync(join(tmpdir(), "wda-run-continuation-"))
   testDirs.push(dir)
   return dir
 }

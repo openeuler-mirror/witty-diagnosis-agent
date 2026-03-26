@@ -1,6 +1,6 @@
 import { describe, expect, test, mock, afterEach } from "bun:test"
 
-import { ANTIGRAVITY_PROVIDER_CONFIG, getPluginNameWithVersion, fetchNpmDistTags, generateOmoConfig } from "./config-manager"
+import { ANTIGRAVITY_PROVIDER_CONFIG, getPluginNameWithVersion, fetchNpmDistTags, generateWdaConfig } from "./config-manager"
 import type { InstallConfig } from "./types"
 
 describe("getPluginNameWithVersion", () => {
@@ -23,7 +23,7 @@ describe("getPluginNameWithVersion", () => {
     const result = await getPluginNameWithVersion("2.14.0")
 
     // #then should use @latest tag
-    expect(result).toBe("oh-my-opencode@latest")
+    expect(result).toBe("witty-diagnosis-agent@latest")
   })
 
   test("returns @beta when current version matches beta tag", async () => {
@@ -39,7 +39,7 @@ describe("getPluginNameWithVersion", () => {
     const result = await getPluginNameWithVersion("3.0.0-beta.3")
 
     // #then should use @beta tag
-    expect(result).toBe("oh-my-opencode@beta")
+    expect(result).toBe("witty-diagnosis-agent@beta")
   })
 
   test("returns @next when current version matches next tag", async () => {
@@ -55,7 +55,7 @@ describe("getPluginNameWithVersion", () => {
     const result = await getPluginNameWithVersion("3.1.0-next.1")
 
     // #then should use @next tag
-    expect(result).toBe("oh-my-opencode@next")
+    expect(result).toBe("witty-diagnosis-agent@next")
   })
 
   test("returns prerelease channel tag when no dist-tag matches prerelease version", async () => {
@@ -71,7 +71,7 @@ describe("getPluginNameWithVersion", () => {
     const result = await getPluginNameWithVersion("3.0.0-beta.2")
 
     // #then should preserve prerelease channel
-    expect(result).toBe("oh-my-opencode@beta")
+    expect(result).toBe("witty-diagnosis-agent@beta")
   })
 
   test("returns prerelease channel tag when fetch fails", async () => {
@@ -82,7 +82,7 @@ describe("getPluginNameWithVersion", () => {
     const result = await getPluginNameWithVersion("3.0.0-beta.3")
 
     // #then should preserve prerelease channel
-    expect(result).toBe("oh-my-opencode@beta")
+    expect(result).toBe("witty-diagnosis-agent@beta")
   })
 
   test("returns bare package name when npm returns non-ok response for stable version", async () => {
@@ -98,11 +98,11 @@ describe("getPluginNameWithVersion", () => {
     const result = await getPluginNameWithVersion("2.14.0")
 
     // #then should fall back to bare package entry
-    expect(result).toBe("oh-my-opencode")
+    expect(result).toBe("witty-diagnosis-agent")
   })
 
   test("prioritizes latest over other tags when version matches multiple", async () => {
-    // #given version matches both latest and beta (during release promotion)
+    // #given version matches both latest and beta (during release prwdation)
     globalThis.fetch = mock(() =>
       Promise.resolve({
         ok: true,
@@ -114,7 +114,7 @@ describe("getPluginNameWithVersion", () => {
     const result = await getPluginNameWithVersion("3.0.0")
 
     // #then should prioritize @latest
-    expect(result).toBe("oh-my-opencode@latest")
+    expect(result).toBe("witty-diagnosis-agent@latest")
   })
 })
 
@@ -135,7 +135,7 @@ describe("fetchNpmDistTags", () => {
     ) as unknown as typeof fetch
 
     // #when fetching dist-tags
-    const result = await fetchNpmDistTags("oh-my-opencode")
+    const result = await fetchNpmDistTags("witty-diagnosis-agent")
 
     // #then should return the tags
     expect(result).toEqual({ latest: "2.14.0", beta: "3.0.0-beta.3" })
@@ -146,7 +146,7 @@ describe("fetchNpmDistTags", () => {
     globalThis.fetch = mock(() => Promise.reject(new Error("Network error"))) as unknown as typeof fetch
 
     // #when fetching dist-tags
-    const result = await fetchNpmDistTags("oh-my-opencode")
+    const result = await fetchNpmDistTags("witty-diagnosis-agent")
 
     // #then should return null
     expect(result).toBeNull()
@@ -162,7 +162,7 @@ describe("fetchNpmDistTags", () => {
     ) as unknown as typeof fetch
 
     // #when fetching dist-tags
-    const result = await fetchNpmDistTags("oh-my-opencode")
+    const result = await fetchNpmDistTags("witty-diagnosis-agent")
 
     // #then should return null
     expect(result).toBeNull()
@@ -239,7 +239,7 @@ describe("config-manager ANTIGRAVITY_PROVIDER_CONFIG", () => {
   })
 })
 
-describe("generateOmoConfig - model fallback system", () => {
+describe("generateWdaConfig - model fallback system", () => {
   test("uses github-copilot sonnet fallback when only copilot available", () => {
     // #given user has only copilot (no max plan)
     const config: InstallConfig = {
@@ -254,7 +254,7 @@ describe("generateOmoConfig - model fallback system", () => {
     }
 
     // #when generating config
-    const result = generateOmoConfig(config)
+    const result = generateWdaConfig(config)
 
     // #then Sisyphus uses Copilot (OR logic - copilot is in claude-opus-4-6 providers)
     expect((result.agents as Record<string, { model: string }>).sisyphus.model).toBe("github-copilot/claude-opus-4.6")
@@ -274,7 +274,7 @@ describe("generateOmoConfig - model fallback system", () => {
     }
 
     // #when generating config
-    const result = generateOmoConfig(config)
+    const result = generateWdaConfig(config)
 
     // #then Sisyphus is omitted (requires all fallback providers)
     expect(result.$schema).toBe("https://raw.githubusercontent.com/witty-diagnosis-agent/witty-diagnosis-agent/main/assets/witty-diagnosis-agent.schema.json")
@@ -295,7 +295,7 @@ describe("generateOmoConfig - model fallback system", () => {
     }
 
     // #when generating config
-    const result = generateOmoConfig(config)
+    const result = generateWdaConfig(config)
 
     // #then librarian should use ZAI model
     expect((result.agents as Record<string, { model: string }>).librarian.model).toBe("zai-coding-plan/glm-4.7")
@@ -317,7 +317,7 @@ describe("generateOmoConfig - model fallback system", () => {
     }
 
     // #when generating config
-    const result = generateOmoConfig(config)
+    const result = generateWdaConfig(config)
 
     // #then Sisyphus is omitted (requires all fallback providers)
     expect((result.agents as Record<string, { model: string }>).sisyphus).toBeUndefined()
@@ -341,7 +341,7 @@ describe("generateOmoConfig - model fallback system", () => {
     }
 
     // #when generating config
-    const result = generateOmoConfig(config)
+    const result = generateWdaConfig(config)
 
     // #then explore should use haiku (max20 plan uses Claude quota)
     expect((result.agents as Record<string, { model: string }>).explore.model).toBe("anthropic/claude-haiku-4-5")
@@ -361,7 +361,7 @@ describe("generateOmoConfig - model fallback system", () => {
     }
 
     // #when generating config
-    const result = generateOmoConfig(config)
+    const result = generateWdaConfig(config)
 
     // #then explore should use haiku (isMax20 doesn't affect explore anymore)
     expect((result.agents as Record<string, { model: string }>).explore.model).toBe("anthropic/claude-haiku-4-5")

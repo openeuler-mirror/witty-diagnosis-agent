@@ -1,4 +1,4 @@
-import type { OhMyOpenCodeConfig } from "../config"
+import type { WittyDiagnosisAgentConfig } from "../config"
 import type { AgentOverrides } from "../config/schema/agent-overrides"
 import { getSessionAgent } from "../features/claude-code-session-state"
 import { log } from "../shared"
@@ -53,7 +53,7 @@ function isSameModel(
  * Returns null if no override should be applied.
  */
 export function resolveUltraworkOverride(
-  pluginConfig: OhMyOpenCodeConfig,
+  pluginConfig: WittyDiagnosisAgentConfig,
   inputAgentName: string | undefined,
   output: {
     message: Record<string, unknown>
@@ -102,7 +102,7 @@ export function resolveUltraworkOverride(
  * Result: API call uses opus, TUI bottom bar stays on sonnet.
  */
 export function applyUltraworkModelOverrideOnMessage(
-  pluginConfig: OhMyOpenCodeConfig,
+  pluginConfig: WittyDiagnosisAgentConfig,
   inputAgentName: string | undefined,
   output: {
     message: Record<string, unknown>

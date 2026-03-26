@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, spyOn, test } from "bun:test"
 
-import type { OhMyOpenCodeConfig } from "../config"
+import type { WittyDiagnosisAgentConfig } from "../config"
 import { createConfigHandler } from "./config-handler"
 import * as agentConfigHandler from "./agent-config-handler"
 import * as commandConfigHandler from "./command-config-handler"
@@ -62,7 +62,7 @@ afterEach(() => {
 describe("createConfigHandler formatter pass-through", () => {
   test("preserves formatter object configured in opencode config", async () => {
     // given
-    const pluginConfig: OhMyOpenCodeConfig = {}
+    const pluginConfig: WittyDiagnosisAgentConfig = {}
     const formatterConfig = {
       prettier: {
         command: ["prettier", "--write"],
@@ -98,7 +98,7 @@ describe("createConfigHandler formatter pass-through", () => {
 
   test("preserves formatter=false configured in opencode config", async () => {
     // given
-    const pluginConfig: OhMyOpenCodeConfig = {}
+    const pluginConfig: WittyDiagnosisAgentConfig = {}
     const config: Record<string, unknown> = {
       formatter: false,
     }

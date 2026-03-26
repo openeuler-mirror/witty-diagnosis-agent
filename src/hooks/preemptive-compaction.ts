@@ -1,5 +1,5 @@
 import { log } from "../shared/logger"
-import type { OhMyOpenCodeConfig } from "../config"
+import type { WittyDiagnosisAgentConfig } from "../config"
 
 import { resolveCompactionModel } from "./shared/compaction-model-resolver"
 const DEFAULT_ACTUAL_LIMIT = 200_000
@@ -74,7 +74,7 @@ type PluginInput = {
 
 export function createPreemptiveCompactionHook(
   ctx: PluginInput,
-  pluginConfig: OhMyOpenCodeConfig,
+  pluginConfig: WittyDiagnosisAgentConfig,
   modelCacheState?: ModelCacheStateLike,
 ) {
   const compactionInProgress = new Set<string>()

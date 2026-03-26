@@ -1,6 +1,6 @@
 import { tool, type ToolDefinition } from "@opencode-ai/plugin/tool"
 import { join } from "path"
-import type { OhMyOpenCodeConfig } from "../../config/schema"
+import type { WittyDiagnosisAgentConfig } from "../../config/schema"
 import { TaskGetInputSchema, TaskObjectSchema } from "./types"
 import { getTaskDir, readJsonSafe } from "../../features/claude-tasks/storage"
 
@@ -11,7 +11,7 @@ function parseTaskId(id: string): string | null {
   return id
 }
 
-export function createTaskGetTool(config: Partial<OhMyOpenCodeConfig>): ToolDefinition {
+export function createTaskGetTool(config: Partial<WittyDiagnosisAgentConfig>): ToolDefinition {
   return tool({
     description: `Retrieve a task by ID.
 

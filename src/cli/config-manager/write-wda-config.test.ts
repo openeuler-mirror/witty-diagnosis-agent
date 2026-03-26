@@ -6,8 +6,8 @@ import { join } from "node:path"
 import { parseJsonc } from "../../shared/jsonc-parser"
 import type { InstallConfig } from "../types"
 import { resetConfigContext } from "./config-context"
-import { generateOmoConfig } from "./generate-omo-config"
-import { writeOmoConfig } from "./write-omo-config"
+import { generateWdaConfig } from "./generate-wda-config"
+import { writeWdaConfig } from "./write-wda-config"
 
 const installConfig: InstallConfig = {
   hasClaude: true,
@@ -28,12 +28,12 @@ function getRecord(value: unknown): Record<string, unknown> {
   return {}
 }
 
-describe("writeOmoConfig", () => {
+describe("writeWdaConfig", () => {
   let testConfigDir = ""
   let testConfigPath = ""
 
   beforeEach(() => {
-    testConfigDir = join(tmpdir(), `omo-write-config-${Date.now()}-${Math.random().toString(36).slice(2)}`)
+    testConfigDir = join(tmpdir(), `wda-write-config-${Date.now()}-${Math.random().toString(36).slice(2)}`)
     testConfigPath = join(testConfigDir, "witty-diagnosis-agent.json")
 
     mkdirSync(testConfigDir, { recursive: true })
@@ -59,10 +59,10 @@ describe("writeOmoConfig", () => {
     }
     writeFileSync(testConfigPath, JSON.stringify(existingConfig, null, 2) + "\n", "utf-8")
 
-    const generatedDefaults = generateOmoConfig(installConfig)
+    const generatedDefaults = generateWdaConfig(installConfig)
 
     // when
-    const result = writeOmoConfig(installConfig)
+    const result = writeWdaConfig(installConfig)
 
     // then
     expect(result.success).toBe(true)

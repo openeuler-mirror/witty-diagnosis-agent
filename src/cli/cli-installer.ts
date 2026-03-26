@@ -7,7 +7,7 @@ import {
   detectCurrentConfig,
   getOpenCodeVersion,
   isOpenCodeInstalled,
-  writeOmoConfig,
+  writeWdaConfig,
 } from "./config-manager"
 import {
   SYMBOLS,
@@ -36,7 +36,7 @@ export async function runCliInstaller(args: InstallArgs, version: string): Promi
     }
     console.log()
     printInfo(
-      "Usage: bunx oh-my-opencode install --no-tui --claude=<no|yes|max20> --gemini=<no|yes> --copilot=<no|yes>",
+      "Usage: bunx witty-diagnosis-agent install",
     )
     console.log()
     return 1
@@ -78,7 +78,7 @@ export async function runCliInstaller(args: InstallArgs, version: string): Promi
 
   const config = argsToConfig(args)
 
-  printStep(step++, totalSteps, "Adding oh-my-opencode plugin...")
+  printStep(step++, totalSteps, "Adding witty-diagnosis-agent plugin...")
   const pluginResult = await addPluginToOpenCodeConfig(version)
   if (!pluginResult.success) {
     printError(`Failed: ${pluginResult.error}`)
@@ -118,13 +118,13 @@ export async function runCliInstaller(args: InstallArgs, version: string): Promi
     step += 2
   }
 
-  printStep(step++, totalSteps, "Writing oh-my-opencode configuration...")
-  const omoResult = writeOmoConfig(config)
-  if (!omoResult.success) {
-    printError(`Failed: ${omoResult.error}`)
+  printStep(step++, totalSteps, "Writing witty-diagnosis-agent configuration...")
+  const wdaResult = writeWdaConfig(config)
+  if (!wdaResult.success) {
+    printError(`Failed: ${wdaResult.error}`)
     return 1
   }
-  printSuccess(`Config written ${SYMBOLS.arrow} ${color.dim(omoResult.configPath)}`)
+  printSuccess(`Config written ${SYMBOLS.arrow} ${color.dim(wdaResult.configPath)}`)
 
   printBox(formatConfigSummary(config), isUpdate ? "Updated Configuration" : "Installation Complete")
 
@@ -165,10 +165,10 @@ export async function runCliInstaller(args: InstallArgs, version: string): Promi
 
   console.log(`${SYMBOLS.star} ${color.yellow("If you found this helpful, consider starring the repo!")}`)
   console.log(
-    `  ${color.dim("gh api --silent --method PUT /user/starred/code-yeongyu/oh-my-opencode >/dev/null 2>&1 || true")}`,
+    `  ${color.dim("gh api --silent --method PUT /user/starred/code-yeongyu/witty-diagnosis-agent >/dev/null 2>&1 || true")}`,
   )
   console.log()
-  console.log(color.dim("oMoMoMoMo... Enjoy!"))
+  console.log(color.dim("WittyDiagnosisAgent... Enjoy!"))
   console.log()
 
   if ((config.hasClaude || config.hasGemini || config.hasCopilot) && !args.skipAuth) {
