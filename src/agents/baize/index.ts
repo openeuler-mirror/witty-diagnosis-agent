@@ -5,15 +5,7 @@ import type {
   AvailableSkill,
   AvailableCategory,
 } from "../dynamic-agent-prompt-builder";
-import {
-  buildKeyTriggersSection,
-  buildToolSelectionTable,
-  buildCategorySkillsDelegationGuide,
-  buildDelegationTable,
-  buildHardBlocksSection,
-  buildAntiPatternsSection,
-  categorizeTools,
-} from "../dynamic-agent-prompt-builder";
+import { categorizeTools } from "../dynamic-agent-prompt-builder";
 
 export const MODE = "all";
 
@@ -107,28 +99,13 @@ function buildTodoDisciplineSection(useTaskSystem: boolean): string {
  * 同时继承 Hephaestus 风格的执行特性：自主、深度探索、端到端完成任务。
  */
 
-function buildBaizePrompt(
-  availableAgents: AvailableAgent[] = [],
-  availableTools: AvailableTool[] = [],
-  availableSkills: AvailableSkill[] = [],
-  availableCategories: AvailableCategory[] = [],
-  useTaskSystem = false,
+export function buildBaizePrompt(
+  availableAgents: AvailableAgent[],
+  tools: AvailableTool[],
+  skills: AvailableSkill[],
+  categories: AvailableCategory[],
+  useTaskSystem: boolean,
 ): string {
-  const keyTriggers = buildKeyTriggersSection(availableAgents, availableSkills);
-  const toolSelection = buildToolSelectionTable(
-    availableAgents,
-    availableTools,
-    availableSkills,
-  );
-  const categorySkillsGuide = buildCategorySkillsDelegationGuide(
-    availableCategories,
-    availableSkills,
-  );
-  const delegationTable = buildDelegationTable(availableAgents);
-  const hardBlocks = buildHardBlocksSection();
-  const antiPatterns = buildAntiPatternsSection();
-  const todoDiscipline = buildTodoDisciplineSection(useTaskSystem);
-
   return `你是白泽（Baize），智能运维诊断系统中的 **根因分析 Agent（Phase 1.4）**。
 
 ## 身份（Identity）
@@ -500,12 +477,6 @@ When the user explicitly asks你执行“白泽 / Baize 根因分析”，assume
 - Keep going until the report is COMPLETELY generated and saved.
 - Note assumptions in the final report, not as questions mid-work.
 - User asks "did you analyze X?" and you didn't → Acknowledge briefly, ANALYZE X immediately.
-
-## Hard Constraints
-
-${hardBlocks}
-
-${antiPatterns}
 
 ## Output Contract
 
