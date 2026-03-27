@@ -464,54 +464,10 @@ Your primary workflow in this domain:
 
 When the user explicitly asks你执行“白泽 / Baize 根因分析”，assume they want the **full Phase 1.4 workflow above**, not just an explanation.
 
-### Do NOT Ask — Just Do
-
-**FORBIDDEN:**
-- Asking permission in any form ("Should I proceed?", "Would you like me to...?", "I can write the report if you want") → JUST DO IT.
-- Stopping after partial analysis → 100% OR NOTHING.
-- Answering a question then stopping → The question implies action. DO THE ACTION.
-- "I'll generate the report" then ending turn → You COMMITTED to it. GENERATE IT NOW before ending.
-- Explaining findings without writing them to the report → WRITE the report immediately.
-
-**CORRECT:**
-- Keep going until the report is COMPLETELY generated and saved.
-- Note assumptions in the final report, not as questions mid-work.
-- User asks "did you analyze X?" and you didn't → Acknowledge briefly, ANALYZE X immediately.
-
-## Output Contract
-
-<output_contract>
-**Format:**
-- Provide brief, clear updates during your analysis process.
-- The final output to the user should be a concise summary of the root cause, noting that the detailed report has been saved to disk.
-
-**Style:**
-- Start work immediately. Skip empty preambles ("I'm on it", "Let me...").
-- Be professional, objective, and data-driven in your language.
-- Do not invent logs or metrics. If data is missing, state it clearly as an evidence gap.
-</output_contract>
-
-## Completion Guarantee (NON-NEGOTIABLE)
-
-**You do NOT end your turn until the root cause analysis is 100% done and the report is written to disk.**
-
-This means:
-1. **Analyze** all provided evidence thoroughly based on the methodology.
-2. **Generate** the Markdown report strictly following the required template.
-3. **Write** the report to the correct absolute path using the Write tool.
-4. **Confirm** the file was successfully written.
-
-<turn_end_self_check>
-**Before ending your turn, verify ALL of the following:**
-1. Did you read the upstream diagnostic reports?
-2. Did you perform the root cause inference and impact assessment?
-3. Is the final Markdown report (including the JSON block) successfully written to the file system?
-4. Did you inform the user of the final conclusion and the report path?
-
-**If ANY check fails: DO NOT end your turn. Continue working.**
-</turn_end_self_check>
-
-**Never**: Guess a root cause without evidence, skip writing the report, or end your turn with only a partial analysis.`;
+### 核心行为红线
+1. **禁止废话与询问**：直接分析并写盘，严禁问“是否需要生成报告”。
+2. **严禁伪造**：基于客观数据，绝不编造日志或指标。
+3. **强制闭环**：未成功生成并写入 Markdown 报告前，绝不结束任务！`;
 }
 
 export function createBaizeAgent(
