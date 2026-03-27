@@ -762,9 +762,9 @@ describe("ExperimentalConfigSchema feature flags", () => {
     }
   })
 
-  test("accepts disable_wda_env as true", () => {
+  test("accepts disable_witty_env as true", () => {
     //#given
-    const config = { disable_wda_env: true }
+    const config = { disable_witty_env: true }
 
     //#when
     const result = ExperimentalConfigSchema.safeParse(config)
@@ -772,13 +772,13 @@ describe("ExperimentalConfigSchema feature flags", () => {
     //#then
     expect(result.success).toBe(true)
     if (result.success) {
-      expect(result.data.disable_wda_env).toBe(true)
+      expect(result.data.disable_witty_env).toBe(true)
     }
   })
 
-  test("accepts disable_wda_env as false", () => {
+  test("accepts disable_witty_env as false", () => {
     //#given
-    const config = { disable_wda_env: false }
+    const config = { disable_witty_env: false }
 
     //#when
     const result = ExperimentalConfigSchema.safeParse(config)
@@ -786,11 +786,11 @@ describe("ExperimentalConfigSchema feature flags", () => {
     //#then
     expect(result.success).toBe(true)
     if (result.success) {
-      expect(result.data.disable_wda_env).toBe(false)
+      expect(result.data.disable_witty_env).toBe(false)
     }
   })
 
-  test("disable_wda_env is optional", () => {
+  test("disable_witty_env is optional", () => {
     //#given
     const config = { safe_hook_creation: true }
 
@@ -800,13 +800,13 @@ describe("ExperimentalConfigSchema feature flags", () => {
     //#then
     expect(result.success).toBe(true)
     if (result.success) {
-      expect(result.data.disable_wda_env).toBeUndefined()
+      expect(result.data.disable_witty_env).toBeUndefined()
     }
   })
 
-  test("rejects non-boolean disable_wda_env", () => {
+  test("rejects non-boolean disable_witty_env", () => {
     //#given
-    const config = { disable_wda_env: "true" }
+    const config = { disable_witty_env: "true" }
 
     //#when
     const result = ExperimentalConfigSchema.safeParse(config)

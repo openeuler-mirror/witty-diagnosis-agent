@@ -12,7 +12,7 @@ import {
 const tempDirs: string[] = []
 
 function createTempDir(): string {
-  const directory = mkdtempSync(join(tmpdir(), "omo-run-marker-"))
+  const directory = mkdtempSync(join(tmpdir(), "witty-run-marker-"))
   tempDirs.push(directory)
   return directory
 }

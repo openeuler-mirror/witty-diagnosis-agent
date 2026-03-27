@@ -113,7 +113,7 @@ Original error: ${createResult.error}`
             agent: MULTIMODAL_LOOKER_AGENT,
             tools: {
               task: false,
-              call_omo_agent: false,
+              call_witty_agent: false,
               look_at: false,
               read: false,
             },

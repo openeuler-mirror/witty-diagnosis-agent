@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs"
 import { join } from "node:path"
 import { detectConfigFile, getOpenCodeConfigPaths, parseJsonc } from "../../../shared"
-import type { WdaConfig } from "./model-resolution-types"
+import type { WittyConfig } from "./model-resolution-types"
 
 const PACKAGE_NAME = "witty-diagnosis-agent"
 const USER_CONFIG_BASE = join(
@@ -10,12 +10,12 @@ const USER_CONFIG_BASE = join(
 )
 const PROJECT_CONFIG_BASE = join(process.cwd(), ".opencode", PACKAGE_NAME)
 
-export function loadWdaConfig(): WdaConfig | null {
+export function loadWittyConfig(): WittyConfig | null {
   const projectDetected = detectConfigFile(PROJECT_CONFIG_BASE)
   if (projectDetected.format !== "none") {
     try {
       const content = readFileSync(projectDetected.path, "utf-8")
-      return parseJsonc<WdaConfig>(content)
+      return parseJsonc<WittyConfig>(content)
     } catch {
       return null
     }
@@ -25,7 +25,7 @@ export function loadWdaConfig(): WdaConfig | null {
   if (userDetected.format !== "none") {
     try {
       const content = readFileSync(userDetected.path, "utf-8")
-      return parseJsonc<WdaConfig>(content)
+      return parseJsonc<WittyConfig>(content)
     } catch {
       return null
     }

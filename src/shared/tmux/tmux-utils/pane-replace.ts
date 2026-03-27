@@ -48,7 +48,7 @@ export async function replaceTmuxPane(
 		return { success: false }
 	}
 
-	const title = `omo-subagent-${description.slice(0, 20)}`
+	const title = `witty-subagent-${description.slice(0, 20)}`
 	const titleProc = spawn([tmux, "select-pane", "-t", paneId, "-T", title], {
 		stdout: "ignore",
 		stderr: "pipe",

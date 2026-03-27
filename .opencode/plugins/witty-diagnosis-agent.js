@@ -1,5 +1,5 @@
 /**
- * witty-diagnosis-agent plugin for OpenCode.ai
+ * witty-diagnosis-agent plugin for opencode.ai
  *
  * Injects witty-diagnosis-agent bootstrap context via system prompt transform.
  * Skills are discovered via OpenCode's native skill tool from symlinked directory.

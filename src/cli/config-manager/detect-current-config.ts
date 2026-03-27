@@ -1,29 +1,29 @@
 import { existsSync, readFileSync } from "node:fs"
 import { parseJsonc } from "../../shared"
 import type { DetectedConfig } from "../types"
-import { getWdaConfigPath } from "./config-context"
+import { getWittyConfigPath } from "./config-context"
 import { detectConfigFormat } from "./opencode-config-format"
 import { parseOpenCodeConfigFileWithError } from "./parse-opencode-config-file"
 
-function detectProvidersFromWdaConfig(): {
+function detectProvidersFromWittyConfig(): {
   hasOpenAI: boolean
   hasOpencodeZen: boolean
   hasZaiCodingPlan: boolean
   hasKimiForCoding: boolean
 } {
-  const wdaConfigPath = getWdaConfigPath()
-  if (!existsSync(wdaConfigPath)) {
+  const wittyConfigPath = getWittyConfigPath()
+  if (!existsSync(wittyConfigPath)) {
     return { hasOpenAI: true, hasOpencodeZen: true, hasZaiCodingPlan: false, hasKimiForCoding: false }
   }
 
   try {
-    const content = readFileSync(wdaConfigPath, "utf-8")
-    const wdaConfig = parseJsonc<Record<string, unknown>>(content)
-    if (!wdaConfig || typeof wdaConfig !== "object") {
+    const content = readFileSync(wittyConfigPath, "utf-8")
+    const wittyConfig = parseJsonc<Record<string, unknown>>(content)
+    if (!wittyConfig || typeof wittyConfig !== "object") {
       return { hasOpenAI: true, hasOpencodeZen: true, hasZaiCodingPlan: false, hasKimiForCoding: false }
     }
 
-    const configStr = JSON.stringify(wdaConfig)
+    const configStr = JSON.stringify(wittyConfig)
     const hasOpenAI = configStr.includes('"openai/')
     const hasOpencodeZen = configStr.includes('"opencode/')
     const hasZaiCodingPlan = configStr.includes('"zai-coding-plan/')
@@ -68,7 +68,7 @@ export function detectCurrentConfig(): DetectedConfig {
 
   result.hasGemini = plugins.some((p) => p.startsWith("opencode-antigravity-auth"))
 
-  const { hasOpenAI, hasOpencodeZen, hasZaiCodingPlan, hasKimiForCoding } = detectProvidersFromWdaConfig()
+  const { hasOpenAI, hasOpencodeZen, hasZaiCodingPlan, hasKimiForCoding } = detectProvidersFromWittyConfig()
   result.hasOpenAI = hasOpenAI
   result.hasOpencodeZen = hasOpencodeZen
   result.hasZaiCodingPlan = hasZaiCodingPlan

@@ -1,5 +1,4 @@
-export const AUTO_DIAG_MODE_MESSAGE = `<system-reminder>
-<fuxi-mode>
+export const AUTO_DIAG_MODE_MESSAGE = `<fuxi-mode>
 
 **MANDATORY**：当该模式激活时，你必须在首次回复开头明确对用户说：**"AUTO-DIAG MODE ENABLED!"**，以告知用户你已进入 Auto-Diag 模式。
 
@@ -22,7 +21,7 @@ export const AUTO_DIAG_MODE_MESSAGE = `<system-reminder>
       - 然后将实际路径（如 \`/Users/username\` 或 \`C:\\Users\\username\`）用于 Write 工具
     - **绝对禁止**在 Write 工具的 file_path 参数中使用 \`$HOME\`、\`~\` 或 \`%USERPROFILE%\` 等环境变量语法
     - **正确示例**：\`/Users/mintuyang/.dayu/plans/20260316_114533_disk_fault.md\`
-    - **错误示例**：\`~/.witty-diagnosis-agent/dayu/plans/...\`（这会创建名为 "$HOME" 的目录）
+    - **错误示例**：\`$HOME/.dayu/plans/...\`（这会创建名为 "$HOME" 的目录）
 - 向用户输出方案摘要：故障画像、Top3 假设、任务数量，以及将交由 Dayu 执行的说明。
 
 ### 阶段 2 — Dayu + Kuafu：任务编排与并行执行
@@ -31,7 +30,7 @@ export const AUTO_DIAG_MODE_MESSAGE = `<system-reminder>
 - 你**不要重新设计 Dayu 的调度细节**，而是把「执行 Plan 并交给 Kuafu 并行诊断」这个意图清晰地交给 Dayu；
 - 调用形式应当遵循 Dayu 的约束，并使用如下语义清晰的 prompt（路径和文件名可替换，但含义必须一致）：
 
-  执行 ~/.witty-diagnosis-agent/dayu/plans/{timestamp}_{plan_id}.md 里的诊断方案，按任务依赖编排并调用 Kuafu 执行。
+  执行 $HOME/.dayu/plans/{timestamp}_{plan_id}.md 里的诊断方案，按任务依赖编排并调用 Kuafu 执行。
 
 - **CRITICAL（执行完成判定）**：你必须在调用 Dayu 时就要求 Dayu 在其后台任务完成进度输出中包含：
   - **Completed:**（来自“全部后台任务已完成”的最终系统提醒块；在 Dayu 的最终返回文本中出现即可视为调度完成）
@@ -44,12 +43,12 @@ export const AUTO_DIAG_MODE_MESSAGE = `<system-reminder>
     "load_skills": [],
     "run_in_background": false,
     "description": "执行诊断方案 " + plan_id,
-    "prompt": "执行 ~/.witty-diagnosis-agent/dayu/plans/" + plan_filename + " 里的诊断方案，按任务依赖编排并调用 Kuafu 执行；并确保在全部后台任务完成后输出最终完成通知块（包含 **Completed:**）。"
+    "prompt": "执行 $HOME/.dayu/plans/" + plan_filename + " 里的诊断方案，按任务依赖编排并调用 Kuafu 执行；并确保在全部后台任务完成后输出最终完成通知块（包含 **Completed:**）。"
   })
 
 - Dayu 在内部会通过 \`task(subagent_type="kuafu")\` 调用 Kuafu：
   - Kuafu 负责真正执行单个诊断任务（top / ping / curl / grep 等），收集一手证据；
-  - Dayu 聚合 Kuafu 的执行结果，在 \`~/.witty-diagnosis-agent/dayu/report/{timestamp}_{plan_id}_report.md\` 生成诊断执行报告。
+  - Dayu 聚合 Kuafu 的执行结果，在 \`$HOME/.dayu/report/{timestamp}_{plan_id}_report.md\` 生成诊断执行报告。
 - 你可以安全假设：当你通过 \`task(subagent_type="dayu")\` 启动 Dayu 后，Dayu 在其子会话内部**依然可以**再次通过 \`task(subagent_type="kuafu")\` 调用 Kuafu；这在 OpenCode / WittyDiagnosisAgent 的权限模型中是被**显式允许**的多层级编排，而不是错误或反模式。
 - **绝对禁止**在 Bash / 命令行中输入 \`$ task ...\`；\`task({...})\` 只能作为「工具调用」出现在你的正常回复里，由 OpenCode 解析执行。
 - **绝对禁止**输出 \`Skill "task"\`、\`/task\` 或任何把 \`task\` 当成 Skill / 命令名的形式；\`task\` 只是一种工具调用，不是可执行命令，也不是 Skill 名。
@@ -77,7 +76,7 @@ export const AUTO_DIAG_MODE_MESSAGE = `<system-reminder>
 - 调用 Baize 时应当：
   - 仅提供 \`plan_id\`（不要读取/搜索 Dayu 报告文件，只依赖系统完成通知来推进流程）；
   - 明确请求 Baize 执行完整的 Phase 1.4 工作流（证据归并、根因推断、影响评估、最终 RCA 报告）；
-- Baize 将在 \`~/.witty-diagnosis-agent/baize/report/{timestamp}_{plan_id}_report.md\` 写入或追加最终根因诊断报告，并给出 TL;DR。
+- Baize 将在 \`$HOME/.baize/report/{timestamp}_{plan_id}_report.md\` 写入或追加最终根因诊断报告，并给出 TL;DR。
 
 ### 对用户的最终交付
 
@@ -90,5 +89,4 @@ export const AUTO_DIAG_MODE_MESSAGE = `<system-reminder>
 你必须主动推动流水线完成上述三个阶段，而不是只停留在计划层面。
 
 </fuxi-mode>
-</system-reminder>
 `

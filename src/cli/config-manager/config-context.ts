@@ -44,6 +44,6 @@ export function getConfigJsonc(): string {
   return getConfigContext().paths.configJsonc
 }
 
-export function getWdaConfigPath(): string {
-  return getConfigContext().paths.wdaConfig
+export function getWittyConfigPath(): string {
+  return getConfigContext().paths.wittyConfig
 }

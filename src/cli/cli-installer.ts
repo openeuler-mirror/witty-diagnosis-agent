@@ -7,7 +7,7 @@ import {
   detectCurrentConfig,
   getOpenCodeVersion,
   isOpenCodeInstalled,
-  writeWdaConfig,
+  writeWittyConfig,
 } from "./config-manager"
 import {
   SYMBOLS,
@@ -36,7 +36,7 @@ export async function runCliInstaller(args: InstallArgs, version: string): Promi
     }
     console.log()
     printInfo(
-      "Usage: bunx witty-diagnosis-agent install",
+      "Usage: bunx witty-diagnosis-agent install --no-tui --claude=<no|yes|max20> --gemini=<no|yes> --copilot=<no|yes>",
     )
     console.log()
     return 1
@@ -50,16 +50,7 @@ export async function runCliInstaller(args: InstallArgs, version: string): Promi
   const totalSteps = 7
   let step = 1
 
-  printStep(step++, totalSteps + 1, "Initializing agent workspace...")
-  try {
-    const { ensureAgentDirectoryExists } = await import("./config-manager/ensure-agent-directory-exists")
-    const workspacePath = ensureAgentDirectoryExists()
-    printSuccess(`Workspace created ${SYMBOLS.arrow} ${color.dim(workspacePath)}`)
-  } catch (err) {
-    printWarning(`Failed to initialize workspace: ${err}`)
-  }
-
-  printStep(step++, totalSteps + 1, "Checking OpenCode installation...")
+  printStep(step++, totalSteps, "Checking OpenCode installation...")
   const installed = await isOpenCodeInstalled()
   const openCodeVersion = await getOpenCodeVersion()
   if (!installed) {
@@ -119,12 +110,12 @@ export async function runCliInstaller(args: InstallArgs, version: string): Promi
   }
 
   printStep(step++, totalSteps, "Writing witty-diagnosis-agent configuration...")
-  const wdaResult = writeWdaConfig(config)
-  if (!wdaResult.success) {
-    printError(`Failed: ${wdaResult.error}`)
+  const wittyResult = writeWittyConfig(config)
+  if (!wittyResult.success) {
+    printError(`Failed: ${wittyResult.error}`)
     return 1
   }
-  printSuccess(`Config written ${SYMBOLS.arrow} ${color.dim(wdaResult.configPath)}`)
+  printSuccess(`Config written ${SYMBOLS.arrow} ${color.dim(wittyResult.configPath)}`)
 
   printBox(formatConfigSummary(config), isUpdate ? "Updated Configuration" : "Installation Complete")
 
@@ -168,7 +159,7 @@ export async function runCliInstaller(args: InstallArgs, version: string): Promi
     `  ${color.dim("gh api --silent --method PUT /user/starred/code-yeongyu/witty-diagnosis-agent >/dev/null 2>&1 || true")}`,
   )
   console.log()
-  console.log(color.dim("WittyDiagnosisAgent... Enjoy!"))
+  console.log(color.dim("wittyDiagnosisAgentMo... Enjoy!"))
   console.log()
 
   if ((config.hasClaude || config.hasGemini || config.hasCopilot) && !args.skipAuth) {

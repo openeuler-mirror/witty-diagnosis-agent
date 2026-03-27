@@ -6,7 +6,7 @@ function main() {
     const { platform, arch } = process;
 
     // This is a simplified version. 
-    // In oh-my-opencode, it checks for a platform-specific package.
+    // In witty-diagnosis-agent, it checks for a platform-specific package.
     // Here, we just check if the binary was built or downloaded.
     // Since we are likely installing from source/git, we might not have binaries pre-downloaded.
 

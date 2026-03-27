@@ -77,7 +77,7 @@ export async function applyAgentConfig(params: {
   const currentModel = params.config.model as string | undefined;
   const disabledSkills = new Set<string>(params.pluginConfig.disabled_skills ?? []);
   const useTaskSystem = params.pluginConfig.experimental?.task_system ?? false;
-  const disableWdaEnv = params.pluginConfig.experimental?.disable_wda_env ?? false;
+  const disableWittyEnv = params.pluginConfig.experimental?.disable_witty_env ?? false;
 
   const builtinAgents = await createBuiltinAgents(
     migratedDisabledAgents,
@@ -92,7 +92,7 @@ export async function applyAgentConfig(params: {
     currentModel,
     disabledSkills,
     useTaskSystem,
-    disableWdaEnv,
+    disableWittyEnv,
   );
 
   const includeClaudeAgents = params.pluginConfig.claude_code?.agents ?? true;

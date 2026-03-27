@@ -22,7 +22,7 @@ export function collectPendingBuiltinAgents(input: {
   availableModels: Set<string>
   disabledSkills?: Set<string>
   useTaskSystem?: boolean
-  disableWdaEnv?: boolean
+  disableWittyEnv?: boolean
 }): { pendingAgentConfigs: Map<string, AgentConfig>; availableAgents: AvailableAgent[] } {
   const {
     agentSources,
@@ -37,7 +37,7 @@ export function collectPendingBuiltinAgents(input: {
     uiSelectedModel,
     availableModels,
     disabledSkills,
-    disableWdaEnv = false,
+    disableWittyEnv = false,
   } = input
 
   const availableAgents: AvailableAgent[] = []

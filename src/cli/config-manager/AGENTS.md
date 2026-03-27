@@ -20,14 +20,14 @@
 | `detect-current-config.ts` | Read existing OpenCode config, detect installed plugins |
 | `ensure-config-directory-exists.ts` | Create `.opencode/` dir if missing |
 | `format-error-with-suggestion.ts` | Format errors with actionable suggestions |
-| `generate-wda-config.ts` | Generate `witty-diagnosis-agent.jsonc` from install selections |
+| `generate-witty-config.ts` | Generate `witty-diagnosis-agent.jsonc` from install selections |
 | `jsonc-provider-editor.ts` | Read/write JSONC files with comment preservation |
 | `npm-dist-tags.ts` | Fetch latest version from npm registry (dist-tags) |
 | `opencode-binary.ts` | Detect OpenCode binary location, verify it's installed |
 | `opencode-config-format.ts` | OpenCode config format constants and type guards |
 | `parse-opencode-config-file.ts` | Parse opencode.json/opencode.jsonc with fallback |
 | `plugin-name-with-version.ts` | Resolve `witty-diagnosis-agent@X.Y.Z` for installation |
-| `write-wda-config.ts` | Write generated config to `.opencode/witty-diagnosis-agent.jsonc` |
+| `write-witty-config.ts` | Write generated config to `.opencode/witty-diagnosis-agent.jsonc` |
 
 ## USAGE PATTERN
 
@@ -38,8 +38,8 @@ Functions are called sequentially by `src/cli/install.ts` / `src/cli/tui-install
 2. detect-current-config (check what's already set up)
 3. opencode-binary (verify opencode installed)
 4. npm-dist-tags (get latest version)
-5. generate-wda-config (build config from user selections)
-6. write-wda-config
+5. generate-witty-config (build config from user selections)
+6. write-witty-config
 7. add-plugin-to-opencode-config
 8. add-provider-config (for each provider selected)
 9. bun-install

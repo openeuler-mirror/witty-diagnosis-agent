@@ -4,17 +4,17 @@ import { existsSync, writeFileSync, mkdirSync, rmSync, readFileSync } from "node
 import { spawnSync } from "node:child_process";
 
 const TEST_DIR = join(process.cwd(), "test_temp");
-// Code uses join(XDG_CONFIG_HOME, "opencode")
-const OPENCODE_CONFIG_DIR = join(TEST_DIR, "opencode");
-const OPENCODE_CONFIG_PATH = join(OPENCODE_CONFIG_DIR, "config.json");
+// Code uses join(XDG_CONFIG_HOME, "witty-diagnosis-agent")
+const witty-diagnosis-agent_CONFIG_DIR = join(TEST_DIR, "witty-diagnosis-agent");
+const witty-diagnosis-agent_CONFIG_PATH = join(witty-diagnosis-agent_CONFIG_DIR, "config.json");
 
 describe("Installation Process", () => {
   beforeEach(() => {
     if (existsSync(TEST_DIR)) {
       rmSync(TEST_DIR, { recursive: true, force: true });
     }
-    mkdirSync(OPENCODE_CONFIG_DIR, { recursive: true });
-    writeFileSync(OPENCODE_CONFIG_PATH, JSON.stringify({ plugins: [] }, null, 2));
+    mkdirSync(witty-diagnosis-agent_CONFIG_DIR, { recursive: true });
+    writeFileSync(witty-diagnosis-agent_CONFIG_PATH, JSON.stringify({ plugins: [] }, null, 2));
   });
 
   afterEach(() => {
@@ -47,16 +47,16 @@ describe("Installation Process", () => {
     expect(result.stdout).toContain("Installation Complete");
 
     // Verify config update
-    const configContent = JSON.parse(readFileSync(OPENCODE_CONFIG_PATH, "utf-8"));
+    const configContent = JSON.parse(readFileSync(witty-diagnosis-agent_CONFIG_PATH, "utf-8"));
     expect(configContent.plugins).toContain("witty-diagnosis-agent@latest");
 
     // Verify local config creation
     expect(existsSync("witty-diagnosis.jsonc")).toBe(true);
   });
   
-  it("should create OpenCode config if missing", () => {
+  it("should create witty-diagnosis-agent config if missing", () => {
       // Remove config file
-      rmSync(OPENCODE_CONFIG_PATH);
+      rmSync(witty-diagnosis-agent_CONFIG_PATH);
       
       const binPath = join(process.cwd(), "bin", "witty-diagnosis-agent.js");
       const env = { ...process.env, XDG_CONFIG_HOME: TEST_DIR };
@@ -70,8 +70,8 @@ describe("Installation Process", () => {
       expect(result.stdout).toContain("Installation Complete");
       
       // Verify config was created
-      expect(existsSync(OPENCODE_CONFIG_PATH)).toBe(true);
-      const configContent = JSON.parse(readFileSync(OPENCODE_CONFIG_PATH, "utf-8"));
+      expect(existsSync(witty-diagnosis-agent_CONFIG_PATH)).toBe(true);
+      const configContent = JSON.parse(readFileSync(witty-diagnosis-agent_CONFIG_PATH, "utf-8"));
       expect(configContent.plugins).toContain("witty-diagnosis-agent@latest");
   });
 });

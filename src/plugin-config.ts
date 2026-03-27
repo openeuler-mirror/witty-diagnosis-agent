@@ -139,7 +139,7 @@ export function loadPluginConfig(
 ): WittyDiagnosisAgentConfig {
   // User-level config path - prefer .jsonc over .json
   const configDir = getOpenCodeConfigDir({ binary: "opencode" });
-  const userBasePath = path.join(configDir, "oh-my-opencode");
+  const userBasePath = path.join(configDir, "witty-diagnosis-agent");
   const userDetected = detectConfigFile(userBasePath);
   const userConfigPath =
     userDetected.format !== "none"
@@ -147,7 +147,7 @@ export function loadPluginConfig(
       : userBasePath + ".json";
 
   // Project-level config path - prefer .jsonc over .json
-  const projectBasePath = path.join(directory, ".opencode", "oh-my-opencode");
+  const projectBasePath = path.join(directory, ".opencode", "witty-diagnosis-agent");
   const projectDetected = detectConfigFile(projectBasePath);
   const projectConfigPath =
     projectDetected.format !== "none"

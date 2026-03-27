@@ -21,7 +21,7 @@ export interface CategoryConfig {
 	variant?: string
 }
 
-export interface GeneratedWdaConfig {
+export interface GeneratedWittyConfig {
 	$schema: string
 	agents?: Record<string, AgentConfig>
 	categories?: Record<string, CategoryConfig>

@@ -102,7 +102,7 @@ export function getOpenCodeConfigPaths(options: OpenCodeConfigDirOptions): OpenC
     configJson: join(configDir, "opencode.json"),
     configJsonc: join(configDir, "opencode.jsonc"),
     packageJson: join(configDir, "package.json"),
-    omoConfig: join(configDir, "witty-diagnosis-agent.json"),
+    wittyConfig: join(configDir, "witty-diagnosis-agent.json"),
   }
 }
 

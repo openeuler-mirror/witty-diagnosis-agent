@@ -3,7 +3,7 @@ import { saveInteractiveBashSessionState, clearInteractiveBashSessionState } fro
 import { buildSessionReminderMessage } from "./constants";
 import type { InteractiveBashSessionState } from "./types";
 import { tokenizeCommand, findSubcommand, extractSessionNameFromTokens } from "./parser";
-import { getOrCreateState, isOmoSession, killAllTrackedSessions } from "./state-manager";
+import { getOrCreateState, isWittySession, killAllTrackedSessions } from "./state-manager";
 import { subagentSessions } from "../../features/claude-code-session-state";
 
 interface ToolExecuteInput {
@@ -75,10 +75,10 @@ export function createInteractiveBashSessionHook(ctx: PluginInput) {
 
     const sessionName = extractSessionNameFromTokens(tokens, subCommand);
 
-    if (isNewSession && isOmoSession(sessionName)) {
+    if (isNewSession && isWittySession(sessionName)) {
       state.tmuxSessions.add(sessionName!);
       stateChanged = true;
-    } else if (isKillSession && isOmoSession(sessionName)) {
+    } else if (isKillSession && isWittySession(sessionName)) {
       state.tmuxSessions.delete(sessionName!);
       stateChanged = true;
     } else if (isKillServer) {

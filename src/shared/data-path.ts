@@ -31,11 +31,11 @@ export function getCacheDir(): string {
 }
 
 /**
- * Returns the oh-my-opencode cache directory.
- * All platforms: ~/.cache/oh-my-opencode
+ * Returns the witty-diagnosis-agent cache directory.
+ * All platforms: ~/.cache/witty-diagnosis-agent
  */
-export function getOmoOpenCodeCacheDir(): string {
-  return path.join(getCacheDir(), "oh-my-opencode")
+export function getWittyOpenCodeCacheDir(): string {
+  return path.join(getCacheDir(), "witty-diagnosis-agent")
 }
 
 /**

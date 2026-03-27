@@ -1,5 +1,4 @@
 import type { AgentConfig } from "@opencode-ai/sdk";
-import type { AgentMode } from "../types";
 import type {
   AvailableAgent,
   AvailableTool,
@@ -15,9 +14,8 @@ import {
   buildAntiPatternsSection,
   categorizeTools,
 } from "../dynamic-agent-prompt-builder";
-import { getSharedEnvPrompt } from "../shared-env-prompt";
 
-const MODE: AgentMode = "all";
+export const MODE = "all";
 
 function buildTodoDisciplineSection(useTaskSystem: boolean): string {
   if (useTaskSystem) {
@@ -96,7 +94,7 @@ function buildTodoDisciplineSection(useTaskSystem: boolean): string {
  * Intelligent O&M Diagnosis System architecture:
  *
  *   - 输入: Dayu / Kuafu 聚合生成的诊断报告（跨平台路径）：
- *           Linux/macOS: `~/.witty-diagnosis-agent/dayu/report/{timestamp}_{plan_id}_report.md`
+ *           Linux/macOS: `$HOME/.dayu/report/{timestamp}_{plan_id}_report.md`
  *           Windows: `%USERPROFILE%\.dayu\report\{timestamp}_{plan_id}_report.md`
  *   - 职责: 基于 Phase 1–3 的诊断结果进行
  *           1.4.1 证据收集与关联 (Evidence Collection)
@@ -104,7 +102,7 @@ function buildTodoDisciplineSection(useTaskSystem: boolean): string {
  *           1.4.3 影响评估 (Impact Assessment)
  *           1.4.4 诊断报告生成 (Report Generation)
  *   - 输出: 覆盖 / 追加生成最终根因诊断报告
- *           `~/.witty-diagnosis-agent/baize/report/{timestamp}_{plan_id}_report.md`
+ *           `$HOME/.baize/report/{timestamp}_{plan_id}_report.md`
  *
  * 同时继承 Hephaestus 风格的执行特性：自主、深度探索、端到端完成任务。
  */
@@ -160,7 +158,7 @@ Your primary workflow in this domain:
    - Read the consolidated diagnostic report produced by Dayu / Kuafu from user home directory.
    - **必须使用绝对路径**：先用 \`Bash("echo $HOME")\` 获取实际路径，再用于 Read 工具
    - **正确示例**：\`/Users/username/.dayu/report/{timestamp}_{plan_id}_report.md\`
-   - **错误示例**：\`~/.witty-diagnosis-agent/dayu/report/...\`（环境变量语法不会被展开）
+   - **错误示例**：\`$HOME/.dayu/report/...\`（环境变量语法不会被展开）
    - The user will either give you the **full report path** or at least \`plan_id\` / \`timestamp\`.
 
 2. **1.4.1 证据收集与关联 (Evidence Collection)**  
@@ -188,7 +186,7 @@ Your primary workflow in this domain:
    - Write or update the report at user home directory:
      - **必须使用绝对路径**：先用 \`Bash("echo $HOME")\` 获取实际路径，再用于 Write 工具
      - **正确示例**：\`/Users/username/.baize/report/{timestamp}_{plan_id}_report.md\`
-     - **错误示例**：\`~/.witty-diagnosis-agent/baize/report/...\`（环境变量语法不会被展开）
+     - **错误示例**：\`$HOME/.baize/report/...\`（环境变量语法不会被展开）
      - If the file does not exist: create it with the full report.
      - If it exists: append a new \`## Root Cause Analysis (Baize)\` section instead of deleting history.
 
@@ -245,7 +243,7 @@ Your primary workflow in this domain:
 
 1. **输入 Dayu 报告 (Input Report)**  
    - 从 Dayu / Kuafu 生成的诊断报告中读取全部内容（跨平台路径）：
-     - Linux/macOS：\`~/.witty-diagnosis-agent/dayu/report/{timestamp}_{plan_id}_report.md\`
+     - Linux/macOS：\`$HOME/.dayu/report/{timestamp}_{plan_id}_report.md\`
      - Windows：\`%USERPROFILE%\\.dayu\\report\\{timestamp}_{plan_id}_report.md\`（CMD）或 \`$HOME\\.dayu\\report\\{timestamp}_{plan_id}_report.md\`（PowerShell）
    - 用户会提供完整路径，或至少 \`plan_id\` / \`timestamp\`，你负责通过只读工具找到最合适的报告文件。  
    - 在 Markdown 尾部定位并解析结构化 JSON 元数据（\`tasks\`、\`artifacts\`、\`hypotheses\`、\`alerts\` 等），将其归一化为上述实体。  
@@ -291,7 +289,7 @@ Your primary workflow in this domain:
    - 产出一个结构化的 \`impact\` 对象（即使只是在文本中描述其字段：severity / affected_entities / time_window / business_impact）。  
 
 7. **1.4.6 诊断报告生成 (Report Generation - Structured Output)**  
-   - 生成一份面向人类可读的「根因分析报告」，并写入或更新：\`~/.witty-diagnosis-agent/baize/report/{timestamp}_{plan_id}_report.md\`。  
+   - 生成一份面向人类可读的「根因分析报告」，并写入或更新：\`$HOME/.baize/report/{timestamp}_{plan_id}_report.md\`。  
    - 报告正文中必须显式包含以下章节（使用清晰的 Markdown 标题，如 \`##\` / \`###\`）：  
      1. **结果汇总（Results Aggregation）** —— 汇总所有子 Agent 的诊断结果，按假设 / 任务维度列出验证状态。  
      2. **时间线重建（Timeline Reconstruction）** —— 按时间顺序列出关键事件，并标注其在因果判断中的角色。  
@@ -339,7 +337,7 @@ ${keyTriggers}
 <intent_extraction>
 ### Step 0: Extract True Intent (BEFORE Classification)
 
-**You are an autonomous deep worker. Users chose you for ACTION, not analysis.**
+**You are an autonwittyus deep worker. Users chose you for ACTION, not analysis.**
 
 Every user message has a surface form and a true intent. Your conservative grounding bias may cause you to interpret messages too literally — counter this by extracting true intent FIRST.
 
@@ -627,18 +625,18 @@ This means:
 **Never**: Leave code broken, delete failing tests, shotgun debug`;
 }
 
-export async function createBaizeAgent(
+export function createBaizeAgent(
   model: string,
   availableAgents?: AvailableAgent[],
   availableToolNames?: string[],
   availableSkills?: AvailableSkill[],
   availableCategories?: AvailableCategory[],
   useTaskSystem = false,
-): Promise<AgentConfig> {
+): AgentConfig {
   const tools = availableToolNames ? categorizeTools(availableToolNames) : [];
   const skills = availableSkills ?? [];
   const categories = availableCategories ?? [];
-  const basePrompt = availableAgents
+  const prompt = availableAgents
     ? buildBaizePrompt(
         availableAgents,
         tools,
@@ -648,19 +646,17 @@ export async function createBaizeAgent(
       )
     : buildBaizePrompt([], tools, skills, categories, useTaskSystem);
 
-  const extraPrompt = await getSharedEnvPrompt();
-
   return {
     description:
-      "Baize (Root Cause Analysis) — Phase 1.4 \"白泽 / Baize - 根因分析\" agent for the Intelligent O&M Diagnosis System. Reads Dayu/Kuafu reports from ~/.witty-diagnosis-agent/dayu/report, aggregates evidence, infers root cause, assesses impact, and writes final RCA reports to ~/.witty-diagnosis-agent/baize/report. (Baize - WittyDiagnosisAgent)",
+      "Baize (Root Cause Analysis) — Phase 1.4 \"白泽 / Baize - 根因分析\" agent for the Intelligent O&M Diagnosis System. Reads Dayu/Kuafu reports from $HOME/.dayu/report, aggregates evidence, infers root cause, assesses impact, and writes final RCA reports to $HOME/.baize/report. (Baize - WittyDiagnosisAgent)",
     mode: MODE,
     model,
     maxTokens: 32000,
-    prompt: basePrompt + extraPrompt,
+    prompt,
     color: "#0D9488", // Teal - Bai Ze / report phase
     permission: {
       question: "allow",
-      call_omo_agent: "deny",
+      call_witty_agent: "deny",
     } as AgentConfig["permission"],
     reasoningEffort: "medium",
   };

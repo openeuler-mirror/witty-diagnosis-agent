@@ -1,8 +1,8 @@
 import type { AgentConfig } from "@opencode-ai/sdk"
 import { createEnvContext } from "../env-context"
 
-export interface ApplyEnvironmentContextOptions {
-  disableWdaEnv?: boolean
+type ApplyEnvironmentContextOptions = {
+  disableWittyEnv?: boolean
 }
 
 export function applyEnvironmentContext(
@@ -10,7 +10,7 @@ export function applyEnvironmentContext(
   directory?: string,
   options: ApplyEnvironmentContextOptions = {}
 ): AgentConfig {
-  if (options.disableWdaEnv || !directory || !config.prompt) return config
+  if (options.disableWittyEnv || !directory || !config.prompt) return config
   const envContext = createEnvContext()
   return { ...config, prompt: config.prompt + envContext }
 }

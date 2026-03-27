@@ -7,7 +7,7 @@ import { CHECK_IDS, CHECK_NAMES, PACKAGE_NAME } from "../constants"
 import type { CheckResult, DoctorIssue } from "../types"
 import { loadAvailableModelsFromCache } from "./model-resolution-cache"
 import { getModelResolutionInfoWithOverrides } from "./model-resolution"
-import type { WdaConfig } from "./model-resolution-types"
+import type { WittyConfig } from "./model-resolution-types"
 
 const USER_CONFIG_BASE = join(getOpenCodeConfigDir({ binary: "opencode" }), PACKAGE_NAME)
 const PROJECT_CONFIG_BASE = join(process.cwd(), ".opencode", PACKAGE_NAME)
@@ -16,7 +16,7 @@ interface ConfigValidationResult {
   exists: boolean
   path: string | null
   valid: boolean
-  config: WdaConfig | null
+  config: WittyConfig | null
   errors: string[]
 }
 
@@ -38,7 +38,7 @@ function validateConfig(): ConfigValidationResult {
 
   try {
     const content = readFileSync(configPath, "utf-8")
-    const rawConfig = parseJsonc<WdaConfig>(content)
+    const rawConfig = parseJsonc<WittyConfig>(content)
     const schemaResult = WittyDiagnosisAgentConfigSchema.safeParse(rawConfig)
 
     if (!schemaResult.success) {
@@ -63,7 +63,7 @@ function validateConfig(): ConfigValidationResult {
   }
 }
 
-function collectModelResolutionIssues(config: WdaConfig): DoctorIssue[] {
+function collectModelResolutionIssues(config: WittyConfig): DoctorIssue[] {
   const issues: DoctorIssue[] = []
   const availableModels = loadAvailableModelsFromCache()
   const resolution = getModelResolutionInfoWithOverrides(config)

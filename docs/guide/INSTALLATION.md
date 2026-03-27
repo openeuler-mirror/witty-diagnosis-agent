@@ -25,8 +25,8 @@ witty-diagnosis-agent -V
 
 复制如下内容到 OpenCode 对话框，由 Agent 引导您完成安装：
 
-```text
-请根据这里的说明安装并配置 witty-diagnosis-agent：
+```markdown
+请根据这里的说明安装并配置 OpenCode：
 https://atomgit.com/openeuler/witty-diagnosis-agent/blob/master/docs/reference/witty-diagnosis-installation.md
 ```
 
@@ -91,4 +91,4 @@ bun run build
 - **权限问题**：如果在 Linux/macOS 上遇到权限错误，尝试使用 `sudo` 或检查目录权限。
 - **网络代理**：如果处于公司内网，请确保配置了正确的 npm 代理。
 
-更多问题排查请参考：[Troubleshooting](../troubleshooting/opencode.md)
+更多问题排查请参考：[Troubleshooting](../troubleshooting/witty-diagnosis-agent.md)

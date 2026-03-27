@@ -61,9 +61,9 @@ export function migrateConfigFile(
     needsWrite = true
   }
 
-  if (copy.omo_agent) {
-    copy.sisyphus_agent = copy.omo_agent
-    delete copy.omo_agent
+  if (copy.witty_agent) {
+    copy.sisyphus_agent = copy.witty_agent
+    delete copy.witty_agent
     needsWrite = true
   }
 

@@ -29,7 +29,7 @@
 
 | Tool | Factory | Parameters |
 |------|---------|------------|
-| `call_omo_agent` | `createCallOmoAgent` | description, prompt, subagent_type, run_in_background, session_id |
+| `call_witty_agent` | `createCallWittyAgent` | description, prompt, subagent_type, run_in_background, session_id |
 
 ### Background Tasks (2)
 
@@ -93,7 +93,7 @@
 |----------|-------|--------|
 | visual-engineering | gemini-3-pro | Frontend, UI/UX |
 | ultrabrain | gpt-5.3-codex xhigh | Hard logic |
-| deep | gpt-5.3-codex medium | Autonomous problem-solving |
+| deep | gpt-5.3-codex medium | Autonwittyus problem-solving |
 | artistry | gemini-3-pro high | Creative approaches |
 | quick | claude-haiku-4-5 | Trivial tasks |
 | unspecified-low | claude-sonnet-4-6 | Moderate effort |

@@ -1,5 +1,5 @@
 /**
- * Detects external plugins that may conflict with oh-my-opencode features.
+ * Detects external plugins that may conflict with witty-diagnosis-agent features.
  * Used to prevent crashes from concurrent notification plugins.
  */
 
@@ -14,7 +14,7 @@ interface OpencodeConfig {
 }
 
 /**
- * Known notification plugins that conflict with oh-my-opencode's session-notification.
+ * Known notification plugins that conflict with witty-diagnosis-agent's session-notification.
  * Both plugins listen to session.idle and send notifications simultaneously,
  * which can cause crashes on Windows due to resource contention.
  */
@@ -124,14 +124,14 @@ export function detectExternalNotificationPlugin(directory: string): ExternalNot
  * Generate a warning message for users with conflicting notification plugins.
  */
 export function getNotificationConflictWarning(pluginName: string): string {
-  return `[oh-my-opencode] External notification plugin detected: ${pluginName}
+  return `[witty-diagnosis-agent] External notification plugin detected: ${pluginName}
 
-Both oh-my-opencode and ${pluginName} listen to session.idle events.
+Both witty-diagnosis-agent and ${pluginName} listen to session.idle events.
    Running both simultaneously can cause crashes on Windows.
 
-   oh-my-opencode's session-notification has been auto-disabled.
+   witty-diagnosis-agent's session-notification has been auto-disabled.
 
-   To use oh-my-opencode's notifications instead, either:
+   To use witty-diagnosis-agent's notifications instead, either:
    1. Remove ${pluginName} from your opencode.json plugins
    2. Or set "notification": { "force_enable": true } in witty-diagnosis-agent.json`
 }

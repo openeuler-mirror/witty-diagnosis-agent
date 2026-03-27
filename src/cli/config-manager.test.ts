@@ -1,6 +1,6 @@
 import { describe, expect, test, mock, afterEach } from "bun:test"
 
-import { ANTIGRAVITY_PROVIDER_CONFIG, getPluginNameWithVersion, fetchNpmDistTags, generateWdaConfig } from "./config-manager"
+import { ANTIGRAVITY_PROVIDER_CONFIG, getPluginNameWithVersion, fetchNpmDistTags, generateWittyConfig } from "./config-manager"
 import type { InstallConfig } from "./types"
 
 describe("getPluginNameWithVersion", () => {
@@ -102,7 +102,7 @@ describe("getPluginNameWithVersion", () => {
   })
 
   test("prioritizes latest over other tags when version matches multiple", async () => {
-    // #given version matches both latest and beta (during release prwdation)
+    // #given version matches both latest and beta (during release prwittytion)
     globalThis.fetch = mock(() =>
       Promise.resolve({
         ok: true,
@@ -239,7 +239,7 @@ describe("config-manager ANTIGRAVITY_PROVIDER_CONFIG", () => {
   })
 })
 
-describe("generateWdaConfig - model fallback system", () => {
+describe("generateWittyConfig - model fallback system", () => {
   test("uses github-copilot sonnet fallback when only copilot available", () => {
     // #given user has only copilot (no max plan)
     const config: InstallConfig = {
@@ -254,7 +254,7 @@ describe("generateWdaConfig - model fallback system", () => {
     }
 
     // #when generating config
-    const result = generateWdaConfig(config)
+    const result = generateWittyConfig(config)
 
     // #then Sisyphus uses Copilot (OR logic - copilot is in claude-opus-4-6 providers)
     expect((result.agents as Record<string, { model: string }>).sisyphus.model).toBe("github-copilot/claude-opus-4.6")
@@ -274,10 +274,10 @@ describe("generateWdaConfig - model fallback system", () => {
     }
 
     // #when generating config
-    const result = generateWdaConfig(config)
+    const result = generateWittyConfig(config)
 
     // #then Sisyphus is omitted (requires all fallback providers)
-    expect(result.$schema).toBe("https://raw.githubusercontent.com/witty-diagnosis-agent/witty-diagnosis-agent/main/assets/witty-diagnosis-agent.schema.json")
+    expect(result.$schema).toBe("https://raw.githubusercontent.com/code-yeongyu/witty-diagnosis-agent/dev/assets/witty-diagnosis-agent.schema.json")
     expect((result.agents as Record<string, { model: string }>).sisyphus).toBeUndefined()
   })
 
@@ -295,7 +295,7 @@ describe("generateWdaConfig - model fallback system", () => {
     }
 
     // #when generating config
-    const result = generateWdaConfig(config)
+    const result = generateWittyConfig(config)
 
     // #then librarian should use ZAI model
     expect((result.agents as Record<string, { model: string }>).librarian.model).toBe("zai-coding-plan/glm-4.7")
@@ -317,7 +317,7 @@ describe("generateWdaConfig - model fallback system", () => {
     }
 
     // #when generating config
-    const result = generateWdaConfig(config)
+    const result = generateWittyConfig(config)
 
     // #then Sisyphus is omitted (requires all fallback providers)
     expect((result.agents as Record<string, { model: string }>).sisyphus).toBeUndefined()
@@ -341,7 +341,7 @@ describe("generateWdaConfig - model fallback system", () => {
     }
 
     // #when generating config
-    const result = generateWdaConfig(config)
+    const result = generateWittyConfig(config)
 
     // #then explore should use haiku (max20 plan uses Claude quota)
     expect((result.agents as Record<string, { model: string }>).explore.model).toBe("anthropic/claude-haiku-4-5")
@@ -361,7 +361,7 @@ describe("generateWdaConfig - model fallback system", () => {
     }
 
     // #when generating config
-    const result = generateWdaConfig(config)
+    const result = generateWittyConfig(config)
 
     // #then explore should use haiku (isMax20 doesn't affect explore anymore)
     expect((result.agents as Record<string, { model: string }>).explore.model).toBe("anthropic/claude-haiku-4-5")

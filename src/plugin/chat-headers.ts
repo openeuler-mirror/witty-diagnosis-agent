@@ -102,7 +102,7 @@ async function hasInternalMarker(
   }
 }
 
-async function isOmoInternalMessage(input: ChatHeadersInput, client: PluginContext["client"]): Promise<boolean> {
+async function isWittyInternalMessage(input: ChatHeadersInput, client: PluginContext["client"]): Promise<boolean> {
   if (input.message.role !== "user") {
     return false
   }
@@ -123,7 +123,7 @@ export function createChatHeadersHandler(args: { ctx: PluginContext }): (input: 
     if (!isChatHeadersOutput(output)) return
 
     if (!isCopilotProvider(normalizedInput.provider.id)) return
-    if (!(await isOmoInternalMessage(normalizedInput, ctx.client))) return
+    if (!(await isWittyInternalMessage(normalizedInput, ctx.client))) return
 
     output.headers["x-initiator"] = "agent"
   }

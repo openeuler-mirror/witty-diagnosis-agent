@@ -10,7 +10,7 @@ import { spawnWithWindowsHide } from "../../shared/spawn-with-windows-hide";
 
 type AbortSession = (args: { path: { id: string } }) => Promise<unknown>
 
-function isOmoSession(sessionName: string | null): sessionName is string {
+function isWittySession(sessionName: string | null): sessionName is string {
   return sessionName !== null && sessionName.startsWith(OMO_SESSION_PREFIX)
 }
 
@@ -90,10 +90,10 @@ export function createInteractiveBashSessionTracker(options: {
     const isKillSession = subCommand === "kill-session"
     const isKillServer = subCommand === "kill-server"
 
-    if (isNewSession && isOmoSession(sessionName)) {
+    if (isNewSession && isWittySession(sessionName)) {
       state.tmuxSessions.add(sessionName)
       stateChanged = true
-    } else if (isKillSession && isOmoSession(sessionName)) {
+    } else if (isKillSession && isWittySession(sessionName)) {
       state.tmuxSessions.delete(sessionName)
       stateChanged = true
     } else if (isKillServer) {

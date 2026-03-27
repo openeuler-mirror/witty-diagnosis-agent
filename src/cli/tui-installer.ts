@@ -8,7 +8,7 @@ import {
   detectCurrentConfig,
   getOpenCodeVersion,
   isOpenCodeInstalled,
-  writeWdaConfig,
+  writeWittyConfig,
 } from "./config-manager"
 import { detectedToInitialValues, formatConfigSummary, SYMBOLS } from "./install-validators"
 import { promptInstallConfig } from "./tui-install-prompts"
@@ -24,7 +24,7 @@ export async function runTuiInstaller(args: InstallArgs, version: string): Promi
   const detected = detectCurrentConfig()
   const isUpdate = detected.isInstalled
 
-  p.intro(color.bgMagenta(color.white(isUpdate ? " WittyDiagnosisAgent... Update " : " WittyDiagnosisAgent... ")))
+  p.intro(color.bgMagenta(color.white(isUpdate ? " wittyDiagnosisAgentMo... Update " : " wittyDiagnosisAgentMo... ")))
 
   if (isUpdate) {
     const initial = detectedToInitialValues(detected)
@@ -32,16 +32,6 @@ export async function runTuiInstaller(args: InstallArgs, version: string): Promi
   }
 
   const spinner = p.spinner()
-
-  spinner.start("Initializing agent workspace")
-  try {
-    const { ensureAgentDirectoryExists } = await import("./config-manager/ensure-agent-directory-exists")
-    const workspacePath = ensureAgentDirectoryExists()
-    spinner.stop(`Workspace created in ${color.cyan(workspacePath)}`)
-  } catch (err) {
-    spinner.stop(`Workspace initialization skipped: ${err} ${color.yellow("[!]")}`)
-  }
-
   spinner.start("Checking OpenCode installation")
 
   const installed = await isOpenCodeInstalled()
@@ -95,13 +85,13 @@ export async function runTuiInstaller(args: InstallArgs, version: string): Promi
   }
 
   spinner.start("Writing witty-diagnosis-agent configuration")
-  const wdaResult = writeWdaConfig(config)
-  if (!wdaResult.success) {
-    spinner.stop(`Failed to write config: ${wdaResult.error}`)
+  const wittyResult = writeWittyConfig(config)
+  if (!wittyResult.success) {
+    spinner.stop(`Failed to write config: ${wittyResult.error}`)
     p.outro(color.red("Installation failed."))
     return 1
   }
-  spinner.stop(`Config written to ${color.cyan(wdaResult.configPath)}`)
+  spinner.stop(`Config written to ${color.cyan(wittyResult.configPath)}`)
 
   return 0
 }

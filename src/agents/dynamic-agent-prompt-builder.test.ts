@@ -175,7 +175,7 @@ describe("buildUltraworkSection", () => {
 })
 
 describe("buildDeepParallelSection", () => {
-  const deepCategory: AvailableCategory = { name: "deep", description: "Autonomous problem-solving" }
+  const deepCategory: AvailableCategory = { name: "deep", description: "Autonwittyus problem-solving" }
   const otherCategory: AvailableCategory = { name: "quick", description: "Trivial tasks" }
 
   it("#given non-Claude model with deep category #when building #then returns parallel delegation section", () => {
