@@ -59,9 +59,8 @@ Generate plan to user home directory (**CRITICAL - 必须使用绝对路径**):
   > {User Query}
 
 - **时间窗口 (Time Window)**:
-  > 起始时间：{Start Time}
-  > 终止时间：{End Time}
-  > (跨度须 ≤ 24小时)
+  > 故障时间：{Fault Time}
+  > (满足：1.历史明确时间段 2.不清楚但可推断 3.过去某时至今)
 
 - **经过交互确认的关键故障现象 (Key Verified Symptoms)**:
   > {Detailed Symptom Description}
