@@ -35,16 +35,6 @@ export function isAnyFallbackEntryAvailable(
 	)
 }
 
-export function isRequiredModelAvailable(
-	requiresModel: string,
-	fallbackChain: FallbackEntry[],
-	availability: ProviderAvailability
-): boolean {
-	const matchingEntry = fallbackChain.find((entry) => entry.model === requiresModel)
-	if (!matchingEntry) return false
-	return matchingEntry.providers.some((provider) => isProviderAvailable(provider, availability))
-}
-
 export function isRequiredProviderAvailable(
 	requiredProviders: string[],
 	availability: ProviderAvailability

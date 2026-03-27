@@ -111,7 +111,6 @@ export const CLI_CATEGORY_MODEL_REQUIREMENTS: Record<string, ModelRequirement> =
       { providers: ["anthropic", "github-copilot", "opencode"], model: "claude-opus-4-6", variant: "max" },
       { providers: ["google", "github-copilot", "opencode"], model: "gemini-3.1-pro", variant: "high" },
     ],
-    requiresModel: "gpt-5.3-codex",
   },
   artistry: {
     fallbackChain: [
@@ -119,7 +118,6 @@ export const CLI_CATEGORY_MODEL_REQUIREMENTS: Record<string, ModelRequirement> =
       { providers: ["anthropic", "github-copilot", "opencode"], model: "claude-opus-4-6", variant: "max" },
       { providers: ["openai", "github-copilot", "opencode"], model: "gpt-5.2" },
     ],
-    requiresModel: "gemini-3.1-pro",
   },
   quick: {
     fallbackChain: [

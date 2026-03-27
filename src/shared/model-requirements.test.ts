@@ -176,7 +176,6 @@ describe("AGENT_MODEL_REQUIREMENTS", () => {
     // #then - requiresProvider includes openai, github-copilot, venice, and opencode
     expect(hephaestus).toBeDefined()
     expect(hephaestus.requiresProvider).toEqual(["openai", "github-copilot", "venice", "opencode"])
-    expect(hephaestus.requiresModel).toBeUndefined()
   })
 
   test("all 10 builtin agents have valid fallbackChain arrays", () => {
@@ -484,23 +483,7 @@ describe("ModelRequirement type", () => {
    })
 })
 
-describe("requiresModel field in categories", () => {
-  test("deep category has requiresModel set to gpt-5.3-codex", () => {
-    // given
-    const deep = CATEGORY_MODEL_REQUIREMENTS["deep"]
 
-    // when / #then
-    expect(deep.requiresModel).toBe("gpt-5.3-codex")
-  })
-
-  test("artistry category has requiresModel set to gemini-3.1-pro", () => {
-    // given
-    const artistry = CATEGORY_MODEL_REQUIREMENTS["artistry"]
-
-    // when / #then
-    expect(artistry.requiresModel).toBe("gemini-3.1-pro")
-  })
-})
 
 describe("gpt-5.3-codex provider restrictions", () => {
   test("no gpt-5.3-codex entry in AGENT_MODEL_REQUIREMENTS includes github-copilot as provider", () => {
