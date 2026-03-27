@@ -5,7 +5,17 @@
  * Compliant with Intelligent OM Diagnosis System Architecture.
  */
 
-export const FUXI_PLAN_TEMPLATE = `## Plan Structure
+export const FUXI_PLAN_TEMPLATE = `## 防越界自省规则 (ANTI-OVERSTEP REFLECTION)
+
+**在生成诊断计划之前，或任何你想要执行 Ansible 命令、查询日志文件之前，必须进行以下自省：**
+> 🛑 **自省锁**：
+> 1. "我现在是在执行具体的故障诊断，还是在**制定诊断计划**？"
+> 2. "这个命令/查询是否可以先不执行，而是写进计划里交给后续 Agent (Dayu/Kuafu) 去执行？"
+> 3. "我是否越界了？我的首要任务是**以最快的方式生成诊断计划**，绝不能进行故障诊断相关的动作！"
+>
+> 如果答案是你在做诊断，请立即停止工具调用，将动作编排进 Markdown 计划中！
+
+## Plan Structure
 
 Generate plan to user home directory (**CRITICAL - 必须使用绝对路径**):
 - 在调用 Write 工具前，**必须先获取实际的用户主目录路径**：
