@@ -537,7 +537,7 @@ export function createBaizeAgent(
 
   return {
     description:
-      "Baize (Root Cause Analysis) — Phase 1.4 \"白泽 / Baize - 根因分析\" agent for the Intelligent O&M Diagnosis System. Reads Dayu/Kuafu reports from $HOME/.dayu/report, aggregates evidence, infers root cause, assesses impact, and writes final RCA reports to $HOME/.baize/report. (Baize - WittyDiagnosisAgent)",
+      "Baize (Root Cause Analysis) — Phase 1.4 \"白泽 / Baize - 根因分析\" agent for the Intelligent O&M Diagnosis System. Reads Dayu/Kuafu reports from user home directory, aggregates evidence, infers root cause, assesses impact, and writes final RCA reports to ~/.witty-diagnosis-agent/baize/reports/. (Baize - WittyDiagnosisAgent)",
     mode: MODE,
     model,
     maxTokens: 32000,
@@ -551,3 +551,4 @@ export function createBaizeAgent(
   };
 }
 createBaizeAgent.mode = MODE;
+
