@@ -1,14 +1,17 @@
 #!/bin/bash
 # collect_audit.sh — 系统审计与日志安全采集脚本
 # 场景：审计日志缺失、rsyslog/auditd异常、日志被篡改、审计规则未生效
-# 用法：bash collect_audit.sh [keyword]
+# 用法：bash collect_audit.sh [keyword] [user]
+# user 可以是用户名（如 root）或 UID（如 0）
 
 KEYWORD="${1:-}"
+USER_FILTER="${2:-}"
 
 echo "════════════════════════════════════════════"
 echo " AUDIT/LOG DIAGNOSIS COLLECTOR"
 echo " 采集时间: $(date '+%Y-%m-%d %H:%M:%S')"
 echo " 关键词过滤: ${KEYWORD:-无}"
+echo " 用户过滤: ${USER_FILTER:-无}"
 echo "════════════════════════════════════════════"
 
 # ── 1. auditd 服务状态 ────────────────────────────
@@ -93,13 +96,27 @@ except Exception as e:
 # ── 6. 关键操作审计搜索 ──────────────────────────
 echo ""
 echo "── [6] 关键审计事件搜索（今日）──"
-echo "[特权命令执行]"
-ausearch -m execve -ts today 2>/dev/null | grep "uid=0" | tail -20 \
-    || grep "type=EXECVE" /var/log/audit/audit.log 2>/dev/null | tail -20
+if [ -n "$USER_FILTER" ]; then
+    echo "[针对用户/UID: $USER_FILTER 的命令执行]"
+    ausearch -m execve -ts today -ui "$USER_FILTER" 2>/dev/null | tail -20 \
+        || grep "type=EXECVE" /var/log/audit/audit.log 2>/dev/null | grep "$USER_FILTER" | tail -20
+else
+    echo "[特权命令执行]"
+    ausearch -m execve -ts today 2>/dev/null | grep "uid=0" | tail -20 \
+        || grep "type=EXECVE" /var/log/audit/audit.log 2>/dev/null | tail -20
+fi
+
 echo ""
-echo "[文件删除操作]"
-ausearch -m unlink,rename -ts today 2>/dev/null | tail -20 \
-    || grep "type=SYSCALL.*unlink\|rename" /var/log/audit/audit.log 2>/dev/null | tail -20
+if [ -n "$USER_FILTER" ]; then
+    echo "[针对用户/UID: $USER_FILTER 的文件删除操作]"
+    ausearch -m unlink,rename -ts today -ui "$USER_FILTER" 2>/dev/null | tail -20 \
+        || grep "type=SYSCALL.*unlink\|rename" /var/log/audit/audit.log 2>/dev/null | grep "$USER_FILTER" | tail -20
+else
+    echo "[文件删除操作]"
+    ausearch -m unlink,rename -ts today 2>/dev/null | tail -20 \
+        || grep "type=SYSCALL.*unlink\|rename" /var/log/audit/audit.log 2>/dev/null | tail -20
+fi
+
 echo ""
 if [ -n "$KEYWORD" ]; then
     echo "[关键词 '$KEYWORD' 审计搜索]"
