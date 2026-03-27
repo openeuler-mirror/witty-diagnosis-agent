@@ -1,8 +1,8 @@
 {
   "agents": {
-    "fuxi":  { "model": "deepseek/deepseek-chat" },
-    "dayu":  { "model": "deepseek/deepseek-chat" },
-    "kuafu": { "model": "deepseek/deepseek-chat" },
-    "baize": { "model": "deepseek/deepseek-chat" }
+    "fuxi":  {},
+    "dayu":  {},
+    "kuafu": {},
+    "baize": {}
   }
 }
