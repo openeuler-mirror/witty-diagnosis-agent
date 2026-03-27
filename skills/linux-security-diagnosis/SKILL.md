@@ -43,10 +43,10 @@ description: >
 
 | 场景编号 | 安全类别 | 典型症状关键词 | 采集脚本 |
 |---------|---------|-------------|---------|
-| S1 | 用户认证/登录安全 | 无法登录、SSH失败、账号锁定、LDAP/SSSD | `collect_auth.sh` |
+| S1 | 用户认证/登录安全 | 无法登录、SSH失败、账号锁定、LDAP/SSSD | `collect_auth.sh [username]` |
 | S2 | 权限控制 | 权限拒绝、无法访问文件、服务启动失败 | `collect_permission.sh` |
 | S3 | 防火墙与网络访问 | 端口不通、连接被拒、异常端口暴露 | `collect_network.sh` |
-| S4 | 系统审计/日志安全 | 日志缺失、auditd异常、日志被篡改 | `collect_audit.sh [keyword] [user/uid]` |
+| S4 | 系统审计/日志安全 | 日志缺失、auditd异常、日志被篡改 | `collect_audit.sh` |
 | S5 | 安全策略与防护 | SELinux拒绝、AppArmor异常、防护服务停止 | `collect_selinux.sh` |
 | S6 | 账户滥用/异常行为 | 异常登录、暴力破解告警、未授权提权 | `collect_account_abuse.sh` |
 | S7 | 内核/系统漏洞 | 内核模块异常、dmesg报错、补丁缺失 | `collect_kernel.sh` |
