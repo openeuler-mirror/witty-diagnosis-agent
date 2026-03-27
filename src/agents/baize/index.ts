@@ -290,10 +290,10 @@ Your primary workflow in this domain:
    - 产出一个结构化的 \`impact\` 对象（即使只是在文本中描述其字段：severity / affected_entities / time_window / business_impact）。  
 
 7. **1.4.6 诊断报告生成 (Report Generation - Structured Output)**  
-   - 生成一份面向人类可读的「根因分析报告」，并写入或更新：`~/.witty-diagnosis-agent/baize/reports/{timestamp}_{plan_id}_report.md`（或用户指定路径）。  
+   - 生成一份面向人类可读的「根因分析报告」，并写入或更新：\`~/.witty-diagnosis-agent/baize/reports/{timestamp}_{plan_id}_report.md\`（或用户指定路径）。  
    - 报告的格式和内容必须严格参考以下模板结构（你需要根据实际故障情况调整表格内容和链路图，但整体章节结构必须保持一致）：
 
-   ```markdown
+   \`\`\`markdown
    # 🔴 故障诊断报告
    
    > **报告编号**：[如：INC-2024-0001]  
@@ -331,7 +331,7 @@ Your primary workflow in this domain:
    
    ### 事故时间线 & 故障传导链路 
    
-   \`\`\`text 
+   \\\`\`\`text 
    [此处根据实际故障绘制时间线与性质，示例：]
    时间        事件                                          性质 
    ────────────────────────────────────────────────────────────── 
@@ -348,11 +348,11 @@ Your primary workflow in this domain:
      │         ↳ 监控告警触发，成功率跌至 0% 
      ▼ 
    [...依次向下直到故障恢复...]
-   \`\`\` 
+   \\\`\`\` 
    
    ### 故障因果链 
    
-   \`\`\`text 
+   \\\`\`\`text 
    [此处根据实际故障绘制因果树，示例：]
    用户请求量突增 
        └─► orders.status 无索引 → 全表扫描（500万行，耗时 >30s） 
@@ -361,7 +361,7 @@ Your primary workflow in this domain:
                                └─► 新请求等待超时（30s timeout） 
                                        └─► 支付接口批量返回 500 
                                                └─► 🔴 支付业务全量中断 
-   \`\`\` 
+   \\\`\`\` 
    
    --- 
    
@@ -399,16 +399,16 @@ Your primary workflow in this domain:
    > 🧪 假设：DB 连接池已满，新请求无法获取连接 
    
    **Step 1 — 确认连接池状态** 
-   \`\`\`sql 
+   \\\`\`\`sql 
    SHOW STATUS LIKE 'Threads_connected'; 
    -- 结果：100 / 100（已满） 
-   \`\`\` 
+   \\\`\`\` 
    
    **Step 3 — 定位问题 SQL** 
-   \`\`\`sql 
+   \\\`\`\`sql 
    EXPLAIN SELECT * FROM orders WHERE status = 1; 
    -- type=ALL → 全表扫描，rows=500万 → 单次耗时 >30s 
-   \`\`\` 
+   \\\`\`\` 
    
    **✅ 结论：\`orders.status\` 字段缺失索引，导致全表扫描，连接长期占用，最终连接池耗尽。** 
    
@@ -416,7 +416,7 @@ Your primary workflow in this domain:
    
    ### 3.3 排查结论 
    
-   \`\`\`text 
+   \\\`\`\`text 
    [绘制排查树，示例：]
    支付接口 500 
    ├─► 网络层                → ✅ 正常，排除 
@@ -426,7 +426,7 @@ Your primary workflow in this domain:
            └─► 慢查询堆积      → ❌ 80+ 线程卡住 
                    └─► 定位 SQL → ❌ orders.status 全表扫描 
                            └─► 🎯 根因确认：缺少索引 
-   \`\`\` 
+   \\\`\`\` 
    
    --- 
    
@@ -451,7 +451,7 @@ Your primary workflow in this domain:
    --- 
    
    *报告完成时间：[当前时间] | 审核人：[系统自动生成]* 
-   ```
+   \`\`\`
 
    - 在 Markdown 报告的末尾，必须追加一个 **有效 JSON 结构块**（说明使用 \`\`\`json 代码块包裹），总结本次 RCA 的结构化结果，字段示例：  
      - \`plan_id\`、\`timeline\`、\`hypotheses\`、\`verifications\`、\`evidence\`、\`evidence_chains\`、\`root_causes\`、\`impact\` 等。  
