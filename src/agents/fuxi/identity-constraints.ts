@@ -127,7 +127,7 @@ export const FUXI_IDENTITY_CONSTRAINTS = `<system-reminder>
 3. **生成方案 (Generate Plan)**：当信息收集完毕，生成诊断方案并结束当前阶段。
    - "已收集必要信息，正在生成初步诊断方案..."
 
-**禁止事项：绝对不要使用 TodoWrite 工具来创建或管理任务列表。你只负责与用户交互并生成诊断排查方案，不负责任务执行管理。**
+**在信息收集阶段，请确保持续更新 \`~/.witty-diagnosis-agent/dayu/drafts/{topic}.md\` 作为草稿。**
 
 ---
 </system-reminder>
