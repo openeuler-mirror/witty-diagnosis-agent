@@ -10,7 +10,7 @@ import {
   isOpenCodeInstalled,
   writeWittyConfig,
 } from "./config-manager"
-import { detectedToInitialValues, formatConfigSummary, SYMBOLS } from "./install-validators"
+import { detectedToInitialValues, formatConfigSummary, SYMBOLS, checkAnsibleInstalled } from "./install-validators"
 import { promptInstallConfig } from "./tui-install-prompts"
 
 import { installSkills } from "./install-skills"
@@ -20,6 +20,18 @@ export async function runTuiInstaller(args: InstallArgs, version: string): Promi
     console.error("Error: Interactive installer requires a TTY. Use --non-interactive or set environment variables directly.")
     return 1
   }
+
+  const spinner = p.spinner()
+  spinner.start("Checking Ansible installation")
+  const ansibleCheck = await checkAnsibleInstalled()
+  if (!ansibleCheck.installed) {
+    spinner.stop(`Ansible not found ${color.red("[X]")}`)
+    p.log.error("Ansible command not found. Please install Ansible before running this installer.")
+    p.note("Installation guide: https://docs.ansible.com/ansible/latest/installation_guide/", "Install Ansible")
+    p.outro(color.red("Installation aborted: missing prerequisite."))
+    return 1
+  }
+  spinner.stop(`Ansible ${ansibleCheck.version ?? "installed"} ${color.green("[OK]")}`)
 
   const detected = detectCurrentConfig()
   const isUpdate = detected.isInstalled
@@ -31,7 +43,6 @@ export async function runTuiInstaller(args: InstallArgs, version: string): Promi
     p.log.info(`Existing configuration detected: Claude=${initial.claude}, Gemini=${initial.gemini}`)
   }
 
-  const spinner = p.spinner()
   spinner.start("Checking OpenCode installation")
 
   const installed = await isOpenCodeInstalled()
