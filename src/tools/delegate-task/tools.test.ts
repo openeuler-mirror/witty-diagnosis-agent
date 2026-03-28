@@ -702,75 +702,7 @@ describe("sisyphus-task", () => {
       expect(result).toBeNull()
     })
 
-    test("blocks requiresModel when availability is known and missing the required model", () => {
-      // given
-      const categoryName = "deep"
-      const availableModels = new Set<string>(["anthropic/claude-opus-4-6"])
 
-      // when
-      const result = resolveCategoryConfig(categoryName, {
-        systemDefaultModel: SYSTEM_DEFAULT_MODEL,
-        availableModels,
-      })
-
-      // then
-      expect(result).toBeNull()
-    })
-
-    test("blocks requiresModel when availability is empty", () => {
-      // given
-      const categoryName = "deep"
-      const availableModels = new Set<string>()
-
-      // when
-      const result = resolveCategoryConfig(categoryName, {
-        systemDefaultModel: SYSTEM_DEFAULT_MODEL,
-        availableModels,
-      })
-
-      // then
-      expect(result).toBeNull()
-    })
-
-    test("bypasses requiresModel when explicit user config provided", () => {
-      // #given
-      const categoryName = "deep"
-      const availableModels = new Set<string>(["anthropic/claude-opus-4-6"])
-      const userCategories = {
-        deep: { model: "anthropic/claude-opus-4-6" },
-      }
-
-      // #when
-      const result = resolveCategoryConfig(categoryName, {
-        systemDefaultModel: SYSTEM_DEFAULT_MODEL,
-        availableModels,
-        userCategories,
-      })
-
-      // #then
-      expect(result).not.toBeNull()
-      expect(result!.config.model).toBe("anthropic/claude-opus-4-6")
-    })
-
-    test("bypasses requiresModel when explicit user config provided even with empty availability", () => {
-      // #given
-      const categoryName = "deep"
-      const availableModels = new Set<string>()
-      const userCategories = {
-        deep: { model: "anthropic/claude-opus-4-6" },
-      }
-
-      // #when
-      const result = resolveCategoryConfig(categoryName, {
-        systemDefaultModel: SYSTEM_DEFAULT_MODEL,
-        availableModels,
-        userCategories,
-      })
-
-      // #then
-      expect(result).not.toBeNull()
-      expect(result!.config.model).toBe("anthropic/claude-opus-4-6")
-    })
 
     test("returns default model from DEFAULT_CATEGORIES for builtin category", () => {
       // given

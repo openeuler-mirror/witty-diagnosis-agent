@@ -3,7 +3,7 @@ import type { BuiltinAgentName, AgentOverrides, AgentPromptMetadata } from "../t
 import type { CategoryConfig, GitMasterConfig } from "../../config/schema"
 import type { BrowserAutomationProvider } from "../../config/schema"
 import type { AvailableAgent } from "../dynamic-agent-prompt-builder"
-import { AGENT_MODEL_REQUIREMENTS, isModelAvailable } from "../../shared"
+import { AGENT_MODEL_REQUIREMENTS } from "../../shared"
 import { buildAgent, isFactory } from "../agent-builder"
 import { applyOverrides } from "./agent-overrides"
 import { applyModelResolution } from "./model-resolution"
@@ -51,13 +51,6 @@ export function collectPendingBuiltinAgents(input: {
     const override = agentOverrides[agentName]
       ?? Object.entries(agentOverrides).find(([key]) => key.toLowerCase() === agentName.toLowerCase())?.[1]
     const requirement = AGENT_MODEL_REQUIREMENTS[agentName]
-
-    // Check if agent requires a specific model
-    if (requirement?.requiresModel && availableModels) {
-      if (!isModelAvailable(requirement.requiresModel, availableModels)) {
-        continue
-      }
-    }
 
     const isPrimaryAgent = isFactory(source) && source.mode === "primary"
 

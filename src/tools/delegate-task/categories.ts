@@ -1,7 +1,6 @@
 import type { CategoryConfig, CategoriesConfig } from "../../config/schema"
 import { DEFAULT_CATEGORIES, CATEGORY_PROMPT_APPENDS } from "./constants"
 import { resolveModel } from "../../shared/model-resolver"
-import { isModelAvailable } from "../../shared/model-availability"
 import { CATEGORY_MODEL_REQUIREMENTS } from "../../shared/model-requirements"
 import { log } from "../../shared/logger"
 
@@ -36,13 +35,6 @@ export function resolveCategoryConfig(
     return null
   }
 
-  const categoryReq = CATEGORY_MODEL_REQUIREMENTS[categoryName]
-  if (categoryReq?.requiresModel && availableModels && !hasExplicitUserConfig) {
-    if (!isModelAvailable(categoryReq.requiresModel, availableModels)) {
-      log(`[resolveCategoryConfig] Category ${categoryName} requires ${categoryReq.requiresModel} but not available`)
-      return null
-    }
-  }
   const defaultPromptAppend = CATEGORY_PROMPT_APPENDS[categoryName] ?? ""
 
   if (!defaultConfig && !userConfig) {

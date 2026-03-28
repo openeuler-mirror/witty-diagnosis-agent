@@ -45,27 +45,7 @@ export async function resolveCategoryExecution(
   })
 
   if (!resolved) {
-    const requirement = CATEGORY_MODEL_REQUIREMENTS[categoryName]
     const allCategoryNames = Object.keys(enabledCategories).join(", ")
-
-    if (categoryExists && requirement?.requiresModel) {
-      return {
-        agentToUse: "",
-        categoryModel: undefined,
-        categoryPromptAppend: undefined,
-        maxPromptTokens: undefined,
-        modelInfo: undefined,
-        actualModel: undefined,
-        isUnstableAgent: false,
-        error: `Category "${categoryName}" requires model "${requirement.requiresModel}" which is not available.
-
-To use this category:
-1. Connect a provider with this model: ${requirement.requiresModel}
-2. Or configure an alternative model in your witty-diagnosis-agent.json for this category
-
-Available categories: ${allCategoryNames}`,
-      }
-    }
 
     return {
       agentToUse: "",

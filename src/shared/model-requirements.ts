@@ -7,7 +7,6 @@ export type FallbackEntry = {
 export type ModelRequirement = {
   fallbackChain: FallbackEntry[]
   variant?: string // Default variant (used when entry doesn't specify one)
-  requiresModel?: string // If set, only activates when this model is available (fuzzy match)
   requiresAnyModel?: boolean // If true, requires at least ONE model in fallbackChain to be available (or empty availability treated as unavailable)
   requiresProvider?: string[] // If set, only activates when any of these providers is connected
 }
@@ -76,7 +75,6 @@ export const CATEGORY_MODEL_REQUIREMENTS: Record<string, ModelRequirement> = {
       { providers: ["anthropic", "github-copilot", "opencode"], model: "claude-opus-4-6", variant: "max" },
       { providers: ["google", "github-copilot", "opencode"], model: "gemini-3.1-pro", variant: "high" },
     ],
-    requiresModel: "gpt-5.3-codex",
   },
   artistry: {
     fallbackChain: [
@@ -84,7 +82,6 @@ export const CATEGORY_MODEL_REQUIREMENTS: Record<string, ModelRequirement> = {
       { providers: ["anthropic", "github-copilot", "opencode"], model: "claude-opus-4-6", variant: "max" },
       { providers: ["openai", "github-copilot", "opencode"], model: "gpt-5.2" },
     ],
-    requiresModel: "gemini-3.1-pro",
   },
   quick: {
     fallbackChain: [

@@ -9,7 +9,6 @@ import { toProviderAvailability } from "./provider-availability"
 import {
 	getSisyphusFallbackChain,
 	isAnyFallbackEntryAvailable,
-	isRequiredModelAvailable,
 	isRequiredProviderAvailable,
 	resolveModelFromChain,
 } from "./fallback-chain-resolution"
@@ -83,9 +82,6 @@ export function generateModelConfig(config: InstallConfig): GeneratedWittyConfig
       continue
     }
 
-    if (req.requiresModel && !isRequiredModelAvailable(req.requiresModel, req.fallbackChain, avail)) {
-      continue
-    }
     if (req.requiresProvider && !isRequiredProviderAvailable(req.requiresProvider, avail)) {
       continue
     }
@@ -106,9 +102,6 @@ export function generateModelConfig(config: InstallConfig): GeneratedWittyConfig
         ? CLI_CATEGORY_MODEL_REQUIREMENTS["unspecified-low"].fallbackChain
         : req.fallbackChain
 
-    if (req.requiresModel && !isRequiredModelAvailable(req.requiresModel, req.fallbackChain, avail)) {
-      continue
-    }
     if (req.requiresProvider && !isRequiredProviderAvailable(req.requiresProvider, avail)) {
       continue
     }
