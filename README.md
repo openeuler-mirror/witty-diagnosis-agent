@@ -43,6 +43,9 @@ Witty 智能诊断 Agent 采用“Agent-Skill-工具-知识”四层解耦架构
 
 - 运行环境：Bun（推荐）或 Node.js
 - 依赖工具：已安装[OpenCode](https://opencode.ai/)
+- 依赖工具：已安装 [Ansible](https://docs.ansible.com/ansible/latest/installation_guide/)（`ansible` 命令须在系统 PATH 中可用，可通过 `ansible --version` 提前验证）
+
+> ⚠️ **注意**：执行 `witty-diagnosis-agent install` 前，请确保本地已完成 Ansible 的安装与环境配置，否则安装程序将直接终止。
 
 #### 安装与配置
 

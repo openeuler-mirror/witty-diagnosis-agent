@@ -12,6 +12,7 @@ import {
 import {
   SYMBOLS,
   argsToConfig,
+  checkAnsibleInstalled,
   detectedToInitialValues,
   formatConfigSummary,
   printBox,
@@ -41,6 +42,16 @@ export async function runCliInstaller(args: InstallArgs, version: string): Promi
     console.log()
     return 1
   }
+
+  const ansibleCheck = await checkAnsibleInstalled()
+  if (!ansibleCheck.installed) {
+    printHeader(false)
+    printError("Ansible command not found. Please install Ansible before running this installer.")
+    printInfo("Installation guide: https://docs.ansible.com/ansible/latest/installation_guide/")
+    console.log()
+    return 1
+  }
+  printSuccess(`Ansible ${ansibleCheck.version ?? ""} detected`)
 
   const detected = detectCurrentConfig()
   const isUpdate = detected.isInstalled

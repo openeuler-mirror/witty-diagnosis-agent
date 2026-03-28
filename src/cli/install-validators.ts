@@ -1,4 +1,6 @@
+import which from "which"
 import color from "picocolors"
+import { spawnWithWindowsHide } from "../shared/spawn-with-windows-hide"
 import type {
   BooleanArg,
   ClaudeSubscription,
@@ -185,5 +187,23 @@ export function detectedToInitialValues(detected: DetectedConfig): {
     opencodeZen: detected.hasOpencodeZen ? "yes" : "no",
     zaiCodingPlan: detected.hasZaiCodingPlan ? "yes" : "no",
     kimiForCoding: detected.hasKimiForCoding ? "yes" : "no",
+  }
+}
+
+export async function checkAnsibleInstalled(): Promise<{
+  installed: boolean
+  version: string | null
+  path: string | null
+}> {
+  try {
+    const path = which.sync("ansible", { nothrow: true })
+    if (!path) return { installed: false, version: null, path: null }
+    const proc = spawnWithWindowsHide(["ansible", "--version"], { stdout: "pipe", stderr: "pipe" })
+    const output = await new Response(proc.stdout).text()
+    await proc.exited
+    const version = proc.exitCode === 0 ? (output.trim().split("\n")[0] ?? null) : null
+    return { installed: true, version, path }
+  } catch {
+    return { installed: false, version: null, path: null }
   }
 }

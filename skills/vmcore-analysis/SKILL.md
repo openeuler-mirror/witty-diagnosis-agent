@@ -16,14 +16,13 @@ pcie_panic/     # 故障文件夹
 ├── src/        # 可选，源码路径，如果存在则要针对问题进行源码分析 
 ├── crash       # crash命令 
 ├── vmlinux     # vmlinux命令  
-└── vmcore_log/ # 包含vmcore文件以及其他文件的目录
-    └── vmcore  # 崩溃转储文件
+└── vmcore      # vmcore文件
 ```
 
 **执行命令：**
 
 ```bash
-cd pcie_panic && ./crash ./vmlinux vmcore_log/vmcore
+cd pcie_panic && ./crash ./vmlinux vmcore
 ```
 
 ## 核心理念：区分分析场景
@@ -472,8 +471,7 @@ crash> struct task_struct.state,comm,parent <addr> # [推荐] 只看关键字段
 │       └── Kconfig                   # 配置定义
 ├── crash                             # crash 命令
 ├── vmlinux                           # 内核镜像
-└── vmcore_log/
-    └── vmcore                        # 崩溃转储文件
+└── vmcore                            # vmcore文件
 ```
 
 #### 4B-2. 源码分析的核心价值
