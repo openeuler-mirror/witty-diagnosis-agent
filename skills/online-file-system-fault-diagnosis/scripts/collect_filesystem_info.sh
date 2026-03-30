@@ -75,7 +75,7 @@ if [ -z "$OUTPUT_DIR" ]; then
         [ "$mount_point" = "/boot/efi" ] && continue
         [ "$mount_point" = "/tmp" ] && continue
         
-        usage=$(df "$mount_point" 2>/dev/null | awk 'NR==2 {gsub("%","",$5); print $5}')
+        usage=$(df "$mount_point" 2>/dev/null | awk 'NR==2 {gsub("%","",$5); print $5+0}')
         [ -z "$usage" ] && continue
         [ "$usage" -ge 98 ] && continue
         
@@ -148,7 +148,7 @@ df -hT 2>/dev/null
 echo ""
 echo "--- 空间使用诊断 ---"
 df -h 2>/dev/null | awk 'NR>1 {
-    usage=$5; gsub("%","",usage);
+    usage=$5; gsub("%","",usage); usage=usage+0;
     mount=$NF;
     if (usage >= 95) {
         print "⚠️  CRITICAL: " $1 " 挂载点 " mount " 使用率 " usage "%，空间即将耗尽！"
@@ -161,7 +161,7 @@ df -h 2>/dev/null | awk 'NR>1 {
 
 echo ""
 echo "--- 各分区大文件/目录分析（Top 10）---"
-for mount in $(df -h 2>/dev/null | awk 'NR>1 && $5 ~ /[0-9]+/ {gsub("%","",$5); if($5>70) print $NF}'); do
+for mount in $(df -h 2>/dev/null | awk 'NR>1 && $5 ~ /[0-9]+/ {gsub("%","",$5); if($5+0>70) print $NF}'); do
     echo ""
     echo "挂载点: $mount"
     du -h --max-depth=2 "$mount" 2>/dev/null | sort -rh | head -10 || echo "无法访问"
@@ -180,7 +180,7 @@ df -i 2>/dev/null
 echo ""
 echo "--- inode 使用诊断 ---"
 df -i 2>/dev/null | awk 'NR>1 {
-    usage=$5; gsub("%","",usage);
+    usage=$5; gsub("%","",usage); usage=usage+0;
     mount=$NF;
     if (usage >= 95) {
         print "⚠️  CRITICAL: " $1 " 挂载点 " mount " inode 使用率 " usage "%，无法创建新文件！"
@@ -193,7 +193,7 @@ df -i 2>/dev/null | awk 'NR>1 {
 
 echo ""
 echo "--- inode 耗尽分区的小文件分布分析 ---"
-for mount in $(df -i 2>/dev/null | awk 'NR>1 && $5 ~ /[0-9]+/ {gsub("%","",$5); if($5>70) print $NF}'); do
+for mount in $(df -i 2>/dev/null | awk 'NR>1 && $5 ~ /[0-9]+/ {gsub("%","",$5); if($5+0>70) print $NF}'); do
     echo ""
     echo "挂载点: $mount"
     echo "目录文件数量统计（Top 10）："
@@ -223,7 +223,7 @@ echo ""
 echo "--- IO 性能诊断 ---"
 if command -v iostat &>/dev/null; then
     iostat -x 2>/dev/null | awk 'NR>3 && $1 ~ /^(sd|vd|nvme|hd|dm)[a-z]*[0-9]*$/ {
-        util=$NF; gsub("%","",util);
+        util=$NF; gsub("%","",util); util=util+0;
         if (util >= 90) {
             print "⚠️  CRITICAL: 磁盘 " $1 " 利用率 " util "%，IO 瓶颈！"
         } else if (util >= 70) {
