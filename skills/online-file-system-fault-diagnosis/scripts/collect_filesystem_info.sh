@@ -304,7 +304,9 @@ for file in "${CRITICAL_FILES[@]}"; do
                 [ "$perms" != "644" ] && echo "  ⚠️  权限异常，应为 644"
                 ;;
             /etc/shadow)
-                [ "$perms" != "000" ] && [ "$perms" != "640" ] && echo "  ⚠️  权限异常，应为 000 或 640"
+                if [ "$perms" != "000" ] && [ "$perms" != "0" ] && [ "$perms" != "640" ]; then
+                    echo "  ⚠️  权限异常，应为 000 或 640"
+                fi
                 ;;
         esac
     else
