@@ -1,34 +1,12 @@
 #!/usr/bin/env bash
-# =============================================================================
-# generate_report.sh — 文件系统诊断报告汇总生成脚本（离线分析）
-#
-# 用途：汇总前序各阶段分析的输出（scene_classifier.py / diagnose_*.py），
-#       生成结构化的最终诊断报告，包含故障摘要、证据链、根本原因和修复建议。
-#       本脚本仅基于已有的日志文件生成报告，不执行任何在线系统命令。
-#
-# 参数：
-#   --output    PATH    最终报告路径（默认：./fs_diagnosis_report_<timestamp>.md）
-#   --scene     PATH    scene_classifier.py 的场景结果文件（默认：/tmp/fs_diagnosis_scene.conf）
-#   --analysis  PATH    diagnose_*.py 的输出文件（可选，支持多个，用逗号分隔）
-#   --config    PATH    环境配置文件（默认：/tmp/fs_diagnosis_env.conf）
-#
-# 使用示例：
-#   ./generate_report.sh --output ./fs_diagnosis_report.md
-#   ./generate_report.sh \
-#       --analysis /tmp/diagnose_fs_corruption_xxx.txt \
-#       --output ./final_report.md
-# =============================================================================
-
 set -euo pipefail
 
-# ---------- 默认值 ----------
 TIMESTAMP=$(date +%Y%m%d_%H%M%S)
 OUTPUT_FILE="./fs_diagnosis_report_${TIMESTAMP}.md"
 SCENE_CONF="/tmp/fs_diagnosis_scene.conf"
 ANALYSIS_FILES=""
 ENV_CONF="/tmp/fs_diagnosis_env.conf"
 
-# ---------- 参数解析 ----------
 while [[ $# -gt 0 ]]; do
     case "$1" in
         --output)    OUTPUT_FILE="$2";   shift 2 ;;
@@ -39,18 +17,15 @@ while [[ $# -gt 0 ]]; do
     esac
 done
 
-# ---------- 加载环境配置 ----------
 if [[ -f "$ENV_CONF" ]]; then source "$ENV_CONF"; fi
 LOG_DIR="${LOG_DIR:-.}"
 
-# ---------- 加载场景标签 ----------
 SCENE="UNKNOWN"
 CONFIDENCE="UNKNOWN"
 if [[ -f "$SCENE_CONF" ]]; then
     source "$SCENE_CONF"
 fi
 
-# ---------- 辅助函数 ----------
 read_log() {
     local log_name="$1"
     local file_path="$LOG_DIR/$log_name"
@@ -59,13 +34,13 @@ read_log() {
     fi
 }
 
-# ---------- 生成报告 ----------
 {
     cat <<EOF
-# Linux 文件系统诊断报告
+# 存储诊断报告（磁盘硬件 & 文件系统）
 
 > 生成时间：$(date)
 > 日志目录：$LOG_DIR
+> 场景标签：$SCENE（置信度：$CONFIDENCE）
 
 ---
 
@@ -85,15 +60,19 @@ read_log() {
 
 EOF
 
-    # 列出可用的日志文件
-    echo "| 日志文件 | 状态 |"
-    echo "|----------|------|"
-    for log_file in kernel_dmesg.log systemd_boot.log fsck_check.log system_messages.log disk_layout_lsblk.log disk_uuid_blkid.log mount_config_fstab.log disk_health_smart.log; do
-        if [[ -f "$LOG_DIR/$log_file" ]]; then
-            lines=$(wc -l < "$LOG_DIR/$log_file" 2>/dev/null || echo "0")
-            echo "| $log_file | ✅ 存在（$lines 行） |"
-        else
-            echo "| $log_file | ❌ 不存在 |"
+    echo "| 日志目录 | 文件 | 状态 |"
+    echo "|----------|------|------|"
+    
+    for sub_dir in "ibmc_logs" "infocollect_logs" "messages"; do
+        DIR_PATH="$LOG_DIR/$sub_dir"
+        if [[ -d "$DIR_PATH" ]]; then
+            for file in "$DIR_PATH"/*; do
+                if [[ -f "$file" ]]; then
+                    filename=$(basename "$file")
+                    lines=$(wc -l < "$file" 2>/dev/null || echo "0")
+                    echo "| $sub_dir/ | $filename | ✅ $lines 行 |"
+                fi
+            done
         fi
     done
     echo ""
@@ -103,15 +82,18 @@ EOF
 ### 2.2 故障现象（Symptom）
 
 > 描述用户观察到的故障现象。示例：
-> 系统启动时挂载 /data 分区失败，导致依赖该分区的服务无法启动。
+> - 文件系统损坏：系统启动时报 EXT4-fs error，无法挂载 /data 分区
+> - 挂载失败：systemd 启动时报 Failed to mount /dev/sdb1
+> - 空间不足：系统报 No space left on device
 
 **（请根据实际情况填写）**
 
 ### 2.3 故障机理（Failure Mechanism）
 
 > 描述故障是如何发生的。示例：
-> /dev/sdb1 的 EXT4 文件系统超级块损坏，导致内核无法识别文件系统类型，
-> systemd 尝试挂载时失败，进而导致依赖该挂载点的服务启动失败。
+> - 文件系统损坏：异常断电导致正在写入的 inode 元数据未完整落盘，造成文件系统不一致
+> - 挂载失败：/etc/fstab 中配置的 UUID 与实际设备 UUID 不匹配
+> - 空间不足：日志文件持续增长占满磁盘空间
 
 **（请根据分析结果填写）**
 
@@ -119,7 +101,6 @@ EOF
 
 EOF
 
-    # 嵌入各阶段分析文件内容（若有）
     if [[ -n "$ANALYSIS_FILES" ]]; then
         IFS=',' read -ra FILES <<< "$ANALYSIS_FILES"
         idx=1
@@ -139,14 +120,14 @@ EOF
 请按以下格式填写每条证据：
 
 **E1：[证据标题，如：文件系统损坏证据]**
-- 日志文件：kernel_dmesg.log
+- 日志文件：messages/messages 或 infocollect_logs/system/dmesg.txt
 - 关键信息：`EXT4-fs error (device sdb1): ext4_find_entry: inode #12345: reading directory`
 - 结论：EXT4 文件系统 /dev/sdb1 的 inode #12345 目录项损坏
 
-**E2：[证据标题，如：fsck 检查结果]**
-- 日志文件：fsck_check.log
-- 关键信息：`Inode 12345, i_size is 0, should be 4096. Fix? yes`
-- 结论：fsck 检测并修复了 inode #12345 的大小错误
+**E2：[证据标题，如：挂载失败证据]**
+- 日志文件：messages/messages
+- 关键信息：`mount: wrong fs type, bad option, bad superblock on /dev/sdb1`
+- 结论：/dev/sdb1 挂载失败，可能是文件系统类型不匹配或超级块损坏
 
 （继续添加 E3、E4... 直到证据链完整）
 EOF
@@ -217,6 +198,7 @@ EOF
 - [ ] 提议的修复方案能防止此类问题再次发生
 - [ ] 检查了系统中其他设备是否存在相同问题
 - [ ] 根因陈述避免了笼统描述
+- [ ] 已排除硬件故障因素（检查 SMART、SEL 日志）
 
 **若有任何未勾选项，必须继续深入分析。**
 
@@ -228,18 +210,23 @@ EOF
 
 EOF
 
-    # 嵌入关键日志片段
-    echo "#### kernel_dmesg.log（前 50 行）"
-    echo '```'
-    read_log "kernel_dmesg.log"
-    echo '```'
-    echo ""
-
-    echo "#### systemd_boot.log（前 50 行）"
-    echo '```'
-    read_log "systemd_boot.log"
-    echo '```'
-    echo ""
+    for sub_dir in "ibmc_logs" "infocollect_logs" "messages"; do
+        DIR_PATH="$LOG_DIR/$sub_dir"
+        if [[ -d "$DIR_PATH" ]]; then
+            for file in "$DIR_PATH"/*; do
+                if [[ -f "$file" ]]; then
+                    filename=$(basename "$file")
+                    if [[ "$filename" =~ \.(txt|log|messages|syslog|dmesg)$ ]] || [[ "$filename" == "messages" ]] || [[ "$filename" == "syslog" ]] || [[ "$filename" == "dmesg" ]]; then
+                        echo "#### $sub_dir/$filename（前 50 行）"
+                        echo '```'
+                        head -50 "$file"
+                        echo '```'
+                        echo ""
+                    fi
+                fi
+            done
+        fi
+    done
 
     cat <<'EOF'
 
@@ -261,6 +248,9 @@ mount | column -t
 # 查看磁盘使用
 df -h
 df -i
+
+# 查看文件系统类型
+blkid
 ```
 
 **⚠️ 注意：以上命令仅供参考，需在原故障系统上执行，本 Skill 仅进行离线日志分析。**
@@ -274,7 +264,7 @@ EOF
 } > "$OUTPUT_FILE"
 
 echo "================================================================"
-echo "✅ 文件系统诊断报告框架已生成：$OUTPUT_FILE"
+echo "✅ 存储诊断报告框架已生成：$OUTPUT_FILE"
 echo ""
 echo "  下一步："
 echo "  1. 用文本编辑器打开报告，填写 §2.2、§2.3、§2.4、§3、§4"
