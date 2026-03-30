@@ -13,6 +13,11 @@
 #   -m <挂载点> 指定挂载点路径（如 /data、/home）
 #   -p <PID>    指定进程 ID（用于分析进程 IO 行为）
 #
+# 输出模式（自动回退）:
+#   - 优先尝试 /tmp 目录
+#   - 若 /tmp 不可写，扫描所有挂载点找可写磁盘
+#   - 若所有磁盘均不可写（空间不足/只读/inode耗尽），则仅输出到标准输出
+#
 # 使用示例:
 #   bash collect_filesystem_info.sh -S "2024-01-15 14:00:00" -E "2024-01-15 15:00:00"
 #   bash collect_filesystem_info.sh -S "2024-01-15 14:00:00" -m /data
@@ -23,9 +28,11 @@ START_TIME=""; END_TIME=""; TARGET_MOUNT=""; TARGET_PID=""
 
 while getopts ":S:E:m:p:h" opt; do
     case $opt in
-        S) START_TIME="$OPTARG" ;; E) END_TIME="$OPTARG" ;;
-        m) TARGET_MOUNT="$OPTARG" ;; p) TARGET_PID="$OPTARG" ;;
-        h) sed -n '3,20p' "$0" | sed 's/^# \{0,2\}//'; exit 0 ;;
+        S) START_TIME="$OPTARG" ;; 
+        E) END_TIME="$OPTARG" ;;
+        m) TARGET_MOUNT="$OPTARG" ;; 
+        p) TARGET_PID="$OPTARG" ;;
+        h) sed -n '3,21p' "$0" | sed 's/^# \{0,2\}//'; exit 0 ;;
         :) echo "错误: -$OPTARG 需要参数值"; exit 1 ;;
     esac
 done
@@ -39,9 +46,56 @@ if [ -n "$START_TIME" ] && [ -z "$END_TIME" ]; then
     echo "ℹ️  未指定 -E，自动设为 +1h: $END_TIME"
 fi
 
-OUTPUT_DIR="/tmp/fs_diag_$(date +%Y%m%d_%H%M%S)"
-mkdir -p "$OUTPUT_DIR"
-exec > >(tee "$OUTPUT_DIR/collect.log") 2>&1
+OUTPUT_DIR=""
+
+try_write_dir() {
+    local dir="$1"
+    local base_dir
+    base_dir=$(dirname "$dir")
+    
+    if [ -d "$base_dir" ] && [ -w "$base_dir" ]; then
+        if mkdir -p "$dir" 2>/dev/null; then
+            if touch "$dir/.write_test" 2>/dev/null && rm -f "$dir/.write_test" 2>/dev/null; then
+                OUTPUT_DIR="$dir"
+                return 0
+            else
+                rmdir "$dir" 2>/dev/null
+            fi
+        fi
+    fi
+    return 1
+}
+
+try_write_dir "/tmp/fs_diag_$(date +%Y%m%d_%H%M%S)"
+
+if [ -z "$OUTPUT_DIR" ]; then
+    for mount_point in $(df -t ext2,ext3,ext4,xfs,btrfs,tmpfs --output=target 2>/dev/null | tail -n +2 | sort -u); do
+        [ "$mount_point" = "/" ] && continue
+        [ "$mount_point" = "/boot" ] && continue
+        [ "$mount_point" = "/boot/efi" ] && continue
+        [ "$mount_point" = "/tmp" ] && continue
+        
+        usage=$(df "$mount_point" 2>/dev/null | awk 'NR==2 {gsub("%","",$5); print $5}')
+        [ -z "$usage" ] && continue
+        [ "$usage" -ge 98 ] && continue
+        
+        test_dir="$mount_point/.fs_diag_$(date +%Y%m%d_%H%M%S)"
+        if try_write_dir "$test_dir"; then
+            break
+        fi
+    done
+fi
+
+if [ -n "$OUTPUT_DIR" ]; then
+    LOG_FILE_MODE="file"
+    fs_type=$(df -T "$OUTPUT_DIR" 2>/dev/null | awk 'NR==2 {print $2}')
+    mount_point=$(df "$OUTPUT_DIR" 2>/dev/null | awk 'NR==2 {print $NF}')
+    echo "ℹ️  日志输出目录: $OUTPUT_DIR (${fs_type:-未知}, 挂载点: ${mount_point:-未知})"
+    exec > >(tee "$OUTPUT_DIR/collect.log" 2>/dev/null || cat) 2>&1
+else
+    LOG_FILE_MODE="stdout_only"
+    echo "⚠️  所有磁盘均不可写（空间不足/只读/inode耗尽），仅输出到标准输出"
+fi
 
 if [ -n "$TARGET_MOUNT" ]; then
     FILTER_DESC="指定挂载点: $TARGET_MOUNT"
@@ -168,7 +222,7 @@ fi
 echo ""
 echo "--- IO 性能诊断 ---"
 if command -v iostat &>/dev/null; then
-    iostat -x 2>/dev/null | awk 'NR>3 && $1 ~ /[a-z]+/ {
+    iostat -x 2>/dev/null | awk 'NR>3 && $1 ~ /^(sd|vd|nvme|hd|dm)[a-z]*[0-9]*$/ {
         util=$NF; gsub("%","",util);
         if (util >= 90) {
             print "⚠️  CRITICAL: 磁盘 " $1 " 利用率 " util "%，IO 瓶颈！"
@@ -260,39 +314,52 @@ done
 
 echo ""
 echo "=== [4.2] 核心动态库检查 ==="
-echo "动态链接库缓存已保存到日志文件"
-echo ""
-ldconfig -p 2>/dev/null >> "$OUTPUT_DIR/collect.log"
+echo "动态链接库缓存："
+ldconfig -p 2>/dev/null | head -20
 
 echo ""
 echo "--- 核心库文件检查 ---"
-CORE_LIBS=(
-    "/lib64/libc.so.6"
-    "/lib64/libm.so.6"
-    "/lib64/libpthread.so.0"
-    "/lib64/libdl.so.2"
-    "/lib64/ld-linux-x86-64.so.2"
-    "/lib64/librt.so.1"
-    "/lib64/libcrypt.so.1"
+CORE_LIB_NAMES=(
+    "libc.so.6"
+    "libm.so.6"
+    "libpthread.so.0"
+    "libdl.so.2"
+    "librt.so.1"
 )
 
-for lib in "${CORE_LIBS[@]}"; do
-    if [ -f "$lib" ]; then
-        perms=$(stat -c "%a" "$lib" 2>/dev/null)
-        size=$(stat -c "%s" "$lib" 2>/dev/null)
-        echo "$lib | 权限: $perms | 大小: $size bytes"
+for lib_name in "${CORE_LIB_NAMES[@]}"; do
+    lib_path=$(ldconfig -p 2>/dev/null | grep -m1 "$lib_name" | awk '{print $NF}')
+    if [ -n "$lib_path" ] && [ -f "$lib_path" ]; then
+        perms=$(stat -c "%a" "$lib_path" 2>/dev/null)
+        size=$(stat -c "%s" "$lib_path" 2>/dev/null)
+        echo "$lib_name -> $lib_path | 权限: $perms | 大小: $size bytes"
         
         if [ "$perms" != "755" ] && [ "$perms" != "555" ]; then
             echo "  ⚠️  权限异常，应为 755 或 555"
         fi
         
-        if ! file "$lib" 2>/dev/null | grep -q "shared object"; then
+        if ! file "$lib_path" 2>/dev/null | grep -q "shared object"; then
             echo "  ⚠️  文件类型异常"
         fi
     else
-        echo "⚠️  $lib 不存在！"
+        echo "⚠️  $lib_name 未在 ldconfig 缓存中找到"
     fi
 done
+
+echo ""
+echo "--- 动态链接器检查 ---"
+LD_SO=$(find /lib* /lib64 -name "ld-linux*.so*" -type f 2>/dev/null | head -1)
+if [ -n "$LD_SO" ] && [ -f "$LD_SO" ]; then
+    perms=$(stat -c "%a" "$LD_SO" 2>/dev/null)
+    size=$(stat -c "%s" "$LD_SO" 2>/dev/null)
+    echo "动态链接器: $LD_SO | 权限: $perms | 大小: $size bytes"
+    
+    if [ "$perms" != "755" ] && [ "$perms" != "555" ]; then
+        echo "  ⚠️  权限异常，应为 755 或 555"
+    fi
+else
+    echo "⚠️  未找到动态链接器"
+fi
 
 echo ""
 echo "=== [4.3] 二进制文件执行测试 ==="
@@ -487,15 +554,17 @@ echo "=== [9.4] NFS 挂载状态（如有）==="
 mount 2>/dev/null | grep nfs
 
 # ================================================================
-# 保存完整日志
+# 保存完整日志（仅文件模式）
 # ================================================================
-dmesg -T 2>/dev/null > "$OUTPUT_DIR/dmesg_full.txt"
-echo ""
-echo "完整内核日志已保存到: $OUTPUT_DIR/dmesg_full.txt"
+if [ -n "$OUTPUT_DIR" ] && [ "$LOG_FILE_MODE" = "file" ]; then
+    dmesg -T 2>/dev/null > "$OUTPUT_DIR/dmesg_full.txt"
+    echo ""
+    echo "完整内核日志已保存到: $OUTPUT_DIR/dmesg_full.txt"
 
-if [ -n "$HAS_JOURNAL" ]; then
-    journalctl -k --no-pager 2>/dev/null > "$OUTPUT_DIR/journal_kernel.txt"
-    echo "完整 journal 内核日志已保存到: $OUTPUT_DIR/journal_kernel.txt"
+    if [ -n "$HAS_JOURNAL" ]; then
+        journalctl -k --no-pager 2>/dev/null > "$OUTPUT_DIR/journal_kernel.txt"
+        echo "完整 journal 内核日志已保存到: $OUTPUT_DIR/journal_kernel.txt"
+    fi
 fi
 
 # ================================================================
@@ -505,18 +574,28 @@ section "收集完成"
 echo ""
 echo "✅ 全量信息收集完成！"
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-echo "📁 输出目录 : $OUTPUT_DIR"
+
+if [ "$LOG_FILE_MODE" = "stdout_only" ]; then
+    echo "📤 输出模式: 仅标准输出（文件系统不可写回退）"
+    echo ""
+    echo "提示: 日志已直接输出到终端，可通过 Ansible/SSH 捕获保存"
+else
+    echo "📁 输出目录 : ${OUTPUT_DIR:-无（仅终端输出）}"
+    echo ""
+    if [ -n "$OUTPUT_DIR" ] && [ "$LOG_FILE_MODE" = "file" ]; then
+        echo "文件输出详情："
+        echo "  - $OUTPUT_DIR/dmesg_full.txt       (完整内核日志)"
+        echo "  - $OUTPUT_DIR/journal_kernel.txt   (journal 内核日志)"
+        echo "  - $OUTPUT_DIR/collect.log          (本次收集完整日志)"
+    fi
+fi
+
 echo ""
-echo "终端输出摘要："
+echo "收集内容摘要："
 echo "  - 磁盘空间使用情况与诊断"
 echo "  - inode 使用情况与诊断"
 echo "  - 磁盘 IO 性能分析"
 echo "  - 关键文件完整性检查"
 echo "  - 文件系统错误日志"
 echo "  - 时间段日志分析"
-echo ""
-echo "文件输出详情："
-echo "  - $OUTPUT_DIR/dmesg_full.txt       (完整内核日志)"
-echo "  - $OUTPUT_DIR/journal_kernel.txt   (journal 内核日志)"
-echo "  - $OUTPUT_DIR/collect.log          (本次收集完整日志)"
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
