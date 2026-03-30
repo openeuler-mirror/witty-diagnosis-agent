@@ -168,14 +168,23 @@ fi
 echo ""
 echo "--- IO 性能诊断 ---"
 if command -v iostat &>/dev/null; then
-    iostat -x 2>/dev/null | awk 'NR>3 && $1 ~ /[a-z]+/ {
-        util=$NF; gsub("%","",util);
-        if (util >= 90) {
+    iostat -x 2>/dev/null | awk '
+    NR>3 && $1 ~ /^[a-z]+[a-z0-9]*$/ && $1 != "Device" {
+        util=$NF;
+        gsub("%","",util);
+        if (util+0 >= 90) {
             print "⚠️  CRITICAL: 磁盘 " $1 " 利用率 " util "%，IO 瓶颈！"
-        } else if (util >= 70) {
+        } else if (util+0 >= 70) {
             print "⚠️  WARNING: 磁盘 " $1 " 利用率 " util "%，IO 压力较高"
+        } else if (util+0 >= 50) {
+            print "ℹ️  INFO: 磁盘 " $1 " 利用率 " util "%"
         }
     }'
+    if [ $? -ne 0 ]; then
+        echo "✅ 当前无磁盘 IO 瓶颈"
+    fi
+else
+    echo "iostat 不可用，跳过 IO 性能诊断"
 fi
 
 echo ""
@@ -183,7 +192,12 @@ echo "=== [3.2] 当前 IO 等待进程 ==="
 cmd_info "ps -eo pid,stat,cmd | grep -E '^[[:space:]]*[0-9]+[[:space:]]+D'" \
     "查找处于不可中断睡眠（D 状态）的进程" \
     "D 状态进程通常表示正在等待 IO"
-ps -eo pid,stat,cmd 2>/dev/null | grep -E '^[[:space:]]*[0-9]+[[:space:]]+D' || echo "无 D 状态进程"
+D_PROCS=$(ps -eo pid,stat,cmd 2>/dev/null | grep -E '^[[:space:]]*[0-9]+[[:space:]]+D')
+if [ -n "$D_PROCS" ]; then
+    echo "$D_PROCS"
+else
+    echo "✅ 无 D 状态进程"
+fi
 
 echo ""
 echo "--- D 状态进程详情 ---"
@@ -267,31 +281,66 @@ ldconfig -p 2>/dev/null | head -50
 
 echo ""
 echo "--- 核心库文件检查 ---"
+
+detect_lib_path() {
+    local lib_name="$1"
+    local lib_path=""
+    
+    if [ -f "/lib64/$lib_name" ]; then
+        lib_path="/lib64/$lib_name"
+    elif [ -f "/lib/x86_64-linux-gnu/$lib_name" ]; then
+        lib_path="/lib/x86_64-linux-gnu/$lib_name"
+    elif [ -f "/usr/lib64/$lib_name" ]; then
+        lib_path="/usr/lib64/$lib_name"
+    elif [ -f "/usr/lib/x86_64-linux-gnu/$lib_name" ]; then
+        lib_path="/usr/lib/x86_64-linux-gnu/$lib_name"
+    elif ldconfig -p 2>/dev/null | grep -q "/$lib_name$"; then
+        lib_path=$(ldconfig -p 2>/dev/null | grep "/$lib_name$" | head -1 | awk '{print $NF}')
+    fi
+    
+    echo "$lib_path"
+}
+
 CORE_LIBS=(
-    "/lib64/libc.so.6"
-    "/lib64/libm.so.6"
-    "/lib64/libpthread.so.0"
-    "/lib64/libdl.so.2"
-    "/lib64/ld-linux-x86-64.so.2"
-    "/lib64/librt.so.1"
-    "/lib64/libcrypt.so.1"
+    "libc.so.6"
+    "libm.so.6"
+    "libpthread.so.0"
+    "libdl.so.2"
+    "ld-linux-x86-64.so.2"
+    "librt.so.1"
+    "libcrypt.so.1"
 )
 
 for lib in "${CORE_LIBS[@]}"; do
-    if [ -f "$lib" ]; then
-        perms=$(stat -c "%a" "$lib" 2>/dev/null)
-        size=$(stat -c "%s" "$lib" 2>/dev/null)
-        echo "$lib | 权限: $perms | 大小: $size bytes"
+    lib_path=$(detect_lib_path "$lib")
+    if [ -n "$lib_path" ] && [ -f "$lib_path" ]; then
+        if [ -L "$lib_path" ]; then
+            real_path=$(readlink -f "$lib_path" 2>/dev/null)
+            perms=$(stat -c "%a" "$real_path" 2>/dev/null)
+            size=$(stat -c "%s" "$real_path" 2>/dev/null)
+            echo "$lib -> $lib_path (符号链接 -> $real_path) | 权限: $perms | 大小: $size bytes"
+        else
+            perms=$(stat -c "%a" "$lib_path" 2>/dev/null)
+            size=$(stat -c "%s" "$lib_path" 2>/dev/null)
+            echo "$lib -> $lib_path | 权限: $perms | 大小: $size bytes"
+        fi
         
         if [ "$perms" != "755" ] && [ "$perms" != "555" ]; then
             echo "  ⚠️  权限异常，应为 755 或 555"
         fi
         
-        if ! file "$lib" 2>/dev/null | grep -q "shared object"; then
-            echo "  ⚠️  文件类型异常"
+        if [ -f "$lib_path" ] && [ ! -L "$lib_path" ]; then
+            if ! file "$lib_path" 2>/dev/null | grep -qE "shared object|ELF"; then
+                echo "  ⚠️  文件类型异常"
+            fi
+        elif [ -L "$lib_path" ]; then
+            real_file=$(readlink -f "$lib_path" 2>/dev/null)
+            if [ -f "$real_file" ] && ! file "$real_file" 2>/dev/null | grep -qE "shared object|ELF"; then
+                echo "  ⚠️  文件类型异常"
+            fi
         fi
     else
-        echo "⚠️  $lib 不存在！"
+        echo "⚠️  $lib 未找到"
     fi
 done
 
@@ -326,9 +375,14 @@ mount 2>/dev/null | grep -E 'ext|xfs|btrfs|nfs'
 
 echo ""
 echo "--- 只读挂载检测 ---"
-mount 2>/dev/null | grep " ro," | while read line; do
-    echo "⚠️  检测到只读挂载: $line"
-done
+ro_mounts=$(mount 2>/dev/null | grep " ro[,)]")
+if [ -n "$ro_mounts" ]; then
+    echo "$ro_mounts" | while read line; do
+        echo "⚠️  检测到只读挂载: $line"
+    done
+else
+    echo "✅ 无只读挂载"
+fi
 
 # ================================================================
 # PART 5: 文件系统错误日志
@@ -336,19 +390,39 @@ done
 section "5. 文件系统错误日志"
 
 echo "=== [5.1] 磁盘空间相关错误 ==="
-dmesg -T 2>/dev/null | grep -iE "No space left on device|ENOSPC|disk.*full|inode.*full" | tail -30
+space_errors=$(dmesg -T 2>/dev/null | grep -iE "No space left on device|ENOSPC|disk.*full|inode.*full" | tail -30)
+if [ -n "$space_errors" ]; then
+    echo "$space_errors"
+else
+    echo "✅ 无磁盘空间相关错误"
+fi
 
 echo ""
 echo "=== [5.2] IO 错误日志 ==="
-dmesg -T 2>/dev/null | grep -iE "I/O error|Buffer I/O error|read error|write error|timeout" | tail -30
+io_errors=$(dmesg -T 2>/dev/null | grep -iE "I/O error|Buffer I/O error|read error|write error|timeout" | tail -30)
+if [ -n "$io_errors" ]; then
+    echo "$io_errors"
+else
+    echo "✅ 无 IO 错误日志"
+fi
 
 echo ""
 echo "=== [5.3] 文件系统错误 ==="
-dmesg -T 2>/dev/null | grep -iE "EXT4-fs error|XFS error|BTRFS error|filesystem.*error|corrupt|remounting.*ro" | tail -30
+fs_errors=$(dmesg -T 2>/dev/null | grep -iE "EXT4-fs error|XFS error|BTRFS error|filesystem.*error|corrupt|remounting.*ro" | tail -30)
+if [ -n "$fs_errors" ]; then
+    echo "$fs_errors"
+else
+    echo "✅ 无文件系统错误日志"
+fi
 
 echo ""
 echo "=== [5.4] 关键文件损坏日志 ==="
-dmesg -T 2>/dev/null | grep -iE "segmentation fault|core dumped|cannot execute|cannot open shared object|lib.*error" | tail -30
+file_errors=$(dmesg -T 2>/dev/null | grep -iE "segmentation fault|core dumped|cannot execute|cannot open shared object|lib.*error" | tail -30)
+if [ -n "$file_errors" ]; then
+    echo "$file_errors"
+else
+    echo "✅ 无关键文件损坏日志"
+fi
 
 # ================================================================
 # PART 6: 时间段日志分析
@@ -406,7 +480,11 @@ if [ -n "$TARGET_MOUNT" ]; then
         
         echo ""
         echo "--- 打开此挂载点的进程 ---"
-        lsof +D "$TARGET_MOUNT" 2>/dev/null | head -30 || echo "lsof 不可用"
+        if command -v lsof &>/dev/null; then
+            lsof +D "$TARGET_MOUNT" 2>/dev/null | head -30
+        else
+            echo "lsof 不可用"
+        fi
     else
         echo "⚠️  $TARGET_MOUNT 不是有效的挂载点"
     fi
@@ -447,7 +525,11 @@ if [ -n "$TARGET_PID" ]; then
         
         echo ""
         echo "--- 进程打开的文件（lsof）---"
-        lsof -p "$TARGET_PID" 2>/dev/null | head -30 || echo "lsof 不可用"
+        if command -v lsof &>/dev/null; then
+            lsof -p "$TARGET_PID" 2>/dev/null | head -30
+        else
+            echo "lsof 不可用"
+        fi
     else
         echo "⚠️  PID $TARGET_PID 不存在，可能已退出"
     fi
@@ -485,7 +567,12 @@ fi
 
 echo ""
 echo "=== [9.4] NFS 挂载状态（如有）==="
-mount 2>/dev/null | grep nfs
+nfs_mounts=$(mount 2>/dev/null | grep nfs)
+if [ -n "$nfs_mounts" ]; then
+    echo "$nfs_mounts"
+else
+    echo "无 NFS 挂载"
+fi
 
 # ================================================================
 # 保存完整日志
