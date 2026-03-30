@@ -51,67 +51,22 @@ Witty 智能诊断 Agent 采用“Agent-Skill-工具-知识”四层解耦架构
 
 Witty 智能诊断 Agent 支持**在线安装**与**源码安装**两种方式，请根据您的网络环境选择合适的安装方式。
 
+##### 方式一：在线安装（推荐）
+
 ```bash
 npm install -g witty-diagnosis-agent@latest
 witty-diagnosis-agent install
 ```
 
-##### 方式二：一键安装（推荐，适用于源码）
+##### 方式二：源码一键安装（适用于源码）
 
 如果您已经克隆了仓库，可以使用一键安装脚本自动完成环境检查、依赖安装、项目构建及插件配置：
-
-```bash
-bash install.sh
-```
-
-##### 方式三：源码手动安装
-
-如果您需要二次开发或在离线环境中使用，可通过源码方式安装。
 
 ```shell
 git clone https://atomgit.com/openeuler/witty-diagnosis-agent.git
 cd witty-diagnosis-agent
-npm install
+bash install.sh
 ```
-
-###### 2. 构建项目
-
-```shell
-npm run build
-```
-
-构建完成后，将在项目根目录生成 `dist/index.js` 等相关文件。
-
-###### 3. 注册插件
-
-配置文件支持两种路径（二选一），优先选择用户级配置：
-
-- 用户级（推荐）：`~/.config/opencode/opencode.json` 或 `opencode.jsonc`
-- 项目级：项目根目录下的 `.opencode/opencode.json` 或 `.opencode/opencode.jsonc`
-
-在配置文件中新增或修改 `plugin` 数组，指向本仓库的构建入口（如果 `opencode.json` 文件不存在，请手动创建一个）：
-
-```json
-{
-    "$schema": "https://opencode.ai/config.json",
-    "plugin": [
-        "file:///{witty-diagnosis-agent项目绝对路径}/dist/index.js"
-    ]
-}
-```
-
-示例（假设项目绝对路径为 `/opt/witty-diagnosis-agent`）：
-
-```json
-{
-    "$schema": "https://opencode.ai/config.json",
-    "plugin": [
-        "file:///opt/witty-diagnosis-agent/dist/index.js"
-    ]
-}
-```
-
-
 
 ### 如何使用
 
