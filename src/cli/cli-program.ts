@@ -34,9 +34,9 @@ program
   .option("--skip-auth", "Skip authentication setup hints")
   .addHelpText("after", `
 Examples:
-  $ bunx witty-diagnosis-agent install
-  $ bunx witty-diagnosis-agent install --no-tui --claude=max20 --openai=yes --gemini=yes --copilot=no
-  $ bunx witty-diagnosis-agent install --no-tui --claude=no --gemini=no --copilot=yes --opencode-zen=yes
+  $ npx witty-diagnosis-agent install
+  $ npx witty-diagnosis-agent install --no-tui --claude=max20 --openai=yes --gemini=yes --copilot=no
+  $ npx witty-diagnosis-agent install --no-tui --claude=no --gemini=no --copilot=yes --opencode-zen=yes
 
 Model Providers (Priority: Native > Copilot > OpenCode Zen > Z.ai > Kimi):
   Claude        Native anthropic/ models (Opus, Sonnet, Haiku)
@@ -64,9 +64,9 @@ Model Providers (Priority: Native > Copilot > OpenCode Zen > Z.ai > Kimi):
   })
 
 program
-   .command("run <message>")
-   .allowUnknownOption()
-   .passThroughOptions()
+  .command("run <message>")
+  .allowUnknownOption()
+  .passThroughOptions()
   .description("Run opencode with todo/background task completion enforcement")
   .option("-a, --agent <name>", "Agent to use (default: from CLI/env/config, fallback: Sisyphus)")
   .option("-d, --directory <path>", "Working directory")
@@ -79,13 +79,13 @@ program
   .option("--session-id <id>", "Resume existing session instead of creating new one")
   .addHelpText("after", `
 Examples:
-  $ bunx witty-diagnosis-agent run "Fix the bug in index.ts"
-  $ bunx witty-diagnosis-agent run --agent Sisyphus "Implement feature X"
-  $ bunx witty-diagnosis-agent run --port 4321 "Fix the bug"
-  $ bunx witty-diagnosis-agent run --attach http://127.0.0.1:4321 "Fix the bug"
-  $ bunx witty-diagnosis-agent run --json "Fix the bug" | jq .sessionId
-  $ bunx witty-diagnosis-agent run --on-complete "notify-send Done" "Fix the bug"
-  $ bunx witty-diagnosis-agent run --session-id ses_abc123 "Continue the work"
+  $ npx witty-diagnosis-agent run "Fix the bug in index.ts"
+  $ npx witty-diagnosis-agent run --agent Sisyphus "Implement feature X"
+  $ npx witty-diagnosis-agent run --port 4321 "Fix the bug"
+  $ npx witty-diagnosis-agent run --attach http://127.0.0.1:4321 "Fix the bug"
+  $ npx witty-diagnosis-agent run --json "Fix the bug" | jq .sessionId
+  $ npx witty-diagnosis-agent run --on-complete "notify-send Done" "Fix the bug"
+  $ npx witty-diagnosis-agent run --session-id ses_abc123 "Continue the work"
 
 Agent resolution order:
   1) --agent flag
@@ -128,9 +128,9 @@ program
   .option("--json", "Output in JSON format for scripting")
   .addHelpText("after", `
 Examples:
-  $ bunx witty-diagnosis-agent get-local-version
-  $ bunx witty-diagnosis-agent get-local-version --json
-  $ bunx witty-diagnosis-agent get-local-version --directory /path/to/project
+  $ npx witty-diagnosis-agent get-local-version
+  $ npx witty-diagnosis-agent get-local-version --json
+  $ npx witty-diagnosis-agent get-local-version --directory /path/to/project
 
 This command shows:
   - Current installed version
@@ -155,10 +155,10 @@ program
   .option("--json", "Output results in JSON format")
   .addHelpText("after", `
 Examples:
-  $ bunx witty-diagnosis-agent doctor            # Show problems only
-  $ bunx witty-diagnosis-agent doctor --status   # Compact dashboard
-  $ bunx witty-diagnosis-agent doctor --verbose  # Deep diagnostics
-  $ bunx witty-diagnosis-agent doctor --json     # JSON output
+  $ npx witty-diagnosis-agent doctor            # Show problems only
+  $ npx witty-diagnosis-agent doctor --status   # Compact dashboard
+  $ npx witty-diagnosis-agent doctor --verbose  # Deep diagnostics
+  $ npx witty-diagnosis-agent doctor --json     # JSON output
 `)
   .action(async (options) => {
     const mode = options.status ? "status" : options.verbose ? "verbose" : "default"
