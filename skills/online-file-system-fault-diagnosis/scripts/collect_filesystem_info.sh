@@ -348,7 +348,16 @@ done
 
 echo ""
 echo "--- 动态链接器检查 ---"
-LD_SO=$(find /lib* /lib64 -name "ld-linux*.so*" -type f 2>/dev/null | head -1)
+LD_SO=""
+for path in /lib64/ld-linux*.so* /lib/ld-linux*.so* /lib/aarch64-linux-gnu/ld-linux*.so* /lib64/ld-linux-aarch64*.so*; do
+    if [ -f "$path" ]; then
+        LD_SO="$path"
+        break
+    fi
+done
+if [ -z "$LD_SO" ]; then
+    LD_SO=$(find /lib /lib64 -name "ld-linux*.so*" -type f 2>/dev/null | head -1)
+fi
 if [ -n "$LD_SO" ] && [ -f "$LD_SO" ]; then
     perms=$(stat -c "%a" "$LD_SO" 2>/dev/null)
     size=$(stat -c "%s" "$LD_SO" 2>/dev/null)
