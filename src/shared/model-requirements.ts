@@ -14,10 +14,11 @@ export type ModelRequirement = {
 export const AGENT_MODEL_REQUIREMENTS: Record<string, ModelRequirement> = {
   baize: {
     fallbackChain: [
-      { providers: ["openai", "venice", "opencode"], model: "gpt-5.3-codex", variant: "medium" },
-      { providers: ["github-copilot"], model: "gpt-5.2", variant: "medium" },
+      { providers: ["anthropic", "github-copilot", "opencode"], model: "claude-opus-4-6", variant: "max" },
+      { providers: ["openai", "github-copilot", "opencode"], model: "gpt-5.2", variant: "high" },
+      { providers: ["opencode"], model: "kimi-k2.5-free" },
+      { providers: ["google", "github-copilot", "opencode"], model: "gemini-3.1-pro" },
     ],
-    requiresProvider: ["openai", "github-copilot", "venice", "opencode"],
   },
   "multimodal-looker": {
     fallbackChain: [
@@ -64,14 +65,14 @@ export const CATEGORY_MODEL_REQUIREMENTS: Record<string, ModelRequirement> = {
   },
   ultrabrain: {
     fallbackChain: [
-      { providers: ["openai", "opencode"], model: "gpt-5.3-codex", variant: "xhigh" },
+      { providers: ["openai", "opencode"], model: "gpt-4o", variant: "xhigh" },
       { providers: ["google", "github-copilot", "opencode"], model: "gemini-3.1-pro", variant: "high" },
       { providers: ["anthropic", "github-copilot", "opencode"], model: "claude-opus-4-6", variant: "max" },
     ],
   },
   deep: {
     fallbackChain: [
-      { providers: ["openai", "opencode"], model: "gpt-5.3-codex", variant: "medium" },
+      { providers: ["openai", "opencode"], model: "gpt-4o", variant: "medium" },
       { providers: ["anthropic", "github-copilot", "opencode"], model: "claude-opus-4-6", variant: "max" },
       { providers: ["google", "github-copilot", "opencode"], model: "gemini-3.1-pro", variant: "high" },
     ],
@@ -93,7 +94,7 @@ export const CATEGORY_MODEL_REQUIREMENTS: Record<string, ModelRequirement> = {
   "unspecified-low": {
     fallbackChain: [
       { providers: ["anthropic", "github-copilot", "opencode"], model: "claude-sonnet-4-6" },
-      { providers: ["openai", "opencode"], model: "gpt-5.3-codex", variant: "medium" },
+      { providers: ["openai", "opencode"], model: "gpt-4o", variant: "medium" },
       { providers: ["google", "github-copilot", "opencode"], model: "gemini-3-flash" },
     ],
   },

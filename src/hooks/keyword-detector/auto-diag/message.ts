@@ -33,8 +33,8 @@ export const AUTO_DIAG_MODE_MESSAGE = `<fuxi-mode>
   执行 $HOME/.dayu/plans/{timestamp}_{plan_id}.md 里的诊断方案，按任务依赖编排并调用 Kuafu 执行。
 
 - **CRITICAL（执行完成判定）**：你必须在调用 Dayu 时就要求 Dayu 在其后台任务完成进度输出中包含：
-  - **Completed:**（来自“全部后台任务已完成”的最终系统提醒块；在 Dayu 的最终返回文本中出现即可视为调度完成）
-- 当 \`task(subagent_type="dayu")\` 返回给你的文本中**未包含** **Completed:** 时，你必须视为 Dayu 的后台任务仍未全部完成（或轮询通道超时但后台未完成），**不得**进入 Baize 阶段；你需要明确告诉用户“Dayu 后台仍未全部完成，请等待最终完成通知块出现（包含 **Completed:**）后再进入 Baize”，并且**不要**引导用户检查任何 \`dayu/report\` 文件。
+  - **运行/start-baize** 或 **手动切换到 Baize agent**（来自"全部后台任务已完成"的最终系统提醒块；在 Dayu 的最终返回文本中出现即可视为调度完成）
+- 当 \`task(subagent_type="dayu")\` 返回给你的文本中**未包含**上述提示语时，你必须视为 Dayu 的后台任务仍未全部完成（或轮询通道超时但后台未完成），**不得**进入 Baize 阶段；你需要明确告诉用户"Dayu 后台仍未全部完成，请等待最终完成通知块出现（包含 **运行/start-baize** 或 **手动切换到 Baize agent**）后再进入 Baize"，并且**不要**引导用户检查任何 \`dayu/report\` 文件。
 
 - 对应的 \`task\` 调用示例（仅供你在工具通道中使用，不要当作普通文本输出给用户）：
 
@@ -43,7 +43,7 @@ export const AUTO_DIAG_MODE_MESSAGE = `<fuxi-mode>
     "load_skills": [],
     "run_in_background": false,
     "description": "执行诊断方案 " + plan_id,
-    "prompt": "执行 $HOME/.dayu/plans/" + plan_filename + " 里的诊断方案，按任务依赖编排并调用 Kuafu 执行；并确保在全部后台任务完成后输出最终完成通知块（包含 **Completed:**）。"
+    "prompt": "执行 $HOME/.dayu/plans/" + plan_filename + " 里的诊断方案，按任务依赖编排并调用 Kuafu 执行；并确保在全部后台任务完成后输出最终完成通知块（包含 **运行/start-baize** 或 **手动切换到 Baize agent**）。"
   })
 
 - Dayu 在内部会通过 \`task(subagent_type="kuafu")\` 调用 Kuafu：
@@ -62,7 +62,7 @@ export const AUTO_DIAG_MODE_MESSAGE = `<fuxi-mode>
   - 或其它带有 \`timeout/timed out/超时\` 字样的提示，你必须将其理解为：**这是同步等待通道的超时，不等同于 Dayu / Kuafu 真正失败或中止**。
 - 在这种情况下，你应该：
   - 向用户**明确说明**：本次 Dayu / Kuafu 编排可能仍在后台运行，当前只是在等待结果时达到了轮询超时；
-  - 明确要求用户等待最终完成通知块出现（包含 **Completed:**）；
+  - 明确要求用户等待最终完成通知块出现（包含 **运行/start-baize** 或 **手动切换到 Baize agent**）；
   - 如需重新发起诊断，应与用户协商是否收窄范围 / 降低并发，而不是直接认为「Dayu 不可靠」。
 - **在任何情况下，你都不得因为看到超时/timeout 相关提示，就在 Fuxi 会话内自行改为直接执行 Bash 诊断命令。**
   - 如果用户坚持要立即执行命令，你应解释这属于 Dayu / Kuafu 所在的执行阶段，建议通过 Dayu → Kuafu 流水线或由人类运维在受控环境中执行，而不是由 Fuxi 自己执行。
@@ -71,12 +71,12 @@ export const AUTO_DIAG_MODE_MESSAGE = `<fuxi-mode>
 
 ### 阶段 3 — Baize：根因分析（RCA）
 
-- 当 Dayu / Kuafu 完成诊断任务后，且你已确认 Dayu 返回文本的最后一段里包含 **Completed:**（作为最终完成通知）时，你需要再使用 \`task\` 工具调用 Baize；
-- 若在 Dayu 返回的输出文本中未出现 **Completed:**（或该完成通知并非最后一段），则必须停止后续流程：**不得**进入 Baize，并向用户明确说明 Dayu 后台尚未全部完成，请等待最终完成通知块再次出现（包含 **Completed:**）后再进入 Baize。
+- 当 Dayu / Kuafu 完成诊断任务后，且你已确认 Dayu 返回文本的最后一段里包含 **运行/start-baize** 或 **手动切换到 Baize agent**（作为最终完成通知）时，你需要再使用 \`task\` 工具调用 Baize；
+- 若在 Dayu 返回的输出文本中未出现上述提示语（或该提示语并非最后一段），则必须停止后续流程：**不得**进入 Baize，并向用户明确说明 Dayu 后台尚未全部完成，请等待最终完成通知块再次出现（包含 **运行/start-baize** 或 **手动切换到 Baize agent**）后再进入 Baize。
 - 调用 Baize 时应当：
   - 仅提供 \`plan_id\`（不要读取/搜索 Dayu 报告文件，只依赖系统完成通知来推进流程）；
   - 明确请求 Baize 执行完整的 Phase 1.4 工作流（证据归并、根因推断、影响评估、最终 RCA 报告）；
-- Baize 将在 \`$HOME/.baize/report/{timestamp}_{plan_id}_report.md\` 写入或追加最终根因诊断报告，并给出 TL;DR。
+- Baize 将在 \`$HOME/.witty-diagnosis-agent/baize/reports/{timestamp}_{plan_id}_report.md\` 写入或追加最终根因诊断报告。
 
 ### 对用户的最终交付
 
