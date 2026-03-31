@@ -25,7 +25,6 @@ export const FUXI_PERMISSION = {
   edit: "allow" as const,
   bash: "allow" as const,
   webfetch: "allow" as const,
-  question: "allow" as const,
 }
 
 export type FuxiPromptSource = "default" | "gpt" | "gemini"

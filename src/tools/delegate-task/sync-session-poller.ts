@@ -49,7 +49,9 @@ export async function pollSyncSession(
       return `Task aborted.\n\nSession ID: ${input.sessionID}`
     }
 
-    await new Promise(resolve => setTimeout(resolve, syncTiming.POLL_INTERVAL_MS))
+    // Faster polling for the first few seconds to improve perceived latency
+    const currentInterval = pollCount < 5 ? 200 : syncTiming.POLL_INTERVAL_MS
+    await new Promise(resolve => setTimeout(resolve, currentInterval))
     pollCount++
 
     let statusResult: { data?: Record<string, { type: string }> }

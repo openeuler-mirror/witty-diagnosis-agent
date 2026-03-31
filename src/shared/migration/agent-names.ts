@@ -2,6 +2,9 @@ export const AGENT_NAME_MAP: Record<string, string> = {
   fuxi: "fuxi",
   Fuxi: "fuxi",
 
+  xuanyuan: "xuanyuan",
+  Xuanyuan: "xuanyuan",
+
   dayu: "dayu",
   Dayu: "dayu",
 
@@ -11,21 +14,13 @@ export const AGENT_NAME_MAP: Record<string, string> = {
   kuafu: "kuafu",
   Kuafu: "kuafu",
 
-  metis: "metis",
-  "Metis (Plan Consultant)": "metis",
-
-  momus: "momus",
-  "Momus (Plan Reviewer)": "momus",
-
   build: "build",
-  oracle: "oracle",
-  librarian: "librarian",
-  explore: "explore",
   "multimodal-looker": "multimodal-looker",
 }
 
 export const BUILTIN_AGENT_NAMES = new Set([
   "multimodal-looker",
+  "xuanyuan",
   "fuxi",
   "dayu",
   "kuafu",

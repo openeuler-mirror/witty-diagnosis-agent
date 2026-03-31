@@ -4,6 +4,7 @@ import { getAgentDisplayName } from "../shared/agent-display-names";
 // 要求：Fuxi 最前，然后 Dayu / Kuafu / Baize，所有 plan / build 相关的放在最后。
 const CORE_FIRST_ORDER: string[] = [
   getAgentDisplayName("fuxi"),
+  getAgentDisplayName("xuanyuan"),
   getAgentDisplayName("dayu"),
   getAgentDisplayName("kuafu"),
   getAgentDisplayName("baize"),

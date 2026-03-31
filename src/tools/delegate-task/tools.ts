@@ -24,7 +24,7 @@ export { resolveCategoryConfig } from "./categories"
 export type { SyncSessionCreatedEvent, DelegateTaskToolOptions, BuildSystemContentInput } from "./types"
 export { buildSystemContent } from "./prompt-builder"
 
-const DEFAULT_CATEGORY_AGENT = "hephaestus"
+const DEFAULT_CATEGORY_AGENT = "fuxi"
 
 export function createDelegateTask(options: DelegateTaskToolOptions): ToolDefinition {
   const { userCategories } = options
@@ -54,33 +54,20 @@ export function createDelegateTask(options: DelegateTaskToolOptions): ToolDefini
     return desc ? `  - ${name}: ${desc}` : `  - ${name}`
   }).join("\n")
 
-  const description = `Spawn agent task with category-based or direct agent selection.
+  const description = `Spawn agent task with direct agent selection.
   
-  ⚠️  CRITICAL: You MUST provide EITHER category OR subagent_type. Omitting BOTH will FAIL.
-  
-  **COMMON MISTAKE (DO NOT DO THIS):**
-  \`\`\`
-  task(description="...", prompt="...", run_in_background=false)  // ❌ FAILS - missing category AND subagent_type
-  \`\`\`
-  
-  **CORRECT - Using category:**
-  \`\`\`
-  task(category="quick", load_skills=[], description="Fix type error", prompt="...", run_in_background=false)
-  \`\`\`
+  ⚠️  CRITICAL: You MUST provide subagent_type.
   
   **CORRECT - Using subagent_type:**
   \`\`\`
-  task(subagent_type="explore", load_skills=[], description="Find patterns", prompt="...", run_in_background=true)
+  task(subagent_type="fuxi", load_skills=[], description="Find patterns", prompt="...", run_in_background=true)
   \`\`\`
   
-  REQUIRED: Provide ONE of:
-  - category: For task delegation (uses Hephaestus with category-optimized model)
-  - subagent_type: For direct agent invocation (explore, librarian, oracle, etc.)
-
-  **DO NOT provide both.** If category is provided, subagent_type is ignored.
+  REQUIRED:
+  - subagent_type: For direct agent invocation (fuxi, dayu, kuafu, baize, etc.)
 
   - load_skills: ALWAYS REQUIRED. Pass [] if no skills needed, or ["skill-1", "skill-2"] for category tasks.
-  - category: Use predefined category → Spawns Hephaestus with category config
+  - category: Optional category for the task.
     Available categories:
   ${categoryList}
   - subagent_type: Use specific agent directly (explore, librarian, oracle, metis, momus)
@@ -102,8 +89,8 @@ export function createDelegateTask(options: DelegateTaskToolOptions): ToolDefini
       description: tool.schema.string().describe("Short task description (3-5 words)"),
       prompt: tool.schema.string().describe("Full detailed prompt for the agent"),
       run_in_background: tool.schema.boolean().describe("true=async (returns task_id), false=sync (waits). Default: false"),
-      category: tool.schema.string().optional().describe(`REQUIRED if subagent_type not provided. Do NOT provide both category and subagent_type.`),
-      subagent_type: tool.schema.string().optional().describe("REQUIRED if category not provided. Do NOT provide both category and subagent_type."),
+      category: tool.schema.string().optional().describe(`Optional category for the task. If provided, subagent_type will be ignored and Fuxi will be used.`),
+      subagent_type: tool.schema.string().describe("REQUIRED. The specific agent to invoke (e.g., fuxi, dayu, kuafu, baize)."),
       session_id: tool.schema.string().optional().describe("Existing Task session to continue"),
       command: tool.schema.string().optional().describe("The command that triggered this task"),
     },
@@ -162,8 +149,8 @@ export function createDelegateTask(options: DelegateTaskToolOptions): ToolDefini
         return executeSyncContinuation(args, ctx, options)
       }
 
-      if (!args.category && !args.subagent_type) {
-        return `Invalid arguments: Must provide either category or subagent_type.`
+      if (!args.subagent_type) {
+        return `Invalid arguments: Must provide subagent_type.`
       }
 
       let systemDefaultModel: string | undefined

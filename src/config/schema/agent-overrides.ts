@@ -58,18 +58,11 @@ export const AgentOverrideConfigSchema = z.object({
 export const AgentOverridesSchema = z.object({
   build: AgentOverrideConfigSchema.optional(),
   plan: AgentOverrideConfigSchema.optional(),
-  sisyphus: AgentOverrideConfigSchema.optional(),
   baize: AgentOverrideConfigSchema.optional(),
-  "sisyphus-junior": AgentOverrideConfigSchema.optional(),
-  "OpenCode-Builder": AgentOverrideConfigSchema.optional(),
+  xuanyuan: AgentOverrideConfigSchema.optional(),
   fuxi: AgentOverrideConfigSchema.optional(),
   dayu: AgentOverrideConfigSchema.optional(),
   kuafu: AgentOverrideConfigSchema.optional(),
-  metis: AgentOverrideConfigSchema.optional(),
-  momus: AgentOverrideConfigSchema.optional(),
-  oracle: AgentOverrideConfigSchema.optional(),
-  librarian: AgentOverrideConfigSchema.optional(),
-  explore: AgentOverrideConfigSchema.optional(),
   "multimodal-looker": AgentOverrideConfigSchema.optional(),
 })
 

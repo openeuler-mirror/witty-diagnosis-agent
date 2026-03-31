@@ -50,8 +50,8 @@ export async function sendSyncPrompt(
   const tools = {
     task: allowTask,
     call_witty_agent: true,
-    question: false,
     ...getAgentToolRestrictions(input.agentToUse),
+    question: false,
   }
   setSessionTools(input.sessionID, tools)
 

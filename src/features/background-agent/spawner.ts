@@ -141,7 +141,7 @@ export async function startTask(
       tools: {
         task: false,
         call_witty_agent: true,
-        question: false,
+        question: input.agent.toLowerCase().includes("fuxi") || input.agent.toLowerCase().includes("dayu"),
         ...getAgentToolRestrictions(input.agent),
       },
       parts: [createInternalAgentTextPart(input.prompt)],

@@ -16,6 +16,7 @@ import { reorderAgentsByPriority } from "./agent-priority-order";
 import { remapAgentKeysToDisplayNames } from "./agent-key-remapper";
 import { buildFuxiAgentConfig } from "./fuxi-agent-config-builder";
 import { buildDayuAgentConfig } from "./dayu-agent-config-builder";
+import { buildXuanyuanAgentConfig } from "./xuanyuan-agent-config-builder";
 import { buildKuafuAgentConfig } from "./kuafu-agent-config-builder";
 import { buildBaizeAgentConfig } from "./baize-agent-config-builder";
 
@@ -128,7 +129,7 @@ export async function applyAgentConfig(params: {
       getAgentDisplayName(configuredDefaultAgent);
   } else {
     (params.config as { default_agent?: string }).default_agent =
-      getAgentDisplayName("fuxi");
+      getAgentDisplayName("xuanyuan");
   }
 
   const agentConfig: Record<string, unknown> = {};
@@ -141,6 +142,17 @@ export async function applyAgentConfig(params: {
     agentConfig["fuxi"] = await buildFuxiAgentConfig({
       configAgentPlan: configAgent?.plan,
       pluginFuxiOverride: fuxiOverride,
+      userCategories: params.pluginConfig.categories,
+      currentModel,
+    });
+
+    const xuanyuanOverride = params.pluginConfig.agents?.["xuanyuan"] as
+      | (Record<string, unknown> & { prompt_append?: string })
+      | undefined;
+
+    agentConfig["xuanyuan"] = await buildXuanyuanAgentConfig({
+      configAgentPlan: configAgent?.plan,
+      pluginXuanyuanOverride: xuanyuanOverride,
       userCategories: params.pluginConfig.categories,
       currentModel,
     });
