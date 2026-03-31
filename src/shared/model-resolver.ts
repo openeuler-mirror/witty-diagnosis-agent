@@ -9,6 +9,7 @@ export type ModelResolutionInput = {
 
 export type ModelSource =
 	| "override"
+	| "inherited"
 	| "category-default"
 	| "provider-fallback"
 	| "system-default"

@@ -463,7 +463,7 @@ When the user explicitly asks你执行“白泽 / Baize 根因分析”，assume
 }
 
 export function createBaizeAgent(
-  model: string,
+  model?: string,
   availableAgents?: AvailableAgent[],
   availableToolNames?: string[],
   availableSkills?: AvailableSkill[],
@@ -487,7 +487,7 @@ export function createBaizeAgent(
     description:
       "Baize (Root Cause Analysis) — Phase 1.4 \"白泽 / Baize - 根因分析\" agent for the Intelligent O&M Diagnosis System. Reads Dayu/Kuafu reports from user home directory, aggregates evidence, infers root cause, assesses impact, and writes final RCA reports to ~/.witty-diagnosis-agent/baize/reports/. (Baize - WittyDiagnosisAgent)",
     mode: MODE,
-    model,
+    ...(model ? { model } : {}),
     maxTokens: 32000,
     prompt,
     color: "#0D9488", // Teal - Bai Ze / report phase

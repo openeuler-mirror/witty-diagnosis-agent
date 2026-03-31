@@ -47,21 +47,17 @@ export async function buildBaizeAgentConfig(
   const resolvedModel = modelResolution?.model
   const resolvedVariant = modelResolution?.variant
 
-  const baseModel =
-    pluginBaizeOverride?.model ??
-    resolvedModel ??
-    currentModel ??
-    "openai/gpt-5.3-codex"
-
-  let baseConfig = await createBaizeAgent(baseModel)
-
   const variantToUse = pluginBaizeOverride?.variant ?? resolvedVariant
-  if (variantToUse) {
-    baseConfig = { ...baseConfig, variant: variantToUse }
-  }
+
+  const baseConfig = createBaizeAgent(
+    pluginBaizeOverride?.model ?? resolvedModel ?? currentModel
+  )
 
   if (!pluginBaizeOverride) {
-    return baseConfig
+    return {
+      ...baseConfig,
+      ...(variantToUse ? { variant: variantToUse } : {}),
+    }
   }
 
   const { model: _ignoredModel, variant: _ignoredVariant, ...restOverride } =
@@ -69,7 +65,7 @@ export async function buildBaizeAgentConfig(
 
   return {
     ...baseConfig,
+    ...(variantToUse ? { variant: variantToUse } : {}),
     ...restOverride,
   }
 }
-

@@ -9,6 +9,7 @@ function normalizeModel(model?: string): string | undefined {
 
 export function resolveModelForDelegateTask(input: {
   userModel?: string
+  inheritedModel?: string
   categoryDefaultModel?: string
   fallbackChain?: FallbackEntry[]
   availableModels: Set<string>
@@ -17,6 +18,20 @@ export function resolveModelForDelegateTask(input: {
   const userModel = normalizeModel(input.userModel)
   if (userModel) {
     return { model: userModel }
+  }
+
+  const inheritedModel = normalizeModel(input.inheritedModel)
+  if (inheritedModel) {
+    if (input.availableModels.size === 0) {
+      return { model: inheritedModel }
+    }
+
+    const parts = inheritedModel.split("/")
+    const providerHint = parts.length >= 2 ? [parts[0]] : undefined
+    const match = fuzzyMatchModel(inheritedModel, input.availableModels, providerHint)
+    if (match) {
+      return { model: match }
+    }
   }
 
   const categoryDefault = normalizeModel(input.categoryDefaultModel)
