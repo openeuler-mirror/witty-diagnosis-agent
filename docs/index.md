@@ -118,7 +118,7 @@
 
 ### 使用指南
 
-- **[docs/guide/USAGE.md](./docs/guide/USAGE.md)** - 使用说明
+- **[docs/guide/MANUAL.md](./docs/guide/MANUAL.md)** - 用户手册
 - **[docs/guide/INSTALLATION.md](./docs/guide/INSTALLATION.md)** - 安装指南
 - **[docs/guide/CONTRIBUTING.md](./docs/guide/CONTRIBUTING.md)** - 贡献指南
 
