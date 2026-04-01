@@ -18,7 +18,7 @@
 * **硬件故障诊断**：面向CPU、内存、磁盘、网卡等核心硬件组件，智能识别硬件运行异常特征，精准判定硬件故障根源，同时提前预警潜在硬件隐患，减少硬件故障对业务的影响。
 * **故障快速修复**：基于诊断过程中生成的结构化报告，自动输出可执行优化建议与修复方案，简化故障处置流程，缩短故障排查与修复周期，实现故障快速恢复，保障业务稳定运行。
 
-完整故障诊断能力请参见[功能列表](reference/features.md)。
+完整故障诊断能力请参见[功能列表](../reference/features.md)。
 
 ## 系统架构
 
@@ -169,16 +169,6 @@ bash install.sh
   Baize Agent将基于Kuafu Agent的分析结果，推导故障根因，并输出最终的故障诊断报告，示例：
   ![Baize-诊断报告](..\assets\guide_baize_report.png)
 
-# 常见问题 (FAQ)
+# 常见问题 (Troubleshooting & FAQ)
 
-**Q: Agent需要配套什么样的大模型？**
-
-A: Agent 对大模型的工具调用、逻辑推理能力有较高要求，推荐使用 GLM-4.6、MiniMax-2.5、DeepSeek-Chat-V3.2 等具备强推理与函数调用能力的模型。
-
-**Q: Agent 支持在线诊断还是离线诊断？** 
-
-A: 视具体诊断任务而定，不同任务对网络的依赖不同，详细支持情况请参见[功能列表](reference/features.md)。
-
-**Q: Agent 需要 root 权限吗？** 
-
-A: 视具体诊断任务而定。读取系统日志、内核数据等操作通常需要 root 或 sudo 权限，普通用户执行此类任务可能会受到权限限制，导致数据采集失败。
+问题排查请参考：[Troubleshooting](../troubleshooting/troubleshooting.md)

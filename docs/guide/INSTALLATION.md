@@ -1,85 +1,46 @@
 # 安装与配置 (Installation & Configuration)
 
-Witty 智能诊断 Agent 支持多种安装方式，以适应不同的网络环境和使用场景。
+## 环境要求
 
-## 在线安装 (Online Installation)
+- 运行环境：Node.js (>=18.0.0)
+- 依赖工具：已安装[OpenCode](https://opencode.ai/)
+- 依赖工具：已安装 [Ansible](https://docs.ansible.com/ansible/latest/installation_guide/)（`ansible` 命令须在系统 PATH 中可用，可通过 `ansible --version` 提前验证）
 
-如果您的环境可以连接外网，这是最简单快捷的安装方式。
+## 安装
 
-### 方式 1: 使用 npm 全局安装 (推荐)
+智能诊断Agent支持**在线安装**与**源码安装**两种方式，您可根据自身网络环境与使用需求选择合适方式。
 
-通过 npm 全局安装 Witty 智能诊断 Agent，安装完成后可通过命令行一键为 OpenCode 注册插件及配置：
+### 方式一：在线安装（推荐）
+
+通过 npm 全局安装智能诊断 Agent，安装完成后可通过命令行一键为 OpenCode 注册插件及配置：
 
 ```bash
 npm install -g witty-diagnosis-agent@latest
 witty-diagnosis-agent install
 ```
 
-安装完成后，运行以下命令验证：
+### 方式二：源码安装
 
-```bash
-witty-diagnosis-agent -V
-```
-
-### 方式 2: 使用 Agent 自动化安装
-
-复制如下内容到 OpenCode 对话框，由 Agent 引导您完成安装：
-
-```markdown
-请根据这里的说明安装并配置 OpenCode：
-https://atomgit.com/openeuler/witty-diagnosis-agent/blob/master/docs/reference/witty-diagnosis-installation.md
-```
-
-## 离线安装 (Offline Installation)
-
-适用于内网环境或无法直接连接 npm 仓库的服务器。
-
-### 方式 1: 源码编译安装
-
-如果您需要二次开发或在离线环境中使用，可通过源码方式安装。
-
-#### 1. 获取代码与依赖
+如果您需要二次开发或在离线环境中使用，可以使用一键安装脚本自动完成环境检查、依赖安装、项目构建及插件配置：
 
 ```shell
 git clone https://atomgit.com/openeuler/witty-diagnosis-agent.git
 cd witty-diagnosis-agent
-bun install
+bash install.sh
 ```
 
-#### 2. 构建项目
+## 配置
 
-```shell
-bun run build
-```
-
-构建完成后，将在项目根目录生成 `dist/index.js` 等相关文件。
-
-#### 3. 注册插件
-
-配置文件支持两种路径（二选一），优先选择用户级配置：
-
-- 用户级（推荐）：`~/.config/opencode/opencode.json` 或 `opencode.jsonc`
-- 项目级：项目根目录下的 `.opencode/opencode.json` 或 `.opencode/opencode.jsonc`
-
-在配置文件中新增或修改 `plugin` 数组，指向本仓库的构建入口（如果 `opencode.json` 文件不存在，请手动创建一个）：
+修改项目根目录下的`.opencode/witty-diagnosis-agent.jsonc` 文件，为各个Agent配置缺省运行模型，以下以 `deepseek/deepseek-chat` 模型为例（可根据实际需求替换）：
 
 ```json
 {
-    "$schema": "https://opencode.ai/config.json",
-    "plugin": [
-        "file:///{witty-diagnosis-agent项目绝对路径}/dist/index.js"
-    ]
-}
-```
-
-示例（假设项目绝对路径为 `/opt/witty-diagnosis-agent`）：
-
-```json
-{
-    "$schema": "https://opencode.ai/config.json",
-    "plugin": [
-        "file:///opt/witty-diagnosis-agent/dist/index.js"
-    ]
+  "agents": {
+    "fuxi":  { "model": "deepseek/deepseek-chat" },
+    "dayu":  { "model": "deepseek/deepseek-chat" },
+    "kuafu": { "model": "deepseek/deepseek-chat" },
+    "baize": { "model": "deepseek/deepseek-chat" }
+  }
 }
 ```
 
@@ -89,6 +50,6 @@ bun run build
 
 - **Node.js 版本**：确保 Node.js 版本 >= 18.0.0。
 - **权限问题**：如果在 Linux/macOS 上遇到权限错误，尝试使用 `sudo` 或检查目录权限。
-- **网络代理**：如果处于公司内网，请确保配置了正确的 npm 代理。
+- **网络代理**：如果处于内部网络，请确保配置了正确的 npm 代理。
 
-更多问题排查请参考：[Troubleshooting](../troubleshooting/witty-diagnosis-agent.md)
+更多问题排查请参考：[Troubleshooting](../troubleshooting/troubleshooting.md)
