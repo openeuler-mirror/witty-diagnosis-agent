@@ -8,7 +8,7 @@ interface QuestionOption {
 interface Question {
   question: string;
   header?: string;
-  options: QuestionOption[];
+  options?: QuestionOption[];
   multiSelect?: boolean;
 }
 
@@ -41,15 +41,22 @@ function truncateQuestionLabels(args: AskUserQuestionArgs): AskUserQuestionArgs 
   };
 }
 
+function isQuestionTool(toolName: string | undefined): boolean {
+  const normalizedToolName = toolName?.toLowerCase();
+  return (
+    normalizedToolName === "question"
+    || normalizedToolName === "askuserquestion"
+    || normalizedToolName === "ask_user_question"
+  );
+}
+
 export function createQuestionLabelTruncatorHook() {
   return {
     "tool.execute.before": async (
       input: { tool: string },
       output: { args: Record<string, unknown> }
     ): Promise<void> => {
-      const toolName = input.tool?.toLowerCase();
-
-      if (toolName === "askuserquestion" || toolName === "ask_user_question") {
+      if (isQuestionTool(input.tool)) {
         const args = output.args as unknown as AskUserQuestionArgs | undefined;
 
         if (args?.questions) {

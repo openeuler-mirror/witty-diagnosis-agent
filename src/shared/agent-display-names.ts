@@ -7,6 +7,7 @@ export const AGENT_DISPLAY_NAMES: Record<string, string> = {
   baize: "Baize (Root Cause Analysis)",
   xuanyuan: "Xuanyuan (Controller)",
   fuxi: "Fuxi (Diagnostic Planner)",
+  "fuxi-sub": "Fuxi-Sub (Diagnostic Planner Subagent)",
   dayu: "Dayu (Orchestration and Scheduling)",
   kuafu: "Kuafu (General Diagnostic Executor)",
   "multimodal-looker": "multimodal-looker",

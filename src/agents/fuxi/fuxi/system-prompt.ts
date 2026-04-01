@@ -3,8 +3,8 @@ import { FUXI_INTERVIEW_MODE } from "./interview-mode"
 import { FUXI_PLAN_GENERATION } from "./plan-generation"
 import { FUXI_PLAN_TEMPLATE } from "./plan-template"
 import { FUXI_BEHAVIORAL_SUMMARY } from "./behavioral-summary"
-import { isGptModel, isGeminiModel } from "../types"
-import { getSharedEnvPrompt } from "../shared-env-prompt"
+import { isGptModel, isGeminiModel } from "../../types"
+import { getSharedEnvPrompt } from "../../shared-env-prompt"
 
 /**
  * Combined Fuxi system prompt (Claude-optimized, default).
@@ -25,6 +25,7 @@ export const FUXI_PERMISSION = {
   edit: "allow" as const,
   bash: "allow" as const,
   webfetch: "allow" as const,
+  question: "allow" as const,
 }
 
 export type FuxiPromptSource = "default" | "gpt" | "gemini"

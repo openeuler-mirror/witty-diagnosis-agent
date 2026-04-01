@@ -80,4 +80,56 @@ describe("applyToolConfig", () => {
       })
     })
   })
+
+  describe("#given fuxi agent is configured", () => {
+    it("#then should allow question outside cli run mode", () => {
+      const previousCliRunMode = process.env.OPENCODE_CLI_RUN_MODE
+      delete process.env.OPENCODE_CLI_RUN_MODE
+
+      try {
+        const params = createParams({
+          taskSystem: false,
+          agents: ["fuxi"],
+        })
+
+        applyToolConfig(params)
+
+        const agent = params.agentResult.fuxi as {
+          permission: Record<string, unknown>
+        }
+        expect(agent.permission.question).toBe("allow")
+      } finally {
+        if (previousCliRunMode === undefined) {
+          delete process.env.OPENCODE_CLI_RUN_MODE
+        } else {
+          process.env.OPENCODE_CLI_RUN_MODE = previousCliRunMode
+        }
+      }
+    })
+
+    it("#then should deny question in cli run mode", () => {
+      const previousCliRunMode = process.env.OPENCODE_CLI_RUN_MODE
+      process.env.OPENCODE_CLI_RUN_MODE = "true"
+
+      try {
+        const params = createParams({
+          taskSystem: false,
+          agents: ["fuxi"],
+        })
+
+        applyToolConfig(params)
+
+        const agent = params.agentResult.fuxi as {
+          permission: Record<string, unknown>
+        }
+        expect(agent.permission.question).toBe("deny")
+      } finally {
+        if (previousCliRunMode === undefined) {
+          delete process.env.OPENCODE_CLI_RUN_MODE
+        } else {
+          process.env.OPENCODE_CLI_RUN_MODE = previousCliRunMode
+        }
+      }
+    })
+  })
 })

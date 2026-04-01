@@ -11,6 +11,7 @@ import { formatDuration } from "./time-formatter"
 import { syncContinuationDeps, type SyncContinuationDeps } from "./sync-continuation-deps"
 import { setSessionTools } from "../../shared/session-tools-store"
 import { normalizeSDKResponse } from "../../shared"
+import { subagentSessions, syncSubagentSessions } from "../../features/claude-code-session-state"
 
 export async function executeSyncContinuation(
   args: DelegateTaskArgs,
@@ -23,11 +24,40 @@ export async function executeSyncContinuation(
   const taskId = `resume_sync_${args.session_id!.slice(0, 8)}`
   const startTime = new Date()
 
+  let resumeAgent: string | undefined
+  let resumeModel: { providerID: string; modelID: string } | undefined
+  let resumeVariant: string | undefined
+  let anchorMessageCount: number | undefined
+
+  try {
+    const messagesResp = await client.session.messages({ path: { id: args.session_id! } })
+    const messages = normalizeSDKResponse(messagesResp, [] as SessionMessage[])
+    anchorMessageCount = messages.length
+    for (let i = messages.length - 1; i >= 0; i--) {
+      const info = messages[i].info
+      if (info?.agent || info?.model || (info?.modelID && info?.providerID)) {
+        resumeAgent = info.agent
+        resumeModel = info.model ?? (info.providerID && info.modelID ? { providerID: info.providerID, modelID: info.modelID } : undefined)
+        resumeVariant = info.variant
+        break
+      }
+    }
+  } catch {
+    const resumeMessageDir = getMessageDir(args.session_id!)
+    const resumeMessage = resumeMessageDir ? findNearestMessageWithFields(resumeMessageDir) : null
+    resumeAgent = resumeMessage?.agent
+    resumeModel = resumeMessage?.model?.providerID && resumeMessage?.model?.modelID
+      ? { providerID: resumeMessage.model.providerID, modelID: resumeMessage.model.modelID }
+      : undefined
+    resumeVariant = resumeMessage?.model?.variant
+  }
+
   if (toastManager) {
     toastManager.addTask({
       id: taskId,
+      sessionID: args.session_id,
       description: args.description,
-      agent: "continue",
+      agent: resumeAgent ?? "continue",
       isBackground: false,
     })
   }
@@ -36,6 +66,7 @@ export async function executeSyncContinuation(
     title: `Continue: ${args.description}`,
     metadata: {
       prompt: args.prompt,
+      agent: resumeAgent,
       load_skills: args.load_skills,
       description: args.description,
       run_in_background: args.run_in_background,
@@ -49,34 +80,21 @@ export async function executeSyncContinuation(
     storeToolMetadata(ctx.sessionID, ctx.callID, syncContMeta)
   }
 
-  let resumeAgent: string | undefined
-  let resumeModel: { providerID: string; modelID: string } | undefined
-  let resumeVariant: string | undefined
-  let anchorMessageCount: number | undefined
+  if (args.session_id) {
+    subagentSessions.add(args.session_id)
+    syncSubagentSessions.add(args.session_id)
+  }
+
+  if (executorCtx.onSyncSessionCreated && args.session_id) {
+    await executorCtx.onSyncSessionCreated({
+      sessionID: args.session_id,
+      parentID: ctx.sessionID,
+      title: args.description,
+    }).catch(() => {})
+    await new Promise(r => setTimeout(r, 200))
+  }
 
   try {
-    try {
-      const messagesResp = await client.session.messages({ path: { id: args.session_id! } })
-      const messages = normalizeSDKResponse(messagesResp, [] as SessionMessage[])
-      anchorMessageCount = messages.length
-      for (let i = messages.length - 1; i >= 0; i--) {
-        const info = messages[i].info
-        if (info?.agent || info?.model || (info?.modelID && info?.providerID)) {
-          resumeAgent = info.agent
-          resumeModel = info.model ?? (info.providerID && info.modelID ? { providerID: info.providerID, modelID: info.modelID } : undefined)
-          resumeVariant = info.variant
-          break
-        }
-      }
-    } catch {
-      const resumeMessageDir = getMessageDir(args.session_id!)
-      const resumeMessage = resumeMessageDir ? findNearestMessageWithFields(resumeMessageDir) : null
-      resumeAgent = resumeMessage?.agent
-      resumeModel = resumeMessage?.model?.providerID && resumeMessage?.model?.modelID
-        ? { providerID: resumeMessage.model.providerID, modelID: resumeMessage.model.modelID }
-        : undefined
-      resumeVariant = resumeMessage?.model?.variant
-    }
 
     const lowerAgent = resumeAgent?.toLowerCase() ?? ""
     const allowTask =

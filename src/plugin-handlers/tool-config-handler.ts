@@ -141,7 +141,7 @@ export function applyToolConfig(params: {
       ...fuxi.permission,
       call_witty_agent: "deny",
       task: "allow",
-      question: "deny",
+      question: questionPermission,
       "task_*": "allow",
       teammate: "allow",
       ...denyTodoTools,
