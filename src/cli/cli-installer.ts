@@ -37,7 +37,7 @@ export async function runCliInstaller(args: InstallArgs, version: string): Promi
     }
     console.log()
     printInfo(
-      "Usage: bunx witty-diagnosis-agent install --no-tui --claude=<no|yes|max20> --gemini=<no|yes> --copilot=<no|yes>",
+      "Usage: npx witty-diagnosis-agent install --no-tui --claude=<no|yes|max20> --gemini=<no|yes> --copilot=<no|yes>",
     )
     console.log()
     return 1

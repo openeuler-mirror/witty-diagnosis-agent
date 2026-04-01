@@ -5,7 +5,6 @@ import re
 import argparse
 from datetime import datetime
 
-# Common timestamp patterns
 TIME_PATTERNS = [
     r'(\w{3}\s+\d+\s+\d{2}:\d{2}:\d{2})',
     r'(\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}:\d{2})',
@@ -29,21 +28,17 @@ def read_log_content(file_path):
         return ""
 
 def is_in_time_range(line, start_dt, end_dt, date_str):
-    # If generic date string is provided
     if date_str:
         if date_str in line:
             return True
         if not start_dt and not end_dt:
             return False
     
-    # If precise time range
     if start_dt or end_dt:
-        # Try to extract timestamp
         for pattern in TIME_PATTERNS:
             match = re.search(pattern, line)
             if match:
                 ts_str = match.group(1)
-                # Try parsing
                 fmts = ["%b %d %H:%M:%S", "%Y-%m-%d %H:%M:%S", "%Y-%m-%dT%H:%M:%S", "%m/%d/%Y %H:%M:%S"]
                 for fmt in fmts:
                     try:
@@ -54,49 +49,46 @@ def is_in_time_range(line, start_dt, end_dt, date_str):
                         return True
                     except:
                         continue
-        # If line has no timestamp but we are filtering by time, skip it
         return False
         
     return True
 
 def classify_scene(log_dir, keywords=None, start_dt=None, end_dt=None, date_str=None):
-    # Read log files
     kernel_log = ""
     systemd_log = ""
     fsck_log = ""
     sysmsg_log = ""
     smart_log = ""
     
-    # Find and read kernel logs
+    ibmc_dir = os.path.join(log_dir, "ibmc_logs")
+    infocollect_dir = os.path.join(log_dir, "infocollect_logs")
+    messages_dir = os.path.join(log_dir, "messages")
+    
     kernel_files = find_files(log_dir, r".*dmesg.*")
     for file in kernel_files:
         kernel_log += read_log_content(file)
     
-    # Find and read systemd logs
     systemd_files = find_files(log_dir, r".*systemd.*|.*boot.*")
     for file in systemd_files:
         systemd_log += read_log_content(file)
     
-    # Find and read fsck logs
     fsck_files = find_files(log_dir, r".*fsck.*")
     for file in fsck_files:
         fsck_log += read_log_content(file)
     
-    # Find and read system messages
     sysmsg_files = find_files(log_dir, r".*messages.*|.*syslog.*")
     for file in sysmsg_files:
         sysmsg_log += read_log_content(file)
     
-    # Find and read SMART logs
-    smart_files = find_files(log_dir, r".*smart.*")
+    smart_files = find_files(log_dir, r".*smart.*|disk_smart.*")
     for file in smart_files:
         smart_log += read_log_content(file)
     
     scene = "UNKNOWN"
     confidence = "LOW"
     reasons = []
+    evidence = []
     
-    # Helper function to check if line matches time/keyword filters
     def check_line(line, pattern):
         if not is_in_time_range(line, start_dt, end_dt, date_str):
             return False
@@ -107,7 +99,6 @@ def classify_scene(log_dir, keywords=None, start_dt=None, end_dt=None, date_str=
             return False
         return True
     
-    # --- Rule 1: Disk Hardware Failure (highest priority) ---
     if smart_log:
         lines = smart_log.split('\n')
         for line in lines:
@@ -116,11 +107,13 @@ def classify_scene(log_dir, keywords=None, start_dt=None, end_dt=None, date_str=
                     scene = "DISK_FAILURE"
                     confidence = "HIGH"
                     reasons.append("SMART状态显示磁盘故障或即将故障")
+                    evidence.append(line.strip()[:200])
                     break
                 elif re.search(r'Reallocated_Sector_Ct.*[1-9]|Current_Pending_Sector.*[1-9]', line, re.IGNORECASE):
                     scene = "DISK_FAILURE"
                     confidence = "MEDIUM"
                     reasons.append("SMART检测到坏扇区")
+                    evidence.append(line.strip()[:200])
                     break
     
     if kernel_log and scene == "UNKNOWN":
@@ -131,9 +124,9 @@ def classify_scene(log_dir, keywords=None, start_dt=None, end_dt=None, date_str=
                     scene = "DISK_FAILURE"
                     confidence = "HIGH"
                     reasons.append("内核日志检测到硬件错误")
+                    evidence.append(line.strip()[:200])
                     break
     
-    # --- Rule 2: File System Corruption ---
     if fsck_log and scene == "UNKNOWN":
         lines = fsck_log.split('\n')
         for line in lines:
@@ -142,6 +135,7 @@ def classify_scene(log_dir, keywords=None, start_dt=None, end_dt=None, date_str=
                     scene = "FS_CORRUPTION"
                     confidence = "HIGH"
                     reasons.append("fsck检测到文件系统错误")
+                    evidence.append(line.strip()[:200])
                     break
     
     if kernel_log and scene == "UNKNOWN":
@@ -152,9 +146,9 @@ def classify_scene(log_dir, keywords=None, start_dt=None, end_dt=None, date_str=
                     scene = "FS_CORRUPTION"
                     confidence = "HIGH"
                     reasons.append("内核日志报告文件系统错误")
+                    evidence.append(line.strip()[:200])
                     break
     
-    # --- Rule 3: I/O Error ---
     if kernel_log and scene == "UNKNOWN":
         lines = kernel_log.split('\n')
         for line in lines:
@@ -163,9 +157,9 @@ def classify_scene(log_dir, keywords=None, start_dt=None, end_dt=None, date_str=
                     scene = "IO_ERROR"
                     confidence = "HIGH"
                     reasons.append("内核日志检测到I/O错误")
+                    evidence.append(line.strip()[:200])
                     break
     
-    # --- Rule 4: Mount Error ---
     if systemd_log and scene == "UNKNOWN":
         lines = systemd_log.split('\n')
         for line in lines:
@@ -174,6 +168,7 @@ def classify_scene(log_dir, keywords=None, start_dt=None, end_dt=None, date_str=
                     scene = "MOUNT_ERROR"
                     confidence = "HIGH"
                     reasons.append("systemd启动日志显示挂载失败")
+                    evidence.append(line.strip()[:200])
                     break
     
     if kernel_log and scene == "UNKNOWN":
@@ -184,9 +179,9 @@ def classify_scene(log_dir, keywords=None, start_dt=None, end_dt=None, date_str=
                     scene = "MOUNT_ERROR"
                     confidence = "MEDIUM"
                     reasons.append("内核日志报告挂载错误")
+                    evidence.append(line.strip()[:200])
                     break
     
-    # --- Rule 5: Space Issue ---
     if sysmsg_log and scene == "UNKNOWN":
         lines = sysmsg_log.split('\n')
         for line in lines:
@@ -195,6 +190,7 @@ def classify_scene(log_dir, keywords=None, start_dt=None, end_dt=None, date_str=
                     scene = "SPACE_ISSUE"
                     confidence = "HIGH"
                     reasons.append("系统日志显示磁盘空间不足")
+                    evidence.append(line.strip()[:200])
                     break
     
     if kernel_log and scene == "UNKNOWN":
@@ -205,9 +201,9 @@ def classify_scene(log_dir, keywords=None, start_dt=None, end_dt=None, date_str=
                     scene = "SPACE_ISSUE"
                     confidence = "MEDIUM"
                     reasons.append("内核日志报告空间不足")
+                    evidence.append(line.strip()[:200])
                     break
     
-    # --- Rule 6: Permission Issue ---
     if sysmsg_log and scene == "UNKNOWN":
         lines = sysmsg_log.split('\n')
         for line in lines:
@@ -216,9 +212,10 @@ def classify_scene(log_dir, keywords=None, start_dt=None, end_dt=None, date_str=
                     scene = "PERMISSION_ISSUE"
                     confidence = "MEDIUM"
                     reasons.append("系统日志显示权限拒绝错误")
+                    evidence.append(line.strip()[:200])
                     break
     
-    return scene, confidence, reasons
+    return scene, confidence, reasons, evidence
 
 def main():
     parser = argparse.ArgumentParser(
@@ -233,7 +230,7 @@ Usage Examples:
         """
     )
     
-    parser.add_argument("log_dir", help="Directory containing file system logs")
+    parser.add_argument("log_dir", help="Root directory containing 'ibmc_logs', 'infocollect_logs', and 'messages' folders")
     parser.add_argument("-k", "--keywords", nargs="+", metavar="WORD",
                         help="Additional keywords to search for")
     parser.add_argument("-d", "--date", metavar="DATE_STR",
@@ -270,7 +267,7 @@ Usage Examples:
     print("================================================================")
     print()
     
-    scene, confidence, reasons = classify_scene(
+    scene, confidence, reasons, evidence = classify_scene(
         args.log_dir, 
         args.keywords, 
         start_dt, 
@@ -290,38 +287,43 @@ Usage Examples:
         print("    • 未命中任何自动规则，需人工分析")
     print()
     
+    if evidence:
+        print("  关键证据：")
+        for i, e in enumerate(evidence[:3], 1):
+            print(f"    [{i}] {e}")
+        print()
+    
     print("================================================================")
     print(" 下一步建议")
     print("================================================================")
     
     if scene == "FS_CORRUPTION":
-        print("  执行：python3 scripts/diagnose_fs_corruption.py <log_dir>")
+        print("  执行：python3 scripts/diagnose_messages.py <log_dir>/messages -k \"EXT4-fs error\" \"XFS.*error\"")
         print("  重点：fsck结果分析 → 损坏类型定位 → 修复方案评估")
     elif scene == "DISK_FAILURE":
         print("  ⚠️  硬件故障优先：停止写入操作！")
-        print("  执行：python3 scripts/diagnose_disk_failure.py <log_dir>")
+        print("  执行：python3 scripts/diagnose_infocollect.py <log_dir>/infocollect_logs")
         print("  重点：SMART指标分析 → 确认故障程度 → 数据备份 → 更换磁盘")
     elif scene == "MOUNT_ERROR":
-        print("  执行：python3 scripts/diagnose_mount_error.py <log_dir>")
+        print("  执行：python3 scripts/diagnose_messages.py <log_dir>/messages -k \"mount\" \"failed\"")
         print("  重点：fstab配置检查 → 设备UUID对比 → 挂载选项验证")
     elif scene == "IO_ERROR":
-        print("  执行：python3 scripts/diagnose_io_error.py <log_dir>")
+        print("  执行：python3 scripts/diagnose_messages.py <log_dir>/messages -k \"I/O error\"")
         print("  重点：I/O错误定位 → 受影响设备确认 → 根因分析（硬件/驱动/文件系统）")
     elif scene == "PERMISSION_ISSUE":
-        print("  执行：python3 scripts/diagnose_permission.py <log_dir>")
+        print("  执行：python3 scripts/diagnose_messages.py <log_dir>/messages -k \"Permission denied\"")
         print("  重点：权限配置检查 → SELinux/AppArmor状态 → 用户/组权限")
     elif scene == "SPACE_ISSUE":
-        print("  执行：python3 scripts/diagnose_space.py <log_dir>")
+        print("  执行：python3 scripts/diagnose_messages.py <log_dir>/messages -k \"No space left\"")
         print("  重点：空间使用分析 → 大文件定位 → 清理建议")
     else:  # UNKNOWN
         print("  ⚠️  无法自动判断，建议手动执行日志分析：")
-        print("  执行：python3 scripts/diagnose_fs_summary.py <log_dir> -o")
+        print("  执行：python3 scripts/diagnose_summary.py <log_dir>")
         print("  或人工审查各日志文件中的ERROR、FAIL、WARNING关键词")
     
     print()
     print("================================================================")
     
-    # Save scene to file for other scripts
     try:
         with open("/tmp/fs_diagnosis_scene.conf", "w") as f:
             f.write(f"SCENE={scene}\n")
