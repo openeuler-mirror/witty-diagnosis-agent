@@ -3,8 +3,8 @@ import { FUXI_INTERVIEW_MODE } from "./interview-mode"
 import { FUXI_PLAN_GENERATION } from "./plan-generation"
 import { FUXI_PLAN_TEMPLATE } from "./plan-template"
 import { FUXI_BEHAVIORAL_SUMMARY } from "./behavioral-summary"
-import { isGptModel, isGeminiModel } from "../types"
-import { getSharedEnvPrompt } from "../shared-env-prompt"
+import { isGptModel, isGeminiModel } from "../../types"
+import { getSharedEnvPrompt } from "../../shared-env-prompt"
 
 /**
  * Combined Fuxi system prompt (Claude-optimized, default).

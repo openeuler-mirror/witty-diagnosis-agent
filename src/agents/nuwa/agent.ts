@@ -302,7 +302,7 @@ createNuwaAgent.mode = MODE
 
 export const nuwaPromptMetadata: AgentPromptMetadata = {
   category: "specialist",
-  cost: "MEDIUM",
+  cost: "EXPENSIVE",
   promptAlias: "Nuwa",
   triggers: [
     {

@@ -1,4 +1,4 @@
-import { FUXI_PERMISSION, getFuxiPrompt } from "../agents/fuxi/fuxi";
+import { FUXI_SUB_PERMISSION, getFuxiSubPrompt } from "../agents/fuxi/fuxi-sub/system-prompt";
 import { resolvePromptAppend } from "../agents/builtin-agents/resolve-file-uri";
 import { AGENT_MODEL_REQUIREMENTS } from "../shared/model-requirements";
 import {
@@ -9,7 +9,7 @@ import {
 import { resolveCategoryConfig } from "./category-config-resolver";
 import type { CategoryConfig } from "../config/schema/categories";
 
-type FuxiOverride = Record<string, unknown> & {
+type FuxiSubOverride = Record<string, unknown> & {
   category?: string;
   model?: string;
   variant?: string;
@@ -22,17 +22,17 @@ type FuxiOverride = Record<string, unknown> & {
   prompt_append?: string;
 };
 
-export async function buildFuxiAgentConfig(params: {
+export async function buildFuxiSubAgentConfig(params: {
   configAgentPlan: Record<string, unknown> | undefined;
-  pluginFuxiOverride: FuxiOverride | undefined;
+  pluginFuxiSubOverride: FuxiSubOverride | undefined;
   userCategories: Record<string, CategoryConfig> | undefined;
   currentModel: string | undefined;
 }): Promise<Record<string, unknown>> {
-  const categoryConfig = params.pluginFuxiOverride?.category
-    ? resolveCategoryConfig(params.pluginFuxiOverride.category, params.userCategories)
+  const categoryConfig = params.pluginFuxiSubOverride?.category
+    ? resolveCategoryConfig(params.pluginFuxiSubOverride.category, params.userCategories)
     : undefined;
 
-  const requirement = AGENT_MODEL_REQUIREMENTS["fuxi"];
+  const requirement = AGENT_MODEL_REQUIREMENTS["fuxi-sub"] || AGENT_MODEL_REQUIREMENTS["fuxi"];
   const connectedProviders = readConnectedProvidersCache();
   const availableModels = await fetchAvailableModels(undefined, {
     connectedProviders: connectedProviders ?? undefined,
@@ -41,7 +41,7 @@ export async function buildFuxiAgentConfig(params: {
   const modelResolution = resolveModelPipeline({
     intent: {
       uiSelectedModel: params.currentModel,
-      userModel: params.pluginFuxiOverride?.model ?? categoryConfig?.model,
+      userModel: params.pluginFuxiSubOverride?.model ?? categoryConfig?.model,
     },
     constraints: { availableModels },
     policy: {
@@ -53,25 +53,25 @@ export async function buildFuxiAgentConfig(params: {
   const resolvedModel = modelResolution?.model;
   const resolvedVariant = modelResolution?.variant;
 
-  const variantToUse = params.pluginFuxiOverride?.variant ?? resolvedVariant;
+  const variantToUse = params.pluginFuxiSubOverride?.variant ?? resolvedVariant;
   const reasoningEffortToUse =
-    params.pluginFuxiOverride?.reasoningEffort ?? categoryConfig?.reasoningEffort;
+    params.pluginFuxiSubOverride?.reasoningEffort ?? categoryConfig?.reasoningEffort;
   const textVerbosityToUse =
-    params.pluginFuxiOverride?.textVerbosity ?? categoryConfig?.textVerbosity;
-  const thinkingToUse = params.pluginFuxiOverride?.thinking ?? categoryConfig?.thinking;
+    params.pluginFuxiSubOverride?.textVerbosity ?? categoryConfig?.textVerbosity;
+  const thinkingToUse = params.pluginFuxiSubOverride?.thinking ?? categoryConfig?.thinking;
   const temperatureToUse =
-    params.pluginFuxiOverride?.temperature ?? categoryConfig?.temperature;
-  const topPToUse = params.pluginFuxiOverride?.top_p ?? categoryConfig?.top_p;
+    params.pluginFuxiSubOverride?.temperature ?? categoryConfig?.temperature;
+  const topPToUse = params.pluginFuxiSubOverride?.top_p ?? categoryConfig?.top_p;
   const maxTokensToUse =
-    params.pluginFuxiOverride?.maxTokens ?? categoryConfig?.maxTokens;
+    params.pluginFuxiSubOverride?.maxTokens ?? categoryConfig?.maxTokens;
 
   const base: Record<string, unknown> = {
     ...(resolvedModel ? { model: resolvedModel } : {}),
     ...(variantToUse ? { variant: variantToUse } : {}),
-    mode: "all",
-    prompt: await getFuxiPrompt(resolvedModel),
-    permission: FUXI_PERMISSION,
-    description: `${(params.configAgentPlan?.description as string) ?? "Plan agent"} (Fuxi - WittyDiagnosisAgent)`,
+    mode: "subagent",
+    prompt: await getFuxiSubPrompt(resolvedModel),
+    permission: FUXI_SUB_PERMISSION,
+    description: `${(params.configAgentPlan?.description as string) ?? "Plan agent"} (FuxiSub - WittyDiagnosisAgent)`,
     color: (params.configAgentPlan?.color as string) ?? "#FF5722",
     ...(temperatureToUse !== undefined ? { temperature: temperatureToUse } : {}),
     ...(topPToUse !== undefined ? { top_p: topPToUse } : {}),
@@ -86,7 +86,7 @@ export async function buildFuxiAgentConfig(params: {
       : {}),
   };
 
-  const override = params.pluginFuxiOverride;
+  const override = params.pluginFuxiSubOverride;
   if (!override) return base;
 
   const { prompt_append, ...restOverride } = override;

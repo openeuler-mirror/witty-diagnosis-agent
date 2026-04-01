@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test"
 
-import { OMO_INTERNAL_INITIATOR_MARKER } from "../shared"
+import { WITTY_INTERNAL_INITIATOR_MARKER } from "../shared"
 import { createChatHeadersHandler } from "./chat-headers"
 
 describe("createChatHeadersHandler", () => {
@@ -14,7 +14,7 @@ describe("createChatHeadersHandler", () => {
                 parts: [
                   {
                     type: "text",
-                    text: `notification\n${OMO_INTERNAL_INITIATOR_MARKER}`,
+                    text: `notification\n${WITTY_INTERNAL_INITIATOR_MARKER}`,
                   },
                 ],
               },
@@ -50,7 +50,7 @@ describe("createChatHeadersHandler", () => {
                 parts: [
                   {
                     type: "text",
-                    text: `notification\n${OMO_INTERNAL_INITIATOR_MARKER}`,
+                    text: `notification\n${WITTY_INTERNAL_INITIATOR_MARKER}`,
                   },
                 ],
               },

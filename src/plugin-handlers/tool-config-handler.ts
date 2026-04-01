@@ -87,6 +87,54 @@ export function applyToolConfig(params: {
       ...denyTodoTools,
     };
   }
+  const xuanyuan = agentByKey(params.agentResult, "xuanyuan");
+  if (xuanyuan) {
+    xuanyuan.permission = {
+      ...xuanyuan.permission,
+      call_witty_agent: "deny",
+      task: "allow",
+      question: questionPermission,
+      "task_*": "allow",
+      teammate: "allow",
+      ...denyTodoTools,
+    };
+  }
+  const kuafu = agentByKey(params.agentResult, "kuafu");
+  if (kuafu) {
+    kuafu.permission = {
+      ...kuafu.permission,
+      call_witty_agent: "deny",
+      task: "allow",
+      question: questionPermission,
+      "task_*": "allow",
+      teammate: "allow",
+      ...denyTodoTools,
+    };
+  }
+  const baize = agentByKey(params.agentResult, "baize");
+  if (baize) {
+    baize.permission = {
+      ...baize.permission,
+      call_witty_agent: "deny",
+      task: "allow",
+      question: questionPermission,
+      "task_*": "allow",
+      teammate: "allow",
+      ...denyTodoTools,
+    };
+  }
+  const nuwa = agentByKey(params.agentResult, "nuwa");
+  if (nuwa) {
+    nuwa.permission = {
+      ...nuwa.permission,
+      call_witty_agent: "deny",
+      task: "allow",
+      question: questionPermission,
+      "task_*": "allow",
+      teammate: "allow",
+      ...denyTodoTools,
+    };
+  }
   const fuxi = agentByKey(params.agentResult, "fuxi");
   if (fuxi) {
     fuxi.permission = {

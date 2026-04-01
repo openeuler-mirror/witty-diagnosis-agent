@@ -1,4 +1,4 @@
-import { OMO_INTERNAL_INITIATOR_MARKER } from "../shared"
+import { WITTY_INTERNAL_INITIATOR_MARKER } from "../shared"
 import type { PluginContext } from "./types"
 
 type ChatHeadersInput = {
@@ -84,7 +84,7 @@ async function hasInternalMarker(
         return false
       }
 
-      return part.text.includes(OMO_INTERNAL_INITIATOR_MARKER)
+      return part.text.includes(WITTY_INTERNAL_INITIATOR_MARKER)
     })
 
     internalMarkerCache.set(cacheKey, hasMarker)

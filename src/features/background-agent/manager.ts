@@ -270,6 +270,9 @@ export class BackgroundManager {
       body: {
         parentID: input.parentSessionID,
         title: `${input.description} (@${input.agent} subagent)`,
+        permission: [
+          { permission: "question", action: "deny", pattern: "*" },
+        ],
       } as Record<string, unknown>,
       query: {
         directory: parentDirectory,
@@ -359,8 +362,8 @@ export class BackgroundManager {
           const tools = {
             task: false,
             call_witty_agent: true,
-            question: false,
             ...getAgentToolRestrictions(input.agent),
+            question: false,
           }
           setSessionTools(sessionID, tools)
           return tools
@@ -632,8 +635,8 @@ export class BackgroundManager {
           const tools = {
             task: false,
             call_witty_agent: true,
-            question: false,
             ...getAgentToolRestrictions(existingTask.agent),
+            question: false,
           }
           setSessionTools(existingTask.sessionID!, tools)
           return tools

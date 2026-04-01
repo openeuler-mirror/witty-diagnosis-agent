@@ -19,21 +19,12 @@ export async function getSharedEnvPrompt(): Promise<string> {
 
   const hostsFile = path.join(os.homedir(), ".witty-diagnosis-agent", "ansible", "hosts.ini");
   if (fs.existsSync(hostsFile)) {
-    try {
-      const hostsConfig = await fs.promises.readFile(hostsFile, "utf8");
-      if (hostsConfig.trim()) {
-        extraPrompt += `- **Ansible Inventory**: 配置文件存在 (\`${hostsFile}\`)，内容如下：\n\`\`\`ini\n${hostsConfig.trim()}\n\`\`\`\n`;
-      } else {
-        extraPrompt += `- **Ansible Inventory**: 配置文件存在 (\`${hostsFile}\`)，但内容为空。\n`;
-      }
-    } catch (e) {
-      extraPrompt += `- **Ansible Inventory**: 配置文件存在 (\`${hostsFile}\`)，但读取失败。\n`;
-    }
+    extraPrompt += `- **Ansible Inventory**: 配置文件路径存在 (\`${hostsFile}\`)。该路径信息仅供参考，表示这里保存过历史服务器记录；当前用户对应的目标服务器**不一定**在这个文件中，后续必须将用户本次输入与该路径对应的历史记录做比对，严禁仅凭该文件路径或历史记录直接认定连接信息已明确。\n`;
   } else {
     extraPrompt += `- **Ansible Inventory**: 配置文件不存在 (\`${hostsFile}\`)。\n`;
   }
 
-  extraPrompt += "\n**注意：如果上述预检查信息显示 Ansible 已安装，或 inventory 配置文件已存在，请直接使用上述信息，切勿再反复调用 bash 探测。**\n";
+  extraPrompt += "\n**注意：如果上述预检查信息显示 Ansible 已安装，或 inventory 路径已存在，可将其作为环境参考信息；但不得把它当成当前用户目标服务器已确认的证据，更不要读取其中历史内容替代用户输入。**\n";
 
   const currentTime = new Date().toISOString();
   extraPrompt += `\n# 当前系统时间\n当前时间为: ${currentTime}\n`;

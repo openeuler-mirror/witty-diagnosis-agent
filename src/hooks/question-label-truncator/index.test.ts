@@ -132,5 +132,22 @@ describe("createQuestionLabelTruncatorHook", () => {
       expect(q2opts[0].label).toBe("Another extremely long labe...");
       expect(q2opts[0].label.length).toBeLessThanOrEqual(30);
     });
+
+    it("normalizes missing options for question tool", async () => {
+      const input = { tool: "question" };
+      const output = {
+        args: {
+          questions: [
+            {
+              question: "请输入日志路径",
+            },
+          ],
+        },
+      };
+
+      await hook["tool.execute.before"]?.(input as any, output as any);
+
+      expect((output.args as any).questions[0].options).toEqual([]);
+    });
   });
 });
