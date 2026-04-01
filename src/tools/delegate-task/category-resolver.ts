@@ -76,6 +76,7 @@ export async function resolveCategoryExecution(
   } else {
     const resolution = resolveModelForDelegateTask({
       userModel: explicitCategoryModel,
+      inheritedModel,
       categoryDefaultModel: resolved.model,
       fallbackChain: requirement.fallbackChain,
       availableModels,
@@ -102,16 +103,16 @@ export async function resolveCategoryExecution(
       const type: "user-defined" | "inherited" | "category-default" | "system-default" =
         explicitCategoryModel
           ? "user-defined"
-          : (systemDefaultModel && actualModel === systemDefaultModel)
-              ? "system-default"
-              : "category-default"
+          : (inheritedModel && actualModel === inheritedModel)
+              ? "inherited"
+              : (systemDefaultModel && actualModel === systemDefaultModel)
+                  ? "system-default"
+                  : "category-default"
 
-      const source: "override" | "category-default" | "system-default" =
+      const source: "override" | "inherited" | "category-default" | "system-default" =
         type === "user-defined"
           ? "override"
-          : type === "system-default"
-              ? "system-default"
-              : "category-default"
+          : type
 
       modelInfo = { model: actualModel, type, source }
 
