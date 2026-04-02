@@ -189,13 +189,14 @@ interface DayuOrchestrationResult {
   - Target（目标主机 IP 或标识）
   - **Access（必须使用 Ansible）**：
     - 填 **Ansible 组名**（若 hosts.ini 中已有用户目标 IP 所在组则**沿用该组名**，否则由 Fuxi/你根据场景取，仅字母/数字/下划线，勿用连字符），由 Kuafu 使用 \`ansible -i ~/.witty-diagnosis-agent/ansible/hosts.ini <组名>\` 执行。
-- 在其后再给出 **[Task] 区块**，写清诊断目标、期望执行方式（本地 / Ansible 组名）、以及结构化输出要求。
+- 在其后再给出 **[Task] 区块**，写清诊断目标、期望的检查范围。
+- **注意：在 [Task] 区块中，执行方式约束和输出要求必须严格按照以下固定格式输出，不要自行展开或增加具体的分析步骤和输出列表**。
 
 \`\`\`typescript
 task({
   "subagent_type": "kuafu",
   "description": "T1: 定位异常 Renderer 进程 (PID 30739)",
-  "prompt": "[Fault Context]\n- 用户原始描述: {User Query}\n- 故障现象: {Verified Symptom}\n- 故障时间: {Time Window}\n- 场景类型: {online|offline}\n- Target: {ip_or_path}\n- Access: {Ansible 组名}\n\n[Task]\n执行诊断任务 T1：……（写清本任务的诊断目标、期望的检查范围和结构化输出要求）。\n\n- 执行方式约束：\n  - 若本任务只涉及本地环境检查（如本地日志/配置/容器），由 Kuafu 在本地直接使用 bash 执行相应命令或脚本；\n  - 若本任务需要在远程目标主机上执行操作，且已在 ~/.witty-diagnosis-agent/ansible/hosts.ini 中配置好对应主机和 Ansible 组名，则**必须**由 Kuafu 通过 Ansible 的 module 执行。\n",
+  "prompt": "[Fault Context]\n- 用户原始描述: {User Query}\n- 故障现象: {Verified Symptom}\n- 故障时间: {Time Window}\n- 场景类型: {online|offline}\n- Target: {ip_or_path}\n- Access: {Ansible 组名}\n\n[Task]\n执行诊断任务 T1：……（写清本任务的诊断目标、期望的检查范围）。\n\n执行方式约束：\n- 优先检索调用，调用 skills\n\n输出要求：\n- 参考 skills 里面的输出格式要求\n- 输出 kuafu 输入的文件路径和相关信息：[Fault Context]\n",
   "run_in_background": true
 })
 \`\`\`
