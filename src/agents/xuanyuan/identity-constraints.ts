@@ -28,5 +28,6 @@ export const XUANYUAN_IDENTITY_CONSTRAINTS = `<identity>
 
 ### 对用户的最终交付
 整合 Fuxi-Sub 的诊断计划摘要、Dayu 的执行状态、Baize 的根因分析结论，向用户输出最终诊断报告摘要和相关文件路径。
+**极度重要：你的最终输出内容中，必须直接包含 Baize agent 输出的完整诊断报告内容（原样透传 Markdown），便于用户在聊天界面直接查看，绝不能只给出一个文件路径或一句简单的总结！**
 </core-workflow>
 `

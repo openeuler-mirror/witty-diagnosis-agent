@@ -60,6 +60,8 @@ iBMC 日志体系
 | `RAID_Controller_Info.txt` | RAID重建 | `Rebuild` | 正在执行RAID重建 |
 | `StorageMgnt_dfl.log` | 存储通信 | `comm lost` | RAID卡通信中断 |
 | `card_manage_dfl.log` | 扣卡故障 | `card error` / `init failed` | 扣卡初始化失败 |
+| `PD_SMART_INFO_C*` | 硬盘健康预警 | `Pre-fail` / `FAILING_NOW` | 全局硬盘 SMART 健康状态汇总 |
+| `drivelog/Disk*/SMARTAttribute` | 单盘 SMART | `Old_age` / `Pre-fail` | 物理单盘底层 SMART 详细属性日志 |
 
 ---
 
@@ -226,6 +228,12 @@ grep -iE "Degraded|Offline|Rebuild|Failed" RAID_Controller_Info.txt
 
 # 查看存储管理日志
 grep -iE "comm lost|error|fail" StorageMgnt_dfl.log | tail -50
+
+# 查看全局硬盘 SMART 健康汇总
+cat LogDump/PD_SMART_INFO_C* | grep -iE "Reallocated_Sectors|Pending_Sector|Uncorrectable"
+
+# 查看物理单盘底层 SMART 详细日志（例如 Disk42）
+cat LogDump/storage/drivelog/Disk42/SMARTAttribute
 ```
 
 #### 3C：电源分析
@@ -479,6 +487,7 @@ echo "============================================"
 | ⭐⭐⭐⭐⭐ 最高 | `ps_black_box.log` | 电源故障黑匣子 |
 | ⭐⭐⭐⭐ 高 | `sel.db` | 硬件事件时间线 |
 | ⭐⭐⭐⭐ 高 | `RAID_Controller_Info.txt` | RAID 降级/离线 |
+| ⭐⭐⭐⭐ 高 | `PD_SMART_INFO_C*` | 硬盘寿命耗尽/健康预警 |
 | ⭐⭐⭐⭐ 高 | `CoreDump/core-*` | iBMC 进程崩溃 |
 | ⭐⭐⭐ 中 | `BMC_dfl.log` | iBMC 运行异常 |
 | ⭐⭐⭐ 中 | `OSDump/img*.jpeg` | OS 崩溃截图 |
@@ -487,7 +496,7 @@ echo "============================================"
 
 ---
 
-**核心原则**：iBMC 日志分析要遵循"**硬件先行、时间线优先、多源交叉验证**"。`fdm_output` 和 `sel.db` 是最权威的故障定性依据，`ps_black_box.log` 是电源类故障的不可替代证据，`OSDump` 是 OS 侧故障现场的第一手资料。
+**核心原则**：iBMC 日志分析要遵循"**硬件先行、时间线优先、多源交叉验证**"。`fdm_output` 和 `sel.db` 是最权威的故障定性依据，`PD_SMART_INFO_C*` 是预判硬盘寿命和物理坏道的关键，`ps_black_box.log` 是电源类故障的不可替代证据，`OSDump` 是 OS 侧故障现场的第一手资料。
 
 ## iBMC 日志清单（增强版）
 
@@ -554,6 +563,8 @@ echo "============================================"
 | Snmp | Snmp_dfl.log | Snmp模块日志 | SNMP代理服务运行日志 | SNMP | authentication failure |
 | StorageMgnt | RAID_Controller_Info.txt | RAID信息 | RAID卡、逻辑盘(LD)、物理盘(PD)的详细属性与状态 | RAID、硬盘 | Offline、Degraded、Rebuild |
 | StorageMgnt | StorageMgnt_dfl.log | StorageMgnt模块日志 | 存储管理模块日志，涉及RAID卡与硬盘纳管 | 存储 | comm lost |
+| StorageMgnt | PD_SMART_INFO_C* | 硬盘SMART信息 | 连接在各RAID控制器下属物理硬盘的全局SMART指标汇总 | 硬盘、存储 | Pre-fail、FAILING_NOW |
+| StorageMgnt | drivelog/Disk*/SMARTAttribute* | 硬盘底层SMART日志 | 每块被识别到的硬盘自身的详细SMART历史日志 | 硬盘、存储 | Old_age、Pre-fail |
 | Upgrade | UPGRADE_dfl.log | Upgrade模块日志 | 固件升级模块日志，记录升级过程与结果 | 固件升级 | upgrade failed、verify failed |
 | Upgrade | upgrade_info | 版本信息 | iBMC管理的各组件固件版本列表 | 固件版本 | - |
 | User | User_dfl.log | User模块日志 | 用户管理模块日志，涉及用户添加、权限修改、认证 | 用户安全 | permission denied |
