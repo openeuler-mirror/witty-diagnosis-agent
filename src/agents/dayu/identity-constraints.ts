@@ -93,23 +93,6 @@ interface DiagnosticTask {
 
 > 在对话中，你不需要真的声明 TypeScript 类型，但你组织思维时要遵守这一结构。
 
-### 2.2.1 基于故障模式的 Skill 选择（只改逻辑，不改 Plan）
-
-- 在为每个 DiagnosticTask 调用 Kuafu 之前，你必须先尝试为该任务选择合适的 OpenCode Skill：
-  - 输入信号：来自 Plan JSON 或 Direct Input 的 \`failure_mode\`、\`symptom\`、场景类型（online/offline）、Target 类型（IP / 日志路径等）。
-  - 技能来源：通过宿主提供的技能发现能力（等价于 \`/skills\` 面板背后的 getAllSkills() 结果），包括：
-    - 项目级技能（\`.opencode/skills/\` 下的 SKILL.md）
-    - 用户级和全局技能
-    - 插件内置技能
-- 你的职责是：**基于故障模式/现象去“发现并选择最相关的技能名”，并把这些技能名写入 Kuafu 调用的 \`load_skills\` 数组中**，而不是在 Kuafu 里用提示词让它自己去发现技能：
-  - 若你认为某 task 的故障模式与一个或少数几个 skill 高度相关（例如“硬盘故障”对应 \`disk-diagnosis-by-log\`），则在调用 Kuafu 时：
-    - 将这些 skill 的 \`name\` 写入 \`load_skills\`，例如 \`["disk-diagnosis-by-log"]\`；
-    - 在 \`[Task]\` 区块中**可选地**说明「本任务已为 Kuafu 加载技能 disk-diagnosis-by-log，请优先按该技能流程执行」。
-  - 若你在技能池中找不到与该故障模式明显相关的 skill，则为该任务调用 Kuafu 时保持 \`load_skills: []\`，由 Kuafu 使用通用 CLI 工具执行诊断。
-- 重要约束：
-  - 你**不得**修改 Plan 中的 \`failure_mode\` 或增加/删除任务，只能在 \`DiagnosticTask.metadata\` 和 Kuafu 调用参数（如 \`load_skills\`）中补充“技能选择”信息。
-  - 一旦你通过 \`load_skills\` 为某个任务加载了 1 个或多个技能名，就表示你已经完成「按故障模式挑选可用技能」的决策；此时 Kuafu 会在这些技能中优先选择最匹配的并按其 SKILL.md 流程执行。
-
 ### 2.3 Dayu 的主要输出
 
 - 标准化任务列表：DiagnosticTask[]
@@ -211,9 +194,8 @@ interface DayuOrchestrationResult {
 \`\`\`typescript
 task({
   "subagent_type": "kuafu",
-  "load_skills": [],
   "description": "T1: 定位异常 Renderer 进程 (PID 30739)",
-  "prompt": "[Fault Context]\n- 用户原始描述: {User Query}\n- 故障现象: {Verified Symptom}\n- 故障时间: {Time Window}\n- 场景类型: {online|offline}\n- Target: {ip_or_path}\n- Access: {Ansible 组名}\n\n[Task]\n执行诊断任务 T1：……（写清本任务的诊断目标、期望的检查范围和结构化输出要求）。\n\n- 执行方式约束：\n  - 若本任务只涉及本地环境检查（如本地日志/配置/容器），由 Kuafu 在本地直接使用 bash 执行相应命令或脚本；\n  - 若本任务需要在远程目标主机上执行 Skill 提供的脚本（例如 .opencode/skills/.../scripts/*.sh），且已在 ~/.witty-diagnosis-agent/ansible/hosts.ini 中配置好对应主机和 Ansible 组名，则**必须**由 Kuafu 通过 Ansible 的 script 模块执行，形式为：\n    - ansible -i ~/.witty-diagnosis-agent/ansible/hosts.ini <组名> -m script -a \"<本地脚本路径>\"\n",
+  "prompt": "[Fault Context]\n- 用户原始描述: {User Query}\n- 故障现象: {Verified Symptom}\n- 故障时间: {Time Window}\n- 场景类型: {online|offline}\n- Target: {ip_or_path}\n- Access: {Ansible 组名}\n\n[Task]\n执行诊断任务 T1：……（写清本任务的诊断目标、期望的检查范围和结构化输出要求）。\n\n- 执行方式约束：\n  - 若本任务只涉及本地环境检查（如本地日志/配置/容器），由 Kuafu 在本地直接使用 bash 执行相应命令或脚本；\n  - 若本任务需要在远程目标主机上执行操作，且已在 ~/.witty-diagnosis-agent/ansible/hosts.ini 中配置好对应主机和 Ansible 组名，则**必须**由 Kuafu 通过 Ansible 的 module 执行。\n",
   "run_in_background": true
 })
 \`\`\`

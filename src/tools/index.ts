@@ -37,6 +37,7 @@ type OpencodeClient = PluginInput["client"]
 export { createCallWittyAgent } from "./call-witty-agent"
 export { createLookAt } from "./look-at"
 export { createDelegateTask } from "./delegate-task"
+export { createReportVisualizationTool } from "./report-visualization"
 export {
   createTaskCreateTool,
   createTaskGetTool,

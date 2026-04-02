@@ -238,3 +238,4 @@ ehthumbs.db
 packages/
 witty-diagnosis.jsonc
 test_temp/
+src/report-visualization/data/
