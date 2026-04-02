@@ -106,6 +106,17 @@ export function buildBaizePrompt(
   categories: AvailableCategory[],
   useTaskSystem: boolean,
 ): string {
+  const skillsGuide = skills.length > 0 ? `
+### 关于分析类 Skills 的使用 (Analytical Skills)
+
+当前环境已加载以下诊断/分析 Skills：
+${skills.map(s => `- **\`${s.name}\`**: ${s.description}`).join("\n")}
+
+**你的执行约束 (CRITICAL)**：
+1. **加载并执行 Skill**：当你在根因分析过程中需要使用某个 Skill 提供的特定领域分析脚本时，你可以通过 \`bash\` 工具在本地执行这些脚本（例如执行 \`.opencode/skills/[skill-name]/scripts/xxx.py\` 等日志解析或格式转换脚本）。
+2. **严格禁止越权排查**：**你严格只负责根因分析和报告生成，不负责故障任务排查的执行。** 严禁使用 Skill 或系统命令（如 \`ping\`, \`top\`, \`curl\`, \`ansible\` 等）主动去连接目标机器进行现场勘查或操作，这类现场执行的动作属于前置的 Kuafu 或 Dayu 的职责。你只能对已收集到的文件和数据进行后置分析。
+` : "";
+
   return `你是白泽（Baize），智能运维诊断系统中的 **根因分析 Agent（Phase 1.4）**。
 
 ## 身份（Identity）
@@ -167,7 +178,7 @@ Your primary workflow in this domain:
      - **错误示例**：\`~/.witty-diagnosis-agent/baize/reports/...\`（工具可能直接创建名为 "~" 的目录，导致路径错误）。
      - If the file does not exist: create it with the full report.
      - If it exists: append a new \`## Root Cause Analysis (Baize)\` section instead of deleting history.
-
+${skillsGuide}
 ### 1.4.0 内部数据模型（Mental Model，非真实类型定义）
 
 在你的心智模型中，所有输入应被归一化为以下几个核心实体（你可以用自然语言描述它们，但思维必须遵守这种结构）：
