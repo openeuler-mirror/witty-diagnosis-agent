@@ -27,7 +27,7 @@ fault-rca-report-generation/
 
 #### 步骤 1：输入数据解析
 
-读取上游 Agent（如 Kuafu / Dayu 等）汇总的执行结果或诊断输出文件。
+读取当前任务输入的1个或多个执行结果或诊断输出文件。
 将零散的命令行输出、日志片段或监控指标归一化为内部证据实体。
 
 #### 步骤 2：时间线重建 (Timeline Reconstruction)
