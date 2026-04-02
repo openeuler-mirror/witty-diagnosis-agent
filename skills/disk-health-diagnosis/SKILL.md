@@ -1,290 +1,211 @@
 ---
 name: disk-health-diagnosis
 description: >
-  服务器磁盘健康全栈诊断与故障预测。当用户上传或提到服务器日志包、询问磁盘健康状态、
-  磁盘故障排查、I/O 性能异常、RAID 降级、硬盘预测性维护时，必须使用本技能。
-  支持三类日志来源：①iBMC 带外日志（华为/浪潮/H3C）②OS infocollect 包（SMART/iostat/RAID）
-  ③/var/log/messages 系统日志。输出综合评分（0~100）与五级风险等级及处置建议。
-  即使用户只说"帮我看看磁盘""服务器磁盘有没有问题""分析一下这个日志包"也要触发本技能。
+  服务器磁盘健康全栈诊断与故障预测技能。面向存储运维/SRE/硬件故障预测团队，
+  系统性阐述并执行"在磁盘尚未发生故障时，如何通过多层检测手段提前识别风险"的完整方法论。
+  覆盖 L1~L6 六层检测体系，基于现状、趋势、背景三视角进行故障预测。
+  支持三类日志来源：①iBMC 带外日志（华为/浪潮/H3C）②OS infocollect 包 ③系统日志。
+  输出风险评分、P0~P3风险等级（四类归因）及分级处置建议。
 ---
 
-# 磁盘健康诊断技能
+# 磁盘健康全栈诊断与故障预测技能
 
-## 概述
+## 一、预测核心判断逻辑
 
-本技能覆盖服务器磁盘全栈诊断，目标是在物理故障前 3~7 天识别预警信号，避免非计划停机。
+本技能的诊断逻辑不仅是事后判断"现在坏没坏"，而是基于趋势和多层指标，综合评估**"它是否正在走向失败，走得多快"**。在执行诊断时，需要同时回答三个问题：
+1. **现状**：当前健康状态是否已有异常？（单点值）
+2. **趋势**：关键指标是否在持续劣化？（diff/增长率）
+3. **背景**：环境、寿命、负载是否放大了风险？（上下文）
 
-**三层数据来源（权重）：**
-- **iBMC 带外层**（35%）— 硬件真实状态，华为/浪潮/H3C 三厂商
-- **OS infocollect 层**（45%）— SMART 指标、I/O 性能、RAID 状态
-- **OS messages 层**（20%）— 内核事件、文件系统报错时间线
+## 二、分层检测体系
 
-详细字段阈值、厂商路径对照、诊断脚本见：
-- `references/thresholds.md` — SMART 字段完整阈值表、ASC/ASCQ 释义、NVMe/SSD 专项
-- `references/ibmc_paths.md` — 三厂商 iBMC 日志路径对照表
-- `scripts/disk_score.sh` — 全自动综合评分脚本
+磁盘故障预测应覆盖 6 个层次，不能只看盘本体。
+```text
+┌────────────────────────────────────────────────────┐ 
+│  L6  业务与存储服务层  OSD / EVS / ECS / 块存储       │ 
+├────────────────────────────────────────────────────┤ 
+│  L5  文件系统与OS层    dmesg / kernel / mount        │ 
+├────────────────────────────────────────────────────┤ 
+│  L4  控制器与链路层    RAID / HBA / SAS / CRC        │ 
+├────────────────────────────────────────────────────┤ 
+│  L3  槽位与环境层      Slot / 温度 / 背板 / 电源       │ 
+├────────────────────────────────────────────────────┤ 
+│  L2  寿命与负载层      上电时间 / 启停次数 / IO压力     │ 
+├────────────────────────────────────────────────────┤ 
+│  L1  盘本体 SMART 层   健康状态 / 错误计数 / 缺陷趋势   │ 
+└────────────────────────────────────────────────────┘ 
+            ↑  越往下越接近介质本身，越往上越接近业务影响
+```
+**预测重点**：L1 + L3 + 趋势维度，是提前发现故障最有价值的三个方向。
 
----
+## 三、各层详细检测项与指标
 
-## 诊断执行流程（SOP）
+### L1 & L2：盘本体及负载寿命层 (SMART + 负载)
+检测目的：直接判断磁盘介质是否出现物理损伤（L1）并结合设备负载及寿命消耗进行综合风险评估（L2）。
 
-按以下 5 步顺序执行。**禁止使用一票否决制中断流程，必须完成全部步骤的全面诊断后，再基于所有证据给出综合结论。**
+**优先使用自动化脚本检测**：
+诊断时必须优先使用内置的自动化脚本：`skills/disk-health-diagnosis/scripts/smart_diagnosis.py`。
+该脚本已封装 L1（物理坏道/寿命耗尽等）与 L2（高通电时间/启停次数等）所有的 SMART 指标规则（参考指南：`references/smart_disk_health_diagnosis_guide.md`），支持自动探测日志场景并提取关键指标，并输出标准化报告至 `/tmp/smart_diagnosis_report_YYYYMMDD_HHMMSS_xxxx.txt`。可以使用 `--help` 参数查看帮助说明。
 
-### Step 0：识别日志包类型与厂商
-
+**脚本使用示例**：
 ```bash
-# 华为 iBMC：典型特征是 dump_info 目录 + LogDump/fdm_output
-test -f dump_info/LogDump/fdm_output && echo "→ 华为 iBMC"
-
-# H3C iBMC：典型特征是 dump_info 目录 + LogDump/arm_fdm_log
-# 也常伴随 H3C 特有目录/文件：3rdDump、SpLogDump、Register、fdm_pfae_log、PD_SMART_INFO_C*
-test -f dump_info/LogDump/arm_fdm_log && echo "→ H3C iBMC"
-
-# 浪潮 Inspur iBMC：典型特征是 onekeylog 扁平化目录 + ErrorAnalyReport.json / RegRawData.json / selelist.csv
-test -f onekeylog/log/ErrorAnalyReport.json && echo "→ 浪潮 Inspur iBMC"
-test -f onekeylog/log/RegRawData.json && echo "→ 浪潮 Inspur iBMC"
-test -f onekeylog/log/selelist.csv && echo "→ 浪潮 Inspur iBMC"
-
-# OS infocollect 包：仅表示 OS 侧日志已就绪，不等价于 iBMC 厂商
-test -f infocollect_logs/disk/disk_smart.txt && echo "→ OS infocollect 包就绪"
+# 直接传入日志的根目录，脚本会自动向下递归并探测属于 OS Infocollect 还是 iBMC 硬件日志场景
+python3 /opt/src/witty-diagnosis-agent/skills/disk-health-diagnosis/scripts/smart_diagnosis.py /opt/data/.../log_directory
 ```
 
-快速判断原则：
-- 出现 `dump_info/LogDump/fdm_output`，优先判定为华为 iBMC
-- 出现 `dump_info/LogDump/arm_fdm_log`，优先判定为 H3C iBMC
-- 出现 `onekeylog/log/ErrorAnalyReport.json`、`RegRawData.json`、`selelist.csv` 这类扁平化日志，优先判定为浪潮 Inspur iBMC
-- 若同时命中多个特征，继续核对目录形态：`dump_info` 体系通常为华为/H3C，`onekeylog` 体系通常为浪潮 Inspur
+**脚本执行失败的降级方案**：
+如果自动化脚本执行失败或因环境原因受限，诊断必须降级为自主手动分析。请严格参考 `references/smart_disk_health_diagnosis_guide.md` 中的场景分类、日志路径及核心指标阈值标准，自主完成检测与评估。
 
----
+> 💡 **详细的 L1 & L2 检测指标说明（包括核心物理状态、介质错误、机械健康、SSD/NVMe 专属指标及负载寿命指标），请统一参阅：** `references/smart_disk_health_diagnosis_guide.md` 中的“附录：SMART 核心指标速查（行业标准）”章节。
 
-### Step 1：iBMC 快速定性（< 5 分钟）
+### L3 & L4：槽位环境与链路控制器层
+检测目的：排除"背板/槽位/温度/电源"导致的非盘本体问题，区分"真盘坏"与"链路/控制器引发的假盘坏"，防止误判换盘。
 
-#### 华为 iBMC
+**优先使用自动化脚本检测**：
+诊断时必须优先使用内置的自动化脚本：`skills/disk-health-diagnosis/scripts/env_link_diagnosis.py`。
+该脚本能够自动分析 iBMC 和 Infocollect 日志中的温度、电源、风扇传感器，并提取 SMART ID 199 (CRC 错误)、RAID 控制器状态以及系统底层的链路重置记录。执行后会输出诊断报告至 `/tmp/env_link_diagnosis_report_YYYYMMDD_HHMMSS_xxxx.txt`。
+
+**脚本使用示例**：
 ```bash
-DUMP="./dump_info"
-# 1. FDM 故障诊断（触发 → 一票否决高危）
-grep -i "Fault" ${DUMP}/LogDump/fdm_output 2>/dev/null
-
-# 2. 当前未清除告警
-grep -iE "Critical|Major" ${DUMP}/AppDump/SensorAlarm/current_event.txt 2>/dev/null | head -20
-
-# 3. RAID 状态（Degraded/Offline/Failed → 一票否决）
-grep -iE "Degraded|Offline|Failed|Rebuild" \
-    ${DUMP}/AppDump/StorageMgnt/RAID_Controller_Info.txt 2>/dev/null
-
-# 4. SEL 存储事件时间线
-tar -xf ${DUMP}/AppDump/SensorAlarm/sel.tar -C /tmp/sel/ 2>/dev/null
-grep -iE "drive|disk|RAID" /tmp/sel/sel_decoded.txt 2>/dev/null | grep "Asserted" | sort
+# 直接传入日志的根目录，脚本会自动向下递归并探测属于 OS Infocollect 还是 iBMC 硬件日志场景
+python3 /opt/src/witty-diagnosis-agent/skills/disk-health-diagnosis/scripts/env_link_diagnosis.py /opt/data/.../log_directory
 ```
 
-#### 浪潮 Inspur iBMC
-```bash
-# 1. AI 故障解析报告（Inspur 独有）
-grep -iE "fault|error|recommend" onekeylog/log/ErrorAnalyReport.json 2>/dev/null
+**手动降级方案与核心关注指标**：
+若脚本受限，请重点检索：
+1. `smart_199_raw_value` (UDMA CRC 错误)：若高则代表线缆/背板异常。
+2. RAID 状态：`sasraidlog` / `RAID_Controller_Info` 中是否存在 `Degraded`、`Offline`。
+3. 链路重置：`dmesg` / `messages` 中是否存在 `reset link`、`hard resetting link`。
+4. 散热与供电：`sensor_info.txt`、`psu_info.txt`、`ps_black_box.log` 中是否存在异常记录。
+*判断原则：若 CRC 高、链路重置频繁而 SMART 介质指标正常，优先排查链路和接触不良，不要轻易换盘。*
 
-# 2. 分级日志（按优先级）
-cat onekeylog/log/emerg.log onekeylog/log/alert.log 2>/dev/null
-grep -iE "disk|storage|RAID" onekeylog/log/crit.log 2>/dev/null
+### L5 & L6：文件系统与业务层 (OS 报错 + 业务告警)
+检测目的：感知操作系统已经"观察到"的 IO 错误，是故障进入系统可见阶段的信号。同时从业务影响面评估是否需要立即止血，并反向印证盘层分析。
 
-# 3. SEL（CSV 格式）
-grep -iE "drive|disk|RAID" onekeylog/log/selelist.csv 2>/dev/null | grep "Assert"
-```
+**优先使用自动化脚本检测**：
+诊断时优先使用对应的自动化脚本进行分析：`scripts/os_io_error_diagnosis.py <log_path>`。
+该脚本已封装 L5（文件系统与OS层）和 L6（业务与存储服务层）所有的报错检测规则。
 
-#### H3C iBMC
-```bash
-# 1. FDM 故障诊断
-grep -iE "Fault|fault detected" LogDump/arm_fdm_log 2>/dev/null
+**分析路径与日志来源**：
+通过分析参考文档可知，硬件带外 BMC 日志（如华为、H3C等 iBMC 日志）不包含 OS 层文件系统错误。此类故障需从 **OS Infocollect 日志** 中提取：
+- `system/dmesg.txt` 或 `var/log/dmesg`
+- `system/var/log/messages*`
 
-# 2. FDM 预告警（H3C 独有）
-grep -iE "warn|predict" LogDump/fdm_pfae_log 2>/dev/null
+详细的日志特征和严重程度说明，请参考 [Infocollect 日志分析指南: OS 层及业务层常见错误指标](references/infocollect_guide.md#41-os-层及业务层常见错误指标-l5l6)。
 
-# 3. 硬盘 SMART（H3C 在 iBMC 层直接有）
-grep -iE "Reallocated|Uncorrectable|Pending|FAILED" LogDump/PD_SMART_INFO_C* 2>/dev/null
+## 四、排查诊断流程
+当进行磁盘诊断分析时，请严格遵循以下流程：
 
-# 4. PHY 误码（H3C 独有）
-grep -iE "error count|invalid dword" LogDump/phy/* 2>/dev/null
-```
+## 五、故障预测方法论
 
----
+本方法论旨在通过分析 L1 到 L6 各层级的错误特征，揭示磁盘故障在物理、链路、系统和业务层面的传播路径与相互影响，从而实现对磁盘健康状况的全面评估与精准预测。
 
-### Step 2：SMART 指标扫描（< 10 分钟）
+### 5.1 各层级故障的相互影响与传播路径
 
-```bash
-SMART="./infocollect_logs/disk/disk_smart.txt"
+磁盘故障通常不是孤立的，而是由底层向上传播，或由外部环境（链路/散热）向下引发。在诊断时，必须建立全局视角，交叉验证不同层级的指标：
 
-# ── 一票否决项 ──────────────────────────────────────
-# 整体健康状态
-grep "SMART overall-health" $SMART | grep -v "PASSED\|OK"
-# → 非 PASSED/OK 时直接高危
+1. **L1（介质物理层） → L5/L6（系统业务层）**：
+   - **传播路径**：当底层介质出现坏道（L1：如 `smart_197/198` 或 `G-list` 增长）且无法通过固件 ECC 修复时，错误会向上传递给操作系统，导致内核报错（L5：如 `I/O error, dev sdX`）。如果错误发生在关键数据区或系统盘，将直接导致存储服务阻塞或退出（L6：如 `OSD IO 阻塞` 或 `文件系统只读`）。
+   - **诊断意义**：如果 L5/L6 出现读写错误，必须下钻至 L1 检查 SMART 指标。若 L1 正常，则大概率为链路或软件层问题。
 
-# SAS ASC/ASCQ 高危码
-grep -iE "ascq.*(30|64|62)" $SMART
-# → ascq=30/64(故障率100%) ascq=62(接近100%) 直接高危
+2. **L4（链路与控制器层） → L1（介质物理层） / L5（系统业务层）**：
+   - **传播路径**：背板接触不良、SAS 线缆老化或 RAID 卡异常（L4：如 `CRC 错误` 或 `PHY 误码`）会导致指令在传输过程中丢失。这会引发磁盘频繁重试，表现为 SMART 超时计数增加（L1：`Command_Timeout`）。同时，链路重置会直接导致操作系统报出链路层错误（L5：`reset link` 或 `hostbyte=DID_SOFT_ERROR`）。
+   - **诊断意义**：当发现大量的 L5 链路重置报错和 L1 的 CRC/超时错误时，不要盲目更换磁盘，应优先排查线缆和背板。
 
-# ── 核心错误计数 ────────────────────────────────────
-grep -E "read_total_uncorrected_error|\
-verify_total_uncorrected_error|\
-write_total_uncorrected_error|\
-elem_in_grown_defect_list" $SMART
-# 阈值见 references/thresholds.md §1.1
+3. **L3（散热与环境层） → L1/L2（介质物理层与寿命）**：
+   - **传播路径**：风扇故障或机房空调异常（L3：环境温度超阈值）会加速机械硬盘电机老化或 SSD 颗粒损耗，导致 L1 的 SMART 温度指标（`smart_194`）报警，并可能间接引发寿命消耗过快（L2）或机械类错误（L1：`Spin_Retry_Count`）。
+   - **诊断意义**：高温是磁盘杀手。当发现某区域多块磁盘同时报出 SMART 预警时，优先检查 iBMC 的环境温度与风扇日志。
 
-# ── SMART ID 关键字段 ────────────────────────────────
-grep -E "^\s*(5|197|198|187|7|1)\s" $SMART
-# ID 5(Reallocated) ID 197(Pending) ID 198(Uncorrectable)
-# 阈值见 references/thresholds.md §1.2
+4. **L2（负载与寿命层） → L1（介质物理层）**：
+   - **传播路径**：长期处于高 IO 吞吐或频繁启停状态（L2：`%util > 90%` 或启停次数超限），会加速磁盘的物理磨损，最终表现为坏道增加或寿命耗尽（L1：`Wear_Leveling_Count` 见底）。
+   - **诊断意义**：在评估亚健康盘的风险时，必须结合 L2 的通电时间和负载。高龄高负载盘即使当前 L1 指标仅有轻微异常，其劣化风险也远高于新盘。
 
-# ── NVMe SSD ────────────────────────────────────────
-grep -iE "critical_warning|percentage_used|available_spare|media_errors" $SMART
-# critical_warning ≠ 0 → 一票否决; percentage_used > 95 → 高危
+### 5.2 综合风险评级标准
 
-# ── SATA SSD 寿命 ───────────────────────────────────
-grep -iE "Media_Wearout|Wear_Leveling|SSD_Life|Lifetime_Remaining|231|233|177" $SMART
-# value < 5 → 高危; < 10 → 预警
+结合 L1-L6 的交叉验证结果，将磁盘健康状态分为四个等级：
 
-# ── 温度 ────────────────────────────────────────────
-grep -iE "Temperature_Celsius|cur_temperature|190|194" $SMART
-# 最优 25~28°C; >45°C 预警; >55°C 高危
-
-# ── iBMA 健康评分 ────────────────────────────────────
-grep -iE "score|predicted|warning|fail" \
-    ./infocollect_logs/disk/hwdiag_hdd.txt 2>/dev/null
-```
-
----
-
-### Step 3：OS I/O 性能核查
-
-```bash
-IC="./infocollect_logs"
-
-# iostat — %util 和 await
-awk 'NR>3 && /sd/ {
-    if ($NF+0 > 90) print "HIGH UTIL:", $0
-}' ${IC}/system/iostat.txt 2>/dev/null | head -10
-
-# blktrace — d2c/q2c 延迟（d2c高→硬件慢; q2c高d2c低→调度问题）
-grep -iE "d2c|q2c" ${IC}/disk/blktrace_log.txt 2>/dev/null | head -10
-
-# I/O 调度器（SSD 不推荐 cfq）
-cat ${IC}/disk/scheduler.txt 2>/dev/null
-
-# RAID OS 侧状态
-grep -iE "Degraded|Offline|Failed|Rebuild" ${IC}/raid/sasraidlog.txt 2>/dev/null
-```
-
----
-
-### Step 4：/var/log/messages 系统日志
-
-```bash
-MSGS="/var/log/messages"
-
-# 宏观量级
-echo "I/O error:    $(grep -ci 'I/O error' $MSGS 2>/dev/null)"
-echo "SCSI error:   $(grep -ci 'SCSI error' $MSGS 2>/dev/null)"
-echo "XFS/EXT4:     $(grep -ciE 'XFS.*error|EXT4-fs error' $MSGS 2>/dev/null)"
-
-# 存储错误详情
-grep -iE "I/O error|blk_update_request|Buffer I/O|EXT4-fs error|\
-XFS.*error|xfs_force_shutdown|rejecting I/O|SATA link down|\
-SCSI error" $MSGS 2>/dev/null | tail -30
-
-# 受影响设备
-grep -iE "I/O error|blk_update_request" $MSGS 2>/dev/null \
-    | grep -oP "sd[a-z]+[0-9]?" | sort | uniq -c | sort -rn
-```
-
----
-
-### Step 5：综合评分与出具结论
-
-按以下评分规则计算后，对照评级表输出结论。
-
-#### 评分维度
-
-| 维度 | 权重上限 | 核心触发条件（节选）|
+| 风险等级 | 判定条件 (满足其一即可) | 建议动作 |
 |---|---|---|
-| iBMC 硬件层 | 35 分 | FDM Fault +25, Critical告警 +20, RAID Degraded +20 |
-| SMART 错误指标 | 35 分 | smart_health≠OK +20, read_uncorrected>1000 +15, NVMe critical_warning≠0 +20 |
-| SMART 趋势差分 | 15 分 | diff_elem_in_grown>100 +10, 7天持续正增长 +5 |
-| OS I/O 性能 | 10 分 | xfs_force_shutdown +8, I/O error>10次/天 +7, %util>98% +5 |
-| 环境与寿命 | 5 分 | 温度>50°C +3, 通电>35000h +2 |
-
-完整评分细则见 `references/thresholds.md` §3。
-
-#### 一票否决规则（直接判高危，忽略总分）
-
-```
-1. fdm_output / arm_fdm_log 检出 Fault
-2. SMART overall-health ≠ OK/PASSED
-3. RAID VD 状态 Degraded / Failed
-4. smart_health_ascq ∈ {30, 64}（故障率 100%）
-5. read_uncorrected_error > 1000 且 verify_uncorrected_error > 1000（双超）
-6. NVMe critical_warning ≠ 0 且 percentage_used > 95
-7. Inspur ErrorAnalyReport 检出 fault 且 SEL Assert 同时存在
-```
-
-#### 风险评级表
-
-| 综合得分 | 等级 | 处置建议 |
-|---|---|---|
-| 0~15 | ✅ 正常 | 按周期巡检，无需特殊处理 |
-| 16~35 | ⚠️ 低风险 | 加强监控频率（每日），关注趋势 |
-| 36~55 | 🟠 中风险 | 7日内评估换盘，安排数据迁移 |
-| 56~75 | 🔴 高危 | 立即开维修工单，3日内数据迁移 |
-| 76+ | 🚨 极高危 | 立即隔离停止写入，紧急换盘 |
+| **P0 致命故障** | 1. L1 核心指标触发（`smart_198 > 0`、SSD 寿命耗尽）。<br>2. iBMC/FDM 硬件底噪判定为 Fault。<br>3. L5/L6 报出严重错误（如文件系统只读、介质不在位）且 L1 同步异常。 | **立即换盘**，限期 4 小时内完成业务迁移与替换，防止数据丢失。 |
+| **P1 高危亚健康** | 1. 坏道指标（`smart_5`、`smart_197`、`G-list`）近期持续增长。<br>2. 出现显著的链路或控制器错误（L4）且影响到 L5 系统 IO。<br>3. SMART Health 预警。 | **计划换盘**，准备备件，建议在 7 天内安排维护窗口进行替换。 |
+| **P2 重点关注** | 1. 坏道指标非零但长期稳定无增长。<br>2. 单次/轻微的超时或 CRC 错误（L1/L4）。<br>3. 持续的高温环境预警（L3）。 | **提升监控频率**，排查环境/链路因素，持续观察 14 天趋势。 |
+| **P3 背景风险** | 1. 累计通电时间 > 5年或极高强度的历史负载（L2）。<br>2. 所有关键错误指标均为 0。 | **例行维护**，记录在案，可结合机房整体规划在下一批次批量汰换。 |
 
 ---
 
-## 快速场景诊断路径
+## 六、诊断结果输出规范
 
-| 现象 | 优先查看 | 关键字/阈值 |
-|---|---|---|
-| 硬盘亮黄灯/掉盘 | `fdm_output` → `RAID_Controller_Info.txt` → `sel` | `Fault`, `Offline`, `Failed` |
-| IO wait 持续高 | `iostat.txt` → `blktrace_log.txt` → `dmesg.txt` | `%util>98%`, `await>100ms` |
-| 文件读写报错 | `dmesg.txt` → `disk_smart.txt` → `messages` | `buffer I/O error`, `Reallocated>0` |
-| SSD 寿命告警 | `disk_smart.txt` → `current_event.txt` | `percentage_used>95`, `life<5` |
-| 新盘无法识别 | `scsi_info.txt` → `RAID_Controller_Info.txt` | 枚举 PD，驱动加载 |
+在完成日志收集与分析后，必须向用户输出结构化、信息详尽的诊断报告。报告需包含全局汇总、具体的故障坐标以及分类明确的排查结论。
 
----
+### 6.1 报告结构要求
 
-## 报告输出模板
+1. **基本信息与检测场景**：明确日志路径、执行时间以及识别出的日志场景（如华为 iBMC、OS infocollect 等）。
+2. **磁盘信息汇总清单**：列出所有检测到的物理磁盘的设备名、槽位、型号、序列号及基本健康状态。
+3. **故障或亚健康详情（核心部分）**：
+   - 必须**分类列出**所有存在问题的磁盘。
+   - 每个问题项必须提供**精确坐标**：包括发生的**时间点**、具体的**来源日志文件路径**、**所在行号**以及**完整的原始日志内容**。
+   - 给出结合 L1-L6 层级关系的**归因分析**与**风险评级（P0-P3）**。
+4. **最终处理建议**：针对每块问题盘，给出明确的下一步动作指导（如立即换盘、排查线缆、继续观察等）。
 
-```
+### 6.2 诊断报告输出模板示例
+
+```text
 =============================================
-  服务器磁盘健康诊断报告
+  服务器磁盘健康预测与综合诊断报告
 =============================================
-诊断时间：YYYY-MM-DD HH:MM
-服务器SN：[SN号]  型号：[型号]  iBMC厂商：[华为/浪潮/H3C]
+检测执行时间：2026-04-02 14:30:00
+日志包路径：/opt/data/logs/10.107.18.37/
+检测场景：OS Infocollect 综合分析
 
-【综合评级】🔴 高危  综合得分：67/100
+（1）磁盘信息汇总
+------------------------------------------------------------------------------------------------------------------------
+Device          | Slot     | Model                          | Serial               | Health    | Power On Hours
+------------------------------------------------------------------------------------------------------------------------
+/dev/sda        | Slot 0   | SAMSUNG MZ7LH240HAHQ-00005     | S45RNA0MC30570       | PASSED    | 34026
+/dev/sdb        | Slot 1   | SEAGATE ST8000NM0055           | ZA123456             | FAILED    | 45120
+------------------------------------------------------------------------------------------------------------------------
 
-【分项得分】
-  iBMC 硬件层：  20/35  （RAID Rebuild +8, 告警 Major +12）
-  SMART 错误：   27/35  （read_uncorrected=1150 +15, ID5=780 +10）
-  SMART 趋势：   10/15  （elem_in_grown 14天差分 +120 → +10）
-  OS I/O性能：    7/10  （I/O error 频繁 +7）
-  环境寿命：      3/5   （温度52°C +3）
+（2）故障或亚健康详细诊断（按 L1-L6 分类）
+------------------------------------------------------------------------------------------------------------------------
 
-【触发项清单】
-  [+15] read_total_uncorrected_error=1150 > 1000
-  [+12] current_event.txt 含 Major 存储告警
-  ……
+【设备】 /dev/sdb (SN: ZA123456, Slot: 1)
+  ◆ 风险等级：P0 - 致命故障 (立即换盘)
+  
+  ▶ L1 (介质物理层) 异常：
+    - 异常表现：ID 198 Offline_Uncorrectable RAW is 5 (>0)
+    - 精确坐标：文件 infocollect_logs/disk/disk_smart.txt , 第 156 行, 时间 2026-04-02 10:15:22
+    - 原始日志：198 Offline_Uncorrectable 0x0030 100 100 000 Old_age Offline - 5
+    - 分析归因：存在彻底无法修复的坏道，物理介质已损坏。
 
-【问题磁盘定位】
-  逻辑设备：/dev/sdb  物理槽位：Slot 3  型号：[型号]  SN：[SN]
+  ▶ L5 (文件系统与 OS 层) 异常：
+    - 异常表现：检测到块设备 IO 错误
+    - 精确坐标：文件 infocollect_logs/system/var/log/messages , 第 8942 行
+    - 原始日志：Apr  2 10:15:25 kernel: blk_update_request: I/O error, dev sdb, sector 12345678
+    - 分析归因：底层的介质坏道（L1）已经导致上层操作系统（L5）读写失败。
 
-【处置建议】
-  立即申请维修工单（P1），3日内完成 /dev/sdb 数据迁移，安排换盘
+【设备】 /dev/sda (SN: S45RNA0MC30570, Slot: 0)
+  ◆ 风险等级：P2 - 重点关注 (排查链路)
+  
+  ▶ L4 (链路与控制器层) / L5 异常：
+    - 异常表现：检测到频繁的 SATA 链路重置
+    - 精确坐标：文件 infocollect_logs/system/var/log/messages , 第 5120 行
+    - 原始日志：Apr  2 08:20:11 kernel: ata1.00: hard resetting link
+    - 分析归因：SMART 介质指标正常，但 OS 层出现链路重置，强烈建议优先排查背板或线缆接触不良。
+
+（3）系统操作与文件系统状态时间线 (Timeline)
+------------------------------------------------------------------------------------------------------------------------
+[2026-04-02 08:20:11] [异常 (Abnormal)] ata1.00: hard resetting link (文件: messages)
+[2026-04-02 10:15:22] [异常 (Abnormal)] 198 Offline_Uncorrectable 0x0030 100 100 000 Old_age Offline - 5 (文件: disk_smart.txt)
+[2026-04-02 10:15:25] [异常 (Abnormal)] blk_update_request: I/O error, dev sdb, sector 12345678 (文件: messages)
+[2026-04-02 10:15:26] [故障 (Failure)] EXT4-fs error (device sdb1)... Remounting filesystem read-only (文件: messages)
+[2026-04-02 10:20:00] [磁盘操作 (Disk Unplugged)] sd 0:0:1:0: [sdb] Synchronizing SCSI cache (文件: messages)
+[2026-04-02 10:45:00] [磁盘操作 (Disk Plugged In)] sd 0:0:1:0: [sdb] Attached SCSI disk (文件: messages)
+[2026-04-02 10:48:30] [恢复 (Recovery)] fsck.ext4 -y /dev/sdb1 (文件: bash_history)
+[2026-04-02 10:50:15] [恢复 (Recovery)] EXT4-fs (sdb1): recovery complete (文件: messages)
+
+（4）最终处理建议
+------------------------------------------------------------------------------------------------------------------------
+- /dev/sdb (ZA123456): [P0] 🔴 致命故障。由于介质损坏已引发系统 IO 错误及文件系统只读，虽经人工 fsck 修复，但物理损坏不可逆，建议立即隔离该盘并执行换盘操作。
+- /dev/sda (S45RNA0MC30570): [P2] 🟡 链路异常。请安排维护窗口重新拔插硬盘或更换线缆，暂不建议直接更换硬盘介质。
 =============================================
 ```
-
----
-
-## 注意事项
-
-- **多盘并存**：disk_smart.txt 含多盘时，按设备（`/dev/sdX`）分组独立评分
-- **厂商路径差异**：华为用 `fdm_output`，H3C 用 `arm_fdm_log`，浪潮用 `ErrorAnalyReport.json`
-- **无历史数据**：缺少多时间点 SMART 时，跳过差分趋势分析，在报告注明
-- **SSD 与 HDD 阈值不同**：SSD await >10ms 关注，HDD await >100ms 关注
-- **自动评分**：可运行 `scripts/disk_score.sh [DUMP_DIR] [IC_DIR] [MSGS]` 自动完成评分

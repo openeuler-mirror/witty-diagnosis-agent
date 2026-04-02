@@ -111,6 +111,29 @@
 | **文件读写报错** | `dmesg.txt` / `disk_smart.txt` | `I/O error`, `Reallocated_Sector_Ct` |
 | **新盘无法识别** | `scsi_info.txt` / `lspci.txt` | 确认 RAID 卡和磁盘是否被 OS 枚举 |
 
+### 4.1 OS 层及业务层常见错误指标 (L5/L6)
+
+在 OS infocollect 场景下，除了上述清单外，请重点关注 `dmesg` / `messages` 以及业务侧上报的以下日志特征，它们反映了故障已进入系统及业务可见阶段：
+
+| 关键词 / 特征 | 含义 | 严重程度/说明 |
+|---|---|---|
+| I/O error, dev sdX | 块设备 IO 错误 | 高 |
+| blk_update_request: I/O error | 块层更新请求错误 | 高 |
+| end_request: I/O error | IO 请求终止错误 | 高 |
+| reset link / hard resetting link | SATA/SAS 链路重置 | 中-高 |
+| ata1.00: failed command: READ FPDMA QUEUED | NCQ 读命令失败 | 高 |
+| EXT4-fs error / XFS: ... I/O error | 文件系统层错误 | 高 |
+| Remounting filesystem read-only | 文件系统被强制转只读 | 极高 |
+| SCSI error: return code = 0x08000002 | SCSI 层错误 | 高 |
+| sd X: [sdX] tag#N FAILED Result: hostbyte=DID_SOFT_ERROR | 软错误，可能是链路 | 中 |
+| OSD 退出服务 (告警 51001) | 存储服务故障，需结合盘层确认 | 高 |
+| OSD IO 阻塞 (告警 51036 / 51635) | 底层 IO 长时间无返回 | 高 |
+| 存储介质不在位 (告警 51455) | 盘掉线或背板接触不良 | 高 |
+| NVMe SSD 故障 (告警 51450) | NVMe 硬件异常 | 高 |
+| 文件系统分区异常 (告警 51837 / CMC1301023) | 可能是系统盘或数据盘引发 | 高 |
+| 系统盘 util > 98% (check_sda_util) | 系统盘打满或正在故障 | 高 |
+| blocks 吞吐统计 (blocks_sent/recv_to_initiator) | 业务 IO 流量画像 | 中 |
+
 ---
 
 ## 五、 日志文件详细说明
