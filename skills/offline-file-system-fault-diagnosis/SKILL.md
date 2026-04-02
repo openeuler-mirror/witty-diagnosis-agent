@@ -1,18 +1,35 @@
 ---
 name: offline-file-system-fault-diagnosis
-description: 通过分析服务器离线日志（iBMC、OS Messages、InfoCollect）诊断 EulerOS 文件系统故障并定位根本原因。适用场景：用户提供日志文件（dmesg、messages、fsck 输出、InfoCollect 包等）并询问文件系统损坏、挂载失败、磁盘 I/O 错误、空间不足、inode 耗尽、权限拒绝等问题的原因或修复方案；用户要求进行日志分析、故障溯源、根因定位或生成诊断报告时。
+description: 通过分析服务器离线日志（iBMC、OS Messages、InfoCollect）诊断 Linux 文件系统（EXT4/XFS）逻辑损坏、挂载异常及存储关联性故障并定位根因。当用户提供日志并询问文件系统只读（Read-only）、挂载失败（Mount Failure）、元数据损毁（Metadata Corruption）、空间/Inode 耗尽、I/O 错误引发的逻辑一致性问题，以及需要针对文件系统进行异常溯源时，调用本技能。
 ---
 
-# 离线文件系统日志诊断
+# 离线文件系统故障诊断
 
-本技能通过分析从服务器收集的标准日志文件，帮助诊断 EulerOS 文件系统故障。
+本技能通过分析从服务器收集的标准日志文件，帮助诊断 Linux 文件系统（EXT4/XFS）及底层存储子系统故障。
 
-> **重要提示**：分析时应遵循 **"先宏观后微观"** 的原则：
-> 1. **全局扫描**：优先使用 **一键诊断脚本** (`scripts/diagnose_summary.py`) 快速识别异常模块和关键报错。
-> **注意：使用脚本时必须优先执行 `--help` 参数，了解脚本用法**
-> 2. **精准定位**：根据脚本输出的线索（如特定时间点或文件名），再使用 `grep` / `less` 等文件操作命令查看具体的原始日志上下文。
+## 技能目录结构
 
-## 日志目录结构与对应诊断脚本
+本技能的目录结构如下，包含诊断脚本、参考资料和文档：
+
+```text
+offline-file-system-fault-diagnosis/
+├── SKILL.md                          # 本技能的主文档
+├── scripts/                          # 诊断脚本目录
+│   ├── diagnose_summary.py           # Step 0: 故障日志采集脚本
+│   ├── diagnose_ibmc.py              # Step 2: iBMC日志分析脚本
+│   ├── diagnose_infocollect.py       # Step 2: InfoCollect/磁盘与文件系统专项分析脚本
+│   └── diagnose_messages.py          # Step 2: OS消息日志分析脚本
+└── references/                       # 参考资料目录
+    ├── FS_fault_scenarios.md         # 文件系统故障场景分类
+    ├── FS_scenario_analysis.md       # 文件系统故障场景专项分析指南
+    ├── infocollect_guide.md          # InfoCollect诊断指南
+    ├── messages.md                   # OS消息日志分析指南
+    ├── huawei_ibmc.md                # 华为iBMC分析指南
+    ├── h3c_ibmc.md                   # H3C iBMC分析指南
+    └── Inspur_ibmc.md                # Inspur iBMC分析指南
+```
+
+## 输入日志目录结构与对应诊断脚本
 
 以 `/path/to/logs/xxxx` 为例，标准的服务器日志收集包通常具有以下层级结构。本技能提供了针对性的脚本来分析不同层级的日志。
 
@@ -21,477 +38,250 @@ description: 通过分析服务器离线日志（iBMC、OS Messages、InfoCollec
 ```text
 <日志根目录> (例如: 10.120.6.76)
 ├── ibmc_logs/                  # iBMC 硬件带外管理日志
-│   └── (支持 Huawei, H3C, Inspur) -> 使用 scripts/diagnose_ibmc.py
+│   └── (硬件报错/槽位告警) -> 使用 scripts/diagnose_ibmc.py
 ├── infocollect_logs/           # 系统信息收集工具生成的分类日志
-│   └── (文件系统/挂载/空间信息)    -> 使用 scripts/diagnose_infocollect.py
+│   └── (SMART信息/文件系统位图/分区表) -> 使用 scripts/diagnose_infocollect.py
 └── messages/                   # 操作系统层面的系统日志
     └── (dmesg, syslog, messages) -> 使用 scripts/diagnose_messages.py
 ```
-
-更深层次的文件架构及详细说明，请参考 `references/` 目录下对应的指南文档（如 [iBMC](references/huawei_ibmc.md), [InfoCollect](references/infocollect_guide.md), [Messages](references/messages.md)）。
-
----
 
 ## ⚠️ 强制执行流程
 
 **必须严格按以下顺序执行，禁止跳过或乱序：**
 
 ```
-Step 0 (环境检查) → Step 1 (故障日志采集) → Step 2 (场景分类) → Step 3 (深入分析) → Step 4 (交叉验证) → Step 5 (生成报告)
+Step 0 (故障日志采集) → Step 1 (场景分类) → Step 2 (深入分析) → Step 3 (根因校验) → Step 4 (界面输出分析报告)
 ```
 
 **执行规则：**
 1. **顺序强制**：必须完成当前步骤并验证通过后，才能进入下一步
-2. **阻断机制**：Step 0 失败时立即停止，禁止继续执行
-3. **场景分支**：Step 2 输出场景标签后，Step 3 必须执行对应的专项分析脚本
-4. **交叉验证**：Step 4 必须验证通过后才能生成最终报告
-5. **文件适配**：日志文件不全时自动降级分析策略，但必须至少有一个日志文件
+2. **场景分支**：Step 1 输出场景标签后，Step 2 必须针对性收集相关证据
+3. **数据校验**：Step 3 必须通过证据矩阵校验后才能得出最终结论
+4. **文件适配**：日志文件不全时自动降级分析策略，但必须至少有一个日志文件
+5. **专注文件系统**：分析过程应聚焦文件系统元数据（Metadata）、日志（Journal）及空间分配逻辑，厘清逻辑损毁与底层 I/O 异常的因果链。
 
 **每步完成标志：**
-- Step 0：输出 `✅ Environment check passed!`
-- Step 1：输出日志文件时间范围、文件统计、错误关键词概览
-- Step 2：输出场景标签（FS_CORRUPTION / DISK_FAILURE / MOUNT_ERROR / IO_ERROR / PERMISSION_ISSUE / SPACE_ISSUE）
-- Step 3：输出问题定位 + 关键证据 + 候选根因 + 修复建议
-- Step 4：输出验证结果 + 置信度调整 + 矛盾点检测
-- Step 5：生成完整的诊断报告文件（.md）
+- Step 0：输出日志文件时间范围、文件统计、错误关键词概览
+- Step 1：确定故障场景（如 FS_CORRUPTION 等）
+- Step 2：输出底层物理/元数据层级的精准定位、传导链及初步根因
+- Step 3：输出根因证据校验表、原生日志证据及置信度定性
+- Step 4：在界面上按固定结构输出最终的分析报告（**严禁生成独立文件**）
 
 ---
 
 ## 分析流程总览
 
-| 阶段 | 目标 | 脚本 |
-|------|------|------|
-| **Step 0** 环境检查 | 验证日志文件存在性和可读性 | `./scripts/check_environment.sh` |
-| **Step 1** 故障日志采集 | 从日志目录采集关键故障事件摘要 | `python3 scripts/diagnose_summary.py <log_dir> -o` |
-| **Step 2** 场景分类 | 判断故障类型（文件系统损坏/磁盘故障/挂载异常等） | `python3 scripts/scene_classifier.py <log_dir>` |
-| **Step 3** 深入分析 | 按场景执行专项分析 | `python3 scripts/diagnose_<source>.py <log_dir>` |
-| **Step 4** 交叉验证 | 多源日志相互佐证，排除误判 | `python3 scripts/cross_validator.py <log_dir>` |
-| **Step 5** 生成报告 | 汇总证据链与根因，生成诊断报告 | `./scripts/generate_report.sh` |
-
-> **强制阻断规则**：`./scripts/check_environment.sh` 返回非 0 退出码时，**立即停止**后续所有步骤。
+| **步骤** | **阶段目标** | **主要工具/方法** |
+| :--- | :--- | :--- |
+| **Step 0** 故障日志采集 | 全量扫描日志目录并识别关键报错 | `python3 scripts/diagnose_summary.py <log_dir> -o` |
+| **Step 1** 场景分类 | 判定现象并确定故障场景类型 | 根据 Step 0 结果参考 [FS_fault_scenarios.md](references/FS_fault_scenarios.md) 匹配 |
+| **Step 2** 深入分析 | 构建起止 T0 的传导链并执行专项诊断 | 参考 [FS_scenario_analysis.md](references/FS_scenario_analysis.md) 获取多维证据 |
+| **Step 3** 根因校验 | 交叉质询证据链，执行证据双向校验 | 对比 iBMC/内核/系统日志的一致性，防止结论发散 |
+| **Step 4** 界面输出分析报告 | 汇总证据链与确认根因，在界面直接输出报告内容 | 结构化输出：结论 + 故障链条 + 修复建议 |
 
 ---
 
-## Step 0：环境检查
+## Step 0：故障日志采集
 
-```bash
-./scripts/check_environment.sh [--log-dir PATH]
-```
+### 全量扫描（宏观分析）
 
-**检查项目：**
-- 日志目录是否存在
-- 至少存在一个日志文件且非空
+**目标**：快速扫描所有日志文件，识别异常模块和关键报错（如 EXT4-fs error, I/O error），建立故障全景视图。
 
-输出 `✅ Environment check passed!` 后方可继续，输出 `❌ Environment check FAILED! 请修复上述问题后重试。` 时，必须立即停止后续所有步骤。
-
----
-
-## Step 1：故障日志采集
-
-使用概览模式（`-o`）从日志目录中采集关键故障事件摘要：
-
+**执行命令**：
 ```bash
 python3 scripts/diagnose_summary.py <log_dir> -o
 ```
 
-**采集内容：**
-- **日志时间范围**：各日志文件覆盖的最早/最晚时间
-- **文件统计**：已识别的日志文件类型及数量
-- **错误关键词概览**：各文件中 error/fail/critical/corrupt 等关键词出现次数
+### 精细定位（微观分析）
 
-**支持过滤采集（缩小分析范围）：**
+**目标**：根据全量扫描结果和用户提供的过滤条件，使用 `grep` / `less` 等文件操作命令查看具体的原始日志上下文获取更细粒度的故障信息。
 
-```bash
-# 按日期过滤采集
-python3 scripts/diagnose_summary.py <log_dir> -o -d "Mar 16"
+> **注意：使用脚本时，必须优先执行 `--help` 参数，了解脚本用法**
 
-# 按时间范围过滤采集
-python3 scripts/diagnose_summary.py <log_dir> -o -s "2026-03-10 08:00:00" -e "2026-03-10 12:00:00"
+---
+## Step 1：场景分类
 
-# 按关键词过滤采集
-python3 scripts/diagnose_summary.py <log_dir> -o -k "I/O error" "corrupt"
+根据 Step 0 采集的日志概览，分析故障现象并确定故障场景类型。
+
+### 场景分类概述
+
+根据 Step 0 采集的日志概览，分析故障现象并从以下标准场景中确定故障场景类型。
+
+> 📖 **参考详见**：[文件系统故障场景分类](references/FS_fault_scenarios.md)
+
+| 场景标签 | 中文描述 | 主要特征 |
+| :--- | :--- | :--- |
+| `FS_CORRUPTION` | 文件系统损毁 | `EXT4-fs error`、`XFS: Metadata corruption`、`fsck` 报错、位图/校验和不一致 |
+| `FS_MOUNT_ERROR` | 逻辑挂载异常 | `Mount failed`、`Structure needs cleaning`、UUID 变更、`/etc/fstab` 配置冲突 |
+| `FS_IO_ERROR` | 内核 I/O 报错 | `Buffer I/O error`、`I/O error`、`Device error` (引发 FS 切只读的核心诱因) |
+| `FS_SPACE_ISSUE` | 空间/索引耗尽 | `No space left on device`、`Inode exhausted`、大文件残留、配额 (Quota) 限制 |
+| `STORAGE_INDUCED_FS_ERR` | 存储诱发的 FS 故障 | 底层磁盘/RAID 硬件故障（如 Drive Fault/Media Error）直接导致的文件系统不可用 |
+| `FS_PERMISSION_CONFIG` | 权限与系统配置问题 | `Permission denied`、SELinux 阻断、ACL 异常、挂载参数 (Mount Options) 冲突 |
+
+### 场景辅助分析与根因假设
+
+确定场景标签后，**必须参考专项分析指南**进行候选根因的初步验证：
+
+> 🔍 **专项分析指南**：[文件系统故障场景专项分析指南](references/FS_scenario_analysis.md)
+
+| 场景标签 | 候选根因假设（需在 Step 2 中验证） |
+| :--- | :--- |
+| `FS_CORRUPTION` | ① 异常断电导致元数据未落盘 ② 磁盘物理坏道损毁关键元数据 ③ 内核/驱动 Bug 导致的逻辑破坏 |
+| `FS_MOUNT_ERROR` | ① 文件系统超级块 (Superblock) 损坏 ② 挂载点目录被占用或存在依赖冲突 |
+| `FS_IO_ERROR` | ① 磁盘介质老化/损坏 ② SAS 链路抖动触发超时重试 ③ RAID 卡缓存故障 |
+| `FS_SPACE_ISSUE` | ① 隐藏进程占用已删除的大文件句柄 ② 小文件过多耗尽 Inode ③ 磁盘配额已满 |
+| `STORAGE_INDUCED_FS_ERR` | ① 磁盘硬件物理失效 (Offline) ② RAID 阵列降级或崩溃 ③ 存储链路徹底中断 |
+| `FS_PERMISSION_CONFIG` | ① 运维操作导致 ACL 被误改 ② 只读模式挂载 (RO) 保护 ③ 容器/虚拟化命名空间隔离 |
+
+> ⚠️ **强制要求**：在进入 Step 2 深入分析前，应先通过 [FS_scenario_analysis.md](references/FS_scenario_analysis.md) 了解对应场景的分析路径。分析结束后，必须对上述候选根因方案逐一标注：✅ 已证实 / ❌ 已排除 / ❓ 证据不足。
+
+**Step 1 完成标志：**
+1. ✅ 确定主要故障场景标签（从上述类型中选择）
+2. ✅ 记录故障现象与关键证据
+3. ✅ 为 Step 2 深入分析提供明确的故障场景方向
+
+---
+## Step 2：深入分析
+
+根据 Step 1 的场景分类结果，必须**首先完成时序关联与故障传导链重建**，然后再通过多源脚本收集证据，最终给出精确的物理/逻辑坐标定位。
+
+### 2.1 时序关联与传导链重建 (核心理论框架)
+
+**目标**：通过多源日志的时间戳对齐，重建故障发生的完整时间轴，厘清事件的先后顺序与因果链，为根因定位提供时序证据。
+
+#### 2.1.1 确定文件系统故障零点 (T0)
+
+故障零点（T0）是时序分析的基准锚点，定义为**最早可观测到异常的时间戳**。确定优先级（由高到低）：
+
+| 优先级 | 来源 | 说明 |
+|----|----|----|
+| **P1** | 硬件错误日志（iBMC / SEL） | 底层物理故障时间点最准确（如 Power Loss, Drive Fault）。 |
+| **P2** | 内核感知层（`dmesg` / `messages`） | 最早出现的 I/O Error 或 EXT4/XFS Metadata Error。 |
+| **P3** | 系统调度层（`syslog` / `messages`） | systemd 挂载失败、服务启动超时或 OOM 触发。 |
+| **P4** | 应用感知层 | 数据库由于 IO 缓慢产生的报错，通常滞后于内核层。 |
+
+#### 2.1.2 多维日志对齐与时间轴矩阵
+
+以 T0 为基准，构建事件序列矩阵。
+*示例：因异常断电导致文件系统损坏的时间轴*
+```text
+T0-2m   ├─ [iBMC SEL]    记录 `Power Loss` 外部供电失效告警。
+T0      ├─ [iBMC SEL]    系统由于过温或供电不足触发强制下电。
+T0+1m   ├─ [OS restart]  系统重启，内核加载存储驱动并尝试挂载根分区之外的文件系统。
+T0+1.5m ├─ [OS dmesg]    `EXT4-fs (sdb1): error loading journal` → 标定为致命故障节点 T0'。
+T0+2m   ├─ [OS messages] `Failed to mount /data: Structure needs cleaning`。
 ```
 
-**选项说明：**
+#### 2.1.3 文件系统故障传导链推断 (示例)
 
-| 选项 | 说明 |
-|------|------|
-| `-o, --overview` | 概览模式，仅输出日志摘要（Step 1 采集专用）|
-| `-k, --keywords` | 关键词过滤（可多个） |
-| `-d, --date` | 日期过滤（如 `"Mar 16"`）|
-| `-s, --start-time` | 开始时间（如 `"2026-03-10 08:00:00"`）|
-| `-e, --end-time` | 结束时间（如 `"2026-03-10 12:00:00"`）|
+结合对齐的时间轴矩阵，运用以下规则推导故障传导链方向：
+- **规则一：自下而上（硬件/介质诱发）**
+  - *传导链*：磁盘物理坏道 (T0) → 触发底层 I/O Error → 文件系统元数据读取失败 (Corruption) → 触发内核安全保护并 `Remount read-only`。
+- **规则二：逻辑向应用传导（配置/空间诱发）**
+  - *传导链*：日志异常膨胀 (T0) → 触发 `No space left` → 元数据/日志提交失败 → 导致应用数据库死锁或服务退出。
 
-**Step 1 完成标志：** 输出日志时间范围、文件类型统计、各文件错误关键词出现次数后，即可进入 Step 2。
+> ⚠️ **精确定位强制要求**：在文件系统诊断中，**严禁仅使用“文件系统损坏”这类含糊结论。**
+> 必须给出明确的“逻辑-物理”映射定位，例如：
+> - ✅ 正确结论：`Mount Point: /data (Device: /dev/sdb1) -> Slot 3 -> EXT4 Metadata Corruption -> Block 98304`。
+> - ❌ 错误结论：`由于 I/O 错误导致挂载失败` 或 `磁盘损坏`。
 
 ---
 
-## Step 2：场景分类
+### 2.2 日志脚本分析执行 (执行工具动作)
 
-根据 Step 1 采集的日志概览，执行以下脚本自动识别故障类型：
-
-```bash
-python3 scripts/scene_classifier.py <log_dir> [选项]
-```
-
-**场景分类规则（按优先级）：**
-
-| 场景标签 | 触发条件 | 优先级 |
-|---------|---------|--------|
-| `DISK_FAILURE` | SMART 状态 FAILED/FAILING，或内核检测到 MCE/硬件错误 | ⭐⭐⭐⭐⭐ |
-| `FS_CORRUPTION` | fsck 检测到 error/corrupt，或内核报告 EXT4/XFS 文件系统错误 | ⭐⭐⭐⭐⭐ |
-| `IO_ERROR` | 内核日志出现 I/O error / Buffer I/O error / timeout | ⭐⭐⭐ |
-| `MOUNT_ERROR` | systemd 启动日志出现 mount.*failed / Failed to mount | ⭐⭐⭐⭐ |
-| `SPACE_ISSUE` | 系统日志出现 No space left / inode exhausted | ⭐⭐⭐⭐ |
-| `PERMISSION_ISSUE` | 系统日志出现 Permission denied / operation not permitted | ⭐⭐⭐ |
-
-### 场景 → 根因假设矩阵
-
-确定场景标签后，**必须从以下矩阵中选取 2~3 个候选根因假设**，并在 Step 3 中逐一验证：
-
-| 场景标签 | 候选根因假设（需在 Step 3 中验证） |
-|---------|----------------------------------|
-| `FS_CORRUPTION` | ① 异常断电导致元数据未落盘 ② 磁盘坏扇区导致文件系统元数据损坏 ③ 内核/驱动 bug 导致写入不一致 |
-| `DISK_FAILURE` | ① 磁盘物理介质老化（Reallocated Sector 超阈值） ② 固件/控制器故障 ③ 电源电压异常导致磁盘损坏 |
-| `MOUNT_ERROR` | ① fstab 中 UUID 配置与实际设备不匹配 ② 文件系统类型不匹配（wrong fs type） ③ 底层文件系统损坏导致无法挂载 |
-| `IO_ERROR` | ① 磁盘物理坏道（SMART 指标恶化） ② RAID 控制器/HBA 固件问题 ③ SAS/SATA 线缆或背板故障 |
-| `SPACE_ISSUE` | ① 日志文件异常增长占满磁盘 ② inode 耗尽（文件数量超限，非容量不足） ③ 大文件或临时文件未清理 |
-| `PERMISSION_ISSUE` | ① SELinux/AppArmor 策略阻断 ② 文件/目录权限位被误修改 ③ 挂载选项包含 noexec/nosuid 等限制 |
-
-> ⚠️ **强制要求**：Step 3 分析结束后，必须对上述候选根因逐一标注：✅ 已证实 / ❌ 已排除 / ❓ 证据不足
-
-**Step 2 完成标志：** 输出场景标签，并将结果写入 `/tmp/fs_diagnosis_scene.conf`，从根因假设矩阵中选定候选根因后，进入 Step 3。
-
----
-
-## Step 3：深入分析
-
-根据 Step 2 的场景分类结果，执行对应的专项分析脚本：
-
-### 3.1 通用分析脚本
+#### 2.2.1 通用分析流程
 
 ```bash
 # iBMC 日志分析（硬件层）
-python3 scripts/diagnose_ibmc.py <ibmc_logs目录> [选项]
+python3 scripts/diagnose_ibmc.py <log_dir>
 
 # InfoCollect 日志分析（系统信息层）
-python3 scripts/diagnose_infocollect.py <infocollect_logs目录> [选项]
+python3 scripts/diagnose_infocollect.py <log_dir>
 
 # OS Messages 日志分析（操作系统层）
-python3 scripts/diagnose_messages.py <messages目录> [选项]
+python3 scripts/diagnose_messages.py <log_dir>
 ```
 
-### 3.2 按场景专项分析
+#### 2.2.2 按场景专项分析
 
-#### 3A：文件系统损坏分析 (FS_CORRUPTION)
+当 Step 1 确定故障场景后，优先分析对应的关键指标：
+1. **文件系统损坏**：重点查看 `dmesg` 中的元数据校验错误及 `infocollect` 中的文件系统位图信息。
+2. **磁盘硬件故障**：重点查看 SMART 中的 `Reallocated_Sector_Ct`。
+3. **空间/索引耗尽**：重点查看 `df -i` 和 `df -h` 的各项指标。
 
-**核心日志文件**：
-- `infocollect_logs/system/dmesg.txt` - 内核文件系统错误
-- `infocollect_logs/raid/sasraidlog.txt` - RAID 控制器日志
-- `messages/messages` 或 `messages/syslog` - 系统级文件系统错误
-
-**关键错误模式：**
-
-| 文件系统类型 | 错误关键字 | 含义 |
-|-------------|-----------|------|
-| EXT4 | `EXT4-fs error` | EXT4 文件系统错误 |
-| EXT4 | `superblock` | 超级块损坏 |
-| EXT4 | `inode` | inode 错误 |
-| XFS | `XFS: ... error` | XFS 文件系统错误 |
-| XFS | `xfs_force_shutdown` | XFS 强制关闭 |
-| BTRFS | `BTRFS: error` | BTRFS 文件系统错误 |
-| 通用 | `corrupt` | 数据损坏 |
-| 通用 | `orphaned inode` | 孤儿 inode |
-
-**分析命令**：
-```bash
-# 检查文件系统错误
-python3 scripts/diagnose_messages.py <messages目录> -k "EXT4-fs error" "XFS.*error" "corrupt"
-
-# 检查 dmesg 中的文件系统错误
-python3 scripts/diagnose_infocollect.py <infocollect目录> -k "filesystem" "superblock" "inode"
-```
-
-**根因推理框架（执行脚本后必须完成）：**
-
-1. **因果链条**：整理从"最早的异常日志时间戳"到"故障发生时间"的完整事件序列
-2. **鉴别排除**：从 Step 2 矩阵中逐一标注 ✅/❌/❓（例：先有 `I/O error` 再出现 `FS error` → 磁盘层传导；仅有 `FS error` 无底层 `I/O error` → 纯软件写入不一致）
-3. **根因锁定**：至少有 2 条独立证据支持，且无矛盾证据时，方可锁定根因
-4. **不确定标注**：若证据不足以锁定，明确标注"待验证假设"并说明缺失的证据类型
-
-> 🔍 **重点确认**：损坏是从磁盘层传导上来（先有 `I/O error` 再有 `FS error`）？还是纯软件层写入不一致（仅有 `FS error`，无底层 `I/O error`）？两者根因和修复方案截然不同。
-
-
-
-#### 3B：挂载错误分析 (MOUNT_ERROR)
-
-**核心日志文件**：
-- `messages/messages` - 系统挂载日志
-- `infocollect_logs/system/dmesg.txt` - 内核挂载错误
-- `infocollect_logs/disk/parted_disk.txt` - 分区信息
-- `infocollect_logs/raid/diskmap.txt` - 磁盘映射
-
-**关键错误模式：**
-
-| 错误关键字 | 含义 |
-|-----------|------|
-| `mount: wrong fs type` | 文件系统类型不匹配 |
-| `mount: bad option` | 挂载选项错误 |
-| `mount: bad superblock` | 超级块损坏 |
-| `special device does not exist` | 设备不存在 |
-| `UUID=xxx does not exist` | UUID 对应设备不存在 |
-| `Dependency failed` | 依赖挂载失败 |
-
-**分析命令**：
-```bash
-# 检查挂载错误
-python3 scripts/diagnose_messages.py <messages目录> -k "mount.*failed" "Failed to mount" "wrong fs type"
-
-# 检查设备映射
-python3 scripts/diagnose_infocollect.py <infocollect目录> -k "mount" "fstab" "UUID"
-```
-
-**根因推理框架（执行脚本后必须完成）：**
-
-1. **因果链条**：整理从"最早的异常日志时间戳"到"故障发生时间"的完整事件序列
-2. **鉴别排除**：从 Step 2 矩阵中逐一标注 ✅/❌/❓
-3. **根因锁定**：至少有 2 条独立证据支持，且无矛盾证据时，方可锁定根因
-4. **不确定标注**：若证据不足以锁定，明确标注"待验证假设"并说明缺失的证据类型
-
-> 🔍 **重点确认**：是配置问题（UUID/fstab 错误）导致挂载无法找到设备？还是底层设备不可达（文件系统损坏、设备离线）导致挂载无法成功？两者修复路径不同，前者改配置，后者需先修复底层。
-
-
-
-#### 3C：空间问题分析 (SPACE_ISSUE)
-
-**核心日志文件**：
-- `infocollect_logs/system/iostat.txt` - I/O 统计
-- `infocollect_logs/disk/parted_disk.txt` - 分区信息
-- `messages/messages` - 空间告警
-
-**关键错误模式：**
-
-| 错误关键字 | 含义 |
-|-----------|------|
-| `No space left on device` | 磁盘空间不足 |
-| `inode` + `exhausted` | inode 耗尽 |
-| `disk full` | 磁盘满 |
-| `cannot create` + `full` | 无法创建文件 |
-
-**分析命令**：
-```bash
-# 检查空间问题
-python3 scripts/diagnose_messages.py <messages目录> -k "No space left" "inode" "full"
-```
-
-**根因推理框架（执行脚本后必须完成）：**
-
-1. **因果链条**：整理从"最早的异常日志时间戳"到"故障发生时间"的完整事件序列
-2. **鉴别排除**：从 Step 2 矩阵中逐一标注 ✅/❌/❓
-3. **根因锁定**：至少有 2 条独立证据支持，且无矛盾证据时，方可锁定根因
-4. **不确定标注**：若证据不足以锁定，明确标注"待验证假设"并说明缺失的证据类型
-
-> 🔍 **重点确认**：是总容量不足（`df -h` 显示使用率 100%）？还是 inode 耗尽（`df -i` 显示 inode 使用率 100%，但磁盘空间剩余）？两者现象相同但根因与处理方式完全不同；同时需确认是哪个子目录/进程导致占满。
-
-
-
-#### 3D：权限问题分析 (PERMISSION_ISSUE)
-
-**核心日志文件**：
-- `messages/messages` - 系统权限日志
-- `ibmc_logs/` - iBMC 安全审计日志
-
-**关键错误模式：**
-
-| 错误关键字 | 含义 |
-|-----------|------|
-| `Permission denied` | 权限拒绝 |
-| `operation not permitted` | 操作不允许 |
-| `access denied` | 访问拒绝 |
-| `SELinux` | SELinux 阻止 |
-
-**分析命令**：
-```bash
-# 检查权限问题
-python3 scripts/diagnose_messages.py <messages目录> -k "Permission denied" "operation not permitted"
-```
-
-**根因推理框架（执行脚本后必须完成）：**
-
-1. **因果链条**：整理从"最早的异常日志时间戳"到"故障发生时间"的完整事件序列
-2. **鉴别排除**：从 Step 2 矩阵中逐一标注 ✅/❌/❓
-3. **根因锁定**：至少有 2 条独立证据支持，且无矛盾证据时，方可锁定根因
-4. **不确定标注**：若证据不足以锁定，明确标注"待验证假设"并说明缺失的证据类型
-
-> 🔍 **重点确认**：是权限位问题（`stat` 查看文件/目录权限）、SELinux/AppArmor 上下文阻断（日志中出现 `avc: denied`），还是挂载选项限制（如 `noexec`、`nosuid`）？三者处理方式各异，不可混淆。
-
-
-
-#### 3E：I/O 错误分析 (IO_ERROR)
-
-**核心日志文件**：
-- `infocollect_logs/system/dmesg.txt` - 内核 I/O 错误
-- `infocollect_logs/disk/disk_smart.txt` - SMART 状态
-- `messages/messages` - 系统 I/O 日志
-
-**关键错误模式：**
-
-| 错误关键字 | 含义 |
-|-----------|------|
-| `I/O error` | I/O 错误 |
-| `Buffer I/O error` | 缓冲区 I/O 错误 |
-| `timeout` | I/O 超时 |
-| `read-error` / `write-error` | 读写错误 |
-
-**分析命令**：
-```bash
-# 检查 I/O 错误
-python3 scripts/diagnose_messages.py <messages目录> -k "I/O error" "Buffer I/O error" "timeout"
-
-# 检查 SMART 状态
-python3 scripts/diagnose_infocollect.py <infocollect目录> -k "FAILED" "Reallocated" "Pending"
-```
-
-**根因推理框架（执行脚本后必须完成）：**
-
-1. **因果链条**：整理从"最早的异常日志时间戳"到"故障发生时间"的完整事件序列
-2. **鉴别排除**：从 Step 2 矩阵中逐一标注 ✅/❌/❓
-3. **根因锁定**：至少有 2 条独立证据支持，且无矛盾证据时，方可锁定根因
-4. **不确定标注**：若证据不足以锁定，明确标注"待验证假设"并说明缺失的证据类型
-
-> 🔍 **重点确认**：I/O 错误是否能定位到特定物理设备（确认 `/dev/sdX` 设备名）？SMART 指标是否同步恶化（`Reallocated_Sector_Ct` 或 `Current_Pending_Sector` 非零）？还是逻辑卷/RAID 映射层问题（物理磁盘 SMART 正常但逻辑层 I/O 异常）？
-
-**Step 3 完成标志：** 所有分析输出完整的问题定位 + 关键证据 + 候选根因（含 ✅/❌/❓ 标注）+ 修复建议后，进入 Step 4。
-
+**Step 2 完成标志**：
+1. ✅ 输出故障零点 T0 的精确时间戳及其所依托的具体日志行。
+2. ✅ 梳理出以 T0 为基准的结构化事件序列矩阵与至少 3 步的确定故障传导链。
+3. ✅ 给出精确到设备文件名（/dev/sdX）和物理槽位（Slot ID）的定位结果。
+4. ✅ 收集脚本产出的相关原生日志片段作为强有力的支撑证据。
 
 ---
+## Step 3：根因反思与证据双向校验 (Cross-Examination Rules)
 
-## Step 4：交叉验证
+**目标**：对 Step 2 输出的“初步传导链与定位结果”进行“交叉质询”，确保结论 100% 由底层日志支撑。
 
-**目标**：通过不同来源的日志相互佐证，**验证 Step 3 锁定的根因假设**，确保结论准确性。
+### 3.1 交叉质询铁律 (Cross-Examination Rules)
 
-在进行诊断前，请确保您收集的日志目录中包含以下类型的日志文件：
+1. **孤证不立原则**：任何涉及 I/O 错误引起的文件系统问题，必须同时在内核日志（dmesg）和存储层（SMART/RAID 卡日志/iBMC）找到独立证据。
+2. **逻辑闭环原则**：从 T0 到最终故障结果，传导链不允许出现逻辑断层。例如：判定为“由于坏道导致”，则必须找到对应的物理扇区重映射记录。
+3. **互斥排异原则**：判定为文件系统自身损坏前，必须排除外部因素（如链路抖动、驱动版本 Bug 或人为 rm -rf）。
 
-1.  **硬件层日志**：
-    *   **SMART 日志** (`disk_smart.txt`): 记录硬盘内部的健康指标，如重映射扇区、通电时间等。
-    *   **RAID/HBA 日志** (`sasraidlog.txt`, `sashbalog.txt`): 记录 RAID 卡控制器事件，如掉盘、重建、介质错误。
-    *   **健康评分** (`hwdiag_hdd.txt`): 厂商工具提供的硬盘健康度评分。
-    *   **iBMC SEL** (`sel.db`, `sel.tar`, `onekeylog/log/selelist.csv`): 记录硬件底层事件。
+### 3.2 强制：根因证据校验表 (Evidence Validation Matrix)
 
-2.  **系统层日志**：
-    *   **内核日志** (`dmesg.txt`): 记录内核环形缓冲区信息，包含 SCSI/ATA 子系统的底层报错。
-    *   **系统消息** (`messages`, `syslog`): 记录系统运行期间的服务和内核事件，包含时间戳。
-    *   **Drop Message** (`drop_message/`): 来自 `/var/log/messages` 的系统日志转储，通常包含 `I/O error`, `SCSI error` 及 `smartd` 监控告警，是分析系统侧故障的关键来源。
+在确认最终结论前，强制要求进行证据校验：
 
-3.  **性能层日志**：
-    *   **I/O 统计** (`iostat.txt`): 记录磁盘的吞吐量、IOPS、队列深度和延迟。
-    *   **块跟踪** (`blktrace_log.txt`): 记录块设备 I/O 请求的详细生命周期延迟。
+| 校验维度 | 校验标准要求 | 强制证据格式（分析打样要求） |
+| :--- | :--- | :--- |
+| **E1: 时序连续性** | 底层报错 (I/O/Power) 是否早于或同步于文件系统报错？ | `[✅/❌ 结果]` + `时序对齐说明` + `原生日志片段` |
+| **E2: 逻辑-物理同一性** | 报错的设备节点 (/dev/sdX) 与物理槽位 (Slot Y) 是否指向同一单元？ | `[✅/❌ 结果]` + `设备与槽位映射日志梳理` |
+| **E3: 现象排他性** | 是否排除了系统 OOM、网络挂载延迟或人为误删等非存储因素？ | `[✅/❌ 结果]` + `主动排异日志及逻辑说明` |
 
-4.  **配置与拓扑日志**：
-    *   **磁盘映射** (`diskmap.txt`, `phy_info.txt`): 记录逻辑盘符与物理槽位的对应关系。
+### 3.3 结论防发散拦截机制 (Anti-Hallucination Mechanism)
 
-### 根因验证检查清单（必须逐项确认）
+*   **断链阻断**：若无法从日志中找到证明因果传导的片段，强制触发流程拦截，回溯重新收集。
+*   **降级处分**：若确实缺乏某一层关键日志，必须在报告中声明为**“疑似故障 (Suspected)”**并标注证据断层位置。
+*   **严禁用词限制**：在证据链未能满足完全闭环标准前，**严禁**使用“肯定”、“必然”等决定性断言。
 
-在确认根因前，通过以下问题检验多源日志的一致性：
-
-| 验证点 | 验证方法 | 通过条件 |
-|--------|---------|----------|
-| **时间一致性** | 对比 iBMC SEL 事件时间、dmesg 内核日志时间、messages 系统日志时间 | 所有来源的异常时间戳在同一时间窗口内（±5 分钟） |
-| **层级传导性** | 检查是否存在"硬件层 → 内核层 → 应用层"的错误传导链 | 有明确的上下层因果关系（如 SMART 恶化 → I/O error → FS error）|
-| **设备一致性** | 确认所有日志中的设备标识（`/dev/sdX`、槽位号、WWN）指向同一物理设备 | 无跨设备混淆 |
-| **根因唯一性** | 检查是否存在多个并发故障（如同时有 `SPACE_ISSUE` + `DISK_FAILURE`） | 明确主根因，次根因单独标注 |
-| **矛盾检测** | 检查是否存在相互矛盾的证据（如 SMART 正常但 I/O error 持续） | 矛盾点必须给出合理解释（如 NVMe 无 SMART 支持）或标注"待验证" |
-
-**Step 4 完成标志：** 根因验证清单全部通过，或矛盾点已合理解释，无严重矛盾点时，进入 Step 5。
-
+**Step 3 完成标志**：
+1. ✅ 结构化地产出《根因证据校验表》中每一项的自查结论。
+2. ✅ 每个通过项均附带 Trace 日志中的 Timestamp 和 Original Text。
+3. ✅ 输出与之等位置信度（已证实 / 高度疑似 / 逻辑推断）的严谨研判方向。
 
 ---
+## Step 4：界面输出分析报告
 
-## Step 5：生成报告
-
-汇总 Step 1～4 的所有分析结果，生成结构化诊断报告：
-
-```bash
-./scripts/generate_report.sh --output ./fs_diagnosis_report.md
-
-# 可附带专项分析输出文件
-./scripts/generate_report.sh \
-    --output ./fs_diagnosis_report_$(date +%Y%m%d).md \
-    --analysis /tmp/diagnose_output.txt
-```
+汇总 Step 0～3 的所有分析结果，直接在当前对话界面输出结构化的诊断结论。**禁止生成任何额外的文档或报告文件。**
 
 **报告结构：**
 
-1. **Executive Summary（故障摘要）** — 故障场景、根本原因、修复建议概述
-2. **Technical Analysis（技术分析）** — 日志文件概览、故障现象、故障机理、证据链（E1/E2/E3...）
-3. **Root Cause（根本原因）** — 直接原因 + 根本原因 + 5 Whys 分析
-4. **Recommendations（修复建议）** — 立即 / 短期 / 中期 / 长期修复措施
-5. **风险评估** — 数据丢失、服务中断、复发风险评估
-6. **最终验证清单** — 确认分析足够深入的检查清单
-7. **附录** — 关键日志片段与相关命令参考
+1. **Executive Summary（故障摘要）** — 故障设备/挂载点、直接原因、业务后果概述
+2. **Fault Chains（故障链条分析）** — **必须包含以下两级链条：**
+   - **故障时间链 (Fault Time Chain)**：列出带关键节点的事件序列，**每个节点必须包含准确的时间戳**（精确到具体时间）。
+   - **故障传导链 (Fault Propagation Chain)**：清晰描绘导致系统表现的因果路径（例如：`RAID卡电池失效 -> 写策略降级 -> I/O 延迟剧增 -> 文件系统由于超时被动切为 Read Only`）。
+3. **Technical Analysis & Root Cause（技术分析与根因）** — 结合 5 Whys 法得出的根因，并提供多源证据链（E1/E2/E3）支撑。
+4. **Recommendations（修复建议）** — 立即操作、备件更换建议及预防性检查
 
-**根因具体性要求（笼统描述视为分析不足）：**
 
-| ❌ 笼统 | ✅ 具体 |
-|--------|--------|
-| "磁盘坏了" | "/dev/sda 存在 128 个坏扇区，SMART Reallocated_Sector_Ct 超过阈值" |
-| "文件系统错误" | "EXT4 文件系统 /dev/sdb1 的 inode #12345 损坏，导致 /data 目录无法访问" |
-| "挂载失败" | "/etc/fstab 中 UUID=xxx 对应的设备不存在，实际设备 UUID 为 yyy" |
+**诊断分析完成性检查（输出报告前必检）：**
 
-**根因推理完成性检查（调用 `generate_report.sh` 前必须通过）：**
-
-在调用 `./scripts/generate_report.sh` 生成报告框架之前，必须能够回答以下所有问题：
-
-- [ ] 根因是否具体到：**设备名**（`/dev/sdX`）+ **错误类型**（超级块损坏/坏扇区/UUID不匹配）+ **触发条件**（断电/老化/配置错误）？
-- [ ] Step 2 矩阵中所有候选根因是否已完成 ✅/❌/❓ 标注？
-- [ ] 是否能描述从"根因"到"最终症状"的完整因果链条（至少 3 层，例：坏扇区 → I/O error → EXT4 超级块损坏 → 挂载失败）？
-- [ ] 是否排除了至少一个"相似但非真正根因"的情况（即做过鉴别诊断）？
-
-> ⚠️ **若有任何未通过项，必须返回 Step 3 继续分析（追加关键词或缩小时间范围），而非直接填写报告模板。**
-
----
-
-## 诊断脚本概览
-
-| 脚本 | 所属步骤 | 功能 | 关键特性 |
-|------|---------|------|----------|
-| `check_environment.sh` | Step 0 | 环境检查 | 验证日志文件存在性和可读性，强制阻断 |
-| `diagnose_summary.py` | Step 1 | 故障日志采集 | 概览模式，输出时间范围/文件统计/错误概览 |
-| `scene_classifier.py` | Step 2 | 场景分类器 | 支持时间/关键词过滤，精确分类，保存场景标签 |
-| `diagnose_ibmc.py` | Step 3 | iBMC 日志分析 | SEL 事件分析，硬件告警检测 |
-| `diagnose_infocollect.py` | Step 3 | InfoCollect 日志分析 | SMART/RAID/iostat 分析 |
-| `diagnose_messages.py` | Step 3 | OS 消息日志分析 | 文件系统错误、挂载错误、空间问题检测 |
-| `generate_report.sh` | Step 5 | 报告生成 | 汇总分析结果，生成结构化诊断报告 |
-
-### 常用参数说明
-
-| 参数 | 说明 | 示例 |
-| :--- | :--- | :--- |
-| `-o`, `--overview` | **快速概览**。查看日志时间跨度、硬件概况及错误文件分布。 | `python3 scripts/diagnose_ibmc.py <dir> -o` |
-| `-d`, `--date` | **特定日期排查**。只显示包含特定日期字符串的日志行。 | `python3 scripts/diagnose_messages.py <dir> -d "Mar 5"` |
-| `-s`, `--start-time` | **开始时间**。格式 "YYYY-MM-DD HH:MM:SS"。 | `... -s "2023-03-05 10:00:00"` |
-| `-e`, `--end-time` | **结束时间**。格式 "YYYY-MM-DD HH:MM:SS"。 | `... -e "2023-03-05 12:00:00"` |
-| `-k`, `--keywords` | **关键词搜索**。增加自定义故障关键词搜索。 | `... -k "EXT4-fs error" "mount failed"` |
+在得出结论前，必须回答以下问题：
+- [ ] 是否给出了精确的**设备名**（/dev/sdX）及对应的**物理槽位号**（Slot ID）？
+- [ ] Step 1 场景假设矩阵是否已完成 ✅/❌ 标注？
+- [ ] 是否排除了文件系统逻辑以外的底层硬件或存储链路干扰？
+- [ ] **是否仅在界面输出了报告内容，没有生成任何文件？**
+- [ ] **故障时间链中的每一个节点是否都有准确的时间？**
+- [ ] **是否清晰勾勒并输出了故障传导链？**
 
 ---
 
 ## 参考资料
 
+* [文件系统故障场景分类](references/FS_fault_scenarios.md)
+* [文件系统故障场景专项分析指南](references/FS_scenario_analysis.md)
 * [InfoCollect 诊断指南](references/infocollect_guide.md)
+* [OS Messages 诊断指南](references/messages.md)
 * [Huawei iBMC 分析](references/huawei_ibmc.md)
 * [H3C iBMC 分析](references/h3c_ibmc.md)
 * [Inspur iBMC 分析](references/Inspur_ibmc.md)
-* [OS Messages 分析](references/messages.md)
 
 ---
-
-## 分析原则
-
-0. **根因优先**：诊断的最终目标是**定位根因（Root Cause）**，而非仅描述症状。每个分析步骤都应推进"为什么会发生"的答案，而非停留在"发生了什么"。症状描述（如"文件系统错误"）只是中间过程，根因（如"断电导致元数据未落盘"）才是终点。
-1. **软件优先**：文件系统问题优先排查软件层面，确认非硬件故障引起
-2. **证据驱动**：每个结论必须有日志数据支撑，无数据则标注"待验证假设"
-3. **配置检查**：挂载问题需检查 fstab 配置、设备 UUID 映射
-4. **风险评估**：评估修复操作对数据的影响，优先选择保守方案
-5. **交叉验证**：通过多源日志相互佐证，确保结论准确性
-6. **离线分析**：本 Skill 仅基于日志文件进行分析，不执行任何在线系统命令
-
