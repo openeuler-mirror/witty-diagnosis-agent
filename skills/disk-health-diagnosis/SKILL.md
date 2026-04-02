@@ -44,13 +44,13 @@ description: >
 检测目的：直接判断磁盘介质是否出现物理损伤（L1）并结合设备负载及寿命消耗进行综合风险评估（L2）。
 
 **优先使用自动化脚本检测**：
-诊断时必须优先使用内置的自动化脚本：`skills/disk-health-diagnosis/scripts/smart_diagnosis.py`。
+诊断时必须优先使用内置的自动化脚本：`python3 scripts/smart_diagnosis.py <log_path>`。
 该脚本已封装 L1（物理坏道/寿命耗尽等）与 L2（高通电时间/启停次数等）所有的 SMART 指标规则（参考指南：`references/smart_disk_health_diagnosis_guide.md`），支持自动探测日志场景并提取关键指标，并输出标准化报告至 `/tmp/smart_diagnosis_report_YYYYMMDD_HHMMSS_xxxx.txt`。可以使用 `--help` 参数查看帮助说明。
 
 **脚本使用示例**：
 ```bash
 # 直接传入日志的根目录，脚本会自动向下递归并探测属于 OS Infocollect 还是 iBMC 硬件日志场景
-python3 /opt/src/witty-diagnosis-agent/skills/disk-health-diagnosis/scripts/smart_diagnosis.py /opt/data/.../log_directory
+python3 scripts/smart_diagnosis.py <log_directory>
 ```
 
 **脚本执行失败的降级方案**：
@@ -62,13 +62,13 @@ python3 /opt/src/witty-diagnosis-agent/skills/disk-health-diagnosis/scripts/smar
 检测目的：排除"背板/槽位/温度/电源"导致的非盘本体问题，区分"真盘坏"与"链路/控制器引发的假盘坏"，防止误判换盘。
 
 **优先使用自动化脚本检测**：
-诊断时必须优先使用内置的自动化脚本：`skills/disk-health-diagnosis/scripts/env_link_diagnosis.py`。
+诊断时必须优先使用内置的自动化脚本：`python3 scripts/env_link_diagnosis.py <log_path>`。
 该脚本能够自动分析 iBMC 和 Infocollect 日志中的温度、电源、风扇传感器，并提取 SMART ID 199 (CRC 错误)、RAID 控制器状态以及系统底层的链路重置记录。执行后会输出诊断报告至 `/tmp/env_link_diagnosis_report_YYYYMMDD_HHMMSS_xxxx.txt`。
 
 **脚本使用示例**：
 ```bash
 # 直接传入日志的根目录，脚本会自动向下递归并探测属于 OS Infocollect 还是 iBMC 硬件日志场景
-python3 /opt/src/witty-diagnosis-agent/skills/disk-health-diagnosis/scripts/env_link_diagnosis.py /opt/data/.../log_directory
+python3 scripts/env_link_diagnosis.py <log_directory>
 ```
 
 **手动降级方案与核心关注指标**：
@@ -83,7 +83,7 @@ python3 /opt/src/witty-diagnosis-agent/skills/disk-health-diagnosis/scripts/env_
 检测目的：感知操作系统已经"观察到"的 IO 错误，是故障进入系统可见阶段的信号。同时从业务影响面评估是否需要立即止血，并反向印证盘层分析。
 
 **优先使用自动化脚本检测**：
-诊断时优先使用对应的自动化脚本进行分析：`scripts/os_io_error_diagnosis.py <log_path>`。
+诊断时优先使用对应的自动化脚本进行分析：`python3 scripts/os_io_error_diagnosis.py <log_path>`。
 该脚本已封装 L5（文件系统与OS层）和 L6（业务与存储服务层）所有的报错检测规则。
 
 **分析路径与日志来源**：
