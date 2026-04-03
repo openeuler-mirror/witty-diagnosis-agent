@@ -395,9 +395,95 @@ def check_system_events(root_dir, extra_keywords=None, **kwargs):
         else:
             print("  No critical storage errors found.")
 
+def get_section(file_path, command_name):
+    """Extract content between { and } for a given command in InfoCollect logs."""
+    content = []
+    try:
+        with open(file_path, 'r', encoding='utf-8', errors='ignore') as f:
+            lines = f.readlines()
+            for i, line in enumerate(lines):
+                if line.strip() == command_name:
+                    # Look for { in next few lines
+                    found_start = False
+                    for j in range(i + 1, min(i + 5, len(lines))):
+                        if '{' in lines[j]:
+                            found_start = True
+                            start_idx = j + 1
+                            break
+                    if found_start:
+                        for k in range(start_idx, len(lines)):
+                            if '}' in lines[k]:
+                                return content
+                            content.append(lines[k].strip())
+    except: pass
+    return content
+
+def check_filesystem_logic(root_dir, **kwargs):
+    print("\n--- Checking Filesystem Logic (df/mount/lsblk) ---")
+    
+    # 1. Look for command outputs in common InfoCollect files
+    cmd_files = find_files(root_dir, r"(command_log\.txt|blk_list\.txt|system_info\.txt)")
+    
+    df_h = []
+    df_i = []
+    mount_info = []
+    lsblk_info = []
+    
+    for f in cmd_files:
+        if not df_h: df_h = get_section(f, "df -Th") or get_section(f, "df -h")
+        if not df_i: df_i = get_section(f, "df -li") or get_section(f, "df -i")
+        if not mount_info: mount_info = get_section(f, "mount")
+        if not lsblk_info: lsblk_info = get_section(f, "lsblk")
+        
+    # 2. Analyze Space Usage (df -h)
+    if df_h:
+        print("  Analyzing Disk Space (df -h)...")
+        for line in df_h:
+            parts = line.split()
+            if len(parts) >= 5 and '%' in parts[-2]:
+                try:
+                    usage = int(parts[-2].replace('%', ''))
+                    if usage > 90:
+                        print(f"    [WARNING] High Space Usage: {parts[0]} mounted on {parts[-1]} is {usage}% full")
+                except ValueError: pass
+    
+    # 3. Analyze Inodes (df -i)
+    if df_i:
+        print("  Analyzing Inodes (df -i)...")
+        for line in df_i:
+            parts = line.split()
+            if len(parts) >= 5 and '%' in parts[-2]:
+                try:
+                    usage = int(parts[-2].replace('%', ''))
+                    if usage > 90:
+                        print(f"    [WARNING] High Inode Usage: {parts[0]} mounted on {parts[-1]} is {usage}% full")
+                except ValueError: pass
+
+    # 4. Analyze Mount Options (mount)
+    if mount_info:
+        print("  Analyzing Mount Options (mount)...")
+        # Critical partitions and data volumes
+        for line in mount_info:
+            if ("/data" in line or " type ext" in line or " type xfs" in line) and "(ro" in line:
+                 print(f"    [CRITICAL] Read-Only Mount Detected: {line}")
+            if "errors=remount-ro" in line:
+                 # This is a config, not an error necessarily, but good to know
+                 pass
+
+    # 5. Check for LVM / Device Mapping
+    if lsblk_info:
+        print("  Checking Device Mapping (lsblk)...")
+        for line in lsblk_info:
+            if "lvm" in line.lower() or "raid" in line.lower():
+                # Just highlight existence for now
+                pass
+
+    if not (df_h or df_i or mount_info):
+        print("  Warning: Could not find df/mount info in common command logs.")
+
 def main():
     parser = argparse.ArgumentParser(
-        description="Detailed Disk Diagnosis Tool (SMART/RAID/iostat Analysis)",
+        description="Detailed Disk Diagnosis Tool (SMART/RAID/iostat/Filesystem Analysis)",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Usage Examples:
@@ -422,7 +508,7 @@ Usage Examples:
                         help="End time for filtering (e.g., '2023-03-05 12:00:00')")
                         
     parser.add_argument("-o", "--overview", action="store_true",
-                        help="Show global health summary (SMART healthy, RAID status, I/O bottlenecks) instead of detailed logs")
+                        help="Show global health summary (SMART healthy, RAID status, Filesystem health) instead of detailed logs")
 
     args = parser.parse_args()
     
@@ -432,12 +518,6 @@ Usage Examples:
 
     if args.overview:
         show_overview(args.log_dir)
-        # If overview is requested, we might still want to run full diagnosis or not?
-        # Usually overview is a quick check. Let's ask or assume.
-        # The user said "Global overview", implying a summary mode. 
-        # I will return after overview to keep it clean, unless user wants both.
-        # But typically one might run -o to see what's up, then run without it for details.
-        # Let's exit after overview.
         sys.exit(0)
 
     # Parse timestamps if provided
@@ -456,7 +536,7 @@ Usage Examples:
             print("Error: Invalid end time format. Use 'YYYY-MM-DD HH:MM:SS'")
             sys.exit(1)
 
-    print(f"Starting Disk Diagnosis on {args.log_dir}...")
+    print(f"Starting Disk & Filesystem Diagnosis on {args.log_dir}...")
     if args.keywords: print(f"Additional Keywords: {args.keywords}")
     if args.date: print(f"Filter Date: {args.date}")
     if start_dt: print(f"Start Time: {start_dt}")
@@ -472,6 +552,7 @@ Usage Examples:
     check_raid(args.log_dir, extra_keywords=args.keywords, **grep_kwargs)
     check_io_performance(args.log_dir, **grep_kwargs)
     check_system_events(args.log_dir, extra_keywords=args.keywords, **grep_kwargs)
+    check_filesystem_logic(args.log_dir, **grep_kwargs)
     
     print("\nDiagnosis Complete.")
 

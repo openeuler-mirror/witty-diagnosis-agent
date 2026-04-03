@@ -27,26 +27,30 @@ def get_time_info(file_path):
     
     try:
         with open(file_path, 'r', encoding='utf-8', errors='ignore') as f:
+            # For time analysis, we might need to skip some header lines
+            # Read first 1000 lines instead of 200 to find first timestamp
             lines = f.readlines()
             if not lines: return None, None, "Empty"
             
-            for line in lines[:200]:
+            for line in lines[:1000]:
                 for pattern, fmt_name in TIME_PATTERNS:
                     match = re.search(pattern, line)
                     if match:
                         ts_str = match.group(1)
-                        detected_fmt = fmt_name
                         fmts = ["%b %d %H:%M:%S", "%Y-%m-%d %H:%M:%S", "%Y-%m-%dT%H:%M:%S", "%m/%d/%Y %H:%M:%S"]
                         for f_str in fmts:
                             try:
                                 dt = datetime.strptime(ts_str, f_str)
                                 if f_str == "%b %d %H:%M:%S": dt = dt.replace(year=datetime.now().year)
-                                if min_dt is None or dt < min_dt: min_dt = dt
+                                if min_dt is None or dt < min_dt: 
+                                    min_dt = dt
+                                    detected_fmt = fmt_name
                                 break
                             except: continue
                         if min_dt: break
             
-            for line in reversed(lines[-200:]):
+            # Read last 1000 lines for max_dt
+            for line in reversed(lines[-1000:]):
                 for pattern, _ in TIME_PATTERNS:
                     match = re.search(pattern, line)
                     if match:
@@ -65,7 +69,8 @@ def get_time_info(file_path):
 
 def run_diagnose_script(script_name, log_dir, args_str=""):
     script_path = os.path.join(os.path.dirname(__file__), script_name)
-    cmd = f"python3 {script_path} {log_dir} {args_str}"
+    # Using list for run is safer but shell=True is used here for simplicity in passing complex quoted args
+    cmd = f"python3 {script_path} \"{log_dir}\" {args_str}"
     try:
         result = subprocess.run(cmd, shell=True, capture_output=True, text=True)
         return result.stdout
@@ -119,13 +124,19 @@ Usage Examples:
         if os.path.exists(path):
             print(f"\n{name} Folder: Found")
             sample_file = None
-            if name == "iBMC Logs": sample_file = find_files(path, r".*sel.*\.txt|.*sel.*\.csv")
-            elif name == "InfoCollect": sample_file = find_files(path, r"disk_smart\.txt|sasraidlog\.txt|dmesg\.txt")
-            elif name == "OS Messages": sample_file = find_files(path, r"messages.*|syslog.*|dmesg.*")
+            if name == "iBMC Logs":
+                sample_file = find_files(path, r".*sel.*\.txt|.*sel.*\.csv")
+            elif name == "InfoCollect":
+                # For InfoCollect, dmesg or messages are better for time range than smart logs
+                sample_file = find_files(path, r"messages.*|syslog.*|dmesg.*|runlog.*")
+                if not sample_file:
+                    sample_file = find_files(path, r"disk_smart\.txt|sasraidlog\.txt")
+            elif name == "OS Messages":
+                sample_file = find_files(path, r"messages.*|syslog.*|dmesg.*")
             
             if sample_file:
                 min_t, max_t, fmt = get_time_info(sample_file[0])
-                print(f"  Sample File: {os.path.basename(sample_file[0])}")
+                print(f"  Sample File: {os.path.relpath(sample_file[0], path)}")
                 print(f"  Time Format: {fmt}")
                 print(f"  Time Range:  {min_t} to {max_t}")
             else:
@@ -140,6 +151,7 @@ Usage Examples:
     if args.date: pass_args += f" -d '{args.date}'"
     if args.start_time: pass_args += f" -s '{args.start_time}'"
     if args.end_time: pass_args += f" -e '{args.end_time}'"
+    if args.overview: pass_args += " -o"
 
     if os.path.exists(sub_dirs["iBMC Logs"]):
         print("\n>>> iBMC Diagnosis Results:")

@@ -85,6 +85,7 @@ Usage Examples:
   python3 %(prog)s ./logs/ -k "disk_fail" "slot0"
   python3 %(prog)s ./logs/ -d "Mar 16"
   python3 %(prog)s ./logs/ -s "2026-03-10 08:00:00" -e "2026-03-10 12:00:00"
+  python3 %(prog)s ./logs/ -o
         """
     )
     parser.add_argument("root_dir", help="Root directory containing 'ibmc_logs', 'infocollect_logs', and 'messages' folders")
@@ -96,6 +97,8 @@ Usage Examples:
                         help="Start time for filtering (e.g., '2026-03-10 08:00:00')")
     parser.add_argument("-e", "--end-time", metavar="'YYYY-MM-DD HH:MM:SS'",
                         help="End time for filtering (e.g., '2026-03-10 12:00:00')")
+    parser.add_argument("-o", "--overview", action="store_true",
+                        help="Show high-level overview for each log category")
     
     args = parser.parse_args()
     root_dir = args.root_dir
@@ -143,6 +146,7 @@ Usage Examples:
     if args.date: pass_args += f" -d '{args.date}'"
     if args.start_time: pass_args += f" -s '{args.start_time}'"
     if args.end_time: pass_args += f" -e '{args.end_time}'"
+    if args.overview: pass_args += " -o"
 
     # Run sub-scripts
     if os.path.exists(sub_dirs["iBMC Logs"]):

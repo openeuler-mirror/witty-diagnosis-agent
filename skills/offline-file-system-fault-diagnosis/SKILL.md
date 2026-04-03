@@ -73,7 +73,7 @@ Step 0 (故障日志采集) → Step 1 (场景分类) → Step 2 (深入分析) 
 
 | **步骤** | **阶段目标** | **主要工具/方法** |
 | :--- | :--- | :--- |
-| **Step 0** 故障日志采集 | 全量扫描日志目录并识别关键报错 | `python3 scripts/diagnose_summary.py <log_dir> -o` |
+| **Step 0** 故障日志采集 | 全量扫描日志目录并识别关键报错 | `python3 scripts/diagnose_summary.py <log_dir>` |
 | **Step 1** 场景分类 | 判定现象并确定故障场景类型 | 根据 Step 0 结果参考 [FS_fault_scenarios.md](references/FS_fault_scenarios.md) 匹配 |
 | **Step 2** 深入分析 | 构建起止 T0 的传导链并执行专项诊断 | 参考 [FS_scenario_analysis.md](references/FS_scenario_analysis.md) 获取多维证据 |
 | **Step 3** 根因校验 | 交叉质询证据链，执行证据双向校验 | 对比 iBMC/内核/系统日志的一致性，防止结论发散 |
@@ -85,18 +85,26 @@ Step 0 (故障日志采集) → Step 1 (场景分类) → Step 2 (深入分析) 
 
 ### 全量扫描（宏观分析）
 
-**目标**：快速扫描所有日志文件，识别异常模块和关键报错（如 EXT4-fs error, I/O error），建立故障全景视图。
+**目标**：快速扫描所有日志文件，识别磁盘及存储子系统的异常，建立故障全景视图。当存在特定报错或时间范围时，利用参数进行第一轮初步精确定位。
 
-**执行命令**：
+**执行命令**（根据场景选择）：
 ```bash
-python3 scripts/diagnose_summary.py <log_dir> -o
+# 场景 1：无明确过滤条件（默认全量扫描）
+python3 scripts/diagnose_summary.py <log_dir>
+
+# 场景 2：用户提供故障关键词时
+python3 scripts/diagnose_summary.py <log_dir> -k "disk_fail" "slot0"
+
+# 场景 3：用户提供故障发生时间/日期时
+python3 scripts/diagnose_summary.py <log_dir> -d "Mar 16"
+python3 scripts/diagnose_summary.py <log_dir> -s "2026-03-10 08:00:00" -e "2026-03-10 12:00:00"
 ```
 
 ### 精细定位（微观分析）
 
-**目标**：根据全量扫描结果和用户提供的过滤条件，使用 `grep` / `less` 等文件操作命令查看具体的原始日志上下文获取更细粒度的故障信息。
+**目标**：在优先使用上述带有参数的扫描命令锁定范围的基础上，结合全量扫描结果，辅以 `grep` / `less` 等文件操作命令查看更细节的原始日志上下文。
 
-> **注意：使用脚本时，必须优先执行 `--help` 参数，了解脚本用法**
+> **注意：使用脚本时，可优先执行 `--help` 参数，了解脚本多维度过滤用法。**
 
 ---
 ## Step 1：场景分类
@@ -202,6 +210,8 @@ python3 scripts/diagnose_infocollect.py <log_dir>
 python3 scripts/diagnose_messages.py <log_dir>
 ```
 
+> **注意：使用脚本时，可优先执行 `--help` 参数，了解脚本多维度过滤用法。**
+
 #### 2.2.2 按场景专项分析
 
 当 Step 1 确定故障场景后，优先分析对应的关键指标：
@@ -258,7 +268,7 @@ python3 scripts/diagnose_messages.py <log_dir>
 2. **Fault Chains（故障链条分析）** — **必须包含以下两级链条：**
    - **故障时间链 (Fault Time Chain)**：列出带关键节点的事件序列，**每个节点必须包含准确的时间戳**（精确到具体时间）。
    - **故障传导链 (Fault Propagation Chain)**：清晰描绘导致系统表现的因果路径（例如：`RAID卡电池失效 -> 写策略降级 -> I/O 延迟剧增 -> 文件系统由于超时被动切为 Read Only`）。
-3. **Technical Analysis & Root Cause（技术分析与根因）** — 结合 5 Whys 法得出的根因，并提供多源证据链（E1/E2/E3）支撑。
+3. **Technical Analysis & Root Cause（技术分析与根因）** — 基于 Step 2 的传导链底层回溯与 Step 3 的交叉质询得出的物理级或配置级根因，并提供多源证据链（E1/E2/E3）支撑。
 4. **Recommendations（修复建议）** — 立即操作、备件更换建议及预防性检查
 
 
