@@ -50,16 +50,14 @@
 
 - 启动 **OpenCode**。
 
-- 在终端执行命令：
+- 执行`/agents`命令选择`Xuanyuan`Agent。
+  
+  ![auto-diag-输入故障描述](../../assets/select_xuanyuan.png)
+
+- 输入故障问题描述，示例如下：
   
   ```shell
-  auto-diag 故障问题描述
-  ```
-  
-  示例：
-  
-  ```shell
-  auto-diag "我的服务器76.53.183.189 enp4s0数据包丢失，请诊断。"
+  我的服务器76.53.183.189 enp4s0数据包丢失，请诊断。
   ```
 
 - 系统将自动执行**智能诊断**流程。
