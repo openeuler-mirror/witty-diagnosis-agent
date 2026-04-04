@@ -18,7 +18,10 @@ Witty 智能诊断 Agent 采用“Agent-Skill-工具-知识”四层解耦架构
 </div>
 
 #### 1. 多智能体协同 (Agent 层)
+
 采用流水线式机制实现诊断自动化：
+
+- Xuan Agent(总控)：调度其它Agent协同完成故障诊断。
 - **Fuxi Agent (规划)**：基于现象生成结构化排查计划。
 - **Dayu Agent (调度)**：解析计划并并发调度给执行节点。
 - **Kuafu Agent (执行)**：加载专属 Skill 深入节点拉取指标与推理。
@@ -26,11 +29,14 @@ Witty 智能诊断 Agent 采用“Agent-Skill-工具-知识”四层解耦架构
 - **Nuwa Agent (自愈)**：基于安全规则，自动生成并执行修复。
 
 #### 2. 专家经验沉淀 (Skill & 知识层)
+
 - **Skill 层**：将专家排查流程封装为可复用的诊断技能（如 OOM、死锁排查）。
 - **知识底座**：内置 openEuler 专属故障模式与因果规则，持续自我进化。
 
 #### 3. 核心诊断场景
+
 深度结合 openEuler 操作系统特性，目前已支持：
+
 - **内核级诊断**：自动化采集解析 VMCore，精准回溯系统崩溃（Crash/Panic）调用栈。
 - **系统级诊断**：针对磁盘 I/O、网络丢包、内存碎片等资源瓶颈提供多维关联分析。
 - **进程级诊断**：深度诊断进程死锁、僵尸进程及服务超时等逻辑异常。
@@ -71,21 +77,24 @@ bash install.sh
 ### 如何使用
 
 1. 启动 \*\*OpenCode \*\*。
-2. 在终端执行命令：
-   ```shell
-   auto-diag 故障问题描述
-   ```
-   **说明**：当前支持离线分析，需在故障描述中指定**遥测数据 / 日志存储路径**。
 
-   示例：
-   ```shell
-   auto-diag "请诊断2026-03-05 14:31前最近一次硬盘故障，日志路径：/tmp/diskfault/logs"
-   ```
-   <img src="docs/assets/wittywork.png" alt="wittywork命令" width="800" />
-3. 系统将自动执行**智能诊断**流程。
-4. 诊断完成后，根据终端输出的报告路径，查看完整的诊断分析报告。
+2. 执行`/agents`命令，选择`Xuanyuan`Agent。
+   
+   ![选择Xuanyuan Agent](docs/assets/select_xuanyuan.png)
 
-   <img src="docs/assets/diagnosis_report.png" alt="诊断报告" width="800" />
+3. 输入故障问题描述，示例：
+   
+   ```shell
+   请诊断2026-03-05 14:31前最近一次硬盘故障，日志路径：/tmp/logs
+   ```
+   
+   <img src="docs/assets/guide_auto_diag_start.png" alt="wittywork命令" width="800" />
+
+4. 系统将自动执行**智能诊断**流程。
+
+5. 诊断完成后，即可查看诊断分析报告概览，可按照界面显示的根因分析报告路径获取完整诊断报告，示例。
+   
+   <img src="docs/assets/guide_auto_diag_report.png" alt="诊断报告" width="800" />
 
 ### 如何贡献
 
