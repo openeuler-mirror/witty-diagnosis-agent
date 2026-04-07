@@ -4,6 +4,125 @@ import { marked } from "marked"
 import type { PluginInput } from "@opencode-ai/plugin"
 import { tool, type ToolDefinition } from "@opencode-ai/plugin/tool"
 
+function isPlainTextReport(md: string) {
+  return (md.match(/【[^】]+】/g) || []).length > 3 ||
+         md.includes("===HEAVY===") ||
+         /^\s+\S+\s{3,}\S+\s{3,}\S+/m.test(md);
+}
+
+function tryConvertTable(lines: string[], start: number) {
+  if (lines[start].trim() !== "---") return null;
+  let hi = start + 1;
+  while (hi < lines.length && !lines[hi].trim()) hi++;
+  if (hi >= lines.length || lines[hi].trim() === "---") return null;
+
+  const headerLine = lines[hi].trim();
+
+  let sep2 = hi + 1;
+  while (sep2 < lines.length && lines[sep2].trim() !== "---") sep2++;
+  if (sep2 >= lines.length) return null;
+
+  const dataLines: string[] = [];
+  let ri = sep2 + 1;
+  while (ri < lines.length && lines[ri].trim() !== "---" && lines[ri].trim() !== "===HEAVY===") {
+    if (lines[ri].trim()) dataLines.push(lines[ri]);
+    ri++;
+  }
+
+  const splitCols = (l: string) => l.trim().split(/  +/).map(s=>s.trim()).filter(Boolean);
+  const headers = splitCols(headerLine);
+  if (headers.length < 2) return null;
+
+  const sep = "| " + headers.join(" | ") + " |";
+  const div = "|" + headers.map(()=>" --- ").join("|") + "|";
+  const rows = dataLines.map(dl => {
+    const cols = splitCols(dl);
+    while (cols.length < headers.length) cols.push("");
+    return "| " + cols.slice(0, headers.length).join(" | ") + " |";
+  });
+
+  const tableMd = [sep, div, ...rows].join("\n");
+  const next = lines[ri]?.trim() === "---" ? ri + 1 : ri;
+  return { md: "\n" + tableMd + "\n", next };
+}
+
+function preprocessPlainText(md: string) {
+  const lines = md.split("\n");
+  const out: string[] = [];
+  let i = 0;
+
+  while (i < lines.length) {
+    const l = lines[i];
+
+    if (l.trim() === "===HEAVY===") {
+      let j = i + 1;
+      while (j < lines.length && !lines[j].trim()) j++;
+      if (j < lines.length && lines[j].trim() !== "===HEAVY===") {
+        const title = lines[j].trim();
+        let k = j + 1;
+        while (k < lines.length && !lines[k].trim()) k++;
+        if (k < lines.length && lines[k].trim() === "===HEAVY===") {
+          out.push(`\n## ${title}\n`);
+          i = k + 1; continue;
+        }
+      }
+      out.push("---"); i++; continue;
+    }
+
+    if (l.trim() === "---") {
+      const result = tryConvertTable(lines, i);
+      if (result) {
+        out.push(result.md);
+        i = result.next; continue;
+      }
+      out.push(""); i++; continue;
+    }
+
+    const bm = l.trim().match(/^【([^】]+)】\s*(.*)$/);
+    if (bm) {
+      const title = bm[1];
+      const rest = bm[2] ? " " + bm[2] : "";
+      if (/^P[0-3]/.test(title)) {
+        out.push(l);
+      } else {
+        out.push(`\n### ${title}${rest}\n`);
+      }
+      i++; continue;
+    }
+
+    out.push(l); i++;
+  }
+  return out.join("\n");
+}
+
+function badgeStatus(text: string) {
+  const t = text.trim();
+  if (t.includes("✅")) return `<span class="badge-ok">${t}</span>`;
+  if (t.includes("❌")) return `<span class="badge-err">${t}</span>`;
+  if (t.includes("⚠") || t.includes("⚠️")) return `<span class="badge-warn">${t}</span>`;
+  return t;
+}
+
+function enrichReportHTML(html: string) {
+  let res = html.replace(/<td>(([^<]*)(✅|❌|⚠️|⚠)[^<]*)<\/td>/g, (_, inner) =>
+    `<td>${badgeStatus(inner)}</td>`
+  );
+  res = res.replace(/<li>(([^<]*)(✅|❌|⚠️|⚠)[^<]*)<\/li>/g, (_, inner) =>
+    `<li>${badgeStatus(inner)}</li>`
+  );
+  res = res.replace(/<p>([^<]*🔴[^<]*全局警告[^<]*)<\/p>/g,
+    (_,t) => `<div class="global-warn">${t}</div>`);
+  res = res.replace(/<p>([^<]*[└├][─][^<]*)<\/p>/g,
+    (_,t) => `<p class="tree-note">${t}</p>`);
+  res = res.replace(/<p>【(P[0-3][^】]*)】([^<]*)<\/p>/g, (_, level, rest) => {
+    const p = level.slice(0,2);
+    const cls = {P0:"fh-p0",P1:"fh-p1",P2:"fh-p2",P3:"fh-p3"}[p as string] ?? "fh-p3";
+    return `<div class="fault-header ${cls}"><span class="fh-badge">${level}</span><span class="fh-rest">${rest.trim()}</span></div>`;
+  });
+  res = res.replace(/<\/ul>\s*<ul>/g, "");
+  return res;
+}
+
 export function createReportVisualizationTool(ctx: PluginInput): Record<string, ToolDefinition> {
   const report_visualization: ToolDefinition = tool({
     description: "Converts a Markdown file into an HTML file for visualization. The output HTML file path will be returned.",
@@ -24,19 +143,20 @@ export function createReportVisualizationTool(ctx: PluginInput): Record<string, 
           return `Error reading file: ${inputPath}\n${err.message}`
         }
 
-        // 预处理：修复 ASCII 报表在 Markdown 解析时的格式崩坏问题
-        // 1. 将长串的 = 替换为粗分割线
         mdContent = mdContent.replace(/^={10,}\s*$/gm, '<hr class="heavy">')
-        // 2. 将长串的 - 替换为细分割线
         mdContent = mdContent.replace(/^-{10,}\s*$/gm, '<hr>')
 
-        // ── 自定义 Renderer：给标题注入 id，代码块注入 data-lang ──────────────────
+        const isReport = isPlainTextReport(mdContent);
+        const processed = isReport ? preprocessPlainText(mdContent) : mdContent;
+
         const renderer = new marked.Renderer()
         const tocItems: { level: number; text: string; id: string }[] = []
 
-        renderer.heading = function (text, level) {
+        // @ts-ignore
+        renderer.heading = function (text: any, level: any) {
           const id = "h-" + text
             .replace(/<[^>]+>/g, "")
+            // @ts-ignore
             .replace(/[^\p{L}\p{N}\s-]/gu, "")
             .trim()
             .replace(/\s+/g, "-")
@@ -44,9 +164,10 @@ export function createReportVisualizationTool(ctx: PluginInput): Record<string, 
             .slice(0, 60)
           tocItems.push({ level, text: text.replace(/<[^>]+>/g, ""), id })
           return `<h${level} id="${id}">${text}</h${level}>\n`
-        }
+        } as any
 
-        renderer.code = function (code, lang) {
+        // @ts-ignore
+        renderer.code = function (code: any, lang: any) {
           const safeLang = lang ? lang.trim() : ""
           const langLabel = safeLang ? `<span class="code-lang">${safeLang}</span>` : ""
           const escaped = code
@@ -60,17 +181,25 @@ export function createReportVisualizationTool(ctx: PluginInput): Record<string, 
   </button>
   <pre><code>${escaped}</code></pre>
 </div>\n`
-        }
+        } as any
 
-        renderer.table = function (header, body) {
+        // @ts-ignore
+        renderer.table = function (header: any, body: any) {
           return `<div class="table-wrap"><table><thead>${header}</thead><tbody>${body}</tbody></table></div>\n`
-        }
+        } as any
 
         marked.setOptions({ renderer, gfm: true, breaks: false })
-        const bodyHTML = await marked.parse(mdContent)
+        let bodyHTML = await marked.parse(processed)
 
-        // ── 生成目录 HTML ──────────────────────────────────────────────────────────
-        function buildToc(items: { level: number; text: string; id: string }[]) {
+        bodyHTML = bodyHTML
+          .replace(/font-family:\s*var\(--font-mono\)/g, "")
+          .replace(/white-space:\s*pre-wrap/g, "");
+
+        if (isReport) {
+          bodyHTML = enrichReportHTML(bodyHTML);
+        }
+
+        const buildToc = (items: { level: number; text: string; id: string }[]) => {
           const filtered = items.filter(i => i.level <= 3)
           if (filtered.filter(i => i.level <= 2).length < 2) return ""
           
@@ -118,8 +247,9 @@ export function createReportVisualizationTool(ctx: PluginInput): Record<string, 
           hour: "2-digit", minute: "2-digit",
         })
 
-        const titleMatch = mdContent.match(/^#\s+(.+)/m)
-        const pageTitle = titleMatch ? titleMatch[1].replace(/[*_\`]/g, "") : outputName
+        const titleMatch = mdContent.match(/^#\s+(.+)/m) || mdContent.match(/服务器[^\n]{0,30}报告/);
+        // @ts-ignore
+        const pageTitle = titleMatch ? (titleMatch[1] || titleMatch[0]).replace(/[\u{1F300}-\u{1F9FF}]/gu, "").replace(/[*_\`]/g, "").trim() : outputName
 
         const fullHTML = `<!DOCTYPE html>
 <html lang="zh-CN">
@@ -127,6 +257,9 @@ export function createReportVisualizationTool(ctx: PluginInput): Record<string, 
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>${pageTitle}</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Lora:ital,wght@0,400;0,600;1,400&family=Source+Sans+3:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
 <style>
   /* ── Design tokens ─────────────────────────────────────────────────────── */
   :root {
@@ -144,14 +277,19 @@ export function createReportVisualizationTool(ctx: PluginInput): Record<string, 
     --accent-mid:  #3b82a0;
 
     --red:         #c0392b;
+    --red-bg:      #fef2f2;
+    --amber:       #92400e;
+    --amber-bg:    #fffbeb;
+    --green:       #14532d;
+    --green-bg:    #f0fdf4;
 
     --code-bg:     #1a1d27;
     --code-text:   #cdd6f4;
     --code-border: #2d3148;
 
-    --font-body: -apple-system, BlinkMacSystemFont, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Segoe UI", sans-serif;
-    --font-head: -apple-system, BlinkMacSystemFont, "PingFang SC", Georgia, serif;
-    --font-mono: "SF Mono", "Fira Code", "JetBrains Mono", Consolas, monospace;
+    --font-body: "Source Sans 3", "PingFang SC", "Hiragino Sans GB", sans-serif;
+    --font-head: "Lora", "PingFang SC", Georgia, serif;
+    --font-mono: "JetBrains Mono", "Fira Code", Consolas, monospace;
 
     --radius:    8px;
     --radius-lg: 12px;
@@ -185,7 +323,7 @@ export function createReportVisualizationTool(ctx: PluginInput): Record<string, 
   .layout {
     display: flex;
     align-items: flex-start;
-    max-width: calc(var(--toc-width) + 900px + var(--gap) * 3);
+    max-width: calc(var(--toc-width) + 820px + var(--gap) * 3);
     margin: 0 auto;
     padding: 48px var(--gap) 96px;
     gap: var(--gap);
@@ -257,8 +395,8 @@ export function createReportVisualizationTool(ctx: PluginInput): Record<string, 
   .toc a:hover  { background: var(--accent-light); color: var(--accent); }
   .toc a.active { background: var(--accent-light); color: var(--accent); font-weight: 500; }
   .toc-l1 { font-weight: 600; color: var(--text); }
-  .toc-l2 { font-size: 12.5px !important; }
-  .toc-l3 { font-size: 12px !important; }
+  .toc-l2 { font-weight: 600; color: var(--text); }
+  .toc-l3 { font-size: 12px !important; padding-left: 14px !important; }
 
   /* ── Article card ──────────────────────────────────────────────────────── */
   .article {
@@ -266,26 +404,22 @@ export function createReportVisualizationTool(ctx: PluginInput): Record<string, 
     background: var(--surface);
     border: 1px solid var(--border);
     border-radius: var(--radius-lg);
-    padding: 56px 60px;
+    padding: 52px 60px;
     box-shadow: var(--shadow-lg);
   }
 
   /* ── Headings ──────────────────────────────────────────────────────────── */
   .article h1 {
     font-family: var(--font-head);
-    font-size: 28px; font-weight: 600; line-height: 1.3;
-    color: var(--text); margin: 0 0 32px;
-    padding-bottom: 20px;
+    font-size: 26px; font-weight: 600; line-height: 1.3;
+    margin: 0 0 28px; padding-bottom: 18px;
     border-bottom: 2px solid var(--text);
-    letter-spacing: -.3px;
   }
   .article h2 {
     font-family: var(--font-head);
     font-size: 19px; font-weight: 600;
-    color: var(--text); margin: 52px 0 14px;
-    padding-bottom: 8px;
+    margin: 48px 0 14px; padding-bottom: 8px;
     border-bottom: 1px solid var(--border);
-    letter-spacing: -.2px;
   }
   .article h2::before {
     content: attr(data-index);
@@ -301,7 +435,7 @@ export function createReportVisualizationTool(ctx: PluginInput): Record<string, 
   .article h3 {
     font-family: var(--font-head);
     font-size: 15.5px; font-weight: 600;
-    color: var(--text); margin: 32px 0 10px;
+    margin: 28px 0 10px;
   }
   .article h3::before {
     content: "§ ";
@@ -310,19 +444,16 @@ export function createReportVisualizationTool(ctx: PluginInput): Record<string, 
   }
   .article h4 {
     font-size: 13.5px; font-weight: 600;
-    color: var(--text-2); margin: 22px 0 8px;
-    text-transform: uppercase; letter-spacing: .05em;
+    color: var(--accent); margin: 20px 0 8px;
   }
 
   /* ── Body text ─────────────────────────────────────────────────────────── */
-  .article p { 
-    font-size: 14.5px; 
+  .article p, .plain { 
+    font-size: 15px; 
     line-height: 1.85; 
     color: var(--text); 
-    margin: 0 0 16px; 
-    white-space: pre-wrap; 
-    word-wrap: break-word;
-    font-family: var(--font-mono);
+    margin: 0 0 12px; 
+    font-family: var(--font-body);
   }
   .article strong { font-weight: 600; }
   .article em     { font-style: italic; color: var(--text-2); }
@@ -330,10 +461,9 @@ export function createReportVisualizationTool(ctx: PluginInput): Record<string, 
     color: var(--accent); text-decoration: underline;
     text-decoration-color: var(--accent-light);
     text-underline-offset: 3px;
-    transition: text-decoration-color .2s;
   }
   .article a:hover { text-decoration-color: var(--accent); }
-  .article hr { border: none; border-top: 1px solid var(--border); margin: 24px 0; }
+  .article hr { border: none; border-top: 1px solid var(--border); margin: 20px 0; }
   .article hr.heavy { border-top: 3px solid var(--text); margin: 32px 0; }
 
   /* ── Blockquote ────────────────────────────────────────────────────────── */
@@ -347,7 +477,7 @@ export function createReportVisualizationTool(ctx: PluginInput): Record<string, 
   .article blockquote strong { color: var(--accent); }
 
   /* ── Lists ─────────────────────────────────────────────────────────────── */
-  .article ul, .article ol { padding-left: 22px; margin: 6px 0 16px; }
+  .article ul, .article ol { padding-left: 22px; margin: 6px 0 14px; }
   .article li { font-size: 15px; line-height: 1.8; margin: 4px 0; }
   .article li::marker { color: var(--accent-mid); }
   .article li > ul, .article li > ol { margin: 3px 0; }
@@ -355,9 +485,9 @@ export function createReportVisualizationTool(ctx: PluginInput): Record<string, 
   /* ── Inline code ───────────────────────────────────────────────────────── */
   .article :not(pre) > code {
     font-family: var(--font-mono);
-    font-size: 13px; font-weight: 500;
+    font-size: 12.5px; font-weight: 500;
     background: #f3f0eb; color: var(--red);
-    padding: 2px 6px; border-radius: 4px;
+    padding: 1px 5px; border-radius: 4px;
     border: 1px solid var(--border);
   }
 
@@ -400,7 +530,7 @@ export function createReportVisualizationTool(ctx: PluginInput): Record<string, 
 
   /* ── Tables ────────────────────────────────────────────────────────────── */
   .table-wrap {
-    overflow-x: auto; margin: 20px 0;
+    overflow-x: auto; margin: 16px 0;
     border-radius: var(--radius-lg);
     border: 1px solid var(--border);
     box-shadow: var(--shadow);
@@ -408,23 +538,72 @@ export function createReportVisualizationTool(ctx: PluginInput): Record<string, 
   table { width: 100%; border-collapse: collapse; font-size: 14px; min-width: 360px; }
   thead { background: #f4f2ee; }
   th {
-    padding: 10px 16px; text-align: left;
+    padding: 9px 14px; text-align: left;
     font-size: 11.5px; font-weight: 600;
     letter-spacing: .04em; text-transform: uppercase;
     color: var(--text-2); border-bottom: 1px solid var(--border);
     white-space: nowrap;
   }
   td {
-    padding: 9px 16px; border-bottom: 1px solid var(--border-soft);
+    padding: 8px 14px; border-bottom: 1px solid var(--border-soft);
     color: var(--text); vertical-align: top; line-height: 1.6;
   }
   tbody tr:last-child td { border-bottom: none; }
   tbody tr:nth-child(even) td { background: #faf9f7; }
   tbody tr:hover td { background: var(--accent-light); transition: background .1s; }
 
+  /* ── KV block ──────────────────────────────────────────────────────────── */
+  .kv-block { background: var(--bg); border: 1px solid var(--border); border-radius: var(--radius-lg); overflow: hidden; margin: 12px 0 20px; }
+  .kv-row { display: flex; border-bottom: 1px solid var(--border-soft); align-items: flex-start; }
+  .kv-row:last-child { border-bottom: none; }
+  .kv-key { flex: 0 0 160px; padding: 9px 16px; font-size: 13.5px; font-weight: 600; color: var(--text-2); background: var(--surface); border-right: 1px solid var(--border-soft); }
+  .kv-val { flex: 1; padding: 9px 16px; font-size: 14px; color: var(--text); }
+
+  /* ── Status badges ─────────────────────────────────────────────────────── */
+  .badge-ok { display: inline-flex; align-items: center; gap: 4px; background: var(--green-bg); color: var(--green); font-size: 13px; font-weight: 500; padding: 2px 9px; border-radius: 20px; border: 1px solid #bbf7d0; }
+  .badge-err { display: inline-flex; align-items: center; gap: 4px; background: var(--red-bg); color: var(--red); font-size: 13px; font-weight: 500; padding: 2px 9px; border-radius: 20px; border: 1px solid #fecaca; }
+  .badge-warn { display: inline-flex; align-items: center; gap: 4px; background: var(--amber-bg); color: var(--amber); font-size: 13px; font-weight: 500; padding: 2px 9px; border-radius: 20px; border: 1px solid #fde68a; }
+
+  /* ── Priority badges ───────────────────────────────────────────────────── */
+  .pri-p0 { display: inline-block; background: #fef2f2; color: #991b1b; border: 1px solid #fca5a5; font-size: 12px; font-weight: 700; padding: 2px 8px; border-radius: 4px; letter-spacing: .04em; }
+  .pri-p1 { display: inline-block; background: #fff7ed; color: #9a3412; border: 1px solid #fdba74; font-size: 12px; font-weight: 700; padding: 2px 8px; border-radius: 4px; }
+  .pri-p2 { display: inline-block; background: #fffbeb; color: #92400e; border: 1px solid #fde68a; font-size: 12px; font-weight: 700; padding: 2px 8px; border-radius: 4px; }
+  .pri-p3 { display: inline-block; background: var(--accent-light); color: var(--accent); border: 1px solid #bfdbfe; font-size: 12px; font-weight: 700; padding: 2px 8px; border-radius: 4px; }
+
+  /* ── Fault header ──────────────────────────────────────────────────────── */
+  .fault-header { display: flex; align-items: center; gap: 12px; padding: 12px 16px; border-radius: var(--radius-lg); margin: 16px 0 8px; border: 1px solid; }
+  .fh-p0 { background: #fef2f2; border-color: #fca5a5; }
+  .fh-p1 { background: #fff7ed; border-color: #fdba74; }
+  .fh-p2 { background: #fffbeb; border-color: #fde68a; }
+  .fh-p3 { background: var(--accent-light); border-color: #bfdbfe; }
+  .fh-badge { font-family: var(--font-mono); font-size: 11px; font-weight: 700; letter-spacing: .08em; }
+  .fh-p0 .fh-badge { color: #991b1b; }
+  .fh-p1 .fh-badge { color: #9a3412; }
+  .fh-p2 .fh-badge { color: #92400e; }
+  .fh-p3 .fh-badge { color: var(--accent); }
+  .fh-rest { font-size: 14px; font-weight: 500; color: var(--text); }
+
+  /* ── Timeline ──────────────────────────────────────────────────────────── */
+  .timeline { border-left: 2px solid var(--accent-mid); margin: 16px 0 16px 8px; padding-left: 20px; }
+  .tl-row { display: flex; align-items: baseline; gap: 10px; margin: 8px 0; font-size: 13.5px; }
+  .tl-ts { font-family: var(--font-mono); font-size: 12px; color: var(--text-3); flex-shrink: 0; white-space: nowrap; }
+  .tl-tag { font-size: 11px; font-weight: 600; padding: 1px 7px; border-radius: 10px; flex-shrink: 0; background: var(--accent-light); color: var(--accent); }
+  .tl-tag.err { background: var(--red-bg); color: var(--red); }
+  .tl-tag.warn { background: var(--amber-bg); color: var(--amber); }
+  .tl-desc { color: var(--text); line-height: 1.5; }
+
+  /* ── Global warn ───────────────────────────────────────────────────────── */
+  .global-warn { background: #fef2f2; border: 1px solid #fca5a5; border-radius: var(--radius-lg); padding: 14px 18px; font-size: 14.5px; font-weight: 600; color: #991b1b; margin: 16px 0; }
+
+  /* ── Tree note ─────────────────────────────────────────────────────────── */
+  .tree-note { font-family: var(--font-mono); font-size: 12.5px; color: var(--text-2); padding: 3px 0 3px 16px; border-left: 2px solid var(--border-soft); margin: 3px 0 3px 8px; }
+
+  /* ── Disclaimer ────────────────────────────────────────────────────────── */
+  .disclaimer { background: var(--bg); border: 1px solid var(--border); border-radius: var(--radius); padding: 14px 18px; font-size: 13.5px; color: var(--text-2); font-style: italic; }
+
   /* ── Meta footer ───────────────────────────────────────────────────────── */
   .meta {
-    margin-top: 56px; padding-top: 18px;
+    margin-top: 48px; padding-top: 16px;
     border-top: 1px solid var(--border-soft);
     display: flex; justify-content: space-between; align-items: center;
     font-size: 12px; color: var(--text-3);
