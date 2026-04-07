@@ -2,216 +2,94 @@
 
 ## 概述
 
-本指南提供了六种网络硬件故障场景的专项分析流程。当 Step 1 确定故障场景后，应根据对应的场景执行专项分析。如果没有匹配的场景，则使用通用分析流程。
-
-## 1. 网卡硬件故障分析 (NIC_HARDWARE_FAILURE)
-
-### 1.1 核心日志文件
-
-- `ibmc_logs/sel.db` / `sel.tar` - iBMC 系统事件日志（网卡/PCIe 错误）
-- `infocollect_logs/system/dmesg.txt` - 内核 PCIe/网卡底层报错
-- `messages/messages` - 系统级驱动/总线错误日志
-
-### 1.2 关键错误模式
-
-| 错误类型 | 错误关键字 | 含义 |
-|---------|-----------|------|
-| iBMC SEL | `Hardware failure` | 显式硬件故障 | 可能性：1. 网卡芯片烧毁 2. 内部逻辑单元损坏 |
-| iBMC SEL | `Hotplug` / `Surprise Removal` | 网卡热插拔事件 | 可能性：1. 人为插拔 2. PCIe 槽位松动触发重枚举 |
-| iBMC SEL | `PCIe error` | PCIe 总线错误 |
-| iBMC SEL | `NIC temperature` | 网卡温度异常 |
-| 内核日志 | `PCIe Bus Error: severity=Fatal` | 致命 PCIe 总线错误 |
-| 内核日志 | `AER: Uncorrected (Fatal) error` | 不可纠正 PCIe AER 错误 |
-| 内核日志 | `Hardware Error` | 硬件错误（驱动感知） |
-
-### 1.3 分析命令
-
-```bash
-# 检查 iBMC 硬件状态
-python3 scripts/diagnose_ibmc.py <ibmc_dir> -k "NIC" "PCIe" "Temperature" "Hotplug"
-# 检查内核层面 PCIe/网卡错误
-python3 scripts/diagnose_messages.py <messages_dir> -k "PCIe error" "NIC failure" "Surprise Removal"
-
-# 综合网络分析
-python3 scripts/diagnose_network.py <log_dir> --hardware
-```
-
-### 1.4 根因推理框架与经典传导链
-
-**经典故障传导链示范：PCIe AER 错误导致网卡重置及业务中断**
-*   **时序链条**：`[物理链路信号不稳/插槽接触不良] -> [PCIe 控制器检测到不可纠正错误(Fatal Error)] -> [内核立即记录 AER 汇报] -> [驱动探测到硬件状态不可用触发 Reset Adapter] -> [链路重初始化失败或反复重置] -> [业务层面表现为网络连接永久中断]`。
-*   **诊断验证点**：检查 `dmesg` 中是否有 `AER: Uncorrected` 且 BDF 号指向网卡。
-
-**通用推理步骤**：
-1. **因果链条**：梳理从 T0（最早硬件报错）到网卡重置、链路 Down 的时间线。
-2. **鉴别排除**：对照根因假设矩阵。先有温度告警则锁定散热；无先兆直接报错则锁定物理损坏。
-3. **根因锁定**：需有跨层证据（iBMC + dmesg）支持。
-4. **不确定标注**：若日志缺失导致传导链断裂，标注传导深度。
+本指南提供了针对网卡、光模块、物理链路及驱动层的深度故障分析流程。在 Step 1 确定故障场景后，必须遵循以下“从物理到逻辑”的推导逻辑锁定根因。
 
 ---
 
-## 2. 驱动/固件问题分析 (DRIVER_ISSUE)
+## 1. 总线与核心硬件故障 (NIC_BUS_HARDWARE)
 
-### 2.1 核心日志文件
+### 1.1 核心日志与指纹识别
+- `ibmc_logs/sel.db`：重点查找 `PCIe Error`、`NIC Fault`、`Temp Critical` 以及 `Suprise Removal`。
+- `infocollect_logs/system/dmesg.txt`：查找 `PCIe Bus Error: severity=Fatal` 或 `AER: Uncorrected (Fatal) error`。
 
-- `infocollect_logs/system/dmesg.txt` - 内核驱动加载/崩溃日志
-- `infocollect_logs/network/ethtool_i.txt` - 驱动及固件(FW)版本信息
-- `messages/messages` - 系统模块操作日志
+### 1.2 物理坐标映射规则
+在分析 PCIe 错误时，必须将 BDF 地址映射到物理槽位/网卡名：
+1. `dmesg` 中的 `0000:03:00.0` -> 通过 `lspci -v` 或 `ethtool -i` 确认对应 `eth0`。
+2. 结合 `iBMC` 日志，确认 `NIC 1` 所在的物理槽位是否发生电压波动或过温。
 
-### 2.2 关键错误模式
-
-| 错误类型 | 错误关键字 | 含义 |
-|---------|-----------|------|
-| 内核日志 | `failed to load firmware` | 固件加载失败 |
-| 内核日志 | `driver error` | 驱动内部错误 |
-| 内核日志 | `ixgbe/i40e/mlx5.*reset` | 驱动触发网卡重置 |
-| 内核日志 | `firmware version mismatch` | 固件版本不匹配 |
-
-### 2.3 分析命令
-
-```bash
-# 检查驱动加载错误
-python3 scripts/diagnose_messages.py <messages目录> -k "driver" "firmware" "failed"
-
-# 检查网卡详细驱动版本
-python3 scripts/diagnose_infocollect.py <infocollect目录> -k "ethtool -i" "version"
-```
-
-### 2.4 根因推理框架
-
-1. **核对兼容性**：比对 OS 内核、驱动和网卡固件是否在官方兼容列表。
-2. **定位崩溃点**：若是驱动导致 Panic，分析堆栈中的函数调用，查找是否有已知的 Bug 补丁。
-3. **证据锁定**：锁定“版本冲突”或“逻辑空指针”证据。
+### 1.3 经典传导链：PCIe 复位导致网卡“消失”
+*   **时序链条**：`[主板槽位供电不稳] -> [PCIe 控制器检测到致命错误 (T0)] -> [内核记录 AER Uncorrected Error] -> [驱动试图重启 Adapter 失败] -> [网卡从 PCI 树中消失] -> [业务层面 ethX 接口丢失]`。
 
 ---
 
-## 3. 物理链路故障分析 (LINK_DOWN)
+## 2. 物理层光/电接口故障 (PHYSICAL_LAYER_SFP)
 
-### 3.1 核心日志文件
+### 2.1 关键诊断指纹 (DOM 审计)
+查阅 `infocollect_logs/network/optical.txt` 中的 DOM（Digital Optical Monitoring）数据：
 
-- `messages/messages` - 链路 Up/Down 切换日志
-- `infocollect_logs/network/ethtool.txt` - 物理层协商参数
-- `infocollect_logs/network/optical.txt` - 光模块功率/温度数据
+| 监控指标 | 健康阈值 (参考) | 异常含义 |
+| :--- | :--- | :--- |
+| **Rx Power** (接收光功率) | -1dBm ~ -12dBm | **低于 -15dBm**：光衰过载，通常由线缆脏、弯折或对端发光弱引起。 |
+| **Tx Power** (发送光功率) | -1dBm ~ -5dBm | **极低或 N/A**：光模块激光器故障，TX Fault。 |
+| **Temperature** (模块温度) | 0℃ ~ 70℃ | **超过 75℃**：模块高温报警，可能导致误码率（CRC）激增。 |
 
-### 3.2 关键错误模式
-
-| 错误类型 | 错误关键字 | 含义 |
-|---------|-----------|------|
-| 系统日志 | `NIC Link is UP` (频繁出现) | 链路震荡 | 可能性：1. 屏蔽层干扰 2. 接口频繁复位 |
-| 系统日志 | `bonding: Active-Backup` | Bond 网卡切换 | 场景：主从网卡链路 Down 触发流量迁移至备用网卡 |
-| 系统日志 | `Link is Down` | 链路断开 |
-| 系统日志 | `lost carrier` | 载波丢失 |
-| 系统日志 | `autonegotiation failed` | 自动协商失败 |
-| 内核日志 | `SFP: vendor mismatch` | 光模块厂商不匹配 |
-
-**经典故障传导链示范：Bond 网卡主备切换过程**
-*   **时序链条**：`[Slave 0 网线松动] -> [PHY 检测到载波丢失] -> [Bonding 驱动 MII 轮询发现故障] -> [内核记录 Link Down] -> [驱动执行 failover 将流量切至 Slave 1] -> [网络短暂颤抖后恢复]`。
-
-### 3.3 分析命令
-
-```bash
-# 检查链路状态日志
-python3 scripts/diagnose_messages.py <messages目录> -k "link down" "carrier" "eth"
-
-# 检查光模块状态
-python3 scripts/diagnose_infocollect.py <infocollect目录> -k "SFP" "DOM" "optical"
-
-# 综合链路分析
-python3 scripts/diagnose_network.py <log_dir> --link
-```
-
-### 3.4 根因推理框架与经典传导链
-
-**经典故障传导链示范：光功率过低导致频繁链路震荡**
-*   **时序链条**：`[光口积尘/光纤弯折] -> [网卡 Rx 接收功率持续走低至临界值] -> [PHY 芯片出现误码风暴] -> [链路感知层判定信号丢失触发 Link Down] -> [重协商成功后 Link Up 再次掉线] -> [由于震荡导致业务中断]`。
+### 2.2 证据验证点
+- 检查 `iBMC` 是否有 `SFP Abnormal` 或 `I2C Read Error`（读不到模块信息）。
 
 ---
 
-## 4. 性能下降/丢包分析 (PERFORMANCE_DEGRADATION)
+## 3. 链路层完整性/信号故障 (LINK_LAYER_INTEGRITY)
 
-### 4.1 核心日志文件
+### 3.1 核心指纹识别 (ethtool 计数器审计)
+查阅 `infocollect_logs/network/ethtool_S.txt`，分析报错计数的潜在指向：
 
-- `infocollect_logs/network/ethtool_S.txt` - 网卡底层统计计数 (Critical)
-- `infocollect_logs/network/ifconfig.txt` - 接口收发及报错计数
-- `infocollect_logs/system/sar_n_DEV.txt` - 历史流量统计数据
+| 计数器名称 | 指向可能根因 (Root Cause Hypothesis) |
+| :--- | :--- |
+| **rx_crc_errors / rx_fcs_errors** | **物理链路干扰**：网线/光纤由于电磁干扰、接触不良导致的物理层校验失败。 |
+| **rx_missed_errors / rx_resource_errors** | **硬件资源耗尽**：网卡内部缓冲区溢出，常见由于 PCIe 带宽不足或系统处理中断过慢。 |
+| **rx_length_errors** | **MTU 不一致**：收到的数据包超过网卡配置上限，导致被硬件层丢弃。 |
+| **rx_dropped** | **软件栈压力**：内核协议栈处理不过来，或防火墙规则/队列溢出导致。 |
 
-### 4.2 关键错误模式 (底层计数审计)
-
-| 计数名称 | 含义 | 指向可能根因 |
-|---------|------|------------|
-| `rx_crc_errors` | CRC 冗余校验错误 | 物理链路磁干扰、网线质量差、光模块损坏 |
-| `rx_missed_errors` | 网卡内部缓冲区溢出 | PCIe 带宽不足、系统负载过高 |
-| `rx_dropped` / `overruns` | `ifconfig` | 核心根因多为 CPU 中断负载不均或处理能力到达瓶颈 |
-| `tx_errors` | 发送错误 | 半双工冲突或物理参数不匹配 |
-
-**网络环路/拥塞分析 (Case 3)**：
-- **特征**：`/proc/net/dev` 中的广播包 (broadcast) 计数呈指数级增长，伴随全核心 CPU `si` 占比爆表。
-- **根因推断**：STP 配置失效触发广播风暴，占满网卡缓冲区。
-
-### 4.3 分析命令
-
-```bash
-# 检查网卡详细计数
-python3 scripts/diagnose_infocollect.py <infocollect目录> -k "ethtool -S" "errors" "dropped"
-
-# 综合性能分析
-python3 scripts/diagnose_network.py <log_dir> --performance
-```
+### 3.2 经典传导链：CRC 风暴导致链路震荡
+*   **时序链条**：`[网线屏蔽层受损] -> [rx_crc_errors 计数爆发式增长 (T0)] -> [PHY 物理层层触发链路自愈重协商] -> [系统记录 Link is DOWN / Link is UP (震荡)] -> [Bonding 驱动主备反复切换] -> [应用层大量重传及延时]`。
 
 ---
 
-## 5. 中断/调度错误分析 (INTERRUPT_ERROR)
+## 4. 驱动与固件逻辑故障 (DRIVER_FIRMWARE_LOGIC)
 
-### 5.1 核心日志文件
+### 4.1 核心指纹
+- `dmesg` 报错：`ixgbe/i40e/mlx5_core: TX hang` 或 `NETDEV WATCHDOG: ethX: transmit queue timeout`。
+- `ethtool -i`：核对固件 (Firmware) 版本是否在厂家官方兼容列表中。
 
-- `infocollect_logs/system/interrupts.txt` - `/proc/interrupts` 计数值
-- `infocollect_logs/system/top.txt` - CPU 软中断 (si) 占比
-- `infocollect_logs/network/irq_affinity.txt` - 中断亲和性配置
-
-### 5.2 关键异常特征
-
-- **单核极化**：某一 CPU 核心处理的中断数远大于其他核心
-- **si 占比过大**：`top` 输出中 `%si` 长期处于高位（>50%）
-- **MSI-X 失败**：`dmesg` 汇报无法分配 MSI-X 中断，回退到 legacy
-
-### 5.3 分析命令
-
-```bash
-# 检查中断分布
-python3 scripts/diagnose_infocollect.py <infocollect目录> -k "interrupts" "si" "affinity"
-```
+### 4.2 分析建议
+- **固件挂死**：如果 `TX hang` 伴随 `Reset Adapter` 但无法恢复，通常是硬件固件进入逻辑死锁状态，需下电冷重启。
 
 ---
 
-## 6. 配置/协议错误分析 (CONFIG_ERROR)
+## 5. 中断处理与资源调度故障 (RESOURCE_SCHEDULING)
 
-### 6.1 核心日志文件
+### 5.1 监控特征
+- `top` 中的 `%si` (Softirq) 长期处于某一 CPU 核心高位（>80%），而其他核心空闲。
+- `infocollect_logs/system/interrupts.txt` 中某一 `ethX-fp-0` 中断计数远高于其他。
 
-- `infocollect_logs/network/ip_addr.txt` - IP 配置
-- `infocollect_logs/network/route.txt` - 路由表
-- `infocollect_logs/network/vlan.txt` - VLAN 子接口配置
-
-### 6.2 关键特征
-
-- **IP 冲突**：在 `messages` 中搜索 `duplicate address` 或 `arp reply`。
-- **MTU 不一致 (Case 5)**：
-  - **现象**：小包正常，大包（如 `ping -s 1472`）不通。
-  - **证据**：`dmesg` 中可能出现 `ICMP fragmentation needed` 且 DF 置位。
-- **网卡名乱序 (Case 6)**：
-  - **现象**：重启后 `eth0` 变为 `eth1`，导致 IP 配置失效。
-  - **检查**：审计 `/etc/udev/rules.d/70-persistent-net.rules` 是否与物理 MAC 地址一致。
+### 5.2 根因路径
+- 检查 `irq_affinity` 配置。如果单核饱和，根因通常是 **RSS (Receive Side Scaling) 队列数过少** 或 **中断绑定未生效**。
 
 ---
 
-## 7. 执行策略
+## 6. 逻辑 Bond 与物理配置限制 (LOGICAL_BONDING_CONFIG)
 
-### 7.1 场景匹配优先
+### 6.1 典型深度指纹
+- **MTU 截断**：
+  - **现象**：`ping -s 1472` (小包) 通，`ping -s 9000` (巨型帧) 不通。
+  - **证据**：`ethtool -S` 中 `rx_length_errors` 增长，且 OS `messages` 中伴随 `fragmentation needed`。
+- **udev 漂移**：
+  - **证据**：`/etc/udev/rules.d/70-persistent-net.rules` 中的 MAC 地址与 `ip link` 中实际显示的 MAC 地址不匹配。
 
-1. **优先使用专项分析**：当 Step 1 确定故障场景后，优先使用对应的专项分析流程。
-2. **参考专项分析指南**：按照本指南中对应场景的分析步骤执行。
-3. **使用专用参数**：使用场景专用的分析命令和参数。
+---
 
-### 7.2 通用分析备用
+## 7. 执行策略与交叉校验 (Critical Rules)
 
-1. **无匹配场景时使用**：当故障现象不符合任何专项场景时，使用通用分析流程。
-2. **结果验证**：通过跨层交叉（iBMC/内核/工具）确认证据的一致性，确保 2 条独立证据锁定根因。
+1.  **分层互斥**：在判定“网卡损坏”前，必须先通过 `optical.txt` 排除“链路层/对端交换机”干扰。如果光功率极佳但 CRC 错误多，则回溯排查本地网口物理损害。
+2.  **孤证不立**：内核层面的 `ethX: link down` 必须找到对应的硬件层报错（如：`iBMC SEL: Cable Disconnected` 或 `NIC temperature abnormal`）才可定性为物理根因。
+3.  **时序逻辑闭环**：所有结论必须附带以 T0（故障零点）为起点的传导链分析，严禁直接跳跃至结论。
