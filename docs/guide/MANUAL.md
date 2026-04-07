@@ -28,11 +28,12 @@ Witty 智能诊断Agent采用“Agent-Skill-工具-知识”四层解耦架构�
 
 **1. Agent层：智能协同的推理引擎与决策中枢**
 
-- **诊断规划 Agent（Fuxi）**：接收故障信息，梳理故障现象，生成根因假设与系统化排查计划。
-- **编排调度 Agent（Dayu）**：解析排查计划，将任务拆解为可执行单元，并行下发至验证分析 Agent。
-- **验证分析 Agent（Kuafu）**：执行专属诊断Skill，调用工具采集、分析多维度数据，完成证据推理与假设验证。
-- **根因融合 Agent（Baize）**：汇总多路诊断结果，进行交叉验证与融合分析，输出结构化、可解读的诊断报告。
-- **故障修复 Agent（Nuwa）**：基于诊断报告推荐针对性修复策略，经人工审核通过后，受控执行修复操作。
+- **总控Agent（轩辕）**：根据用户输入自动调度其它Agent协同完成根因诊断。
+- **诊断规划 Agent（伏羲）**：接收故障信息，梳理故障现象，生成根因假设与系统化排查计划。
+- **编排调度 Agent（大禹）**：解析排查计划，将任务拆解为可执行单元，并行下发至验证分析 Agent。
+- **验证分析 Agent（夸父）**：执行专属诊断Skill，调用工具采集、分析多维度数据，完成证据推理与假设验证。
+- **根因融合 Agent（白泽）**：汇总多路诊断结果，进行交叉验证与融合分析，输出结构化、可解读的诊断报告。
+- **故障修复 Agent（女娲）**：基于诊断报告推荐针对性修复策略，经人工审核通过后，受控执行修复操作。
 
 **2. Skill层：专家经验的标准化沉淀与场景化赋能**
 将资深运维专家的故障排查思路，抽象为可复用、可编排的标准化诊断技能，覆盖系统崩溃、死锁、IO异常等各类复杂故障场景，支撑多场景快速诊断。
@@ -74,58 +75,49 @@ cd witty-diagnosis-agent
 bash install.sh
 ```
 
-## 配置
-
-修改项目根目录下的`.opencode/witty-diagnosis-agent.jsonc` 文件，为各个Agent配置缺省运行模型，以下以 `deepseek/deepseek-chat` 模型为例（可根据实际需求替换）：
-
-```json
-{
-  "agents": {
-    "fuxi":  { "model": "deepseek/deepseek-chat" },
-    "dayu":  { "model": "deepseek/deepseek-chat" },
-    "kuafu": { "model": "deepseek/deepseek-chat" },
-    "baize": { "model": "deepseek/deepseek-chat" }
-  }
-}
-```
-
 # 使用指南
 
 智能诊断Agent提供两种使用模式：一键执行模式（适合快速排障）、单步执行模式（适合精细化排查与调试），您可根据故障场景选择。
 
 ## 一键执行模式
 
-通过执行 `auto-diag` 命令，系统自动调用Fuxi、Dayu、Kuafu、Baize四个Agent，完成“任务规划→编排调度→验证分析→根因融合”全流程，最终输出结构化故障诊断报告，操作便捷高效。
+通过 `Xuanyuan` Agent自动调用`Fuxi`、`Dayu`、`Kuafu`、`Baize`四个Agent，完成“任务规划→编排调度→验证分析→根因融合”全流程，最终输出结构化故障诊断报告，操作便捷高效。
 
 - 启动 **OpenCode**。
 
-- 在终端执行命令：
+- 执行`/agents`命令，选择`Xuanyuan`Agent。
+  
+  ![auto-diag-输入故障描述](../assets/select_xuanyuan.png)
+
+- 输入故障问题描述，示例：
   
   ```shell
-    auto-diag 故障问题描述
-  ```
-  
-  示例：
-  
-  ```shell
-    auto-diag "请诊断2026-03-05 14:31前最近一次硬盘故障，日志路径：/tmp/logs"
+    请诊断2026-03-05 14:31前最近一次硬盘故障，日志路径：/tmp/logs
   ```
   
   ![auto-diag-输入故障描述](../assets/guide_auto_diag_start.png)
 
 - 系统自动启动智能诊断流程，示例：
-  生成诊断方案过程中，会按需向用户确认相关信息（如故障范围、日志路径等）：
+  `Xuanyuan`Agent调用`Fuxi`Agent生成诊断方案，单击【Fuxi-Sub（Dianostic Planner Subagent）Task】可查看`Fuxi` Agent执行详情：
+  
+  ![auto-diag-查看Fuxi详情](../assets/guide_auto_diag_check_fuxi.png)
+  
+  `Fuxi`Agent按需向用户确认相关疑问：
   ![auto-diag-澄清](../assets/guide_auto_diag_clarify.png)
-  单击【Dayu Task】，可查看Dayu Agent的任务执行进展：
+  单击【Dayu Task】，可查看`Dayu` Agent的任务执行进展：
   ![auto-diag-查看Dayu详情](../assets/guide_auto_diag_check_dayu.png)
-  单击Parent、Prev、Next按钮，可切换Fuxi Agent与Dayu Agent的视图：
+  单击Parent按钮，可切换到`Xuanyuan` Agent视图：
   ![auto-diag-Dayu-切换Agent](../assets/guide_auto_diag_dayu.png)
-  在Dayu Agent视图中，单击【Kuafu Task】，可查看Kuafu Agent的执行进展：
+  单击【Kuafu Task】，可查看Kuafu Agent的执行进展：
   ![auto-diag-查看Kuafu详情](../assets/guide_auto_diag_check_kuafu.png)
-  单击Parent、Prev、Next按钮，可切换Dayu Agent与Kuafu Agent的视图：
+  单击Parent按钮，可切换到`Xuanyuan` Agent视图：
   ![auto-diag-Dayu-切换Agent](../assets/guide_auto_diag_kuafu.png)
+  
+  单击【Baize Task】，可查看`Baize`Agent的执行进展，在Baize Agent视图中，单击Parent按钮，可切换到`Xuanyuan` Agent视图：
+  
+  ![auto-diag-Dayu-切换Agent](../assets/guide_auto_diag_check_baize.png)
 
-- 诊断完成后，即可查看完整的诊断分析报告，示例。
+- 诊断完成后，即可查看诊断分析报告概览，可按照界面显示的根因分析报告路径获取完整诊断报告，示例。
   ![auto-diag-诊断报告](../assets/guide_auto_diag_report.png)
 
 ## 单步执行模式
@@ -133,6 +125,10 @@ bash install.sh
 单步执行模式可分别调用Fuxi、Dayu、Baize三个核心Agent分步执行任务，适合需要精细化排查故障、调试诊断流程的场景，具体步骤如下：
 
 - 启动 **OpenCode**。
+
+- 执行`/agents`命令选择`Fuxi`Agent。
+  
+  ![Fuxi-故障问题描述](../assets/select_fuxi.png)
 
 - 输入故障问题描述，例如：
   
