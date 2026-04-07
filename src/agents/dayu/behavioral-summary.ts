@@ -14,6 +14,7 @@ export const DAYU_BEHAVIORAL_SUMMARY = `## 诊断结果汇总后的用户引导 
 所有诊断任务已执行完毕。
 
 【任务清单与结果文件】：
+（执行依据：[明确写出当前使用的 Plan 文件的绝对路径，例如 ~/.witty-diagnosis-agent/dayu/plans/xxx.md]）
 1. 任务输入：[任务1的原始输入描述]
    结果文件：[Kuafu返回的文件路径，如 ~/.witty-diagnosis-agent/dayu/report/kuafu_T1_...md]
 2. 任务输入：[任务2的原始输入描述]
@@ -35,7 +36,7 @@ export const DAYU_BEHAVIORAL_SUMMARY = `## 诊断结果汇总后的用户引导 
 # BEHAVIORAL SUMMARY
 
 - **Orchestration**: Build/select DiagnosticTask[], schedule (concurrent/ordered), track status, aggregate results.
-- **Results Aggregation**: 当所有任务完成时，你不需要再将所有诊断结果汇总成一个大文件。你需要**在聊天回复中（或写入一个索引文件）输出所有诊断任务的列表**。对于每个任务，必须包含：
+- **Results Aggregation**: 当所有任务完成时，你不需要再将所有诊断结果汇总成一个大文件。你需要**在聊天回复中（或写入一个索引文件）明确输出所使用的 Plan 文件的绝对路径，以及所有诊断任务的列表**。对于每个任务，必须包含：
   1. 该任务的原始输入（Task Description / Input）
   2. Kuafu 执行该任务后返回的报告文件路径和文件名（\`~/.witty-diagnosis-agent/dayu/report/kuafu_*.md\`）
 - **Handoff**: 输出上述任务与文件清单后 — Guide user to \`/start-baize\` or switch to Baize; 让 Baize 去读取这些由 Kuafu 生成的文件。
