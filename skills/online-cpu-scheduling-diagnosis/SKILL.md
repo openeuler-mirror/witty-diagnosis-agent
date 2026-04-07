@@ -1,5 +1,5 @@
 ---
-name: cpu-scheduling-diagnosis
+name: online-cpu-scheduling-diagnosis
 description: |
   专业的 Linux CPU 调度故障在线诊断 skill。当用户提到系统 load 飙升、进程 D 状态/不可中断睡眠、僵尸进程/Z 状态、软中断过载、硬中断过载、RT 进程死循环、R 状态死锁、CPU 使用率异常、cgroup CPU 限流、系统响应卡顿、业务时延抖动、进程无法 kill、PID 资源耗尽等问题时，必须使用此 skill。
 ---
@@ -15,7 +15,7 @@ description: |
 ## 文件结构
 
 ```
-cpu-scheduling-diagnosis/
+online-cpu-scheduling-diagnosis/
 ├── SKILL.md                    # 诊断流程文档
 └── scripts/
     └── collect_basic_info.sh   # 综合信息收集脚本
