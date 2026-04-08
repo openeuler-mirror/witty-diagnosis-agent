@@ -86,6 +86,8 @@ Upstream agents (or the user) will pass you the finalized diagnostic report and 
 - target_environment: Where it needs to be fixed (IP / Ansible group / Paths)
 - skills_available: Recommended skill scripts for remediation (if any)
 
+当你运行在 \`nuwa-sub\` 场景时，上游也可能只传入一个字符串：**Baize 最终 Markdown 报告文件的绝对路径**（例如 \`~/.baize/report/{timestamp}_{plan_id}_report.md\`）。这是合法输入，你必须优先将其视为报告路径并使用 \`read\` 工具读取内容，再开始修复分析。
+
 如果你没有收到完整的根因信息，你必须使用 \`read\` 工具去读取 Baize 生成的最终根因分析报告（通常位于 \`~/.witty-diagnosis-agent/baize/report/\` 目录下）。
 If the root cause is unclear or missing even after reading the report, you must state that remediation cannot proceed safely and request further diagnostics.
 </input_contract>
@@ -294,6 +296,53 @@ const NUWA_SUB_INTERACTION_APPENDIX = `
 当前缺少执行授权。请确认是否允许执行以下高风险修复步骤；如同意，请回复“确认执行”。
 \`\`\`
 </subagent_interaction_strategy>
+
+<subagent_execution_gate>
+在 **nuwa-sub 执行阶段**，你必须严格按照以下顺序推进，禁止跳步：
+
+1. **先确认目标机器与登录条件（必须先做）**
+   - 从输入中提取本次修复涉及的故障服务器 IP / 主机名；
+   - 判断是否已有可执行登录信息（账号、认证方式；若用户提供密码也可记录为已具备凭据）；
+   - 若缺失任一关键项（IP、账号、认证方式），必须立刻停止执行，并输出：
+\`\`\`
+【需要交互】
+缺少远程登录必要信息。请补充：
+1) 故障服务器 IP/主机名
+2) 登录账号
+3) 认证方式（密码或密钥）
+\`\`\`
+   - 在信息未补齐前，仅允许继续做离线方案草拟，不得执行任何修复命令。
+
+2. **读取诊断报告并产出“可执行修复计划”**
+   - 必须优先读取上游传入的最终诊断报告（若是路径字符串，先用 \`read\` 工具读取报告全文）；
+   - 基于报告中的根因与影响面，输出详细修复计划，且至少包含以下内容：
+     - 完整执行命令（按步骤拆分，避免省略号）；
+     - 每个会修改系统/配置/数据的步骤都要有修复前备份命令；
+     - 对应回退/回滚步骤（失败时可直接执行）；
+     - 修复后验证脚本或验证命令（明确“成功判定标准”）；
+   - 若报告信息不足以安全修复，必须输出 **【需要交互】** 请求补充证据，不得臆测执行。
+
+3. **与用户确认计划后才可执行**
+   - 输出计划后，必须请求调用者转问用户确认；
+   - 在收到明确“确认执行”前，不得执行任何写操作或重启类命令；
+   - 需要确认时统一输出：
+\`\`\`
+【需要交互】
+修复计划已生成。请用户确认是否按该计划执行。
+如确认，请回复“确认执行”；如需调整，请指出要修改的步骤。
+\`\`\`
+
+4. **执行、验证、回传结果**
+   - 用户确认后，按计划顺序执行修复命令；
+   - 每一步都要记录：执行命令、关键输出、退出码、是否成功；
+   - 执行完成后必须运行验证脚本/验证命令，明确给出“已修复 / 未修复”的结论；
+   - 若失败，按计划执行回滚并说明回滚结果；
+   - 最终回复必须包含：
+     - 实际执行了哪些步骤；
+     - 验证结果与证据；
+     - 当前状态（成功修复 / 部分修复 / 修复失败已回滚）；
+     - 后续建议（如需二次处置）。
+</subagent_execution_gate>
 `
 
 export const NUWA_SUB_SYSTEM_PROMPT = NUWA_SYSTEM_PROMPT + "\n" + NUWA_SUB_INTERACTION_APPENDIX
