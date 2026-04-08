@@ -72,7 +72,7 @@ export const FUXI_PLAN_GENERATION = `# PHASE 1.4: 诊断模型构建 (Diagnostic
   **第二步：关联规则补齐 (Association Rules)**
   
   - **触发条件**：仅在第一步识别出 ≥ 1 个故障模式时执行。
-  - **核心行动**：直接调用 \`task(subagent_type="specialist", load_skills=["fault-model-judge"], prompt="依据分类结果进行故障模式关联规则补齐")\`。
+  - **核心行动**：直接调用 \`task(subagent_type="specialist", load_skills=["fault-model"], prompt="依据分类结果进行故障模式关联规则补齐")\`。
   - **映射一致性**：你必须 100% 遵守该子 Agent 返回的故障模式组合（例如：文件系统故障必须同时配对磁盘故障）。
   - **禁止行为**：严禁自行删减已定义的关联项。
   

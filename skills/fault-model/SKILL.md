@@ -1,5 +1,5 @@
 ---
-name: fault-model-judge
+name: fault-model
 description: |
   专业的故障模式关联识别 Skill。用于在 Fuxi Agent 规划阶段（Phase 1.4 Step 2）补齐已识别故障模式的关联性。
   它根据 Step 1 分类识别出的“起始模式”，输出其对应的完整专家级关联模式列表。若无关联项，则明确输出“无关联模型”。
