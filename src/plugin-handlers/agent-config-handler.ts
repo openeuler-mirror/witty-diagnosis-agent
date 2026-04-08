@@ -21,6 +21,8 @@ import { buildDayuAgentConfig } from "./dayu-agent-config-builder";
 import { buildXuanyuanAgentConfig } from "./xuanyuan-agent-config-builder";
 import { buildKuafuAgentConfig } from "./kuafu-agent-config-builder";
 import { buildBaizeAgentConfig } from "./baize-agent-config-builder";
+import { buildNuwaAgentConfig } from "./nuwa-agent-config-builder";
+import { buildNuwaSubAgentConfig } from "./nuwa-sub-agent-config-builder";
 
 type AgentConfigRecord = Record<string, Record<string, unknown> | undefined> & {
   build?: Record<string, unknown>;
@@ -185,6 +187,28 @@ export async function applyAgentConfig(params: {
 
     agentConfig["baize"] = await buildBaizeAgentConfig({
       pluginBaizeOverride: baizeOverride,
+      currentModel,
+    });
+
+    const nuwaOverride = params.pluginConfig.agents?.["nuwa"] as
+      | (Record<string, unknown> & { prompt_append?: string })
+      | undefined;
+
+    agentConfig["nuwa"] = await buildNuwaAgentConfig({
+      configAgentPlan: configAgent?.plan,
+      pluginNuwaOverride: nuwaOverride,
+      userCategories: params.pluginConfig.categories,
+      currentModel,
+    });
+
+    const nuwaSubOverride = params.pluginConfig.agents?.["nuwa-sub"] as
+      | (Record<string, unknown> & { prompt_append?: string })
+      | undefined;
+
+    agentConfig["nuwa-sub"] = await buildNuwaSubAgentConfig({
+      configAgentPlan: configAgent?.plan,
+      pluginNuwaSubOverride: nuwaSubOverride,
+      userCategories: params.pluginConfig.categories,
       currentModel,
     });
   }

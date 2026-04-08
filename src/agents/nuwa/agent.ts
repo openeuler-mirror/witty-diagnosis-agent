@@ -17,6 +17,9 @@ const MODE: AgentMode = "all"
 export interface NuwaContext {
   model?: string
 }
+export interface NuwaSubContext {
+  model?: string
+}
 
 export const NUWA_SYSTEM_PROMPT = `
 <system-reminder>
@@ -277,28 +280,80 @@ todoWrite([
 </execution_pattern>
 `
 
-export async function createNuwaAgent(ctx: NuwaContext): Promise<AgentConfig> {
+const NUWA_SUB_INTERACTION_APPENDIX = `
+<subagent_interaction_strategy>
+你当前运行在 **nuwa-sub** 子代理模式。
+
+- 你没有提问工具权限（例如 \`question\` / \`AskUserQuestion\`），严禁尝试直接向用户发起交互。
+- 当你在任一步骤需要用户补充信息（例如缺失根因、环境信息、执行授权）时，必须立即停止继续执行，并在回复开头输出 **【需要交互】**，将问题抛给调用者（上层代理）转问用户。
+- 你可以继续完成不依赖交互的分析与方案草拟，但涉及用户确认或授权的步骤必须通过 **【需要交互】** 机制转交。
+
+示例：
+\`\`\`
+【需要交互】
+当前缺少执行授权。请确认是否允许执行以下高风险修复步骤；如同意，请回复“确认执行”。
+\`\`\`
+</subagent_interaction_strategy>
+`
+
+export const NUWA_SUB_SYSTEM_PROMPT = NUWA_SYSTEM_PROMPT + "\n" + NUWA_SUB_INTERACTION_APPENDIX
+
+export const NUWA_PERMISSION = {
+  bash: "allow" as const,
+  edit: "allow" as const,
+  question: "allow" as const,
+  call_witty_agent: "deny" as const,
+}
+
+export const NUWA_SUB_PERMISSION = {
+  bash: "allow" as const,
+  edit: "allow" as const,
+  call_witty_agent: "deny" as const,
+}
+
+export async function getNuwaPrompt(): Promise<string> {
   const extraPrompt = await getSharedEnvPrompt();
+  return NUWA_SYSTEM_PROMPT + extraPrompt;
+}
+
+export async function getNuwaSubPrompt(): Promise<string> {
+  const extraPrompt = await getSharedEnvPrompt();
+  return NUWA_SUB_SYSTEM_PROMPT + extraPrompt;
+}
+
+export async function createNuwaAgent(ctx: NuwaContext): Promise<AgentConfig> {
   const baseConfig: AgentConfig = {
     description:
       "Generates remediation plans, immediate fixes, and root cause solutions based on diagnostic findings. (Nuwa - WittyDiagnosisAgent)",
     mode: MODE,
     ...(ctx.model ? { model: ctx.model } : {}),
     temperature: 0.2,
-    prompt: NUWA_SYSTEM_PROMPT + extraPrompt,
+    prompt: await getNuwaPrompt(),
     color: "#22C55E", // Green for healing/fixing
-    permission: {
-      bash: "allow",
-      edit: "allow",
-      question: "allow",
-      call_witty_agent: "deny",
-    } as AgentConfig["permission"],
+    permission: NUWA_PERMISSION as AgentConfig["permission"],
   }
 
   return baseConfig
 }
 
 createNuwaAgent.mode = MODE
+
+export async function createNuwaSubAgent(ctx: NuwaSubContext): Promise<AgentConfig> {
+  const baseConfig: AgentConfig = {
+    description:
+      "Generates remediation plans and execution-ready recovery steps in subagent mode. (Nuwa-Sub - WittyDiagnosisAgent)",
+    mode: "subagent",
+    ...(ctx.model ? { model: ctx.model } : {}),
+    temperature: 0.2,
+    prompt: await getNuwaSubPrompt(),
+    color: "#22C55E",
+    permission: NUWA_SUB_PERMISSION as AgentConfig["permission"],
+  }
+
+  return baseConfig
+}
+
+createNuwaSubAgent.mode = "subagent"
 
 export const nuwaPromptMetadata: AgentPromptMetadata = {
   category: "specialist",

@@ -135,6 +135,17 @@ export function applyToolConfig(params: {
       ...denyTodoTools,
     };
   }
+  const nuwaSub = agentByKey(params.agentResult, "nuwa-sub");
+  if (nuwaSub) {
+    nuwaSub.permission = {
+      ...nuwaSub.permission,
+      call_witty_agent: "deny",
+      task: "allow",
+      "task_*": "allow",
+      teammate: "allow",
+      ...denyTodoTools,
+    };
+  }
   const fuxi = agentByKey(params.agentResult, "fuxi");
   if (fuxi) {
     fuxi.permission = {
