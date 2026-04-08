@@ -4,7 +4,7 @@ import {
   findSlashCommandPartIndex,
 } from "./detector"
 import { executeSlashCommand, type ExecutorOptions } from "./executor"
-import { log } from "../../shared"
+import { setPinnedSessionModel } from "../../shared/session-model-state"
 import {
   AUTO_SLASH_COMMAND_TAG_CLOSE,
   AUTO_SLASH_COMMAND_TAG_OPEN,
@@ -50,14 +50,6 @@ export function createAutoSlashCommandHook(options?: AutoSlashCommandHookOptions
     ): Promise<void> => {
       const promptText = extractPromptText(output.parts)
 
-      // Debug logging to diagnose slash command issues
-      if (promptText.startsWith("/")) {
-        log(`[auto-slash-command] chat.message hook received slash command`, {
-          sessionID: input.sessionID,
-          promptText: promptText.slice(0, 100),
-        })
-      }
-
       if (
         promptText.includes(AUTO_SLASH_COMMAND_TAG_OPEN) ||
         promptText.includes(AUTO_SLASH_COMMAND_TAG_CLOSE)
@@ -77,11 +69,6 @@ export function createAutoSlashCommandHook(options?: AutoSlashCommandHookOptions
       }
       sessionProcessedCommands.add(commandKey)
 
-      log(`[auto-slash-command] Detected: /${parsed.command}`, {
-        sessionID: input.sessionID,
-        args: parsed.args,
-      })
-
       const result = await executeSlashCommand(parsed, executorOptions)
 
       const idx = findSlashCommandPartIndex(output.parts)
@@ -90,11 +77,6 @@ export function createAutoSlashCommandHook(options?: AutoSlashCommandHookOptions
       }
 
       if (!result.success || !result.replacementText) {
-        log(`[auto-slash-command] Command not found, skipping`, {
-          sessionID: input.sessionID,
-          command: parsed.command,
-          error: result.error,
-        })
         return
       }
 
@@ -110,6 +92,10 @@ export function createAutoSlashCommandHook(options?: AutoSlashCommandHookOptions
       }
 
       if (shouldPreserveModelForCommand(parsed.command) && input.model) {
+        setPinnedSessionModel(input.sessionID, {
+          providerID: input.model.providerID,
+          modelID: input.model.modelID,
+        })
         output.message["model"] = {
           providerID: input.model.providerID,
           modelID: input.model.modelID,
@@ -118,11 +104,6 @@ export function createAutoSlashCommandHook(options?: AutoSlashCommandHookOptions
 
       const taggedContent = `${AUTO_SLASH_COMMAND_TAG_OPEN}\n${result.replacementText}\n${AUTO_SLASH_COMMAND_TAG_CLOSE}`
       output.parts[idx].text = taggedContent
-
-      log(`[auto-slash-command] Replaced message with command template`, {
-        sessionID: input.sessionID,
-        command: parsed.command,
-      })
     },
 
     "command.execute.before": async (
@@ -134,12 +115,6 @@ export function createAutoSlashCommandHook(options?: AutoSlashCommandHookOptions
         return
       }
 
-      log(`[auto-slash-command] command.execute.before received`, {
-        sessionID: input.sessionID,
-        command: input.command,
-        arguments: input.arguments,
-      })
-
       const parsed = {
         command: input.command,
         args: input.arguments || "",
@@ -149,11 +124,6 @@ export function createAutoSlashCommandHook(options?: AutoSlashCommandHookOptions
       const result = await executeSlashCommand(parsed, executorOptions)
 
       if (!result.success || !result.replacementText) {
-        log(`[auto-slash-command] command.execute.before - command not found in our executor`, {
-          sessionID: input.sessionID,
-          command: input.command,
-          error: result.error,
-        })
         return
       }
 
@@ -180,6 +150,10 @@ export function createAutoSlashCommandHook(options?: AutoSlashCommandHookOptions
       }
 
       if (shouldPreserveModelForCommand(input.command) && input.model) {
+        setPinnedSessionModel(input.sessionID, {
+          providerID: input.model.providerID,
+          modelID: input.model.modelID,
+        })
         output.message = output.message ?? {}
         output.message["model"] = {
           providerID: input.model.providerID,
@@ -187,10 +161,6 @@ export function createAutoSlashCommandHook(options?: AutoSlashCommandHookOptions
         }
       }
 
-      log(`[auto-slash-command] command.execute.before - injected template`, {
-        sessionID: input.sessionID,
-        command: input.command,
-      })
     },
   }
 }
