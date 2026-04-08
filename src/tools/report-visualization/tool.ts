@@ -6,32 +6,58 @@ import { tool, type ToolDefinition } from "@opencode-ai/plugin/tool"
 
 function isPlainTextReport(md: string) {
   return (md.match(/【[^】]+】/g) || []).length > 3 ||
-         md.includes("===HEAVY===") ||
+         md.includes('<hr class="heavy">') ||
          /^\s+\S+\s{3,}\S+\s{3,}\S+/m.test(md);
 }
 
 function tryConvertTable(lines: string[], start: number) {
-  if (lines[start].trim() !== "---") return null;
+  if (lines[start].trim() !== "<hr>") return null;
+  
   let hi = start + 1;
   while (hi < lines.length && !lines[hi].trim()) hi++;
-  if (hi >= lines.length || lines[hi].trim() === "---") return null;
+  if (hi >= lines.length || lines[hi].trim() === "<hr>" || /^#{1,6}\s/.test(lines[hi].trim())) return null;
 
   const headerLine = lines[hi].trim();
 
   let sep2 = hi + 1;
-  while (sep2 < lines.length && lines[sep2].trim() !== "---") sep2++;
+  while (sep2 < lines.length && lines[sep2].trim() !== "<hr>") {
+    // 原来这里过于严格导致有些表头上下有多余空行或说明就直接返回 null，现改为跳过
+    if (/^#{1,6}\s/.test(lines[sep2].trim())) return null;
+    sep2++;
+  }
   if (sep2 >= lines.length) return null;
 
   const dataLines: string[] = [];
   let ri = sep2 + 1;
-  while (ri < lines.length && lines[ri].trim() !== "---" && lines[ri].trim() !== "===HEAVY===") {
-    if (lines[ri].trim()) dataLines.push(lines[ri]);
+  let hasClosingDash = false;
+  
+  while (ri < lines.length && lines[ri].trim() !== '<hr class="heavy">') {
+    const l = lines[ri].trim();
+    if (l === "<hr>") {
+      hasClosingDash = true;
+      break;
+    }
+    if (/^#{1,6}\s/.test(l) || l.startsWith("【")) {
+      break;
+    }
+    if (l) dataLines.push(l);
     ri++;
   }
 
-  const splitCols = (l: string) => l.trim().split(/  +/).map(s=>s.trim()).filter(Boolean);
+  const splitCols = (l: string) => {
+      // 将多个连续空格当做列分隔符，普通单空格不分隔。如果有特定格式可以利用特殊处理，这里用正则按照2个以上空格拆分
+      const parts = l.trim().split(/\s{2,}/);
+      return parts.map(s => s.trim()).filter(Boolean);
+    };
   const headers = splitCols(headerLine);
   if (headers.length < 2) return null;
+
+  if (!hasClosingDash) {
+    if (dataLines.length === 0) return null;
+    for (const dl of dataLines) {
+      if (splitCols(dl).length < 2) return null;
+    }
+  }
 
   const sep = "| " + headers.join(" | ") + " |";
   const div = "|" + headers.map(()=>" --- ").join("|") + "|";
@@ -42,7 +68,7 @@ function tryConvertTable(lines: string[], start: number) {
   });
 
   const tableMd = [sep, div, ...rows].join("\n");
-  const next = lines[ri]?.trim() === "---" ? ri + 1 : ri;
+  const next = hasClosingDash ? ri + 1 : ri;
   return { md: "\n" + tableMd + "\n", next };
 }
 
@@ -54,28 +80,28 @@ function preprocessPlainText(md: string) {
   while (i < lines.length) {
     const l = lines[i];
 
-    if (l.trim() === "===HEAVY===") {
+    if (l.trim() === '<hr class="heavy">') {
       let j = i + 1;
       while (j < lines.length && !lines[j].trim()) j++;
-      if (j < lines.length && lines[j].trim() !== "===HEAVY===") {
+      if (j < lines.length && lines[j].trim() !== '<hr class="heavy">') {
         const title = lines[j].trim();
         let k = j + 1;
         while (k < lines.length && !lines[k].trim()) k++;
-        if (k < lines.length && lines[k].trim() === "===HEAVY===") {
+        if (k < lines.length && lines[k].trim() === '<hr class="heavy">') {
           out.push(`\n## ${title}\n`);
           i = k + 1; continue;
         }
       }
-      out.push("---"); i++; continue;
+      out.push("<hr>"); i++; continue;
     }
 
-    if (l.trim() === "---") {
+    if (l.trim() === "<hr>") {
       const result = tryConvertTable(lines, i);
       if (result) {
         out.push(result.md);
         i = result.next; continue;
       }
-      out.push(""); i++; continue;
+      out.push(l); i++; continue;
     }
 
     const bm = l.trim().match(/^【([^】]+)】\s*(.*)$/);
@@ -84,6 +110,8 @@ function preprocessPlainText(md: string) {
       const rest = bm[2] ? " " + bm[2] : "";
       if (/^P[0-3]/.test(title)) {
         out.push(l);
+      } else if (title === "基本信息" || title === "结论") {
+        out.push(`\n## ${title}${rest}\n`);
       } else {
         out.push(`\n### ${title}${rest}\n`);
       }
@@ -112,8 +140,20 @@ function enrichReportHTML(html: string) {
   );
   res = res.replace(/<p>([^<]*🔴[^<]*全局警告[^<]*)<\/p>/g,
     (_,t) => `<div class="global-warn">${t}</div>`);
-  res = res.replace(/<p>([^<]*[└├][─][^<]*)<\/p>/g,
-    (_,t) => `<p class="tree-note">${t}</p>`);
+  res = res.replace(/<p>([\s\S]*?)<\/p>/g, (match, inner) => {
+    if ((inner.includes("└─") || inner.includes("├─")) && !inner.includes("<img") && !inner.includes("<a ")) {
+      return `<p class="tree-note">${inner}</p>`;
+    }
+    // 特殊处理基本信息等用空格排版的段落，以及带有盘符说明格式的高龄盘段落
+    if (inner.includes("  检测执行时间") || inner.includes("  报告类型") || (/^\/dev\//m.test(inner.trim()) && inner.includes("  "))) {
+      return `<p style="white-space: pre-wrap; font-family: var(--font-mono);">${inner}</p>`;
+    }
+    // 最后的显示内容要有回车
+    if (inner.includes("报告生成时间") && inner.includes("报告保存路径")) {
+      return `<p style="white-space: pre-wrap; line-height: 1.8;">${inner}</p>`;
+    }
+    return match;
+  });
   res = res.replace(/<p>【(P[0-3][^】]*)】([^<]*)<\/p>/g, (_, level, rest) => {
     const p = level.slice(0,2);
     const cls = {P0:"fh-p0",P1:"fh-p1",P2:"fh-p2",P3:"fh-p3"}[p as string] ?? "fh-p3";
@@ -143,9 +183,20 @@ export function createReportVisualizationTool(ctx: PluginInput): Record<string, 
           return `Error reading file: ${inputPath}\n${err.message}`
         }
 
-        mdContent = mdContent.replace(/^={10,}\s*$/gm, '<hr class="heavy">')
-        mdContent = mdContent.replace(/^-{10,}\s*$/gm, '<hr>')
+        mdContent = mdContent.replace(/^={10,}\s*$/gm, '\n<hr class="heavy">\n')
+        mdContent = mdContent.replace(/^-{10,}\s*$/gm, '\n<hr>\n')
+        
+        // 修复：处理纯文本报告顶部的两行重线，将其替换为一个主标题
+        mdContent = mdContent.replace(/\n<hr class="heavy">\n\n+(.+)\n+\n<hr class="heavy">\n/m, (match, title) => {
+          return `\n# ${title.trim()}\n`;
+        });
 
+        // 预处理一些纯文本的列表前缀，将其转换为标准的 Markdown 列表格式，以免在 HTML 中换行丢失
+        mdContent = mdContent.replace(/^(\s*▶\s+[^：:]+[：:])\s*(.*)/gm, '\n\n**$1**\n$2\n');
+        mdContent = mdContent.replace(/^(\s*\d+\.\s+\[[^\]]+\][：:])\s*(.*)/gm, '\n<div style="margin-bottom: 8px;"><strong>$1</strong> $2</div>\n');
+        // 针对诸如 [系统时间 xxx] L5 I/O报错：这种前缀
+        mdContent = mdContent.replace(/^(\s*\[[^\]]+\]\s+.*?)[：:]\s*(.*)/gm, '\n<div style="margin-bottom: 8px;"><strong>$1:</strong> $2</div>\n');
+        
         const isReport = isPlainTextReport(mdContent);
         const processed = isReport ? preprocessPlainText(mdContent) : mdContent;
 
@@ -153,7 +204,9 @@ export function createReportVisualizationTool(ctx: PluginInput): Record<string, 
         const tocItems: { level: number; text: string; id: string }[] = []
 
         // @ts-ignore
-        renderer.heading = function (text: any, level: any) {
+        renderer.heading = function (textObj: any, levelArg: any) {
+          const text = typeof textObj === 'object' ? textObj.text : textObj;
+          const level = typeof textObj === 'object' ? textObj.depth : levelArg;
           const id = "h-" + text
             .replace(/<[^>]+>/g, "")
             // @ts-ignore
@@ -167,7 +220,9 @@ export function createReportVisualizationTool(ctx: PluginInput): Record<string, 
         } as any
 
         // @ts-ignore
-        renderer.code = function (code: any, lang: any) {
+        renderer.code = function (codeObj: any, langArg: any) {
+          const code = typeof codeObj === 'object' ? codeObj.text : codeObj;
+          const lang = typeof codeObj === 'object' ? codeObj.lang : langArg;
           const safeLang = lang ? lang.trim() : ""
           const langLabel = safeLang ? `<span class="code-lang">${safeLang}</span>` : ""
           const escaped = code
@@ -183,21 +238,18 @@ export function createReportVisualizationTool(ctx: PluginInput): Record<string, 
 </div>\n`
         } as any
 
-        // @ts-ignore
-        renderer.table = function (header: any, body: any) {
-          return `<div class="table-wrap"><table><thead>${header}</thead><tbody>${body}</tbody></table></div>\n`
-        } as any
-
         marked.setOptions({ renderer, gfm: true, breaks: false })
         let bodyHTML = await marked.parse(processed)
+
+        bodyHTML = bodyHTML.replace(/<table>/g, '<div class="table-wrap"><table>').replace(/<\/table>/g, '</table></div>')
 
         bodyHTML = bodyHTML
           .replace(/font-family:\s*var\(--font-mono\)/g, "")
           .replace(/white-space:\s*pre-wrap/g, "");
 
-        if (isReport) {
-          bodyHTML = enrichReportHTML(bodyHTML);
-        }
+        bodyHTML = enrichReportHTML(bodyHTML);
+
+        bodyHTML = bodyHTML.replace(/<h1(.*?)>([\s\S]*?)<\/h1>/, `<div class="title-container"><h1$1>$2</h1><div class="brand-logo">by <strong>Witty Diagnosis Agent</strong></div></div>`);
 
         const buildToc = (items: { level: number; text: string; id: string }[]) => {
           const filtered = items.filter(i => i.level <= 3)
@@ -227,7 +279,7 @@ export function createReportVisualizationTool(ctx: PluginInput): Record<string, 
             } else {
               html += `<span class="toc-spacer"></span>`
             }
-            html += `<a href="#${item.id}" class="${cls}">${item.text}</a></div>\n`
+            html += `<a href="#${item.id}" onclick="event.preventDefault(); const target = document.getElementById('${item.id}'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="${cls}">${item.text}</a></div>\n`
             
             currentLevel = item.level
           })
@@ -249,7 +301,7 @@ export function createReportVisualizationTool(ctx: PluginInput): Record<string, 
 
         const titleMatch = mdContent.match(/^#\s+(.+)/m) || mdContent.match(/服务器[^\n]{0,30}报告/);
         // @ts-ignore
-        const pageTitle = titleMatch ? (titleMatch[1] || titleMatch[0]).replace(/[\u{1F300}-\u{1F9FF}]/gu, "").replace(/[*_\`]/g, "").trim() : outputName
+        const pageTitle = titleMatch ? (titleMatch[1] || titleMatch[0]).replace(/[\u{1F300}-\u{1F9FF}]/gu, "").replace(/[*_`]/g, "").trim() : outputName
 
         const fullHTML = `<!DOCTYPE html>
 <html lang="zh-CN">
@@ -409,11 +461,19 @@ export function createReportVisualizationTool(ctx: PluginInput): Record<string, 
   }
 
   /* ── Headings ──────────────────────────────────────────────────────────── */
+  .title-container {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-end;
+    margin: 0 0 28px;
+    padding-bottom: 18px;
+    border-bottom: 2px solid var(--text);
+  }
   .article h1 {
     font-family: var(--font-head);
     font-size: 26px; font-weight: 600; line-height: 1.3;
-    margin: 0 0 28px; padding-bottom: 18px;
-    border-bottom: 2px solid var(--text);
+    margin: 0; padding-bottom: 0;
+    border-bottom: none;
   }
   .article h2 {
     font-family: var(--font-head);
@@ -474,6 +534,8 @@ export function createReportVisualizationTool(ctx: PluginInput): Record<string, 
     border-radius: 0 var(--radius) var(--radius) 0;
   }
   .article blockquote p { font-size: 14.5px; color: var(--accent); margin: 0; line-height: 1.7; }
+  /* 支持块引用内部保留换行符（修复头部概要换行丢失问题） */
+  .article blockquote p { white-space: pre-wrap; }
   .article blockquote strong { color: var(--accent); }
 
   /* ── Lists ─────────────────────────────────────────────────────────────── */
@@ -596,7 +658,7 @@ export function createReportVisualizationTool(ctx: PluginInput): Record<string, 
   .global-warn { background: #fef2f2; border: 1px solid #fca5a5; border-radius: var(--radius-lg); padding: 14px 18px; font-size: 14.5px; font-weight: 600; color: #991b1b; margin: 16px 0; }
 
   /* ── Tree note ─────────────────────────────────────────────────────────── */
-  .tree-note { font-family: var(--font-mono); font-size: 12.5px; color: var(--text-2); padding: 3px 0 3px 16px; border-left: 2px solid var(--border-soft); margin: 3px 0 3px 8px; }
+  .tree-note { white-space: pre-wrap; font-family: var(--font-mono); font-size: 13.5px; line-height: 1.6; color: var(--text-2); margin: 8px 0 8px 16px; }
 
   /* ── Disclaimer ────────────────────────────────────────────────────────── */
   .disclaimer { background: var(--bg); border: 1px solid var(--border); border-radius: var(--radius); padding: 14px 18px; font-size: 13.5px; color: var(--text-2); font-style: italic; }
@@ -610,6 +672,24 @@ export function createReportVisualizationTool(ctx: PluginInput): Record<string, 
   }
   .meta-source { font-family: var(--font-mono); font-size: 11.5px; }
 
+  /* ── Brand logo ────────────────────────────────────────────────────────── */
+  .brand-logo {
+    font-family: var(--font-head);
+    font-size: 14px;
+    color: var(--text-3);
+    letter-spacing: 0.05em;
+    margin-bottom: 4px;
+    flex-shrink: 0;
+    margin-left: 16px;
+  }
+  .brand-logo strong {
+    font-weight: 600;
+    color: var(--accent);
+  }
+  @media (max-width: 900px) {
+    .title-container { flex-direction: column; align-items: flex-start; gap: 12px; }
+    .brand-logo { margin-left: 0; margin-bottom: 0; }
+  }
   /* ── Print ─────────────────────────────────────────────────────────────── */
   @media print {
     body { background: white; }
@@ -617,6 +697,7 @@ export function createReportVisualizationTool(ctx: PluginInput): Record<string, 
     .layout { display: block; padding: 0; }
     .article { border: none; box-shadow: none; padding: 24px; }
     .copy-btn { display: none; }
+    .brand-logo { margin-bottom: 0; }
   }
 
   /* ── Responsive ────────────────────────────────────────────────────────── */
@@ -637,7 +718,7 @@ export function createReportVisualizationTool(ctx: PluginInput): Record<string, 
 
 <div class="layout">
   ${hasToc ? tocHTML : ""}
-  <article class="article" id="article">
+  <article class="article" id="article" style="position: relative;">
     ${bodyHTML}
     <div class="meta">
       <span class="meta-source">${outputName.replace(".html", ".md")}</span>

@@ -94,7 +94,7 @@ function buildTodoDisciplineSection(useTaskSystem: boolean): string {
  *           1.4.3 核心分析与推断 (Core Analysis based on Skill)
  *           1.4.4 分析报告生成 (Report Generation based on Skill)
  *   - 输出: 覆盖 / 追加生成最终分析报告
- *           `~/.witty-diagnosis-agent/baize/reports/{timestamp}_{plan_id}_report.md` （或用户指定路径）
+ *           `~/.witty-diagnosis-agent/baize/reports/【简短故障现象或用户描述简写】_{session_id}_{timestamp}_report.md` （或用户指定路径）
  *
  * 同时继承 Hephaestus 风格的执行特性：自主、深度探索、端到端完成任务。
  */
@@ -163,7 +163,7 @@ Your primary workflow in this domain:
    - **Consult the Skill**: If applicable, use the \`skill\` tool to read the specific Skill for the identified scenario. **The Skill contains the specific analysis methodology and the required output report format.**
    - **Strictly follow the methodology and instructions provided in the Skill** (or general SRE experience if no skill applies) to perform evidence collection, core analysis, and report generation.
    - Write or update the generated report at user home directory:
-     - **默认输出路径**：\`~/.witty-diagnosis-agent/baize/reports/{timestamp}_{plan_id}_report.md\`
+     - **默认输出路径**：\`~/.witty-diagnosis-agent/baize/reports/【简短故障现象或用户描述简写】_{session_id}_{timestamp}_report.md\` （例如 \`~/.witty-diagnosis-agent/baize/reports/磁盘IO超时告警_abc123_20260408092028_report.md\`）
      - **如果用户指定了路径**：请严格使用用户指定的路径。
      - **必须使用绝对路径**：如果路径中包含 \`~\` 或 \`$HOME\`，先用 \`Bash("echo $HOME")\` 获取实际路径，再拼接用于 Write 工具。
      - **错误示例**：\`~/.witty-diagnosis-agent/baize/reports/...\`（工具可能直接创建名为 "~" 的目录，导致路径错误）。
@@ -184,13 +184,14 @@ ${skillsGuide}
    - **注意：分析推断过程在后台完成，不要将原始输入数据或复杂的推断草稿重复打印给用户。**  
    - **极其重要：如果有对应的 Skill，输出格式和分析方法必须由该 Skill 决定，请严格按照其提供的格式输出！**
    - Write or update the generated report at user home directory:
-     - **默认输出路径**：\`~/.witty-diagnosis-agent/baize/reports/{timestamp}_{plan_id}_report.md\`
+     - **默认输出路径**：\`~/.witty-diagnosis-agent/baize/reports/【简短故障现象或用户描述简写】_{session_id}_{timestamp}_report.md\` （例如 \`~/.witty-diagnosis-agent/baize/reports/磁盘IO超时告警_abc123_20260408092028_report.md\`）
      - **如果用户指定了路径**：请严格使用用户指定的路径。
      - **必须使用绝对路径**：如果路径中包含 \`~\` 或 \`$HOME\`，先用 \`Bash("echo $HOME")\` 获取实际路径，再拼接用于 Write 工具。
      - **错误示例**：\`~/.witty-diagnosis-agent/baize/reports/...\`（工具可能直接创建名为 "~" 的目录，导致路径错误）。
      - If the file does not exist: create it with the full report.
      - If it exists: append a new section instead of deleting history.
    - **双重输出要求**：报告生成后，**不仅要通过 Write 工具写入指定文件，还必须将完整的 Markdown 报告内容直接输出到与用户的对话界面（控制台）中。绝不能在聊天界面只给个总结就草草了事。**
+   - **强制表格格式（CRITICAL）**：无论输入数据（如 Python 脚本的诊断输出）是什么格式，你在最终报告中输出的所有表格（包括磁盘清单、组件状态、风险清单、行动建议等），**必须全部使用标准的 Markdown 表格语法（如 \`| 字段 | 字段 |\\n| --- | --- |\`）**。绝对禁止使用 \`---\` 或 \`===\` 拼接的纯文本表格或带有 \`└─ 说明：\` 等缩进的非标准表格！
    - **时间格式约束（极度重要）**：所有输出到报告中的时间点（包括报告时间、故障时段、事故时间线等），必须补齐为**完整的「年-月-日 时:分:秒」格式（如 \`2024-01-01 10:00:00\`）**。如果原始日志中只有月日（如 \`Apr  2 10:15:25\`），请结合上下文推断补全为 \`YYYY-MM-DD HH:mm:ss\`；如果只有时分秒或相对时间，请务必换算为绝对的完整时间戳。
 
 When the user explicitly asks你执行“白泽 / Baize 分析”，assume they want the **full Phase 1.4 workflow above**, not just an explanation.
