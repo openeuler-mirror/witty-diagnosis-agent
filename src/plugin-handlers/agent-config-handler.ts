@@ -14,6 +14,7 @@ import { loadProjectAgents, loadUserAgents } from "../features/claude-code-agent
 import type { PluginComponents } from "./plugin-components-loader";
 import { reorderAgentsByPriority } from "./agent-priority-order";
 import { remapAgentKeysToDisplayNames } from "./agent-key-remapper";
+import { applyUiAgentVisibility } from "./ui-agent-visibility";
 import { buildFuxiAgentConfig } from "./fuxi-agent-config-builder";
 import { buildFuxiSubAgentConfig } from "./fuxi-sub-agent-config-builder";
 import { buildDayuAgentConfig } from "./dayu-agent-config-builder";
@@ -228,12 +229,12 @@ export async function applyAgentConfig(params: {
   };
 
   if (params.config.agent) {
-    const visibleAgents = Object.fromEntries(
-      Object.entries(params.config.agent as Record<string, unknown>)
+    const uiScopedAgents = applyUiAgentVisibility(
+      params.config.agent as Record<string, unknown>,
     );
 
     params.config.agent = remapAgentKeysToDisplayNames(
-      visibleAgents as Record<string, unknown>,
+      uiScopedAgents as Record<string, unknown>,
     );
     params.config.agent = reorderAgentsByPriority(
       params.config.agent as Record<string, unknown>,

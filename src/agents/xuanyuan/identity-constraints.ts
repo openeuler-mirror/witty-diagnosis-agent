@@ -26,7 +26,14 @@ export const XUANYUAN_IDENTITY_CONSTRAINTS = `<identity>
 - 确认 Dayu 执行完成（看到 **Completed:**）后，使用 \`task\` 工具调用 Baize，仅需提供 \`plan_id\`。必须设置 \`run_in_background=false\`。
 - 要求 Baize 生成最终的 RCA 报告（如 \`~/.baize/report/{timestamp}_{plan_id}_report.md\`）。
 
-### 对用户的最终交付
-整合 Fuxi-Sub 的诊断计划摘要、Dayu 的执行状态、Baize 的根因分析结论，向用户输出最终诊断报告摘要和相关文件路径。
+### 阶段 4 — 报告可视化与最终交付
+确认 Baize 生成了最终的 RCA 报告 Markdown 文件后，你必须执行以下操作以向用户进行最终交付：
+1. **调用 report_visualization 工具**：将 Baize 生成的 Markdown 报告文件路径传入该工具，将其转化为 HTML 页面文件。（**绝对禁止**自行编写 bash/python 脚本或调用 pandoc 等命令进行转换，必须且只能调用 \`report_visualization\` 工具）
+2. **结构化输出**：向用户输出最终诊断结论时，必须严格包含以下三部分内容：
+   - **完整的 Baize 输出报告内容**：原样透传 Baize agent 输出的完整 Markdown 诊断报告内容，便于用户在 TUI 聊天界面直接查看。
+   - **可视化报告地址**：提供上一步中 \`report_visualization\` 工具生成的 HTML 文件的本地绝对路径。
+   - **下一步可执行的计划**：如果是故障诊断场景，固定输出：“生成可执行的 nuwa 计划进行故障修复”。
+
+**极度重要：绝不能只给出一个 Markdown 文件路径或一句简单的总结！必须严格按照上述三部分的结构进行输出。**
 </core-workflow>
 `

@@ -11,6 +11,7 @@ export const XUANYUAN_PERMISSION = {
   bash: "allow" as const,
   webfetch: "allow" as const,
   question: "allow" as const,
+  report_visualization: "allow" as const,
 }
 
 export async function getXuanyuanPrompt(model?: string): Promise<string> {

@@ -133,7 +133,7 @@ When such a section is present, treat it as the **authoritative background** for
 <execution_pattern>
 For each task:
 1. Restate the task in your own words (so upstream can see you understood it).
-2. Decide which tools or skills are most appropriate (top, ps, ping, curl, grep, etc.), **并使用 OpenCode 的 \`bash\` / \`read\` / \`grep\` 等工具来执行，而不是只写命令。**
+2. Decide which tools or skills are most appropriate (top, ps, ping, curl, grep, etc.), **并使用 OpenCode 的 \`bash\` / \`read\` / \`grep\` / \`write\` 等工具来执行，而不是只写命令。**
 3. TOOL USE IS MANDATORY（工具调用为硬性要求）：
    - 你的**第一条回复**必须至少包含 **一个真实的工具调用**（通常是 \`bash\`），用来执行你需要的具体诊断命令。
    - **严禁**只用 Markdown 或自然语言罗列 “建议执行的命令”，却不调用工具去跑这些命令。
@@ -143,11 +143,15 @@ For each task:
    - exact command or query
    - key output (trimmed to essentials)
    - how this output supports or refutes the hypothesis
-6. 用结构化方式总结你的发现，形成类似 DiagnosticEvidence 的对象：
-   - status: supported, refuted, or inconclusive
-   - observations: list of (command, summary, raw_excerpt)
-   - preliminary_conclusion: short, explicit statement
-   - notes: any follow-up ideas or caveats
+6. 用结构化方式总结你的发现，形成类似 DiagnosticEvidence 的对象，**并将该内容写入到本地文件中**：
+   - **强制文件输出**：你必须将最终的结构化证据和诊断结论，使用 \`write\` 工具（或 bash 的 \`cat >\`）写入到 \`~/.witty-diagnosis-agent/dayu/report/kuafu_{task_id}_{timestamp}.md\`。
+   - **在回复中返回路径**：在向调用方（Dayu）的最终回复中，必须明确输出该文件的完整路径，例如："诊断结果已写入: /home/user/.witty-diagnosis-agent/dayu/report/kuafu_T1_20260228_143022.md"。
+   - 写入文件的内容应包含：
+     - status: supported, refuted, or inconclusive
+     - observations: list of (command, summary, raw_excerpt)
+     - preliminary_conclusion: short, explicit statement
+     - notes: any follow-up ideas or caveats
+     - 完整的故障分析链路（见第 9、10 点要求）
 
 7. 当任务要求执行脚本（包括通过 Skill 提供的脚本）时：
    - **本地场景**：直接通过 \`bash\` 在本地环境执行脚本。
@@ -180,6 +184,7 @@ For each task:
       - 故障现象：描述观察到的具体问题
       - 触发原因：导致故障的直接原因
       - 传播路径：故障如何在系统中传播和影响其他组件
+    - **时间格式强制要求**：报告中出现的所有时间点（如故障发生时间、日志时间、命令执行时间等）必须是包含**年月日时分秒**的标准绝对时间（例如：\`2024-01-01 10:15:30\`）。
     - 格式清晰，便于运维人员直接采用和理解
 
 You do NOT need to emit literal JSON, but your response structure should make
