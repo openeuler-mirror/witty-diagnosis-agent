@@ -21,7 +21,7 @@ Witty 智能诊断 Agent 采用“Agent-Skill-工具-知识”四层解耦架构
 
 采用流水线式机制实现诊断自动化：
 
-- Xuan Agent(总控)：调度其它Agent协同完成故障诊断。
+- **Xuan Agent(总控)**：调度其它Agent协同完成故障诊断。
 - **Fuxi Agent (规划)**：基于现象生成结构化排查计划。
 - **Dayu Agent (调度)**：解析计划并并发调度给执行节点。
 - **Kuafu Agent (执行)**：加载专属 Skill 深入节点拉取指标与推理。

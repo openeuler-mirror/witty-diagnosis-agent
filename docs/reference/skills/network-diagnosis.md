@@ -46,7 +46,24 @@
 
 # 使用流程
 
-智能诊断Agent网络故障诊断操作简单，无需复杂配置，运维人员仅需一步即可完成故障诊断：
+## 前置要求
+
+### 网络连通要求
+- 确保智能诊断Agent与目标服务器之间网络连通，以便执行诊断脚本并获取网络状态的完整信息
+
+### 权限要求
+- **用户权限**：需要以`root`或`sudo`权限执行诊断脚本和命令，以获取完整的网络信息
+- **命令执行权限**：需要具备执行`ip`、`ethtool`、`dmesg`、`journalctl`、`iptables`、`nft`、`conntrack`、`dig`、`nslookup`、`nc`、`ss`、`mtr`、`traceroute`、`curl`、`arping`等命令的权限
+
+### 工具安装要求
+- 确保目标服务器已安装以下工具：`iproute2`、`ethtool`、`iptables`、`nftables`、`conntrack-tools`、`dnsutils`、`netcat-openbsd`、`iproute2`、`mtr`、`traceroute`、`curl`、`arping`
+
+### 数据准备要求
+- 若已知故障发生时间，建议提前记录故障时间窗口，以便精准分析
+- 若涉及特定网口，建议准备网口名称（如`enp4s0`）
+- 若涉及特定目标IP或网段，建议准备目标IP地址或网段信息
+
+## 操作步骤
 
 - 启动 **OpenCode**。
 
