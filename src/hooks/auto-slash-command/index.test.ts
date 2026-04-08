@@ -100,6 +100,10 @@ describe("createAutoSlashCommandHook", () => {
 
       // then
       expect(updateSpy).toHaveBeenCalledWith(sessionID, "dayu")
+      expect(output.message["model"]).toEqual({
+        providerID: "anthropic",
+        modelID: "claude-sonnet-4-6",
+      })
     })
 
     it("should update session agent to baize for /start-baize", async () => {
@@ -115,6 +119,46 @@ describe("createAutoSlashCommandHook", () => {
 
       // then
       expect(updateSpy).toHaveBeenCalledWith(sessionID, "baize")
+      expect(output.message["model"]).toEqual({
+        providerID: "anthropic",
+        modelID: "claude-sonnet-4-6",
+      })
+    })
+
+    it("should update session agent to xuanyuan for /witty-diag in dayu session", async () => {
+      // given /witty-diag in allowed source agent session
+      const updateSpy = spyOn(sessionState, "updateSessionAgent")
+      const hook = createAutoSlashCommandHook()
+      const sessionID = `test-session-witty-diag-${Date.now()}`
+      const input = createMockInput(sessionID)
+      input.agent = "dayu"
+      const output = createMockOutput("/witty-diag diagnose now")
+
+      // when
+      await hook["chat.message"](input, output)
+
+      // then
+      expect(updateSpy).toHaveBeenCalledWith(sessionID, "xuanyuan")
+      expect(output.message["model"]).toEqual({
+        providerID: "anthropic",
+        modelID: "claude-sonnet-4-6",
+      })
+    })
+
+    it("should NOT update session agent for /witty-diag in non-allowed session", async () => {
+      // given /witty-diag in non-allowed source agent session
+      const updateSpy = spyOn(sessionState, "updateSessionAgent")
+      const hook = createAutoSlashCommandHook()
+      const sessionID = `test-session-witty-diag-blocked-${Date.now()}`
+      const input = createMockInput(sessionID)
+      input.agent = "nuwa"
+      const output = createMockOutput("/witty-diag diagnose now")
+
+      // when
+      await hook["chat.message"](input, output)
+
+      // then
+      expect(updateSpy).not.toHaveBeenCalledWith(sessionID, "xuanyuan")
     })
   })
 
@@ -289,6 +333,8 @@ describe("createAutoSlashCommandHook", () => {
         command,
         sessionID: `test-session-cmd-${Date.now()}-${Math.random()}`,
         arguments: args,
+        agent: "test-agent",
+        model: { providerID: "deepseek", modelID: "deepseek-chat" },
       }
     }
 
@@ -370,6 +416,10 @@ describe("createAutoSlashCommandHook", () => {
 
       //#then
       expect(updateSpy).toHaveBeenCalledWith(input.sessionID, "dayu")
+      expect(output.message?.["model"]).toEqual({
+        providerID: "deepseek",
+        modelID: "deepseek-chat",
+      })
     })
 
     it("should update session agent to baize for start-baize command", async () => {
@@ -384,6 +434,29 @@ describe("createAutoSlashCommandHook", () => {
 
       //#then
       expect(updateSpy).toHaveBeenCalledWith(input.sessionID, "baize")
+      expect(output.message?.["model"]).toEqual({
+        providerID: "deepseek",
+        modelID: "deepseek-chat",
+      })
+    })
+
+    it("should update session agent to xuanyuan for witty-diag command in allowed session", async () => {
+      //#given
+      const updateSpy = spyOn(sessionState, "updateSessionAgent")
+      const hook = createAutoSlashCommandHook()
+      const input = createCommandInput("witty-diag", "some goal")
+      input.agent = "kuafu"
+      const output = createCommandOutput("original")
+
+      //#when
+      await hook["command.execute.before"](input, output)
+
+      //#then
+      expect(updateSpy).toHaveBeenCalledWith(input.sessionID, "xuanyuan")
+      expect(output.message?.["model"]).toEqual({
+        providerID: "deepseek",
+        modelID: "deepseek-chat",
+      })
     })
   })
 })

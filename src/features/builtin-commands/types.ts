@@ -9,6 +9,7 @@ export type BuiltinCommandName =
   | "start-work"
   | "start-dayu"
   | "start-baize"
+  | "witty-diag"
   | "stop-continuation"
   | "handoff"
 

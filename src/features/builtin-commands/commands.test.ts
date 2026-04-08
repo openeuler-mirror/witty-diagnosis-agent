@@ -16,6 +16,18 @@ describe("loadBuiltinCommands", () => {
     expect(commands.handoff.name).toBe("handoff")
   })
 
+  test("should include witty-diag command in loaded commands", () => {
+    //#given
+    const disabledCommands: BuiltinCommandName[] = []
+
+    //#when
+    const commands = loadBuiltinCommands(disabledCommands)
+
+    //#then
+    expect(commands["witty-diag"]).toBeDefined()
+    expect(commands["witty-diag"].agent).toBe("xuanyuan")
+  })
+
   test("should exclude handoff when disabled", () => {
     //#given
     const disabledCommands: BuiltinCommandName[] = ["handoff"]

@@ -1,6 +1,7 @@
-import { describe, test, expect } from "bun:test"
+import { describe, test, expect, spyOn } from "bun:test"
 
 import { createChatMessageHandler } from "./chat-message"
+import * as sessionState from "../features/claude-code-session-state"
 
 type ChatMessagePart = { type: string; text?: string; [key: string]: unknown }
 type ChatMessageHandlerOutput = { message: Record<string, unknown>; parts: ChatMessagePart[] }
@@ -141,5 +142,20 @@ describe("createChatMessageHandler - TUI variant passthrough", () => {
     //#then
     expect(output.parts).toHaveLength(1)
     expect(output.parts[0].text).toContain("[BACKGROUND TASK COMPLETED]")
+  })
+
+  test("updates session agent on every message when input.agent exists", async () => {
+    //#given
+    const updateSpy = spyOn(sessionState, "updateSessionAgent")
+    const args = createMockHandlerArgs({ shouldOverride: false })
+    const handler = createChatMessageHandler(args)
+    const input = createMockInput("dayu", { providerID: "openai", modelID: "gpt-5.3-codex" })
+    const output = createMockOutput()
+
+    //#when
+    await handler(input, output)
+
+    //#then
+    expect(updateSpy).toHaveBeenCalledWith("test-session", "dayu")
   })
 })
