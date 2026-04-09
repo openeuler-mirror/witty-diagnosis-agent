@@ -72,7 +72,7 @@ export const FUXI_PLAN_GENERATION = `# PHASE 1.4: 诊断模型构建 (Diagnostic
   **第二步：关联规则补齐 (Association Rules)**
   
   - **触发条件**：仅在第一步识别出 ≥ 1 个故障模式时执行。
-  - **核心行动**：直接调用 \`task(subagent_type="specialist", load_skills=["fault-model"], prompt="依据分类结果进行故障模式关联规则补齐")\`。
+  - **核心行动**：直接创建子 Agent进行故障模式关联规则补齐 \`task(subagent_type="specialist", run_in_background=false, load_skills=["fault-model"], prompt="依据分类结果进行故障模式关联规则补齐")\`。
   - **映射一致性**：你必须 100% 遵守该子 Agent 返回的故障模式组合（例如：文件系统故障必须同时配对磁盘故障）。
   - **禁止行为**：严禁自行删减已定义的关联项。
   
@@ -171,7 +171,7 @@ export const FUXI_PLAN_GENERATION = `# PHASE 1.4: 诊断模型构建 (Diagnostic
       → 第四步: 存在确定性诊断路径（vmcore 分析必然收敛到唯一根因）
       → 输出: \`| 故障模式 |\\n| :--- |\\n| vmcore分析 |\`（单任务直通，不展开假设候选）
   - 用户输入: "硬盘故障"
-      → 第一步: 故障模式 → 第二步: 调用 \`task(subagent_type="specialist", ...)\` → 第三步: 短路触发
+      → 第一步: 故障模式 → 第二步: 创建子 Agent \`task(subagent_type="specialist", ...)\` 进行故障模式关联规则补齐 → 第三步: 短路触发
       → 输出: \`| 故障模式 |\\n| :--- |\\n| 硬盘故障、文件系统故障 |\`
   - 用户输入: "CPU冲高"
       → 第一步: 故障模式 → 第三步: 短路触发
