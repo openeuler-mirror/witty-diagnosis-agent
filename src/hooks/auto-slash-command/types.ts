@@ -26,8 +26,11 @@ export interface CommandExecuteBeforeInput {
   command: string
   sessionID: string
   arguments: string
+  agent?: string
+  model?: { providerID: string; modelID: string }
 }
 
 export interface CommandExecuteBeforeOutput {
+  message?: Record<string, unknown>
   parts: Array<{ type: string; text?: string; [key: string]: unknown }>
 }

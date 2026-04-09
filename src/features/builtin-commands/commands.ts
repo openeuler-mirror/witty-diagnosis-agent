@@ -8,6 +8,7 @@ import { START_WORK_TEMPLATE } from "./templates/start-work"
 import { HANDOFF_TEMPLATE } from "./templates/handoff"
 import { START_DAYU_TEMPLATE } from "./templates/start-dayu"
 import { START_BAIZE_TEMPLATE } from "./templates/start-baize"
+import { WITTY_DIAG_TEMPLATE } from "./templates/witty-diag"
 
 const BUILTIN_COMMAND_DEFINITIONS: Record<BuiltinCommandName, Omit<CommandDefinition, "name">> = {
   "init-deep": {
@@ -87,6 +88,14 @@ ${START_DAYU_TEMPLATE}
     agent: "baize",
     template: `<command-instruction>
 ${START_BAIZE_TEMPLATE}
+</command-instruction>`,
+    argumentHint: "[goal-or-notes]",
+  },
+  "witty-diag": {
+    description: "(builtin) Switch current session to Xuanyuan agent",
+    agent: "xuanyuan",
+    template: `<command-instruction>
+${WITTY_DIAG_TEMPLATE}
 </command-instruction>`,
     argumentHint: "[goal-or-notes]",
   },

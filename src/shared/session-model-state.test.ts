@@ -1,5 +1,12 @@
 import { describe, expect, test } from "bun:test"
-import { clearSessionModel, getSessionModel, setSessionModel } from "./session-model-state"
+import {
+  clearPinnedSessionModel,
+  clearSessionModel,
+  getPinnedSessionModel,
+  getSessionModel,
+  setPinnedSessionModel,
+  setSessionModel,
+} from "./session-model-state"
 
 describe("session-model-state", () => {
   test("stores and retrieves a session model", () => {
@@ -26,5 +33,25 @@ describe("session-model-state", () => {
 
     //#then
     expect(getSessionModel(sessionID)).toBeUndefined()
+  })
+
+  test("stores and clears a pinned session model", () => {
+    //#given
+    const sessionID = "ses_pin"
+
+    //#when
+    setPinnedSessionModel(sessionID, { providerID: "deepseek", modelID: "deepseek-chat" })
+
+    //#then
+    expect(getPinnedSessionModel(sessionID)).toEqual({
+      providerID: "deepseek",
+      modelID: "deepseek-chat",
+    })
+
+    //#when
+    clearPinnedSessionModel(sessionID)
+
+    //#then
+    expect(getPinnedSessionModel(sessionID)).toBeUndefined()
   })
 })

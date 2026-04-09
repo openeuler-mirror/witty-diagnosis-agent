@@ -1,6 +1,13 @@
-import { describe, test, expect } from "bun:test"
+import { describe, test, expect, spyOn } from "bun:test"
 
 import { createChatMessageHandler } from "./chat-message"
+import * as sessionState from "../features/claude-code-session-state"
+import {
+  clearPinnedSessionModel,
+  clearSessionModel,
+  setSessionModel,
+  setPinnedSessionModel,
+} from "../shared/session-model-state"
 
 type ChatMessagePart = { type: string; text?: string; [key: string]: unknown }
 type ChatMessageHandlerOutput = { message: Record<string, unknown>; parts: ChatMessagePart[] }
@@ -43,7 +50,7 @@ function createMockOutput(variant?: string): ChatMessageHandlerOutput {
   if (variant !== undefined) {
     message["variant"] = variant
   }
-  return { message, parts: [] }
+  return { message, parts: [{ type: "text", text: "normal message" }] }
 }
 
 describe("createChatMessageHandler - TUI variant passthrough", () => {
@@ -141,5 +148,204 @@ describe("createChatMessageHandler - TUI variant passthrough", () => {
     //#then
     expect(output.parts).toHaveLength(1)
     expect(output.parts[0].text).toContain("[BACKGROUND TASK COMPLETED]")
+  })
+
+  test("updates session agent on every message when input.agent exists", async () => {
+    //#given
+    const updateSpy = spyOn(sessionState, "updateSessionAgent")
+    const args = createMockHandlerArgs({ shouldOverride: false })
+    const handler = createChatMessageHandler(args)
+    const input = createMockInput("dayu", { providerID: "openai", modelID: "gpt-5.3-codex" })
+    const output = createMockOutput()
+
+    //#when
+    await handler(input, output)
+
+    //#then
+    expect(updateSpy).toHaveBeenCalledWith("test-session", "dayu")
+  })
+
+  test("applies pinned session model when present", async () => {
+    //#given
+    setPinnedSessionModel("test-session", {
+      providerID: "deepseek",
+      modelID: "deepseek-chat",
+    })
+    const args = createMockHandlerArgs({ shouldOverride: false })
+    const handler = createChatMessageHandler(args)
+    const input = createMockInput("dayu", { providerID: "deepseek", modelID: "deepseek-chat" })
+    const output = createMockOutput()
+
+    //#when
+    await handler(input, output)
+
+    //#then
+    expect(output.message["model"]).toEqual({
+      providerID: "deepseek",
+      modelID: "deepseek-chat",
+    })
+
+    clearPinnedSessionModel("test-session")
+  })
+
+  test("inherits previous session model on agent switch in chat.message", async () => {
+    //#given
+    sessionState.updateSessionAgent("test-session", "Xuanyuan")
+    setSessionModel("test-session", {
+      providerID: "deepseek",
+      modelID: "deepseek-chat",
+    })
+    const args = createMockHandlerArgs({ shouldOverride: false })
+    const handler = createChatMessageHandler(args)
+    const input = createMockInput("Dayu", { providerID: "anthropic", modelID: "claude-sonnet-4-6" })
+    const output = createMockOutput()
+    output.parts[0].text = "/start-dayu keep model"
+
+    //#when
+    await handler(input, output)
+
+    //#then
+    expect(output.message["model"]).toEqual({
+      providerID: "deepseek",
+      modelID: "deepseek-chat",
+    })
+
+    clearPinnedSessionModel("test-session")
+    clearSessionModel("test-session")
+  })
+
+  test("inherits previous session model when switching via display agent names", async () => {
+    //#given
+    sessionState.updateSessionAgent("test-session", "Xuanyuan (Controller)")
+    setSessionModel("test-session", {
+      providerID: "deepseek",
+      modelID: "deepseek-chat",
+    })
+    const args = createMockHandlerArgs({ shouldOverride: false })
+    const handler = createChatMessageHandler(args)
+    const input = createMockInput(
+      "Dayu (Orchestration and Scheduling)",
+      { providerID: "opencode", modelID: "minimax-m2.5-free" }
+    )
+    const output = createMockOutput()
+    output.parts[0].text = "/start-dayu keep model"
+
+    //#when
+    await handler(input, output)
+
+    //#then
+    expect(output.message["model"]).toEqual({
+      providerID: "deepseek",
+      modelID: "deepseek-chat",
+    })
+
+    clearPinnedSessionModel("test-session")
+    clearSessionModel("test-session")
+  })
+
+  test("clears pinned model when user manually changes model without agent switch", async () => {
+    //#given
+    setPinnedSessionModel("test-session", {
+      providerID: "deepseek",
+      modelID: "deepseek-chat",
+    })
+    const args = createMockHandlerArgs({ shouldOverride: false })
+    const handler = createChatMessageHandler(args)
+    const input = createMockInput("Dayu (Orchestration and Scheduling)", {
+      providerID: "opencode",
+      modelID: "minimax-m2.5-free",
+    })
+    const output = createMockOutput()
+
+    //#when
+    await handler(input, output)
+
+    //#then
+    expect(output.message["model"]).toBeUndefined()
+
+    clearPinnedSessionModel("test-session")
+    clearSessionModel("test-session")
+  })
+
+  test("does not inherit model on plain agent switch without slash command", async () => {
+    //#given
+    sessionState.updateSessionAgent("test-session", "Xuanyuan (Controller)")
+    setSessionModel("test-session", {
+      providerID: "deepseek",
+      modelID: "deepseek-chat",
+    })
+    const args = createMockHandlerArgs({ shouldOverride: false })
+    const handler = createChatMessageHandler(args)
+    const input = createMockInput("Dayu (Orchestration and Scheduling)", {
+      providerID: "opencode",
+      modelID: "minimax-m2.5-free",
+    })
+    const output = createMockOutput()
+    output.parts[0].text = "hello"
+
+    //#when
+    await handler(input, output)
+
+    //#then
+    expect(output.message["model"]).toBeUndefined()
+
+    clearPinnedSessionModel("test-session")
+    clearSessionModel("test-session")
+  })
+
+  test("inherits model when command is expanded into instruction template", async () => {
+    //#given
+    sessionState.updateSessionAgent("test-session", "Xuanyuan (Controller)")
+    setSessionModel("test-session", {
+      providerID: "myprovider",
+      modelID: "ep-20260212143927-jsbht",
+    })
+    const args = createMockHandlerArgs({ shouldOverride: false })
+    const handler = createChatMessageHandler(args)
+    const input = createMockInput("Dayu (Orchestration and Scheduling)", {
+      providerID: "opencode",
+      modelID: "minimax-m2.5-free",
+    })
+    const output = createMockOutput()
+    output.parts[0].text =
+      "<command-instruction>\nYou are switching this session to the Dayu agent.\n</command-instruction>"
+
+    //#when
+    await handler(input, output)
+
+    //#then
+    expect(output.message["model"]).toEqual({
+      providerID: "myprovider",
+      modelID: "ep-20260212143927-jsbht",
+    })
+
+    clearPinnedSessionModel("test-session")
+    clearSessionModel("test-session")
+  })
+
+  test("clears pinned model on normal agent switch with manual model change", async () => {
+    //#given
+    sessionState.updateSessionAgent("test-session", "Dayu (Orchestration and Scheduling)")
+    setPinnedSessionModel("test-session", {
+      providerID: "myprovider",
+      modelID: "ep-20260212143927-jsbht",
+    })
+    const args = createMockHandlerArgs({ shouldOverride: false })
+    const handler = createChatMessageHandler(args)
+    const input = createMockInput("Xuanyuan (Controller)", {
+      providerID: "deepseek",
+      modelID: "deepseek-chat",
+    })
+    const output = createMockOutput()
+    output.parts[0].text = "hello"
+
+    //#when
+    await handler(input, output)
+
+    //#then
+    expect(output.message["model"]).toBeUndefined()
+
+    clearPinnedSessionModel("test-session")
+    clearSessionModel("test-session")
   })
 })
