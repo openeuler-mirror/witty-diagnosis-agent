@@ -1562,6 +1562,63 @@ describe("todo-continuation-enforcer", () => {
     expect(promptCalls).toHaveLength(0)
   })
 
+  test("should skip injection when nuwa-sub agent has incomplete todos", async () => {
+    const sessionID = "main-nuwa-sub-remediation"
+    setMainSession(sessionID)
+
+    const mockMessagesNuwaSub = [
+      { info: { id: "msg-1", role: "user", agent: "nuwa-sub" } },
+      {
+        info: {
+          id: "msg-2",
+          role: "assistant",
+          agent: "nuwa-sub",
+        },
+      },
+    ]
+
+    const mockInput = {
+      client: {
+        session: {
+          todo: async () => ({
+            data: [{ id: "1", content: "实际执行修复并验证", status: "pending", priority: "high" }],
+          }),
+          messages: async () => ({ data: mockMessagesNuwaSub }),
+          prompt: async (opts: any) => {
+            promptCalls.push({
+              sessionID: opts.path.id,
+              agent: opts.body.agent,
+              model: opts.body.model,
+              text: opts.body.parts[0].text,
+            })
+            return {}
+          },
+          promptAsync: async (opts: any) => {
+            promptCalls.push({
+              sessionID: opts.path.id,
+              agent: opts.body.agent,
+              model: opts.body.model,
+              text: opts.body.parts[0].text,
+            })
+            return {}
+          },
+        },
+        tui: { showToast: async () => ({}) },
+      },
+      directory: "/tmp/test",
+    } as any
+
+    const hook = createTodoContinuationEnforcer(mockInput, {})
+
+    await hook.handler({
+      event: { type: "session.idle", properties: { sessionID } },
+    })
+
+    await fakeTimers.advanceBy(3000)
+
+    expect(promptCalls).toHaveLength(0)
+  })
+
   test("should inject when agent info is undefined but skipAgents is empty", async () => {
     fakeTimers.restore()
     // given - session with no agent info but skipAgents is empty

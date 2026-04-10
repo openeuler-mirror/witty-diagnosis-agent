@@ -2,7 +2,8 @@ import { createSystemDirective, SystemDirectiveTypes } from "../../shared/system
 
 export const HOOK_NAME = "todo-continuation-enforcer"
 
-export const DEFAULT_SKIP_AGENTS = ["prometheus", "compaction"]
+/** nuwa-sub: remediation subagent must hand off to Xuanyuan for user confirmation; todo continuation must not inject "proceed without permission". */
+export const DEFAULT_SKIP_AGENTS = ["prometheus", "compaction", "nuwa-sub"]
 
 export const CONTINUATION_PROMPT = `${createSystemDirective(SystemDirectiveTypes.TODO_CONTINUATION)}
 

@@ -3,6 +3,24 @@ import type { SessionMessage } from "./executor-types"
 import { getTimingConfig } from "./timing"
 import { log } from "../../shared/logger"
 import { normalizeSDKResponse } from "../../shared"
+import { getAgentConfigKey } from "../../shared/agent-display-names"
+
+/** Nuwa-sub signals Xuanyuan must question the user; sync poll should return to parent without todo-continuation forcing further turns. */
+const NUWA_SUB_HANDOFF_MARKER = "【需要交互】"
+
+function lastAssistantTextContent(messages: SessionMessage[]): string {
+  const lastAssistant = [...messages].reverse().find((m) => m.info?.role === "assistant")
+  if (!lastAssistant?.parts?.length) return ""
+  return lastAssistant.parts
+    .filter((p) => p.type === "text" || p.type === "reasoning")
+    .map((p) => (p as { text?: string }).text ?? "")
+    .join("\n")
+}
+
+function nuwaSubAwaitingParentHandoff(agentToUse: string, messages: SessionMessage[]): boolean {
+  if (getAgentConfigKey(agentToUse) !== "nuwa-sub") return false
+  return lastAssistantTextContent(messages).includes(NUWA_SUB_HANDOFF_MARKER)
+}
 
 const NON_TERMINAL_FINISH_REASONS = new Set(["tool-calls", "unknown"])
 
@@ -89,6 +107,14 @@ export async function pollSyncSession(
 
     if (input.anchorMessageCount !== undefined && msgs.length <= input.anchorMessageCount) {
       continue
+    }
+
+    if (nuwaSubAwaitingParentHandoff(input.agentToUse, msgs)) {
+      log("[task] Poll complete - nuwa-sub handoff to Xuanyuan (需要交互)", {
+        sessionID: input.sessionID,
+        pollCount,
+      })
+      break
     }
 
     if (isSessionComplete(msgs)) {
