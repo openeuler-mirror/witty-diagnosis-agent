@@ -4,7 +4,7 @@ import {
   findSlashCommandPartIndex,
 } from "./detector"
 import { executeSlashCommand, type ExecutorOptions } from "./executor"
-import { setPinnedSessionModel } from "../../shared/session-model-state"
+import { getPinnedSessionModel, setPinnedSessionModel } from "../../shared/session-model-state"
 import {
   AUTO_SLASH_COMMAND_TAG_CLOSE,
   AUTO_SLASH_COMMAND_TAG_OPEN,
@@ -91,14 +91,21 @@ export function createAutoSlashCommandHook(options?: AutoSlashCommandHookOptions
         }
       }
 
-      if (shouldPreserveModelForCommand(parsed.command) && input.model) {
-        setPinnedSessionModel(input.sessionID, {
-          providerID: input.model.providerID,
-          modelID: input.model.modelID,
-        })
-        output.message["model"] = {
-          providerID: input.model.providerID,
-          modelID: input.model.modelID,
+      if (shouldPreserveModelForCommand(parsed.command)) {
+        const existing = getPinnedSessionModel(input.sessionID)
+        const model =
+          existing ??
+          (input.model
+            ? { providerID: input.model.providerID, modelID: input.model.modelID }
+            : undefined)
+        if (model) {
+          if (!existing && input.model) {
+            setPinnedSessionModel(input.sessionID, model)
+          }
+          output.message["model"] = {
+            providerID: model.providerID,
+            modelID: model.modelID,
+          }
         }
       }
 
@@ -149,15 +156,22 @@ export function createAutoSlashCommandHook(options?: AutoSlashCommandHookOptions
         }
       }
 
-      if (shouldPreserveModelForCommand(input.command) && input.model) {
-        setPinnedSessionModel(input.sessionID, {
-          providerID: input.model.providerID,
-          modelID: input.model.modelID,
-        })
-        output.message = output.message ?? {}
-        output.message["model"] = {
-          providerID: input.model.providerID,
-          modelID: input.model.modelID,
+      if (shouldPreserveModelForCommand(input.command)) {
+        const existing = getPinnedSessionModel(input.sessionID)
+        const model =
+          existing ??
+          (input.model
+            ? { providerID: input.model.providerID, modelID: input.model.modelID }
+            : undefined)
+        if (model) {
+          if (!existing && input.model) {
+            setPinnedSessionModel(input.sessionID, model)
+          }
+          output.message = output.message ?? {}
+          output.message["model"] = {
+            providerID: model.providerID,
+            modelID: model.modelID,
+          }
         }
       }
 
