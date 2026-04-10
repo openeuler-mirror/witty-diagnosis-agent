@@ -95,6 +95,9 @@ export type OverridableAgentName =
   | "build"
   | "xuanyuan"
   | "fuxi"
+  | "fuxi-sub"
+  | "nuwa"
+  | "nuwa-sub"
   | "dayu"
   | "baize"
   | BuiltinAgentName

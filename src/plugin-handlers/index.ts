@@ -10,4 +10,6 @@ export * from "./fuxi-agent-config-builder";
 export * from "./dayu-agent-config-builder";
 export * from "./kuafu-agent-config-builder";
 export * from "./baize-agent-config-builder";
+export * from "./nuwa-agent-config-builder";
+export * from "./nuwa-sub-agent-config-builder";
 export * from "./agent-priority-order";

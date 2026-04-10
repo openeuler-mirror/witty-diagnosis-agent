@@ -41,6 +41,20 @@ export const AGENT_MODEL_REQUIREMENTS: Record<string, ModelRequirement> = {
       { providers: ["opencode"], model: "minimax-m2.5-free" },
     ],
   },
+  nuwa: {
+    fallbackChain: [
+      { providers: ["opencode"], model: "deepseek-r1", variant: "max" },
+      { providers: ["zai-coding-plan", "opencode"], model: "glm-5", variant: "high" },
+      { providers: ["opencode"], model: "minimax-m2.5-free" },
+    ],
+  },
+  "nuwa-sub": {
+    fallbackChain: [
+      { providers: ["opencode"], model: "deepseek-r1", variant: "max" },
+      { providers: ["zai-coding-plan", "opencode"], model: "glm-5", variant: "high" },
+      { providers: ["opencode"], model: "minimax-m2.5-free" },
+    ],
+  },
   dayu: {
     fallbackChain: [
       { providers: ["opencode"], model: "deepseek-r1", variant: "max" },
