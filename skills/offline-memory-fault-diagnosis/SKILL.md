@@ -1,6 +1,6 @@
 ---
 name: offline-memory-fault-diagnosis
-description: 通过分析服务器离线日志（iBMC、OS Messages、InfoCollect）诊断 EulerOS 内存硬件故障、内存访问异常、内存负载/泄漏问题并定位物理或逻辑级根因。当用户提供日志并询问内存 ECC 错误（CE/UCE）、MCE 报错、内存巡检告警、内存在位异常、内存热插拔、内存主板插槽故障，以及由于内存泄漏/耗竭（OOM）引发的系统挂起或业务异常需要进行多维根因溯源时，调用本技能。
+description: 通过分析服务器离线日志（iBMC、OS Messages、InfoCollect）诊断 Linux 内存硬件故障、内存访问异常、内存负载/泄漏问题并定位物理或逻辑级根因。当用户提供日志并询问内存 ECC 错误（CE/UCE）、MCE 报错、内存巡检告警、内存在位异常、内存热插拔、内存主板插槽故障，以及由于内存泄漏/耗竭（OOM）引发的系统挂起或业务异常需要进行多维根因溯源时，调用本技能。
 ---
 
 # 离线内存故障诊断
