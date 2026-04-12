@@ -14,12 +14,15 @@ import { loadProjectAgents, loadUserAgents } from "../features/claude-code-agent
 import type { PluginComponents } from "./plugin-components-loader";
 import { reorderAgentsByPriority } from "./agent-priority-order";
 import { remapAgentKeysToDisplayNames } from "./agent-key-remapper";
+import { applyUiAgentVisibility } from "./ui-agent-visibility";
 import { buildFuxiAgentConfig } from "./fuxi-agent-config-builder";
 import { buildFuxiSubAgentConfig } from "./fuxi-sub-agent-config-builder";
 import { buildDayuAgentConfig } from "./dayu-agent-config-builder";
 import { buildXuanyuanAgentConfig } from "./xuanyuan-agent-config-builder";
 import { buildKuafuAgentConfig } from "./kuafu-agent-config-builder";
 import { buildBaizeAgentConfig } from "./baize-agent-config-builder";
+import { buildNuwaAgentConfig } from "./nuwa-agent-config-builder";
+import { buildNuwaSubAgentConfig } from "./nuwa-sub-agent-config-builder";
 
 type AgentConfigRecord = Record<string, Record<string, unknown> | undefined> & {
   build?: Record<string, unknown>;
@@ -186,6 +189,28 @@ export async function applyAgentConfig(params: {
       pluginBaizeOverride: baizeOverride,
       currentModel,
     });
+
+    const nuwaOverride = params.pluginConfig.agents?.["nuwa"] as
+      | (Record<string, unknown> & { prompt_append?: string })
+      | undefined;
+
+    agentConfig["nuwa"] = await buildNuwaAgentConfig({
+      configAgentPlan: configAgent?.plan,
+      pluginNuwaOverride: nuwaOverride,
+      userCategories: params.pluginConfig.categories,
+      currentModel,
+    });
+
+    const nuwaSubOverride = params.pluginConfig.agents?.["nuwa-sub"] as
+      | (Record<string, unknown> & { prompt_append?: string })
+      | undefined;
+
+    agentConfig["nuwa-sub"] = await buildNuwaSubAgentConfig({
+      configAgentPlan: configAgent?.plan,
+      pluginNuwaSubOverride: nuwaSubOverride,
+      userCategories: params.pluginConfig.categories,
+      currentModel,
+    });
   }
 
   const kuafuOverride = params.pluginConfig.agents?.["kuafu"] as
@@ -228,12 +253,12 @@ export async function applyAgentConfig(params: {
   };
 
   if (params.config.agent) {
-    const visibleAgents = Object.fromEntries(
-      Object.entries(params.config.agent as Record<string, unknown>)
+    const uiScopedAgents = applyUiAgentVisibility(
+      params.config.agent as Record<string, unknown>,
     );
 
     params.config.agent = remapAgentKeysToDisplayNames(
-      visibleAgents as Record<string, unknown>,
+      uiScopedAgents as Record<string, unknown>,
     );
     params.config.agent = reorderAgentsByPriority(
       params.config.agent as Record<string, unknown>,

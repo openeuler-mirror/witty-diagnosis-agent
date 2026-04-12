@@ -325,6 +325,39 @@ describe("pollSyncSession", () => {
      })
    })
 
+  describe("nuwa-sub handoff", () => {
+    test("completes poll when assistant text contains 需要交互 even if finish is tool-calls", async () => {
+      const { pollSyncSession } = require("./sync-session-poller")
+
+      const mockClient = {
+        session: {
+          messages: async () => ({
+            data: [
+              { info: { id: "msg_001", role: "user", time: { created: 1000 } } },
+              {
+                info: { id: "msg_002", role: "assistant", time: { created: 2000 }, finish: "tool-calls" },
+                parts: [
+                  { type: "tool-call", text: "todoWrite" },
+                  { type: "text", text: "修复计划已生成。\n【需要交互】\n请你（Xuanyuan）使用 question 工具" },
+                ],
+              },
+            ],
+          }),
+          status: async () => ({ data: { ses_nuwa_handoff: { type: "idle" } } }),
+        },
+      }
+
+      const result = await pollSyncSession(createMockCtx(), mockClient, {
+        sessionID: "ses_nuwa_handoff",
+        agentToUse: "nuwa-sub",
+        toastManager: null,
+        taskId: undefined,
+      })
+
+      expect(result).toBeNull()
+    })
+  })
+
   describe("isSessionComplete edge cases", () => {
     test("returns false when messages array is empty", () => {
       const { isSessionComplete } = require("./sync-session-poller")

@@ -2,8 +2,15 @@ import type { WittyDiagnosisAgentConfig } from "../config"
 import type { PluginContext } from "./types"
 
 import { hasConnectedProvidersCache } from "../shared"
-import { setSessionModel } from "../shared/session-model-state"
-import { setSessionAgent } from "../features/claude-code-session-state"
+import { getAgentConfigKey } from "../shared/agent-display-names"
+import {
+  clearPinnedSessionModel,
+  getPinnedSessionModel,
+  getSessionModel,
+  setPinnedSessionModel,
+  setSessionModel,
+} from "../shared/session-model-state"
+import { getSessionAgent, updateSessionAgent } from "../features/claude-code-session-state"
 import { applyUltraworkModelOverrideOnMessage } from "./ultrawork-model-override"
 import { parseRalphLoopArguments } from "../hooks/ralph-loop/command-arguments"
 
@@ -22,6 +29,41 @@ export type ChatMessageInput = {
   model?: { providerID: string; modelID: string }
 }
 type StartWorkHookOutput = { parts: Array<{ type: string; text?: string }> }
+
+function isModelInheritingAgentSwitch(previousAgent?: string, incomingAgent?: string): boolean {
+  if (!previousAgent || !incomingAgent) return false
+  const prev = getAgentConfigKey(previousAgent)
+  const next = getAgentConfigKey(incomingAgent)
+  if (prev === next) return false
+
+  const sourceAgents = new Set(["fuxi", "dayu", "baize", "kuafu", "xuanyuan"])
+  const targetAgents = new Set(["dayu", "baize", "xuanyuan"])
+  return sourceAgents.has(prev) && targetAgents.has(next)
+}
+
+function isSameModel(
+  a?: { providerID: string; modelID: string },
+  b?: { providerID: string; modelID: string }
+): boolean {
+  if (!a || !b) return false
+  return a.providerID === b.providerID && a.modelID === b.modelID
+}
+
+function extractPromptText(parts: ChatMessagePart[]): string {
+  return parts
+    .filter((p) => p.type === "text")
+    .map((p) => p.text || "")
+    .join(" ")
+    .trim()
+}
+
+function isModelInheritanceSlashCommand(promptText: string): boolean {
+  return /^\/(start-dayu|start-baize|witty-diag)\b/i.test(promptText)
+}
+
+function isModelInheritanceCommandTemplate(promptText: string): boolean {
+  return /you are switching this session to the (dayu|baize|xuanyuan) agent\./i.test(promptText)
+}
 
 function isStartWorkHookOutput(value: unknown): value is StartWorkHookOutput {
   if (typeof value !== "object" || value === null) return false
@@ -70,8 +112,43 @@ export function createChatMessageHandler(args: {
     input: ChatMessageInput,
     output: ChatMessageHandlerOutput
   ): Promise<void> => {
+    const promptText = extractPromptText(output.parts)
+    const shouldInheritForSlashCommand =
+      isModelInheritanceSlashCommand(promptText) || isModelInheritanceCommandTemplate(promptText)
+    const previousAgent = getSessionAgent(input.sessionID)
+    const previousModel = getSessionModel(input.sessionID)
+    if (
+      shouldInheritForSlashCommand &&
+      isModelInheritingAgentSwitch(previousAgent, input.agent) &&
+      previousModel
+    ) {
+      setPinnedSessionModel(input.sessionID, previousModel)
+    }
+
     if (input.agent) {
-      setSessionAgent(input.sessionID, input.agent)
+      updateSessionAgent(input.sessionID, input.agent)
+    }
+
+    let pinnedModel = getPinnedSessionModel(input.sessionID)
+    const isSwitchingForInheritance =
+      shouldInheritForSlashCommand && isModelInheritingAgentSwitch(previousAgent, input.agent)
+
+    // If user manually changed model (e.g. /models) outside inheritance commands, release pin.
+    if (
+      pinnedModel &&
+      input.model &&
+      !isSwitchingForInheritance &&
+      !isSameModel(pinnedModel, input.model)
+    ) {
+      clearPinnedSessionModel(input.sessionID)
+      pinnedModel = undefined
+    }
+
+    if (pinnedModel) {
+      output.message["model"] = {
+        providerID: pinnedModel.providerID,
+        modelID: pinnedModel.modelID,
+      }
     }
 
     if (firstMessageVariantGate.shouldOverride(input.sessionID)) {
@@ -93,6 +170,8 @@ export function createChatMessageHandler(args: {
       if (typeof providerID === "string" && typeof modelID === "string") {
         setSessionModel(input.sessionID, { providerID, modelID })
       }
+    } else if (pinnedModel) {
+      setSessionModel(input.sessionID, pinnedModel)
     } else if (input.model) {
       setSessionModel(input.sessionID, input.model)
     }

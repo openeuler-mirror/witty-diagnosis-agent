@@ -110,11 +110,13 @@ def get_file_time_range(file_path):
         pass
     return min_dt, max_dt
 
-def grep_file(file_path, keywords, start_dt=None, end_dt=None, date_str=None):
+def grep_file(file_path, keywords, start_dt=None, end_dt=None, date_str=None, context=0):
     results = []
     try:
         with open(file_path, 'r', encoding='utf-8', errors='ignore') as f:
-            for i, line in enumerate(f):
+            lines = f.readlines()
+            matched_indices = []
+            for i, line in enumerate(lines):
                 # Time filter
                 if (start_dt or end_dt or date_str):
                     if not is_in_time_range(line, start_dt, end_dt, date_str):
@@ -123,8 +125,36 @@ def grep_file(file_path, keywords, start_dt=None, end_dt=None, date_str=None):
                 # Keyword filter
                 for keyword in keywords:
                     if keyword.lower() in line.lower():
-                        results.append(f"Line {i+1}: {line.strip()}")
+                        matched_indices.append(i)
                         break
+
+            if not matched_indices:
+                return results
+
+            if context == 0:
+                for i in matched_indices:
+                    results.append(f"Line {i+1}: {lines[i].strip()}")
+                return results
+
+            # Merge overlapping contexts
+            blocks = []
+            current_block = [max(0, matched_indices[0] - context), min(len(lines) - 1, matched_indices[0] + context)]
+            
+            for i in matched_indices[1:]:
+                start = max(0, i - context)
+                end = min(len(lines) - 1, i + context)
+                if start <= current_block[1] + 1:
+                    current_block[1] = max(current_block[1], end)
+                else:
+                    blocks.append(current_block)
+                    current_block = [start, end]
+            blocks.append(current_block)
+
+            for block in blocks:
+                block_lines = [f"Line {k+1}: {lines[k].strip()}" for k in range(block[0], block[1] + 1)]
+                results.append("\n".join(block_lines))
+                results.append("-" * 20)
+                
     except Exception as e:
         results.append(f"Error reading {file_path}: {e}")
     return results
@@ -186,25 +216,30 @@ def show_overview(root_dir):
     print("=======================\n")
 
 def check_os_storage_errors(root_dir, extra_keywords=None, **kwargs):
-    print("\n--- Checking OS-Level Storage Errors (dmesg/messages) ---")
+    print("\n--- Checking OS-Level Storage & Filesystem Errors ---")
     files = find_files(root_dir, r"(dmesg.*|messages.*|syslog.*)")
     if not files:
         # Fallback to scanning all logs in the directory if specific ones aren't found
         files = find_files(root_dir, r".*\.log")
         
-    keywords = ["I/O error", "SCSI error", "buffer I/O error", "rejecting I/O", "xfs_force_shutdown", "EXT4-fs error", "disk error", "sector"]
+    keywords = [
+        "I/O error", "SCSI error", "buffer I/O error", "rejecting I/O", 
+        "xfs_force_shutdown", "EXT4-fs error", "disk error", "sector",
+        "Corruption", "Journal error", "Structure needs cleaning", "remount-ro",
+        "No space left", "Inode exhausted", "filesystem consistency"
+    ]
     if extra_keywords:
         keywords.extend(extra_keywords)
     
     for file in files:
         print(f"Scanning {file}...")
-        issues = grep_file(file, keywords, **kwargs)
+        issues = grep_file(file, keywords, context=2, **kwargs)
         if issues:
-            print(f"  Found {len(issues)} potential issues. Showing first 20:")
-            for issue in issues[:20]:
+            print(f"  Found {len(issues) // 2 if '---' in str(issues) else len(issues)} potential issues. Showing first few:")
+            for issue in issues[:10]:
                 print(f"  {issue}")
         else:
-            print("  No critical OS storage errors found.")
+            print("  No critical OS storage/FS errors found.")
 
 def check_kernel_panics(root_dir, **kwargs):
     print("\n--- Checking Kernel Panics/Oops ---")

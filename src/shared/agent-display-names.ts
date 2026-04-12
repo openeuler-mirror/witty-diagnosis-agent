@@ -8,6 +8,8 @@ export const AGENT_DISPLAY_NAMES: Record<string, string> = {
   xuanyuan: "Xuanyuan (Controller)",
   fuxi: "Fuxi (Diagnostic Planner)",
   "fuxi-sub": "Fuxi-Sub (Diagnostic Planner Subagent)",
+  nuwa: "Nuwa (Remediation Planner)",
+  "nuwa-sub": "Nuwa-Sub (Remediation Planner Subagent)",
   dayu: "Dayu (Orchestration and Scheduling)",
   kuafu: "Kuafu (General Diagnostic Executor)",
   "multimodal-looker": "multimodal-looker",

@@ -18,7 +18,13 @@ import {
 import { resetMessageCursor } from "../shared";
 import { log } from "../shared/logger";
 import { shouldRetryError } from "../shared/model-error-classifier";
-import { clearSessionModel, setSessionModel } from "../shared/session-model-state";
+import {
+  clearPinnedSessionModel,
+  clearSessionModel,
+  getSessionModel,
+  setPinnedSessionModel,
+  setSessionModel,
+} from "../shared/session-model-state";
 import { deleteSessionTools } from "../shared/session-tools-store";
 import { lspManager } from "../tools";
 
@@ -96,6 +102,17 @@ function extractProviderModelFromErrorMessage(message: string): { providerID?: s
   }
 
   return {};
+}
+
+function isModelInheritingAgentSwitch(prevAgent?: string, nextAgent?: string): boolean {
+  if (!prevAgent || !nextAgent) return false;
+  const prev = prevAgent.toLowerCase();
+  const next = nextAgent.toLowerCase();
+  if (prev === next) return false;
+
+  const sourceAgents = new Set(["fuxi", "dayu", "baize", "kuafu", "xuanyuan"]);
+  const targetAgents = new Set(["dayu", "baize", "xuanyuan"]);
+  return sourceAgents.has(prev) && targetAgents.has(next);
 }
 type EventInput = Parameters<NonNullable<NonNullable<CreatedHooks["writeExistingFileGuard"]>["event"]>>[0];
 export function createEventHandler(args: {
@@ -244,6 +261,7 @@ export function createEventHandler(args: {
         resetMessageCursor(sessionInfo.id);
         firstMessageVariantGate.clear(sessionInfo.id);
         clearSessionModel(sessionInfo.id);
+        clearPinnedSessionModel(sessionInfo.id);
         syncSubagentSessions.delete(sessionInfo.id);
         deleteSessionTools(sessionInfo.id);
         await managers.skillMcpManager.disconnectSession(sessionInfo.id);
@@ -260,14 +278,22 @@ export function createEventHandler(args: {
       const agent = info?.agent as string | undefined;
       const role = info?.role as string | undefined;
       if (sessionID && role === "user") {
+        const previousAgent = getSessionAgent(sessionID);
+        const previousModel = getSessionModel(sessionID);
+        const providerID = info?.providerID as string | undefined;
+        const modelID = info?.modelID as string | undefined;
+
         if (agent) {
           updateSessionAgent(sessionID, agent);
         }
-        const providerID = info?.providerID as string | undefined;
-        const modelID = info?.modelID as string | undefined;
-        if (providerID && modelID) {
-          lastKnownModelBySession.set(sessionID, { providerID, modelID });
-          setSessionModel(sessionID, { providerID, modelID });
+        if (isModelInheritingAgentSwitch(previousAgent, agent) && previousModel) {
+          setPinnedSessionModel(sessionID, previousModel);
+          setSessionModel(sessionID, previousModel);
+          lastKnownModelBySession.set(sessionID, previousModel);
+        } else if (providerID && modelID) {
+          const currentModel = { providerID, modelID };
+          lastKnownModelBySession.set(sessionID, currentModel);
+          setSessionModel(sessionID, currentModel);
         }
       }
 
