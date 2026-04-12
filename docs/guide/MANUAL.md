@@ -117,7 +117,7 @@ bash install.sh
   
   ![auto-diag-Dayu-切换Agent](../assets/guide_auto_diag_check_baize.png)
 
-- 诊断完成后，即可查看诊断分析报告概览，可按照界面显示的根因分析报告路径获取完整诊断报告，示例。
+- 诊断完成后，系统将生成[HTML](../reference/reports/hard_disk_fault_diagnosis_report.html)和[Markdown](../reference/reports/hard_disk_fault_diagnosis_report.md)两种格式的诊断分析报告，同时在界面上展示完整报告内容。
   ![auto-diag-诊断报告](../assets/guide_auto_diag_report.png)
 
 ## 单步执行模式
