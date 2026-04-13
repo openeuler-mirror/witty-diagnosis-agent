@@ -96,6 +96,8 @@ bash install.sh
    
    <img src="docs/assets/guide_auto_diag_report.png" alt="诊断报告" width="800" />
 
+如需了解更多操作细节，可查阅[用户手册](docs/guide/MANUAL.html)；支持的诊断能力与功能说明详见[功能列表](docs/reference/features.html)。
+
 ### 如何贡献
 
 #### 社区贡献
