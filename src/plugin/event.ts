@@ -18,6 +18,7 @@ import {
 import { resetMessageCursor } from "../shared";
 import { log } from "../shared/logger";
 import { shouldRetryError } from "../shared/model-error-classifier";
+import { parseSessionModelField } from "../shared/session-model-parse";
 import {
   clearPinnedSessionModel,
   clearSessionModel,
@@ -243,6 +244,21 @@ export function createEventHandler(args: {
           };
         },
       );
+    }
+
+    if (event.type === "session.updated") {
+      const info = props?.info as Record<string, unknown> | undefined;
+      const sessionID = typeof info?.id === "string" ? info.id : undefined;
+      if (sessionID && info) {
+        const directP = info.providerID as string | undefined;
+        const directM = info.modelID as string | undefined;
+        const fromModelField = parseSessionModelField(info.model);
+        if (typeof directP === "string" && typeof directM === "string") {
+          setSessionModel(sessionID, { providerID: directP, modelID: directM });
+        } else if (fromModelField) {
+          setSessionModel(sessionID, fromModelField);
+        }
+      }
     }
 
     if (event.type === "session.deleted") {

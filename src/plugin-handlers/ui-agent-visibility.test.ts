@@ -2,6 +2,15 @@ import { describe, expect, it } from "bun:test"
 import { applyUiAgentVisibility } from "./ui-agent-visibility"
 
 describe("applyUiAgentVisibility", () => {
+  it("keeps native OpenCode build agent visible (not hidden)", () => {
+    const result = applyUiAgentVisibility({
+      build: { mode: "primary", temperature: 0.1 },
+      dayu: { mode: "all" },
+    })
+    expect(result.build).toEqual({ mode: "primary", temperature: 0.1 })
+    expect(result.dayu).toMatchObject({ hidden: true, mode: "subagent" })
+  })
+
   it("keeps xuanyuan and fuxi visible in the UI", () => {
     const result = applyUiAgentVisibility({
       xuanyuan: { mode: "all", color: "#2196F3" },
@@ -29,7 +38,7 @@ describe("applyUiAgentVisibility", () => {
         permission: { task: "allow" },
         hidden: true,
       },
-      build: { mode: "subagent", temperature: 0.1, hidden: true },
+      build: { mode: "primary", temperature: 0.1 },
       "custom-agent": {
         mode: "subagent",
         description: "custom",

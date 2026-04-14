@@ -37,6 +37,8 @@ export const KUAFU_SYSTEM_PROMPT = `
 - 只要任务需要在**远程目标主机上执行 Skill 提供的脚本**（例如 \`.opencode/skills/.../scripts/*.sh\`），你必须遵守下面的硬性顺序：
   1. **必须使用 Ansible**：在 inventory 已配置的前提下，**一律通过 Ansible 的 \`script\` 模块执行脚本**，形式为  
      \`ansible -i ~/.witty-diagnosis-agent/ansible/hosts.ini <组名> -m script -a "<本地脚本路径>"\`；
+     - **\`-a\` 内容**：一条字符串里写全「**本地**脚本绝对路径 + 脚本自身参数」（如 \`--vmlinux\` / \`--vmcore\` / \`--crash\`），不要拆成错误的 \`--args\` 或与 \`script\` 不兼容的 \`chdir\` 组合，否则会报 \`_raw_params\` / \`cmd\` 缺失。
+     - **Shell 变量（易错）**：**禁止**使用 \`-e 'ansible_shell_type=/bin/bash'\`。Ansible 里 \`ansible_shell_type\` 是 shell **插件类型名**（如 \`sh\`），不能填可执行文件路径，否则会报 \`Could not find the shell plugin required (/bin/bash)\`。若必须指定远端用 bash，应使用 \`-e 'ansible_shell_executable=/bin/bash'\`，或把 \`ansible_shell_executable=/bin/bash\` 写在 \`hosts.ini\` 对应组/主机上；多数环境下也可**不写** \`-e\`。
   2. **Ansible 环境检查**：在执行远程操作前，必须先检查本地是否安装了 Ansible (\`ansible --version\`)，若未安装则根据操作系统自动安装：
      - CentOS/RHEL/openEuler: \`yum install -y ansible\`
      - Ubuntu/Debian: \`apt-get install -y ansible\`

@@ -1,6 +1,12 @@
 import type { ContextCollector } from "./collector"
 import type { Message, Part } from "@opencode-ai/sdk"
 import { log } from "../../shared"
+import {
+  extractPromptTextFromParts,
+  isModelInheritanceUserPrompt,
+} from "../../shared/model-inheritance-prompt"
+import { parseSessionModelField } from "../../shared/session-model-parse"
+import { setSessionModel } from "../../shared/session-model-state"
 import { getMainSessionID } from "../claude-code-session-state"
 
 interface OutputPart {
@@ -85,9 +91,6 @@ export function createContextInjectorMessagesTransformHook(
   return {
     "experimental.chat.messages.transform": async (_input, output) => {
       const { messages } = output
-      log("[DEBUG] experimental.chat.messages.transform called", {
-        messageCount: messages.length,
-      })
       if (messages.length === 0) {
         return
       }
@@ -101,7 +104,6 @@ export function createContextInjectorMessagesTransformHook(
       }
 
       if (lastUserMessageIndex === -1) {
-        log("[DEBUG] No user message found in messages")
         return
       }
 
@@ -109,22 +111,33 @@ export function createContextInjectorMessagesTransformHook(
       // Try message.info.sessionID first, fallback to mainSessionID
       const messageSessionID = (lastUserMessage.info as unknown as { sessionID?: string }).sessionID
       const sessionID = messageSessionID ?? getMainSessionID()
-      log("[DEBUG] Extracted sessionID", {
-        messageSessionID,
-        mainSessionID: getMainSessionID(),
-        sessionID,
-        infoKeys: Object.keys(lastUserMessage.info),
-      })
       if (!sessionID) {
-        log("[DEBUG] sessionID is undefined (both message.info and mainSessionID are empty)")
         return
       }
 
+      // OpenCode attaches the resolved model to each UserMessage; runtime may use `{ providerID, modelID }`
+      // or a string like `provider/model`. Sync map so chat.message inheritance sees fresh mem.
+      // Skip when the last user text is /start-dayu etc.: OpenCode often puts the *target* agent default
+      // model on that message, which would overwrite the prior agent's chosen model before chat.message runs.
+      if (lastUserMessage.info.role === "user") {
+        const promptText = extractPromptTextFromParts(
+          lastUserMessage.parts as Array<{ type: string; text?: string }>
+        )
+        const skipSyncForInheritance = isModelInheritanceUserPrompt(promptText)
+        if (!skipSyncForInheritance) {
+          const info = lastUserMessage.info as Record<string, unknown>
+          const parsed =
+            parseSessionModelField(info.model) ??
+            (typeof info.providerID === "string" && typeof info.modelID === "string"
+              ? { providerID: info.providerID, modelID: info.modelID }
+              : undefined)
+          if (parsed) {
+            setSessionModel(sessionID, parsed)
+          }
+        }
+      }
+
       const hasPending = collector.hasPending(sessionID)
-      log("[DEBUG] Checking hasPending", {
-        sessionID,
-        hasPending,
-      })
       if (!hasPending) {
         return
       }

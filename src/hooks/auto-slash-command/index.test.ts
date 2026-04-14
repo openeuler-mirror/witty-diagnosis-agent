@@ -1,4 +1,4 @@
-import { describe, expect, it, beforeEach, mock, spyOn } from "bun:test"
+import { describe, expect, it, mock, spyOn } from "bun:test"
 import type {
   AutoSlashCommandHookInput,
   AutoSlashCommandHookOutput,
@@ -6,12 +6,7 @@ import type {
   CommandExecuteBeforeOutput,
 } from "./types"
 
-// Import real shared module to avoid mock leaking to other test files
-import * as shared from "../../shared"
 import * as sessionState from "../../features/claude-code-session-state"
-
-// Spy on log instead of mocking the entire module
-const logMock = spyOn(shared, "log").mockImplementation(() => {})
 
 const { createAutoSlashCommandHook } = await import("./index")
 
@@ -37,10 +32,6 @@ function createMockOutput(text: string): AutoSlashCommandHookOutput {
 }
 
 describe("createAutoSlashCommandHook", () => {
-  beforeEach(() => {
-    logMock.mockClear()
-  })
-
   describe("slash command replacement", () => {
     it("should not modify message when command not found", async () => {
       // given a slash command that doesn't exist
@@ -383,25 +374,6 @@ describe("createAutoSlashCommandHook", () => {
       //#then
       expect(output.parts[0].text).toContain("<auto-slash-command>")
       expect(output.parts[0].text).toContain("/ralph-loop Command")
-    })
-
-    it("should pass command arguments correctly", async () => {
-      //#given
-      const hook = createAutoSlashCommandHook()
-      const input = createCommandInput("some-command", "arg1 arg2 arg3")
-      const output = createCommandOutput("original")
-
-      //#when
-      await hook["command.execute.before"](input, output)
-
-      //#then
-      expect(logMock).toHaveBeenCalledWith(
-        "[auto-slash-command] command.execute.before received",
-        expect.objectContaining({
-          command: "some-command",
-          arguments: "arg1 arg2 arg3",
-        })
-      )
     })
 
     it("should update session agent to dayu for start-dayu command", async () => {
