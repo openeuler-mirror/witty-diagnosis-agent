@@ -92,9 +92,11 @@ bash install.sh
 
 4. 系统将自动执行**智能诊断**流程。
 
-5. 诊断完成后，即可查看诊断分析报告概览，可按照界面显示的根因分析报告路径获取完整诊断报告，示例。
+5. 诊断完成后，系统将生成[HTML](docs/reference/reports/hard_disk_fault_diagnosis_report.html)和[Markdown](docs/reference/reports/hard_disk_fault_diagnosis_report.md)两种格式的诊断分析报告，同时在界面上展示完整报告内容：
    
    <img src="docs/assets/guide_auto_diag_report.png" alt="诊断报告" width="800" />
+
+如需了解更多操作细节，可查阅[用户手册](docs/guide/MANUAL.html)；支持的诊断能力与功能说明详见[功能列表](docs/reference/features.html)。
 
 ### 如何贡献
 
