@@ -1,6 +1,7 @@
 import { getAgentConfigKey } from "../shared/agent-display-names"
 
-const UI_VISIBLE_AGENT_KEYS = new Set(["xuanyuan", "fuxi"])
+/** Xuanyuan/Fuxi：主界面；build：OpenCode 原生 Build 模式，需与上游一致在 UI 中可选 */
+const UI_VISIBLE_AGENT_KEYS = new Set(["xuanyuan", "fuxi", "build"])
 
 export function applyUiAgentVisibility(
   agents: Record<string, unknown>,
