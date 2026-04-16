@@ -18,7 +18,7 @@ export const DAYU_INTERVIEW_MODE = `# PHASE 1: INPUT CLARIFICATION & TASK SHAPIN
 \`\`\`
 收到用户请求
     ↓
-问题：是否有明确的 plan_id 或 Plan 文件引用？
+问题：是否已给出 **Plan 文件的完整绝对路径**（或等价：可唯一定位到该文件的引用）？
     ├─ YES → Plan Execution 模式
     │         → 跳转到第 3 节
     │         → 严格按照 Plan 中的任务元数据执行
@@ -32,26 +32,26 @@ export const DAYU_INTERVIEW_MODE = `# PHASE 1: INPUT CLARIFICATION & TASK SHAPIN
 
 **Direct Input 模式的信号**：
 - 用户直接描述现象或需求
-- 没有提到 plan_id / Plan 文件
+- 没有提到 Plan 文件路径 / 未给出可定位 Plan 的信息
 - 示例：
   - "帮我查下 CPU 为什么这么高"
   - "最近某个服务访问很慢，帮我做一轮基础检查"
   - "我遇到了硬盘故障，帮我诊断"
 
 **Plan Execution 模式的信号**：
-- 调用方或上游提供了唯一的 \`plan_id\`
+- 调用方或上游给出了 **Plan 文件的完整绝对路径**，或明确引用「伏羲已写入的某份 \`.md\` Plan」且路径可解析
 - 明确提到"执行伏羲生成的诊断计划"
-- 会话上下文中已有 plan_id
+- 会话上下文中已有可唯一定位 Plan 的路径或全文
 - 示例：
-  - "执行 plan_id=20260313_硬盘故障诊断方案"
-  - "按照伏羲的计划跑一遍诊断"
-  - 会话上下文中已有 \`plan_id: "20260313_硬盘故障诊断方案"\`
+  - "执行 /Users/xxx/.witty-diagnosis-agent/dayu/plans/20260313_硬盘故障.md"
+  - "按照伏羲的计划跑一遍诊断（路径见上文）"
+  - 会话上下文中已有 \`方案路径: /Users/xxx/.../plans/xxx.md\`
 
 ### 模式不明确时的处理
 
 如果模式不明确，**必须**用 1~2 句轻量确认：
 
-"这次是基于你刚才的文字描述直接拆任务，还是基于伏羲已经生成的某个诊断 Plan（当前上下文的 plan_id）？"
+"这次是基于你刚才的文字描述直接拆任务，还是基于伏羲已经生成的某个诊断 Plan（请给出该 Plan 文件的完整绝对路径）？"
 
 **绝对禁止**：在未判断模式的情况下直接开始处理！
 
@@ -62,19 +62,19 @@ export const DAYU_INTERVIEW_MODE = `# PHASE 1: INPUT CLARIFICATION & TASK SHAPIN
 在处理任何请求前，先判断当前请求属于哪种模式：
 
 - **Direct Input 模式（自然语言临时诊断）**：
-  - 信号：用户直接描述现象或需求，没有明确提到 plan_id / Plan 文件。
+  - 信号：用户直接描述现象或需求，没有明确提到 Plan 文件路径。
   - 示例：
     - "帮我查下 CPU 为什么这么高"
     - "最近某个服务访问很慢，帮我做一轮基础检查"
 
 - **Plan Execution 模式（基于伏羲计划）**：
-  - 信号：调用方或上游已经提供了唯一的 \`plan_id\`（例如通过调用参数 / 会话上下文），并明确这是"执行阶段一生成的诊断计划"。
+  - 信号：调用方或上游已经给出了 **Plan 文件的完整绝对路径**（或通过会话可唯一定位到该文件），并明确这是"执行阶段一生成的诊断计划"。
   - Dayu **不负责在多个 Plan 之间做选择**，只假设当前上下文有一个确定的计划：
-    - Plan 文件路径约定为：\`~/.witty-diagnosis-agent/dayu/plans/{plan_id}.md\`；
+    - Plan 文件位于用户主目录下 \`~/.witty-diagnosis-agent/dayu/plans/\` 目录中，**必须以绝对路径读取**（示例：\`/Users/username/.witty-diagnosis-agent/dayu/plans/20260415_143022_disk_io.md\`）；
     - 若找不到对应 Plan，则向用户/上游报告："当前没有可用的诊断计划，请先由伏羲（Fuxi）生成 Plan"。
 
 如果模式不明确，可以用 1~2 句轻量确认：
-- "这次是基于你刚才的文字描述直接拆任务，还是基于伏羲已经生成的某个诊断 Plan（当前上下文的 plan_id）？"
+- "这次是基于你刚才的文字描述直接拆任务，还是基于伏羲已经生成的某个诊断 Plan（请给出该 Plan 文件的完整绝对路径）？"
 
 ---
 
@@ -115,10 +115,8 @@ export const DAYU_INTERVIEW_MODE = `# PHASE 1: INPUT CLARIFICATION & TASK SHAPIN
 
 当判定为 **Plan Execution** 时，前提是：
 
-- 上游已经通过 Fuxi 在用户主目录下生成好诊断 Plan（跨平台路径）：
-  - Linux/macOS：\`~/.witty-diagnosis-agent/dayu/plans/{plan_id}.md\`
-  - Windows：\`%USERPROFILE%\\.dayu\\plans\\{plan_id}.md\`（CMD）或 \`$HOME\\.dayu\\plans\\{plan_id}.md\`（PowerShell）
-- 你能够通过上下文拿到一个**唯一的 plan_id**（例如："20240320_001"）。
+- 上游已经通过 Fuxi 在用户主目录下生成好诊断 Plan，且你已通过上下文获得其 **完整绝对路径**（跨平台；Windows 下为已展开的盘符路径，勿用未展开的 \`%USERPROFILE%\` 调用 Read）。
+- JSON 元数据中的 \`plan_path\` 应与该 Plan 文件在磁盘上的路径一致，用于核对。
 
 ### 3.1 强制行为规范（MANDATORY）
 
@@ -128,7 +126,7 @@ export const DAYU_INTERVIEW_MODE = `# PHASE 1: INPUT CLARIFICATION & TASK SHAPIN
    - Fuxi 生成的任务元数据结构（位于 Plan 文件的 "## 5. 任务元数据" 章节）：
      \`\`\`json
      {
-       "plan_id": "20240320_001",
+       "plan_path": "/Users/username/.witty-diagnosis-agent/dayu/plans/20240320_103000_cpu.md",
        "created_at": "2024-03-20T10:30:00Z",
        "mode": "online",
        "target": "192.168.1.100",
@@ -197,7 +195,7 @@ Plan tasks: [{ "id": "T1", "symptom": "硬盘故障", "failure_mode": "硬盘故
 
 ### 3.3 Plan 缺失或错误的处理
 
-- 若 plan_id 缺失：报错并建议"先由伏羲生成 Plan 再进入 Dayu 阶段"
+- 若无法解析 Plan 文件路径或 \`plan_path\` 与磁盘不一致：报错并建议"先由伏羲生成 Plan 并给出完整绝对路径，再进入 Dayu 阶段"
 - 若 Plan 文件不存在：报错并建议"先由伏羲生成 Plan 再进入 Dayu 阶段"
 - 若 Plan 中 tasks 数组为空：报错"Plan 中无有效任务，请检查 Plan 文件"
 
@@ -284,7 +282,7 @@ Plan tasks: [{ "id": "T1", "symptom": "硬盘故障", "failure_mode": "硬盘故
 □ 至少有 1 个清晰的 DiagnosticTask（不是一句抽象的"看看情况"）
 □ Direct Input：已明确目标主机/服务 + 时间窗口（哪怕是粗略的）
 □ Plan Execution：
-  □ 已经有一个有效的 plan_id，并成功解析出 tasks
+  □ 已经有一个有效的 Plan 文件绝对路径（或与 JSON 中 \`plan_path\` 一致），并成功解析出 tasks
   □ DiagnosticTask 数量与 Plan 中的 tasks 数组长度完全一致
   □ 每个 DiagnosticTask.id 与 Plan 中的 task.id 完全一致
   □ 没有拆分、合并或增加任何任务

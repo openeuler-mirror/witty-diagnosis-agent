@@ -38,7 +38,7 @@
 └─ 流程特点:
     ├─ 一键触发: 用户仅需输入指令 (e.g., "autopilot 排查 SSH 连接失败")
     ├─ 全自动流转: 轩辕 接管全流程，自动协调伏羲、大禹、夸父、白泽进行流水线作业
-    └─ 结果闭环: 全程无人工干预，直至产出最终诊断报告 (~/.baize/report/*_report.md)
+    └─ 结果闭环: 全程无人工干预，直至产出最终诊断报告 (~/.witty-diagnosis-agent/baize/reports/*_report.md)
 ```
 
 
@@ -197,7 +197,7 @@
     │   │   ├─ 中间节点：故障模式 (Failure Mode, e.g., CPU 饱和 / 软死锁)
     │   │   └─ 叶子节点：潜在根因 (Root Cause, e.g., 进程死循环 / 驱动 Bug)
     └─ 2) 计划内容输出 (Plan Output)：
-        ├─ 存储路径：`~/.dayu/plans/{timestamp}_{plan_id}.md`
+        ├─ 存储路径：`~/.witty-diagnosis-agent/dayu/plans/<时间戳>_<主题简写>.md`（须记录完整绝对路径）
         └─ 计划内容结构 (Plan Structure)：
             1. 故障场景 (Fault Scenario)
                - 场景类型 (Mode)：在线诊断 (Online) / 离线分析 (Offline)
@@ -223,7 +223,7 @@
                 - **[关键]** 必须在 Markdown 末尾附加 JSON 格式的任务元数据，供阶段2程序解析：
                   ```json
                   {
-                    "plan_id": "20240320_001",
+                    "plan_path": "/Users/username/.witty-diagnosis-agent/dayu/plans/20240320_103000_cpu.md",
                     "tasks": [
                       { "id": "T1", "mode": "CPU 饱和", "root_cause": "进程死循环", "priority": "P1" }
                     ]
@@ -247,7 +247,7 @@
 │   ├─ 双模输入机制 (Dual Input Mode)：
 │   │   ├─ 模式 A (Direct Input)：用户直接输入自然语言指令 (e.g., "帮我查下CPU为什么这么高")
 │   │   │   └─ 动作：大禹 (Dayu) 实时拆解为临时 Task，不依赖 Plan 文件
-│   │   └─ 模式 B (Plan Execution)：读取阶段1输出的排查计划文件 (`~/.dayu/plans/*.md`)
+│   │   └─ 模式 B (Plan Execution)：读取阶段1输出的排查计划文件 (`~/.witty-diagnosis-agent/dayu/plans/*.md`)
 │   │       └─ 动作：解析文件末尾的 JSON 结构化数据块，批量加载任务
 │   └─ 路由策略：
 │       ├─ 统一封装：无论是用户指令还是 Plan 文件，均转换为标准 Task 对象
@@ -258,7 +258,7 @@
     ├─ 状态追踪：监控各 夸父 (Kuafu) Agent 的执行进度
     └─ 结果持久化：
         ├─ 实时流式输出：将每个 Task 的执行日志实时写入文件
-        └─ 最终汇聚：所有 Task 完成后，生成统一的诊断报告存入 `~/.dayu/report/{timestamp}_{plan_id}_report.md`
+        └─ 最终汇聚：所有 Task 完成后，生成统一的诊断报告存入 `~/.witty-diagnosis-agent/dayu/report/`（带时间戳的汇总 Markdown；具体文件名以 Dayu 写入为准）
 ```
 
 ### 1.3 诊断任务执行 (夸父 / Kuafu - 通用诊断执行) [Phase 2]
@@ -299,7 +299,7 @@
 │   └─ 评估故障影响范围和严重程度
 └─ 1.4.4 诊断报告生成 (Report Generation)
     ├─ 整合 Phase 1-4 的所有关键信息，生成面向用户的最终诊断报告
-    └─ 输出路径：覆盖更新 `~/.baize/report/{timestamp}_{plan_id}_report.md`，追加根因分析结论与证据链
+    └─ 输出路径：覆盖或追加写入 `~/.witty-diagnosis-agent/baize/reports/` 下由 Baize 命名的最终 RCA Markdown，追加根因分析结论与证据链
 ```
 
 ### 1.5 解决方案生成与智能修复 (女娲 / Nuwa - 智能修复) [Phase 4 - 可选]

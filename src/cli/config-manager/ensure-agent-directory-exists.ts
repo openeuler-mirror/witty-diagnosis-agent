@@ -13,7 +13,7 @@ export function ensureAgentDirectoryExists(): string {
     "dayu/drafts",
     "dayu/report",
     "kuafu",
-    "baize/report"
+    "baize/reports"
   ]
 
   if (!existsSync(targetDir)) {

@@ -16,9 +16,9 @@ export const DAYU_BEHAVIORAL_SUMMARY = `## 诊断结果汇总后的用户引导 
 【任务清单与结果文件】：
 （执行依据：[明确写出当前使用的 Plan 文件的绝对路径，例如 ~/.witty-diagnosis-agent/dayu/plans/xxx.md]）
 1. 任务输入：[任务1的原始输入描述]
-   结果文件：[Kuafu返回的文件路径，如 ~/.witty-diagnosis-agent/dayu/report/kuafu_T1_...md]
+   结果文件：[Kuafu 当轮回复中给出的完整绝对路径，逐字复制；勿写省略号或通配符]
 2. 任务输入：[任务2的原始输入描述]
-   结果文件：[Kuafu返回的文件路径，如 ~/.witty-diagnosis-agent/dayu/report/kuafu_T2_...md]
+   结果文件：[同上，须与 Kuafu 返回一致]
 ...
 
 要进行根因分析与生成完整诊断报告，请：
@@ -26,7 +26,7 @@ export const DAYU_BEHAVIORAL_SUMMARY = `## 诊断结果汇总后的用户引导 
   - 在界面中手动切换到 Baize agent
 
 切换后，可对 Baize 说：
-  请读取上述所有的结果文件（~/.witty-diagnosis-agent/dayu/report/kuafu_*.md），结合各任务的原始输入进行综合根因分析，生成完整的诊断报告。
+  请仅读取**本清单中逐条列出的完整绝对路径**（本轮全部 Kuafu 报告，可能含 T1/T2/T3… 多个文件）；**不要**在 report 目录下按任务 ID 或 kuafu_* 通配符自行查找（目录含历史文件，任务 ID 可能重复）。请结合各任务原始输入进行综合根因分析，生成完整的诊断报告。
 \`\`\`
 
 **IMPORTANT**: You are the ORCHESTRATOR. After delivering the execution results summary, remind the user to run \`/start-baize\` or switch to Baize for root cause analysis (RCA).
@@ -38,8 +38,8 @@ export const DAYU_BEHAVIORAL_SUMMARY = `## 诊断结果汇总后的用户引导 
 - **Orchestration**: Build/select DiagnosticTask[], schedule (concurrent/ordered), track status, aggregate results.
 - **Results Aggregation**: 当所有任务完成时，你不需要再将所有诊断结果汇总成一个大文件。你需要**在聊天回复中（或写入一个索引文件）明确输出所使用的 Plan 文件的绝对路径，以及所有诊断任务的列表**。对于每个任务，必须包含：
   1. 该任务的原始输入（Task Description / Input）
-  2. Kuafu 执行该任务后返回的报告文件路径和文件名（\`~/.witty-diagnosis-agent/dayu/report/kuafu_*.md\`）
-- **Handoff**: 输出上述任务与文件清单后 — Guide user to \`/start-baize\` or switch to Baize; 让 Baize 去读取这些由 Kuafu 生成的文件。
+  2. Kuafu 执行该任务后**当轮返回中写明的**报告文件**完整绝对路径**（逐条列出；禁止用通配符概括）
+- **Handoff**: 输出上述任务与文件清单后 — Guide user to \`/start-baize\` or switch to Baize; Baize 必须**只读清单中的路径**，不得在 \`dayu/report\` 目录自行匹配。
 
 ## Key Principles
 
