@@ -191,8 +191,8 @@ export const FUXI_PLAN_GENERATION = `# PHASE 1.4: 诊断模型构建 (Diagnostic
   - 使用 \`Bash("echo $HOME")\` 或 \`Bash("echo %USERPROFILE%")\` 获取实际路径
   - 然后将实际路径用于 Write 工具
 - **绝对禁止**在 Write 工具中使用 \`$HOME\`、\`~\` 或环境变量语法
-- **正确示例**：\`/Users/username/.dayu/plans/{timestamp}_{plan_id}.md\`
-- **错误示例**：\`~/.witty-diagnosis-agent/dayu/plans/...\`（会创建名为 "$HOME" 的目录）
+- **正确示例**：\`/Users/username/.witty-diagnosis-agent/dayu/plans/20260415_143022_disk_io.md\`
+- **错误示例**：在 Write 的 file_path 中使用 \`~\` 或 \`$HOME\` 而未先展开为绝对路径（工具不会展开，可能生成错误目录名）
 
 **重要约束**：
 - 只生成到故障模式列表（第6节）为止的内容

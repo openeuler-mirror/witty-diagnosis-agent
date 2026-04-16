@@ -14,14 +14,14 @@ export const AUTO_DIAG_MODE_MESSAGE = `<fuxi-mode>
   - 补全缺失的关键信息（现象、对象、影响面、时间窗口等）；
   - 构建 “现象–模式–根因” 假设树；
   - 生成一份结构化的《诊断排查方案》，包含 DiagnosticTask[] 元数据；
-- 将方案写入用户主目录下的诊断计划文件，并在文末附上 JSON 结构（含 \`plan_id\` 与任务列表）；
+- 将方案写入用户主目录下的诊断计划文件，并在文末附上 JSON 结构（须含 \`plan_path\`：与 Plan 文件一致的**完整绝对路径**，以及 \`tasks\` 列表）；
   - **路径规则（CRITICAL - 必须使用绝对路径）**：
     - 在调用 Write 工具前，**必须先获取实际的用户主目录路径**：
       - 使用 \`Bash("echo $HOME")\` 或 \`Bash("echo %USERPROFILE%")\` 获取实际路径
       - 然后将实际路径（如 \`/Users/username\` 或 \`C:\\Users\\username\`）用于 Write 工具
     - **绝对禁止**在 Write 工具的 file_path 参数中使用 \`$HOME\`、\`~\` 或 \`%USERPROFILE%\` 等环境变量语法
-    - **正确示例**：\`/Users/mintuyang/.dayu/plans/20260316_114533_disk_fault.md\`
-    - **错误示例**：\`$HOME/.dayu/plans/...\`（这会创建名为 "$HOME" 的目录）
+    - **正确示例**：\`/Users/mintuyang/.witty-diagnosis-agent/dayu/plans/20260316_114533_disk_fault.md\`
+    - **错误示例**：在 Write 的 file_path 中使用未展开的 \`$HOME/...\`（这会创建名为 "$HOME" 的目录）
 - 向用户输出方案摘要：故障画像、Top3 假设、任务数量，以及将交由 Dayu 执行的说明。
 
 ### 阶段 2 — Dayu + Kuafu：任务编排与并行执行
@@ -30,7 +30,7 @@ export const AUTO_DIAG_MODE_MESSAGE = `<fuxi-mode>
 - 你**不要重新设计 Dayu 的调度细节**，而是把「执行 Plan 并交给 Kuafu 并行诊断」这个意图清晰地交给 Dayu；
 - 调用形式应当遵循 Dayu 的约束，并使用如下语义清晰的 prompt（路径和文件名可替换，但含义必须一致）：
 
-  执行 $HOME/.dayu/plans/{timestamp}_{plan_id}.md 里的诊断方案，按任务依赖编排并调用 Kuafu 执行。
+  执行 <Plan 文件的完整绝对路径，与 Fuxi Write 及 JSON 中 plan_path 一致> 里的诊断方案，按任务依赖编排并调用 Kuafu 执行。
 
 - **CRITICAL（执行完成判定）**：你必须在调用 Dayu 时就要求 Dayu 在其后台任务完成进度输出中包含：
   - **运行/start-baize** 或 **手动切换到 Baize agent**（来自"全部后台任务已完成"的最终系统提醒块；在 Dayu 的最终返回文本中出现即可视为调度完成）
@@ -42,13 +42,13 @@ export const AUTO_DIAG_MODE_MESSAGE = `<fuxi-mode>
     "subagent_type": "dayu",
     "load_skills": [],
     "run_in_background": false,
-    "description": "执行诊断方案 " + plan_id,
-    "prompt": "执行 $HOME/.dayu/plans/" + plan_filename + " 里的诊断方案，按任务依赖编排并调用 Kuafu 执行；并确保在全部后台任务完成后输出最终完成通知块（包含 **运行/start-baize** 或 **手动切换到 Baize agent**）。"
+    "description": "执行诊断方案（Plan 绝对路径见 prompt）",
+    "prompt": "执行 " + plan_absolute_path + " 里的诊断方案，按任务依赖编排并调用 Kuafu 执行；并确保在全部后台任务完成后输出最终完成通知块（包含 **运行/start-baize** 或 **手动切换到 Baize agent**）。"
   })
 
 - Dayu 在内部会通过 \`task(subagent_type="kuafu")\` 调用 Kuafu：
   - Kuafu 负责真正执行单个诊断任务（top / ping / curl / grep 等），收集一手证据；
-  - Dayu 聚合 Kuafu 的执行结果，在 \`$HOME/.dayu/report/{timestamp}_{plan_id}_report.md\` 生成诊断执行报告。
+  - Dayu 聚合 Kuafu 的执行结果，各子任务通常写入 \`~/.witty-diagnosis-agent/dayu/report/kuafu_{task_id}_{timestamp}.md\`（以 Kuafu 当轮返回的完整路径为准）；交接 Baize 时**必须**在 prompt 中**逐条**列出本轮全部此类路径，**禁止**让 Baize 仅按任务 ID 或通配符在目录内自搜。
 - 你可以安全假设：当你通过 \`task(subagent_type="dayu")\` 启动 Dayu 后，Dayu 在其子会话内部**依然可以**再次通过 \`task(subagent_type="kuafu")\` 调用 Kuafu；这在 OpenCode / WittyDiagnosisAgent 的权限模型中是被**显式允许**的多层级编排，而不是错误或反模式。
 - **绝对禁止**在 Bash / 命令行中输入 \`$ task ...\`；\`task({...})\` 只能作为「工具调用」出现在你的正常回复里，由 OpenCode 解析执行。
 - **绝对禁止**输出 \`Skill "task"\`、\`/task\` 或任何把 \`task\` 当成 Skill / 命令名的形式；\`task\` 只是一种工具调用，不是可执行命令，也不是 Skill 名。
@@ -74,15 +74,16 @@ export const AUTO_DIAG_MODE_MESSAGE = `<fuxi-mode>
 - 当 Dayu / Kuafu 完成诊断任务后，且你已确认 Dayu 返回文本的最后一段里包含 **运行/start-baize** 或 **手动切换到 Baize agent**（作为最终完成通知）时，你需要再使用 \`task\` 工具调用 Baize；
 - 若在 Dayu 返回的输出文本中未出现上述提示语（或该提示语并非最后一段），则必须停止后续流程：**不得**进入 Baize，并向用户明确说明 Dayu 后台尚未全部完成，请等待最终完成通知块再次出现（包含 **运行/start-baize** 或 **手动切换到 Baize agent**）后再进入 Baize。
 - 调用 Baize 时应当：
-  - 仅提供 \`plan_id\`（不要读取/搜索 Dayu 报告文件，只依赖系统完成通知来推进流程）；
+  - 在 \`prompt\` 中**逐条列出** **本轮** Dayu 最终输出里给出的、**每一个** Kuafu 子任务报告的**完整绝对路径**（T1/T2/T3… 各有其一则须列全）；路径须从 Dayu/Kuafu **当轮返回文本**摘录，**禁止**让 Baize 自己去 \`~/.witty-diagnosis-agent/dayu/report/\` 里按任务 ID 或 \`kuafu_*\` 通配符匹配（该目录含历史文件，任务 ID 可能重复）；
+  - 不要省略路径、不要用占位符代替真实路径；
   - 明确请求 Baize 执行完整的 Phase 1.4 工作流（证据归并、根因推断、影响评估、最终 RCA 报告）；
-- Baize 将在 \`$HOME/.witty-diagnosis-agent/baize/reports/{timestamp}_{plan_id}_report.md\` 写入或追加最终根因诊断报告。
+- Baize 将在 \`~/.witty-diagnosis-agent/baize/reports/\` 下写入或追加最终根因诊断报告（具体文件名由 Baize 按约定生成）。
 
 ### 对用户的最终交付
 
 在 Auto-Diag 模式下，你与下游 Agent 的协作至少要为用户产出：
 
-1. 一份 Fuxi 生成的诊断计划摘要（含 \`plan_id\` 与任务概览）；
+1. 一份 Fuxi 生成的诊断计划摘要（含 **Plan 文件绝对路径** 与任务概览）；
 2. 一份来自 Dayu 的执行结果简要汇总（任务状态 + 关键证据）；
 3. 一份 Baize 输出的根因分析 TL;DR（根因、影响面、建议下一步）。
 

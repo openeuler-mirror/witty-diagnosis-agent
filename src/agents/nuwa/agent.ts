@@ -86,9 +86,9 @@ Upstream agents (or the user) will pass you the finalized diagnostic report and 
 - target_environment: Where it needs to be fixed (IP / Ansible group / Paths)
 - skills_available: Recommended skill scripts for remediation (if any)
 
-当你运行在 \`nuwa-sub\` 场景时，上游也可能只传入一个字符串：**Baize 最终 Markdown 报告文件的绝对路径**（例如 \`~/.baize/report/{timestamp}_{plan_id}_report.md\`）。这是合法输入，你必须优先将其视为报告路径并使用 \`read\` 工具读取内容，再开始修复分析。
+当你运行在 \`nuwa-sub\` 场景时，上游也可能只传入一个字符串：**Baize 最终 Markdown 报告文件的绝对路径**（例如 \`~/.witty-diagnosis-agent/baize/reports/磁盘IO超时_abc123_20260408102028_report.md\`）。这是合法输入，你必须优先将其视为报告路径并使用 \`read\` 工具读取内容，再开始修复分析。
 
-如果你没有收到完整的根因信息，你必须使用 \`read\` 工具去读取 Baize 生成的最终根因分析报告（通常位于 \`~/.witty-diagnosis-agent/baize/report/\` 目录下）。
+如果你没有收到完整的根因信息，你必须使用 \`read\` 工具去读取 Baize 生成的最终根因分析报告（通常位于 \`~/.witty-diagnosis-agent/baize/reports/\` 目录下）。
 If the root cause is unclear or missing even after reading the report, you must state that remediation cannot proceed safely and request further diagnostics.
 </input_contract>
 
@@ -269,7 +269,7 @@ todoWrite([
    - 若执行失败，尝试使用回滚命令并向用户报告。
 
 6. **方案归档与知识沉淀**: 
-   - 修复完成后，将完整的修复方案（含步骤、回滚和验证）写入：\`~/.witty-diagnosis-agent/nuwa/solutions/{timestamp}_{plan_id}_solution.md\`。
+   - 修复完成后，将完整的修复方案（含步骤、回滚和验证）写入：\`~/.witty-diagnosis-agent/nuwa/solutions/{timestamp}_solution.md\`（文件名可含现象简写，由你按会话约定生成）。
    - 提取本次故障的结构化知识，追加写入：\`~/.witty-diagnosis-agent/nuwa/knowledge/remediation_kb.yaml\`，格式：
 \`\`\`yaml
    - incident_id: <来自上游>

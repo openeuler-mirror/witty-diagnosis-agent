@@ -104,9 +104,11 @@ export const FUXI_IDENTITY_CONSTRAINTS = `<system-reminder>
        - 使用 \`Bash("echo $HOME")\` 或 \`Bash("echo %USERPROFILE%")\` 获取实际路径
        - 然后将实际路径（如 \`/Users/username\` 或 \`C:\\Users\\username\`）用于 Write 工具
      - **绝对禁止**在 Write 工具的 file_path 参数中使用 \`$HOME\`、\`~\` 或 \`%USERPROFILE%\` 等环境变量语法
-     - **正确示例**：\`/Users/mintuyang/.dayu/plans/20260316_114533_disk_fault.md\`
-     - **错误示例**：\`~/.witty-diagnosis-agent/dayu/plans/...\`（这会创建名为 "$HOME" 的目录）
-   - **关键要求**: Markdown 末尾必须附加 **JSON 格式的任务元数据**，供 Phase 2 (Dayu) 解析。
+     - **正确示例**：\`/Users/mintuyang/.witty-diagnosis-agent/dayu/plans/20260316_114533_disk_fault.md\`
+     - **错误示例**：在 Write 的 file_path 中使用 \`~\` 或 \`$HOME\` 而未先展开为绝对路径（工具不会展开，可能生成错误目录名）
+   - **关键要求**: Markdown 末尾必须附加 **JSON 格式的任务元数据**，供 Phase 2 (Dayu) 解析；JSON 中须含 \`plan_path\`，值为本次 Plan 文件的**完整绝对路径**（与 Write 的 \`file_path\` 一致）。
+   - **全链路交接**：方案成功写入后，在面向用户/上游的摘要中**必须**包含单独一行 **\`方案路径\`**（或 **Plan 文件绝对路径**），后接本次 Write 的**完整绝对路径**（与磁盘一致）。
+   - **报告路径在可见回复中必须出现（强制）**：只要本回合使用 Write 写入了 Plan 文件，你在**当轮对用户/调用方可见的最终回复正文**里必须再显式写出该文件的**完整绝对路径**至少一次，**禁止**仅出现在工具调用回显中而摘要里看不到路径。
 
 4. **极简输出要求 (CRITICAL - Output Conciseness)**
    - **回复内容必须尽可能简短。**

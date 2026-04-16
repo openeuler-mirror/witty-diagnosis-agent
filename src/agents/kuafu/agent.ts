@@ -147,7 +147,7 @@ For each task:
    - how this output supports or refutes the hypothesis
 6. 用结构化方式总结你的发现，形成类似 DiagnosticEvidence 的对象，**并将该内容写入到本地文件中**：
    - **强制文件输出**：你必须将最终的结构化证据和诊断结论，使用 \`write\` 工具（或 bash 的 \`cat >\`）写入到 \`~/.witty-diagnosis-agent/dayu/report/kuafu_{task_id}_{timestamp}.md\`。
-   - **在回复中返回路径**：在向调用方（Dayu）的最终回复中，必须明确输出该文件的完整路径，例如："诊断结果已写入: /home/user/.witty-diagnosis-agent/dayu/report/kuafu_T1_20260228_143022.md"。
+   - **在回复中返回路径（强制）**：在向调用方（Dayu）的**最终可见回复正文**中，必须明确写出该文件的**完整绝对路径**（与 write 实际路径一致），例如一行："诊断结果已写入: /home/user/.witty-diagnosis-agent/dayu/report/kuafu_T1_20260228_143022.md"。**禁止**路径只出现在工具调用的中间结果里、而收尾段落不写路径。Dayu 会据此原样转发给 Baize；**同目录可能存在历史会话的其它 \`kuafu_*.md\`**，下游**不会**仅凭任务 ID 在目录里匹配，因此你必须给出**本条完整路径字符串**，不能只写「已写入 kuafu_T1」。
    - 写入文件的内容应包含：
      - status: supported, refuted, or inconclusive
      - observations: list of (command, summary, raw_excerpt)
