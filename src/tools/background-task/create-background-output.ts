@@ -52,7 +52,7 @@ export function createBackgroundOutput(manager: BackgroundOutputManager, client:
         .describe(
           "Wait for completion (default: false). System notifies when done, so blocking is rarely needed."
         ),
-      timeout: tool.schema.number().optional().describe("Max wait time in ms (default: 60000, max: 600000)"),
+      timeout: tool.schema.number().optional().describe("Max wait time in ms (default: 1200000, max: 3600000)"),
       full_session: tool.schema.boolean().optional().describe("Return full session messages with filters (default: true)"),
       include_thinking: tool.schema.boolean().optional().describe("Include thinking/reasoning parts in full_session output (default: false)"),
       message_limit: tool.schema.number().optional().describe("Max messages to return (capped at 100)"),
@@ -86,7 +86,7 @@ export function createBackgroundOutput(manager: BackgroundOutputManager, client:
         }
 
         const shouldBlock = args.block === true
-        const timeoutMs = Math.min(args.timeout ?? 60000, 600000)
+        const timeoutMs = Math.min(args.timeout ?? 1200000, 3600000)
         const fullSession = args.full_session ?? true
 
         let resolvedTask = task

@@ -6,7 +6,10 @@ let WAIT_FOR_SESSION_TIMEOUT_MS = 30000
 // Max total time to wait for a sync delegated session (e.g. Dayu → Kuafu orchestration).
 // Increased from 10 minutes to 30 minutes to better accommodate long-running diagnostic flows.
 let MAX_POLL_TIME_MS = 30 * 60 * 1000
-let SESSION_CONTINUATION_STABILITY_MS = 5000
+// Stability window: how long the sync poller waits after detecting terminal finish
+// to confirm the session is truly done (not just idle between background task launch
+// and completion notification). Extended to 20 minutes for slow model scenarios.
+let SESSION_CONTINUATION_STABILITY_MS = 20 * 60 * 1000
 
 export function getTimingConfig() {
   return {
@@ -27,7 +30,7 @@ export function __resetTimingConfig(): void {
   WAIT_FOR_SESSION_INTERVAL_MS = 100
   WAIT_FOR_SESSION_TIMEOUT_MS = 30000
   MAX_POLL_TIME_MS = 30 * 60 * 1000
-  SESSION_CONTINUATION_STABILITY_MS = 5000
+  SESSION_CONTINUATION_STABILITY_MS = 20 * 60 * 1000
 }
 
 export function __setTimingConfig(overrides: Partial<ReturnType<typeof getTimingConfig>>): void {

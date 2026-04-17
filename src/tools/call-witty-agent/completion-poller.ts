@@ -17,7 +17,7 @@ export async function waitForCompletion(
 
   // Poll for session completion
   const POLL_INTERVAL_MS = 500
-  const MAX_POLL_TIME_MS = 5 * 60 * 1000 // 5 minutes max
+  const MAX_POLL_TIME_MS = 20 * 60 * 1000 // 20 minutes max
   const pollStart = Date.now()
   let lastMsgCount = 0
   let stablePolls = 0
@@ -65,6 +65,6 @@ export async function waitForCompletion(
 
   if (Date.now() - pollStart >= MAX_POLL_TIME_MS) {
     log(`[call_witty_agent] Timeout reached`)
-    throw new Error("Agent task timed out after 5 minutes.")
+    throw new Error("Agent task timed out after 20 minutes.")
   }
 }
