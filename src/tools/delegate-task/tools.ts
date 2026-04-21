@@ -85,7 +85,7 @@ export function createDelegateTask(options: DelegateTaskToolOptions): ToolDefini
   return tool({
     description,
     args: {
-      load_skills: tool.schema.array(tool.schema.string()).describe("Skill names to inject. REQUIRED - pass [] if no skills needed."),
+      load_skills: tool.schema.array(tool.schema.string()).optional().describe("Skill names to inject. REQUIRED - pass [] if no skills needed."),
       description: tool.schema.string().describe("Short task description (3-5 words)"),
       prompt: tool.schema.string().describe("Full detailed prompt for the agent"),
       run_in_background: tool.schema.boolean().describe("true=async (returns task_id), false=sync (waits). Default: false"),
@@ -121,11 +121,8 @@ export function createDelegateTask(options: DelegateTaskToolOptions): ToolDefini
           args.load_skills = []
         }
       }
-      if (args.load_skills === undefined) {
-        throw new Error(`Invalid arguments: 'load_skills' parameter is REQUIRED. Pass [] if no skills needed.`)
-      }
-      if (args.load_skills === null) {
-        throw new Error(`Invalid arguments: load_skills=null is not allowed. Pass [] if no skills needed.`)
+      if (args.load_skills === undefined || args.load_skills === null) {
+        args.load_skills = []
       }
 
       const runInBackground = args.run_in_background === true
