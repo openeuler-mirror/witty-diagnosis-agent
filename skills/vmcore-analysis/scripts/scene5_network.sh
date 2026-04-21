@@ -1,7 +1,7 @@
 #!/bin/bash
 # =============================================================================
-# 场景 4：网络不通 / 网络崩溃 深度信息收集脚本
-# 用法: ./scene4_network.sh [--crash CMD] [--vmlinux PATH] [--vmcore PATH]
+# 场景 5：网络不通 / 网络崩溃 深度信息收集脚本
+# 用法: ./scene5_network.sh [--crash CMD] [--vmlinux PATH] [--vmcore PATH]
 # =============================================================================
 
 set -euo pipefail
@@ -33,8 +33,8 @@ for f in "$VMLINUX" "$VMCORE"; do
 done
 
 LOG_CWD="$(pwd -P 2>/dev/null || pwd)"
-OUTFILE="${LOG_CWD}/scene4_network_$(date +%Y%m%d_%H%M%S).log"
-echo -e "${CYAN}${BOLD}[场景4] 网络不通 / 网络崩溃 信息收集${RESET}"
+OUTFILE="${LOG_CWD}/scene5_network_$(date +%Y%m%d_%H%M%S).log"
+echo -e "${CYAN}${BOLD}[场景5] 网络不通 / 网络崩溃 信息收集${RESET}"
 echo -e "${GREEN}输出文件: ${OUTFILE}${RESET}"
 echo ""
 
@@ -75,8 +75,8 @@ bt -a
 echo "========== [12/14] IRQ 中断信息 =========="
 irq
 
-echo "========== [13/14] 所有进程状态 =========="
-ps
+echo "========== [13/14] 进程（ps -G，轻量）=========="
+ps -G
 
 echo "========== [14/14] 内存情况（网络 skb 可能耗内存） =========="
 kmem -i
@@ -87,7 +87,7 @@ CMDS
 
 {
     echo "======================================================================"
-    echo " 场景4: 网络不通 / 网络崩溃 分析报告"
+    echo " 场景5: 网络不通 / 网络崩溃 分析报告"
     echo " 生成时间: $(date '+%Y-%m-%d %H:%M:%S')"
     echo " vmlinux : $VMLINUX"
     echo " vmcore  : $VMCORE"

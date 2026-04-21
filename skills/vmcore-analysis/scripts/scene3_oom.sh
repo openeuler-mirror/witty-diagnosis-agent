@@ -1,7 +1,7 @@
 #!/bin/bash
 # =============================================================================
-# 场景 2：内存泄漏 / OOM / 内存耗尽 深度信息收集脚本
-# 用法: ./scene2_oom.sh [--crash CMD] [--vmlinux PATH] [--vmcore PATH]
+# 场景 3：内存泄漏 / OOM / 内存耗尽 深度信息收集脚本
+# 用法: ./scene3_oom.sh [--crash CMD] [--vmlinux PATH] [--vmcore PATH]
 # =============================================================================
 
 set -euo pipefail
@@ -33,52 +33,49 @@ for f in "$VMLINUX" "$VMCORE"; do
 done
 
 LOG_CWD="$(pwd -P 2>/dev/null || pwd)"
-OUTFILE="${LOG_CWD}/scene2_oom_$(date +%Y%m%d_%H%M%S).log"
-echo -e "${CYAN}${BOLD}[场景2] OOM / 内存泄漏 / 内存耗尽 信息收集${RESET}"
+OUTFILE="${LOG_CWD}/scene3_oom_$(date +%Y%m%d_%H%M%S).log"
+echo -e "${CYAN}${BOLD}[场景3] OOM / 内存泄漏 / 内存耗尽 信息收集${RESET}"
 echo -e "${GREEN}输出文件: ${OUTFILE}${RESET}"
 echo ""
 
 CRASH_CMDS=$(cat <<'CMDS'
-echo "========== [1/14] 系统基本信息 =========="
+echo "========== [1/13] 系统基本信息 =========="
 sys
 
-echo "========== [2/14] 内核日志 (OOM/killer/cgroup) =========="
+echo "========== [2/13] 内核日志 (OOM/killer/cgroup) =========="
 log
 
-echo "========== [3/14] 内存整体使用分布 =========="
+echo "========== [3/13] 内存整体使用分布 =========="
 kmem -i
 
-echo "========== [4/14] Slab 缓存使用详情（按占用排序） =========="
+echo "========== [4/13] Slab 缓存使用详情（按占用排序） =========="
 kmem -s
 
-echo "========== [5/14] 所有进程及内存信息 =========="
-ps
-
-echo "========== [6/14] 进程内存按 RSS 排序（Top 20） =========="
+echo "========== [5/13] 进程 RSS Top 20（ps -G｜sort；已去掉全量 ps 以加速）=========="
 ps -G | sort -k 8 -rn | head -20
 
-echo "========== [7/14] 页面分配统计 =========="
+echo "========== [6/13] 页面分配统计 =========="
 kmem -p | head -60
 
-echo "========== [8/14] Zone 内存分布 =========="
+echo "========== [7/13] Zone 内存分布 =========="
 kmem -z
 
-echo "========== [9/14] Buddy 系统空闲页统计 =========="
+echo "========== [8/13] Buddy 系统空闲页统计 =========="
 kmem -f
 
-echo "========== [10/14] Hugepage 使用情况 =========="
+echo "========== [9/13] Hugepage 使用情况 =========="
 kmem -h
 
-echo "========== [11/14] 调用栈（确认是否在内存分配路径崩溃） =========="
+echo "========== [10/13] 调用栈（确认是否在内存分配路径崩溃） =========="
 bt
 
-echo "========== [12/14] 带行号的调用栈 =========="
+echo "========== [11/13] 带行号的调用栈 =========="
 bt -l
 
-echo "========== [13/14] 运行队列（确认是否有 D 状态进程） =========="
+echo "========== [12/13] 运行队列（确认是否有 D 状态进程） =========="
 runq
 
-echo "========== [14/14] 虚拟内存统计 =========="
+echo "========== [13/13] 虚拟内存统计 =========="
 vm
 
 quit
@@ -87,7 +84,7 @@ CMDS
 
 {
     echo "======================================================================"
-    echo " 场景2: 内存泄漏 / OOM / 内存耗尽 分析报告"
+    echo " 场景3: 内存泄漏 / OOM / 内存耗尽 分析报告"
     echo " 生成时间: $(date '+%Y-%m-%d %H:%M:%S')"
     echo " vmlinux : $VMLINUX"
     echo " vmcore  : $VMCORE"
@@ -99,12 +96,12 @@ CMDS
     echo ""
     echo "======================================================================"
     echo " [分析提示]"
-    echo "  1. 在 [2/14] log 中搜索: Out of memory / OOM / killed process"
+    echo "  1. 在 [2/13] log 中搜索: Out of memory / OOM / killed process"
     echo "     搜索: Memory cgroup out of memory / oom_kill_process"
-    echo "  2. 在 [3/14] kmem -i 中查看: FREE / SLAB / MLOCKED 比例"
-    echo "  3. 在 [4/14] kmem -s 中查找占用异常大的 slab（如 > 1GB）"
-    echo "  4. 在 [5/14] ps 中查找 RSS/VSZ 最大的进程"
-    echo "  5. 在 [6/14] 确认 Top 20 内存消耗进程，结合 OOM 日志的 adj 值"
+    echo "  2. 在 [3/13] kmem -i 中查看: FREE / SLAB / MLOCKED 比例"
+    echo "  3. 在 [4/13] kmem -s 中查找占用异常大的 slab（如 > 1GB）"
+    echo "  4. 在 [5/13] ps -G Top 20 中对照 RSS/VSZ 与 OOM 日志；需全量表可交互 ps"
+    echo "  5. 结合 [5/13] Top 20 与 kmem，对照 OOM 日志中的 adj 值"
     echo "  6. 若 slab 占用异常，可进一步用: kmem -S <slab_name> 深入分析"
     echo "  7. task/mm/cgroup：有候选类型时先用 struct <type> <addr> 试解是否结构体对象；RSS/VSZ 等数值勿 struct（详见 SKILL.md）。"
     echo "======================================================================"

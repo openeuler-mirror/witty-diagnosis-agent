@@ -1,7 +1,7 @@
 #!/bin/bash
 # =============================================================================
-# 场景 6：硬件故障 / 驱动崩溃 深度信息收集脚本
-# 用法: ./scene6_hardware.sh [--crash CMD] [--vmlinux PATH] [--vmcore PATH]
+# 场景 7：硬件故障 / 驱动崩溃 深度信息收集脚本
+# 用法: ./scene7_hardware.sh [--crash CMD] [--vmlinux PATH] [--vmcore PATH]
 # =============================================================================
 
 set -euo pipefail
@@ -33,8 +33,8 @@ for f in "$VMLINUX" "$VMCORE"; do
 done
 
 LOG_CWD="$(pwd -P 2>/dev/null || pwd)"
-OUTFILE="${LOG_CWD}/scene6_hardware_$(date +%Y%m%d_%H%M%S).log"
-echo -e "${CYAN}${BOLD}[场景6] 硬件故障 / 驱动崩溃 信息收集${RESET}"
+OUTFILE="${LOG_CWD}/scene7_hardware_$(date +%Y%m%d_%H%M%S).log"
+echo -e "${CYAN}${BOLD}[场景7] 硬件故障 / 驱动崩溃 信息收集${RESET}"
 echo -e "${GREEN}输出文件: ${OUTFILE}${RESET}"
 echo ""
 
@@ -66,8 +66,8 @@ bt -r
 echo "========== [9/15] IRQ 中断统计（检查硬件中断异常） =========="
 irq
 
-echo "========== [10/15] 所有进程状态 =========="
-ps
+echo "========== [10/15] 进程（ps -G，轻量）=========="
+ps -G
 
 echo "========== [11/15] 运行队列（检查 CPU 阻塞） =========="
 runq
@@ -90,7 +90,7 @@ CMDS
 
 {
     echo "======================================================================"
-    echo " 场景6: 硬件故障 / 驱动崩溃 分析报告"
+    echo " 场景7: 硬件故障 / 驱动崩溃 分析报告"
     echo " 生成时间: $(date '+%Y-%m-%d %H:%M:%S')"
     echo " vmlinux : $VMLINUX"
     echo " vmcore  : $VMCORE"
