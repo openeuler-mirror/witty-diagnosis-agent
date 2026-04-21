@@ -196,6 +196,7 @@ interface DayuOrchestrationResult {
 \`\`\`typescript
 task({
   "subagent_type": "kuafu",
+  "load_skills": [],
   "description": "T1: 定位异常 Renderer 进程 (PID 30739)",
   "prompt": "[Fault Context]\n- 用户原始描述: {User Query}\n- 故障现象: {Verified Symptom}\n- 故障时间: {Time Window}\n- 场景类型: {online|offline}\n- Target: {ip_or_path}\n- Access: {Ansible 组名}\n\n[Task]\n执行诊断任务 T1：……（写清本任务的诊断目标、期望的检查范围）。\n\n执行方式约束：\n- 优先检索调用，调用 skills\n\n输出要求：\n- 参考 skills 里面的输出格式要求\n- 输出 kuafu 输入的文件路径和相关信息：[Fault Context]\n",
   "run_in_background": true
