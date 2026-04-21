@@ -1,7 +1,7 @@
 #!/bin/bash
 # =============================================================================
-# 场景 3：系统挂死 / 死锁 / 无响应 深度信息收集脚本
-# 用法: ./scene3_deadlock.sh [--crash CMD] [--vmlinux PATH] [--vmcore PATH]
+# 场景 4：系统挂死 / 死锁 / 无响应 深度信息收集脚本
+# 用法: ./scene4_deadlock.sh [--crash CMD] [--vmlinux PATH] [--vmcore PATH]
 # =============================================================================
 
 set -euo pipefail
@@ -33,8 +33,8 @@ for f in "$VMLINUX" "$VMCORE"; do
 done
 
 LOG_CWD="$(pwd -P 2>/dev/null || pwd)"
-OUTFILE="${LOG_CWD}/scene3_deadlock_$(date +%Y%m%d_%H%M%S).log"
-echo -e "${CYAN}${BOLD}[场景3] 系统挂死 / 死锁 / 无响应 信息收集${RESET}"
+OUTFILE="${LOG_CWD}/scene4_deadlock_$(date +%Y%m%d_%H%M%S).log"
+echo -e "${CYAN}${BOLD}[场景4] 系统挂死 / 死锁 / 无响应 信息收集${RESET}"
 echo -e "${GREEN}输出文件: ${OUTFILE}${RESET}"
 echo ""
 
@@ -45,8 +45,8 @@ sys
 echo "========== [2/13] 内核日志 (hung_task/softlockup/watchdog) =========="
 log
 
-echo "========== [3/13] 所有进程状态（重点看 D/UN 状态） =========="
-ps
+echo "========== [3/13] 进程（ps -G，轻量；全量 ps 可见 D/UN，大 vmcore 上很慢）=========="
+ps -G
 
 echo "========== [4/13] 所有 CPU 运行队列 =========="
 runq
@@ -84,7 +84,7 @@ CMDS
 
 {
     echo "======================================================================"
-    echo " 场景3: 系统挂死 / 死锁 / 无响应 分析报告"
+    echo " 场景4: 系统挂死 / 死锁 / 无响应 分析报告"
     echo " 生成时间: $(date '+%Y-%m-%d %H:%M:%S')"
     echo " vmlinux : $VMLINUX"
     echo " vmcore  : $VMCORE"
@@ -98,7 +98,7 @@ CMDS
     echo " [分析提示]"
     echo "  1. 在 [2/13] log 中搜索: hung_task / soft lockup / watchdog"
     echo "     搜索: INFO: task blocked / RCU stall"
-    echo "  2. 在 [3/13] ps  中筛选状态为 D(不可中断睡眠) 或 UN 的进程"
+    echo "  2. 在 [3/13] ps -G / 必要时交互 ps 中筛 D(不可中断睡眠) / UN"
     echo "  3. 在 [4/13] runq 中确认各 CPU 是否阻塞在同一函数"
     echo "  4. 在 [6/13] bt -a 中查看所有进程栈，寻找相互等待的锁链"
     echo "     重点关注: mutex_lock / down / __schedule / io_schedule"

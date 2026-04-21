@@ -1,7 +1,7 @@
 #!/bin/bash
 # =============================================================================
-# 场景 5：文件系统只读 / 挂载异常 / IO 卡顿 深度信息收集脚本
-# 用法: ./scene5_filesystem.sh [--crash CMD] [--vmlinux PATH] [--vmcore PATH]
+# 场景 6：文件系统只读 / 挂载异常 / IO 卡顿 深度信息收集脚本
+# 用法: ./scene6_filesystem.sh [--crash CMD] [--vmlinux PATH] [--vmcore PATH]
 # =============================================================================
 
 set -euo pipefail
@@ -33,8 +33,8 @@ for f in "$VMLINUX" "$VMCORE"; do
 done
 
 LOG_CWD="$(pwd -P 2>/dev/null || pwd)"
-OUTFILE="${LOG_CWD}/scene5_filesystem_$(date +%Y%m%d_%H%M%S).log"
-echo -e "${CYAN}${BOLD}[场景5] 文件系统只读 / 挂载异常 / IO 卡顿 信息收集${RESET}"
+OUTFILE="${LOG_CWD}/scene6_filesystem_$(date +%Y%m%d_%H%M%S).log"
+echo -e "${CYAN}${BOLD}[场景6] 文件系统只读 / 挂载异常 / IO 卡顿 信息收集${RESET}"
 echo -e "${GREEN}输出文件: ${OUTFILE}${RESET}"
 echo ""
 
@@ -69,8 +69,8 @@ bt -f
 echo "========== [10/14] 所有 CPU 调用栈 =========="
 bt -a
 
-echo "========== [11/14] 所有进程状态（关注 D 状态，IO 等待） =========="
-ps
+echo "========== [11/14] 进程（ps -G，轻量；看 D 态可交互 ps）=========="
+ps -G
 
 echo "========== [12/14] 运行队列 =========="
 runq
@@ -87,7 +87,7 @@ CMDS
 
 {
     echo "======================================================================"
-    echo " 场景5: 文件系统只读 / 挂载异常 / IO 卡顿 分析报告"
+    echo " 场景6: 文件系统只读 / 挂载异常 / IO 卡顿 分析报告"
     echo " 生成时间: $(date '+%Y-%m-%d %H:%M:%S')"
     echo " vmlinux : $VMLINUX"
     echo " vmcore  : $VMCORE"
@@ -107,7 +107,7 @@ CMDS
     echo "  2. 在 [3/14] mount 中确认各分区挂载状态（ro 表示已变只读）"
     echo "  3. 在 [4/14] files 中查看进程打开的文件及所在文件系统"
     echo "  4. 在 [5/14] super 中查看超级块状态，确认文件系统类型和标志"
-    echo "  5. 在 [11/14] ps 中筛选 D 状态进程（阻塞在 IO 上）"
+    echo "  5. 在 [11/14] ps -G / 交互 ps 中筛 D 状态（IO 阻塞）"
     echo "  6. 在 [7/14] bt 中确认崩溃是否在 IO 路径（如 submit_bio）"
     echo "  7. 结合 Scene6 脚本排查底层存储硬件问题"
     echo "  8. super/inode/dentry：有候选类型时先用 struct <type> <addr> 试解是否结构体对象；仅日志无对象地址勿硬套 struct（详见 SKILL.md）。"
