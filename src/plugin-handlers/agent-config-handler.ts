@@ -84,6 +84,8 @@ export async function applyAgentConfig(params: {
   const useTaskSystem = params.pluginConfig.experimental?.task_system ?? false;
   const disableWittyEnv = params.pluginConfig.experimental?.disable_witty_env ?? false;
 
+  const outputLanguage = params.pluginConfig.output_language ?? "zh";
+
   const builtinAgents = await createBuiltinAgents(
     migratedDisabledAgents,
     params.pluginConfig.agents,
@@ -98,6 +100,7 @@ export async function applyAgentConfig(params: {
     disabledSkills,
     useTaskSystem,
     disableWittyEnv,
+    outputLanguage
   );
 
   const includeClaudeAgents = params.pluginConfig.claude_code?.agents ?? true;
@@ -148,6 +151,7 @@ export async function applyAgentConfig(params: {
       pluginFuxiOverride: fuxiOverride,
       userCategories: params.pluginConfig.categories,
       currentModel,
+      outputLanguage,
     });
 
     const fuxiSubOverride = params.pluginConfig.agents?.["fuxi-sub"] as
@@ -159,6 +163,7 @@ export async function applyAgentConfig(params: {
       pluginFuxiSubOverride: fuxiSubOverride,
       userCategories: params.pluginConfig.categories,
       currentModel,
+      outputLanguage,
     });
 
     const xuanyuanOverride = params.pluginConfig.agents?.["xuanyuan"] as
@@ -170,6 +175,7 @@ export async function applyAgentConfig(params: {
       pluginXuanyuanOverride: xuanyuanOverride,
       userCategories: params.pluginConfig.categories,
       currentModel,
+      outputLanguage,
     });
 
     const dayuOverride = params.pluginConfig.agents?.["dayu"] as
@@ -181,6 +187,7 @@ export async function applyAgentConfig(params: {
       pluginDayuOverride: dayuOverride,
       userCategories: params.pluginConfig.categories,
       currentModel,
+      outputLanguage,
     });
 
     const baizeOverride = params.pluginConfig.agents?.["baize"];
@@ -188,6 +195,7 @@ export async function applyAgentConfig(params: {
     agentConfig["baize"] = await buildBaizeAgentConfig({
       pluginBaizeOverride: baizeOverride,
       currentModel,
+      outputLanguage,
     });
 
     const nuwaOverride = params.pluginConfig.agents?.["nuwa"] as
@@ -199,6 +207,7 @@ export async function applyAgentConfig(params: {
       pluginNuwaOverride: nuwaOverride,
       userCategories: params.pluginConfig.categories,
       currentModel,
+      outputLanguage,
     });
 
     const nuwaSubOverride = params.pluginConfig.agents?.["nuwa-sub"] as
@@ -210,6 +219,7 @@ export async function applyAgentConfig(params: {
       pluginNuwaSubOverride: nuwaSubOverride,
       userCategories: params.pluginConfig.categories,
       currentModel,
+      outputLanguage,
     });
   }
 
@@ -220,6 +230,7 @@ export async function applyAgentConfig(params: {
   agentConfig["kuafu"] = await buildKuafuAgentConfig({
     pluginKuafuOverride: kuafuOverride,
     currentModel,
+    outputLanguage,
   });
 
   const filteredConfigAgents = configAgent

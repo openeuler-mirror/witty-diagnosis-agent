@@ -10,17 +10,18 @@ function detectProvidersFromWittyConfig(): {
   hasOpencodeZen: boolean
   hasZaiCodingPlan: boolean
   hasKimiForCoding: boolean
+  outputLanguage: "zh" | "en"
 } {
   const wittyConfigPath = getWittyConfigPath()
   if (!existsSync(wittyConfigPath)) {
-    return { hasOpenAI: true, hasOpencodeZen: true, hasZaiCodingPlan: false, hasKimiForCoding: false }
+    return { hasOpenAI: true, hasOpencodeZen: true, hasZaiCodingPlan: false, hasKimiForCoding: false, outputLanguage: "zh" }
   }
 
   try {
     const content = readFileSync(wittyConfigPath, "utf-8")
     const wittyConfig = parseJsonc<Record<string, unknown>>(content)
     if (!wittyConfig || typeof wittyConfig !== "object") {
-      return { hasOpenAI: true, hasOpencodeZen: true, hasZaiCodingPlan: false, hasKimiForCoding: false }
+      return { hasOpenAI: true, hasOpencodeZen: true, hasZaiCodingPlan: false, hasKimiForCoding: false, outputLanguage: "zh" }
     }
 
     const configStr = JSON.stringify(wittyConfig)
@@ -29,9 +30,11 @@ function detectProvidersFromWittyConfig(): {
     const hasZaiCodingPlan = configStr.includes('"zai-coding-plan/')
     const hasKimiForCoding = configStr.includes('"kimi-for-coding/')
 
-    return { hasOpenAI, hasOpencodeZen, hasZaiCodingPlan, hasKimiForCoding }
+    const outputLanguage = (wittyConfig.output_language as "zh" | "en") ?? "zh"
+
+    return { hasOpenAI, hasOpencodeZen, hasZaiCodingPlan, hasKimiForCoding, outputLanguage }
   } catch {
-    return { hasOpenAI: true, hasOpencodeZen: true, hasZaiCodingPlan: false, hasKimiForCoding: false }
+    return { hasOpenAI: true, hasOpencodeZen: true, hasZaiCodingPlan: false, hasKimiForCoding: false, outputLanguage: "zh" }
   }
 }
 
@@ -46,6 +49,7 @@ export function detectCurrentConfig(): DetectedConfig {
     hasOpencodeZen: true,
     hasZaiCodingPlan: false,
     hasKimiForCoding: false,
+    outputLanguage: "zh",
   }
 
   const { format, path } = detectConfigFormat()
@@ -68,11 +72,12 @@ export function detectCurrentConfig(): DetectedConfig {
 
   result.hasGemini = plugins.some((p) => p.startsWith("opencode-antigravity-auth"))
 
-  const { hasOpenAI, hasOpencodeZen, hasZaiCodingPlan, hasKimiForCoding } = detectProvidersFromWittyConfig()
+  const { hasOpenAI, hasOpencodeZen, hasZaiCodingPlan, hasKimiForCoding, outputLanguage } = detectProvidersFromWittyConfig()
   result.hasOpenAI = hasOpenAI
   result.hasOpencodeZen = hasOpencodeZen
   result.hasZaiCodingPlan = hasZaiCodingPlan
   result.hasKimiForCoding = hasKimiForCoding
+  result.outputLanguage = outputLanguage
 
   return result
 }

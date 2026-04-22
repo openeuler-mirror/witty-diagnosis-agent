@@ -23,6 +23,7 @@ export function collectPendingBuiltinAgents(input: {
   disabledSkills?: Set<string>
   useTaskSystem?: boolean
   disableWittyEnv?: boolean
+  outputLanguage?: "zh" | "en"
 }): { pendingAgentConfigs: Map<string, AgentConfig>; availableAgents: AvailableAgent[] } {
   const {
     agentSources,
@@ -38,6 +39,7 @@ export function collectPendingBuiltinAgents(input: {
     availableModels,
     disabledSkills,
     disableWittyEnv = false,
+    outputLanguage,
   } = input
 
   const availableAgents: AvailableAgent[] = []
@@ -64,7 +66,7 @@ export function collectPendingBuiltinAgents(input: {
     if (!resolution) continue
     const { model, variant: resolvedVariant } = resolution
 
-    let config = buildAgent(source, model, mergedCategories, gitMasterConfig, browserProvider, disabledSkills)
+    let config = buildAgent(source, model, mergedCategories, gitMasterConfig, browserProvider, disabledSkills, outputLanguage)
 
     if (resolvedVariant) {
       config = { ...config, variant: resolvedVariant }

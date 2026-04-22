@@ -1,4 +1,5 @@
 import { NUWA_SUB_PERMISSION, getNuwaSubPrompt } from "../agents/nuwa/agent";
+import { AGENT_LOCALIZATION, l } from "../agents/shared/localization";
 import { resolvePromptAppend } from "../agents/builtin-agents/resolve-file-uri";
 import { AGENT_MODEL_REQUIREMENTS } from "../shared/model-requirements";
 import {
@@ -27,6 +28,7 @@ export async function buildNuwaSubAgentConfig(params: {
   pluginNuwaSubOverride: NuwaSubOverride | undefined;
   userCategories: Record<string, CategoryConfig> | undefined;
   currentModel: string | undefined;
+  outputLanguage: "zh" | "en";
 }): Promise<Record<string, unknown>> {
   const categoryConfig = params.pluginNuwaSubOverride?.category
     ? resolveCategoryConfig(params.pluginNuwaSubOverride.category, params.userCategories)
@@ -69,9 +71,9 @@ export async function buildNuwaSubAgentConfig(params: {
     ...(resolvedModel ? { model: resolvedModel } : {}),
     ...(variantToUse ? { variant: variantToUse } : {}),
     mode: "subagent",
-    prompt: await getNuwaSubPrompt(),
+    prompt: await getNuwaSubPrompt(params.outputLanguage),
     permission: NUWA_SUB_PERMISSION,
-    description: `${(params.configAgentPlan?.description as string) ?? "Remediation agent"} (Nuwa-Sub - WittyDiagnosisAgent)`,
+    description: `${(params.configAgentPlan?.description as string) ?? l(AGENT_LOCALIZATION["nuwa-sub"] || AGENT_LOCALIZATION["nuwa"], params.outputLanguage)}`,
     color: (params.configAgentPlan?.color as string) ?? "#22C55E",
     ...(temperatureToUse !== undefined ? { temperature: temperatureToUse } : {}),
     ...(topPToUse !== undefined ? { top_p: topPToUse } : {}),

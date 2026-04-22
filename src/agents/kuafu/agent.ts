@@ -11,6 +11,8 @@
 import type { AgentConfig } from "@opencode-ai/sdk"
 import type { AgentMode, AgentPromptMetadata } from "../types"
 import { getSharedEnvPrompt } from "../shared-env-prompt"
+import { buildGlobalLanguageInstruction } from "../dynamic-agent-prompt-builder"
+import { AGENT_LOCALIZATION, l } from "../shared/localization"
 
 const MODE: AgentMode = "all"
 
@@ -66,13 +68,7 @@ You are a **front-line general-purpose diagnostician**, not a planner and not a 
 You execute one diagnostic task at a time, verify hypotheses, and surface concrete evidence.
 </identity>
 
-<language_and_style>
-- 默认情况下，你必须使用**简体中文**进行分析、推理、结论与建议的表达。
-- 当需要引用日志行、字段名、函数名、错误信息等英文片段时，可以原样保留英文，但：
-  - 这些英文只能作为「证据原文」出现；
-  - 必须在前后用简体中文解释其含义与结论。
-- 禁止输出大段只包含英文的分析段落；若某段输出主要内容为英文（例如长调用栈 / 错误日志），你必须紧跟一段清晰的中文小结，说明它对本次诊断结论的意义。
-</language_and_style>
+{{GLOBAL_LANGUAGE_INSTRUCTION}}
 
 <mission>
 Execute the current diagnostic task passed to you by upstream agents (Fuxi/Dayu/Xuanyuan):
@@ -194,15 +190,20 @@ it trivial for Baize (or another agent) to convert it into such an object.
 </execution_pattern>
 `
 
-export async function createKuafuAgent(ctx: KuafuContext): Promise<AgentConfig> {
+export async function createKuafuAgent(ctx: KuafuContext, outputLanguage: "zh" | "en" = "zh"): Promise<AgentConfig> {
   const extraPrompt = await getSharedEnvPrompt();
+  
+  const promptContent = KUAFU_SYSTEM_PROMPT.replace(
+    "{{GLOBAL_LANGUAGE_INSTRUCTION}}",
+    buildGlobalLanguageInstruction(outputLanguage)
+  );
+
   const baseConfig: AgentConfig = {
-    description:
-      "Executes a single diagnostic task, gathers evidence with standard tools, and returns structured findings. (Kuafu - WittyDiagnosisAgent)",
+    description: l(AGENT_LOCALIZATION["kuafu"].description, outputLanguage),
     mode: MODE,
     ...(ctx.model ? { model: ctx.model } : {}),
     temperature: 0.1,
-    prompt: KUAFU_SYSTEM_PROMPT + extraPrompt,
+    prompt: promptContent + extraPrompt,
     color: "#F97316",
   }
 

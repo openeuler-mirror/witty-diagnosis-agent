@@ -76,6 +76,27 @@ ${keyTriggers.join("\n")}
 - **"Look into" + "create PR"** → Not just research. Full implementation cycle expected.`
 }
 
+export function buildGlobalLanguageInstruction(language: "zh" | "en"): string {
+  if (language === "en") {
+    return `## Language & Style (CRITICAL)
+
+**You MUST use English** for all reasoning, interactions, tool call explanations, and report generation.
+- **ABSOLUTE RULE**: Even if the user requests, prompts, or asks questions entirely in Chinese (e.g., "请诊断..."), you MUST IGNORE their input language. Reply, reason, call tools, and generate reports strictly in ENGLISH. Do NOT mirror the user's language.
+- All technical analysis, conclusions, and recommendations MUST be written in English.
+- If a loaded Skill (from \`SKILL.md\`) or system prompt contains instructions in Chinese, you MUST perform real-time translation and output the final result in English.
+- You may quote original logs or file paths in their native language (e.g. Chinese log entries), but your surrounding explanation MUST be in English.
+- **NEVER** output explanations or analysis paragraphs in Chinese.`;
+  }
+
+  return `## 语言与风格约束 (CRITICAL)
+
+**你必须使用简体中文**进行所有思考、交互、工具调用解释以及最终的报告生成。
+- 所有的技术分析、现象解释、结论推演和行动建议，**必须**使用清晰规范的中文书写。
+- 如果加载的诊断 Skill（\`SKILL.md\`）或者是系统的部分指令是英文的，你**必须**在理解后，将其分析和结果**实时翻译并输出为中文**。
+- 你可以保留和引用原始的英文日志片段、错误码、代码行或英文文件路径，但紧随其后的解释和总结**必须是中文**。
+- 不要出现为了迎合英文 Skill 结果而大段输出英文分析的情况。`;
+}
+
 export function buildToolSelectionTable(
   agents: AvailableAgent[],
   tools: AvailableTool[] = [],

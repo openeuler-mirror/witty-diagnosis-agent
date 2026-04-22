@@ -22,6 +22,8 @@ import { WebsearchConfigSchema } from "./websearch"
 
 export const WittyDiagnosisAgentConfigSchema = z.object({
   $schema: z.string().optional(),
+  /** Global output language for reasoning, interactions, and reports (default: "zh") */
+  output_language: z.enum(["zh", "en"]).default("zh"),
   /** Enable new task system (default: false) */
   new_task_system_enabled: z.boolean().optional(),
   /** Default agent name for `witty-diagnosis-agent run` (env: OPENCODE_DEFAULT_AGENT) */

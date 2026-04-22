@@ -31,12 +31,13 @@ program
   .option("--opencode-zen <value>", "OpenCode Zen access: no, yes (default: no)")
   .option("--zai-coding-plan <value>", "Z.ai Coding Plan subscription: no, yes (default: no)")
   .option("--kimi-for-coding <value>", "Kimi For Coding subscription: no, yes (default: no)")
+  .option("--output-language <value>", "Output language for agents: zh, en (default: zh)")
   .option("--skip-auth", "Skip authentication setup hints")
   .addHelpText("after", `
 Examples:
   $ npx witty-diagnosis-agent install
   $ npx witty-diagnosis-agent install --no-tui --claude=max20 --openai=yes --gemini=yes --copilot=no
-  $ npx witty-diagnosis-agent install --no-tui --claude=no --gemini=no --copilot=yes --opencode-zen=yes
+  $ npx witty-diagnosis-agent install --no-tui --claude=no --gemini=no --copilot=yes --opencode-zen=yes --output-language=en
 
 Model Providers (Priority: Native > Copilot > OpenCode Zen > Z.ai > Kimi):
   Claude        Native anthropic/ models (Opus, Sonnet, Haiku)
@@ -57,6 +58,7 @@ Model Providers (Priority: Native > Copilot > OpenCode Zen > Z.ai > Kimi):
       opencodeZen: options.opencodeZen,
       zaiCodingPlan: options.zaiCodingPlan,
       kimiForCoding: options.kimiForCoding,
+      outputLanguage: options.outputLanguage,
       skipAuth: options.skipAuth ?? false,
     }
     const exitCode = await install(args)

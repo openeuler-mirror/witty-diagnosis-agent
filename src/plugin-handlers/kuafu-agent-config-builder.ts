@@ -7,6 +7,7 @@ export interface BuildKuafuAgentConfigParams {
   pluginKuafuOverride?: AgentOverrideConfig
   /** Currently selected UI model, if any */
   currentModel?: string
+  outputLanguage: "zh" | "en"
 }
 
 /**
@@ -24,7 +25,8 @@ export async function buildKuafuAgentConfig(
   const baseModel = (pluginKuafuOverride?.model as string | undefined) ?? currentModel
 
   const baseConfig = await createKuafuAgent(
-    baseModel ? { model: baseModel } : {}
+    baseModel ? { model: baseModel } : {},
+    params.outputLanguage
   )
 
   if (!pluginKuafuOverride) {

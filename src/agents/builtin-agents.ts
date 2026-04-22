@@ -39,7 +39,8 @@ export async function createBuiltinAgents(
   uiSelectedModel?: string,
   disabledSkills?: Set<string>,
   useTaskSystem = false,
-  disableWittyEnv = false
+  disableWittyEnv = false,
+  outputLanguage: "zh" | "en" = "zh"
 ): Promise<Record<string, AgentConfig>> {
 
   const connectedProviders = readConnectedProvidersCache()
@@ -80,6 +81,7 @@ export async function createBuiltinAgents(
     availableModels,
     disabledSkills,
     disableWittyEnv,
+    outputLanguage,
   })
 
   const registeredAgents = parseRegisteredAgentSummaries(customAgentSummaries)

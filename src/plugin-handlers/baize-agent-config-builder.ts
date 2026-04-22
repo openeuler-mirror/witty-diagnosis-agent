@@ -13,6 +13,7 @@ export interface BuildBaizeAgentConfigParams {
   pluginBaizeOverride?: AgentOverrideConfig
   /** Currently selected UI model, if any */
   currentModel?: string
+  outputLanguage: "zh" | "en"
 }
 
 /**
@@ -50,7 +51,13 @@ export async function buildBaizeAgentConfig(
   const variantToUse = pluginBaizeOverride?.variant ?? resolvedVariant
 
   const baseConfig = createBaizeAgent(
-    pluginBaizeOverride?.model ?? resolvedModel ?? currentModel
+    pluginBaizeOverride?.model ?? resolvedModel ?? currentModel,
+    undefined,
+    undefined,
+    undefined,
+    undefined,
+    false,
+    params.outputLanguage
   )
 
   if (!pluginBaizeOverride) {

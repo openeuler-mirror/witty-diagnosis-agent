@@ -1,4 +1,5 @@
 import { XUANYUAN_PERMISSION, getXuanyuanPrompt } from "../agents/xuanyuan";
+import { AGENT_LOCALIZATION, l } from "../agents/shared/localization";
 import { resolvePromptAppend } from "../agents/builtin-agents/resolve-file-uri";
 import { AGENT_MODEL_REQUIREMENTS } from "../shared/model-requirements";
 import {
@@ -27,6 +28,7 @@ export async function buildXuanyuanAgentConfig(params: {
   pluginXuanyuanOverride: XuanyuanOverride | undefined;
   userCategories: Record<string, CategoryConfig> | undefined;
   currentModel: string | undefined;
+  outputLanguage: "zh" | "en";
 }): Promise<Record<string, unknown>> {
   const categoryConfig = params.pluginXuanyuanOverride?.category
     ? resolveCategoryConfig(params.pluginXuanyuanOverride.category, params.userCategories)
@@ -69,9 +71,9 @@ export async function buildXuanyuanAgentConfig(params: {
     ...(resolvedModel ? { model: resolvedModel } : {}),
     ...(variantToUse ? { variant: variantToUse } : {}),
     mode: "all",
-    prompt: await getXuanyuanPrompt(resolvedModel),
+    prompt: await getXuanyuanPrompt(resolvedModel, params.outputLanguage),
     permission: XUANYUAN_PERMISSION,
-    description: `${(params.configAgentPlan?.description as string) ?? "Plan agent"} (Xuanyuan - WittyDiagnosisAgent)`,
+    description: `${(params.configAgentPlan?.description as string) ?? l(AGENT_LOCALIZATION["xuanyuan"].description, params.outputLanguage)}`,
     color: (params.configAgentPlan?.color as string) ?? "#2196F3",
     ...(temperatureToUse !== undefined ? { temperature: temperatureToUse } : {}),
     ...(topPToUse !== undefined ? { top_p: topPToUse } : {}),

@@ -2,6 +2,7 @@ import { DAYU_IDENTITY_CONSTRAINTS } from "./identity-constraints"
 import { DAYU_INTERVIEW_MODE } from "./interview-mode"
 import { DAYU_BEHAVIORAL_SUMMARY } from "./behavioral-summary"
 import { getSharedEnvPrompt } from "../shared-env-prompt"
+import { buildGlobalLanguageInstruction } from "../dynamic-agent-prompt-builder"
 
 /**
  * Combined Dayu system prompt (model-agnostic, default).
@@ -45,9 +46,10 @@ export function getDayuPromptSource(model?: string): DayuPromptSource {
  *
  * Currently returns the unified orchestration prompt for all models.
  */
-export async function getDayuPrompt(model?: string): Promise<string> {
+export async function getDayuPrompt(model?: string, outputLanguage: "zh" | "en" = "zh"): Promise<string> {
   // keep signature for future model-specific variants if needed
   void model
   const extraPrompt = await getSharedEnvPrompt()
-  return DAYU_SYSTEM_PROMPT + extraPrompt
+  const langPrompt = buildGlobalLanguageInstruction(outputLanguage)
+  return DAYU_SYSTEM_PROMPT + `\n\n${langPrompt}\n\n` + extraPrompt
 }

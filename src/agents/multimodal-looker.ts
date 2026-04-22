@@ -1,6 +1,8 @@
 import type { AgentConfig } from "@opencode-ai/sdk"
 import type { AgentMode, AgentPromptMetadata } from "./types"
 import { createAgentToolAllowlist } from "../shared/permission-compat"
+import { buildGlobalLanguageInstruction } from "./dynamic-agent-prompt-builder"
+import { AGENT_LOCALIZATION, l } from "./shared/localization"
 
 const MODE: AgentMode = "subagent"
 
@@ -11,12 +13,11 @@ export const MULTIMODAL_LOOKER_PROMPT_METADATA: AgentPromptMetadata = {
   triggers: [],
 }
 
-export function createMultimodalLookerAgent(model: string): AgentConfig {
+export function createMultimodalLookerAgent(model: string, outputLanguage: "zh" | "en" = "zh"): AgentConfig {
   const restrictions = createAgentToolAllowlist(["read"])
 
   return {
-    description:
-      "Analyze media files (PDFs, images, diagrams) that require interpretation beyond raw text. Extracts specific information or summaries from documents, describes visual content. Use when you need analyzed/extracted data rather than literal file contents. (Multimodal-Looker - WittyDiagnosisAgent)",
+    description: l(AGENT_LOCALIZATION["multimodal-looker"].description, outputLanguage),
     mode: MODE,
     model,
     temperature: 0.1,
@@ -52,7 +53,9 @@ Response rules:
 - Match the language of the request
 - Be thorough on the goal, concise on everything else
 
-Your output goes straight to the main agent for continued work.`,
+Your output goes straight to the main agent for continued work.
+
+${buildGlobalLanguageInstruction(outputLanguage)}`,
   }
 }
 createMultimodalLookerAgent.mode = MODE
