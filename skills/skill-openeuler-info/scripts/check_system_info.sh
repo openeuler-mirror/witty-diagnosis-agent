@@ -82,7 +82,7 @@ show_hardware_info() {
     # CPU信息
     echo -e "${GREEN}CPU信息:${NC}"
     if command -v lscpu &> /dev/null; then
-        lscpu | grep -E "Model name|CPU(s):|Thread(s) per core|Core(s) per socket|Socket(s):"
+        LC_ALL=C lscpu | grep -E "Model name|CPU(s):|Thread(s) per core|Core(s) per socket|Socket(s):"
     elif command -v cat &> /dev/null && [ -f "/proc/cpuinfo" ]; then
         cat /proc/cpuinfo | grep -E "model name|cpu cores" | head -n 5
     else
