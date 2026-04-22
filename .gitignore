@@ -46,6 +46,7 @@ src/experiments/
 # OS
 .DS_Store
 Thumbs.db
+*:Zone.Identifier
 share/python-wheels/
 MANIFEST
 # PyInstaller

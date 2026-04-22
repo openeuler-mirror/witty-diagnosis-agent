@@ -149,7 +149,8 @@ function enrichReportHTML(html: string) {
       return `<p style="white-space: pre-wrap; font-family: var(--font-mono);">${inner}</p>`;
     }
     // 最后的显示内容要有回车
-    if (inner.includes("报告生成时间") && inner.includes("报告保存路径")) {
+    if ((inner.includes("报告生成时间") || inner.includes("报告生成完成时间")) && 
+        (inner.includes("报告保存路径") || inner.includes("分析Agent") || inner.includes("数据来源"))) {
       return `<p style="white-space: pre-wrap; line-height: 1.8;">${inner}</p>`;
     }
     return match;
