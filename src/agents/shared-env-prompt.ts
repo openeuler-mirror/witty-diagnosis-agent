@@ -67,7 +67,7 @@ export async function getSharedEnvPrompt(): Promise<string> {
   extraPrompt += `3. **下游 Agent 引用规则** — 后续 Agent 读取前序产物时，必须引用前序输出的确切绝对路径，不得自行在目录中匹配查找。\n\n`;
   extraPrompt += `**输出格式示例：**\n`;
   extraPrompt += `\`\`\`\n`;
-  extraPrompt += `## 诊断结果\n\n已完成 XX 诊断分析。\n\n📁 **输出文件路径**：\n- 诊断报告：`/Users/leiw/.witty-diagnosis-agent/dayu/report/xxx.md`\n- 原始数据：`/Users/leiw/.witty-diagnosis-agent/kuafu/xxx.json`\n\n下一步：交由 Baize 进行根因分析\n`;
+  extraPrompt += `## 诊断结果\n\n已完成 XX 诊断分析。\n\n📁 **输出文件路径**：\n- 诊断报告：`~/.witty-diagnosis-agent/dayu/report/xxx.md`\n- 原始数据：`~/.witty-diagnosis-agent/kuafu/xxx.json`\n\n下一步：交由 Baize 进行根因分析\n`;
   extraPrompt += `\`\`\`\n`;
 
   return extraPrompt;
