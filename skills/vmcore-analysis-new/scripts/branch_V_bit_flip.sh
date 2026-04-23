@@ -145,8 +145,7 @@ extract_from_cr2_percpu() {
     local PREEMPT_OFFSET
     PREEMPT_OFFSET=$(echo "${PREEMPT_OUT}" | awk -F'=' '{print $NF}' \
         | grep -oE '(0x)?[0-9a-fA-F]{4,16}' | head -1 | sed 's/0x//' || true)
-    # 兜底：使用已知固定偏移
-    [[ -z "${PREEMPT_OFFSET}" ]] && PREEMPT_OFFSET="15c10"
+    [[ -z "${PREEMPT_OFFSET}" ]] && { warn "__preempt_count 偏移无法提取，来源3 跳过"; return 1; }
 
     local INT_BASE INT_OFFSET INT_EXPECTED
     INT_BASE=$((16#${PERCPU_BASE}))
@@ -318,7 +317,14 @@ else
 fi
 
 if echo "${RD_ACT}" | grep -qi "cannot access\|invalid\|error\|fault\|inaccessible"; then
+    # 【严重错误确证】
+    # 这是一个决定性的证据！
+    # 期望地址是合法可读的，但与之仅差 1 bit 的实际地址（CR2）完全无法读取（未映射/受保护）。
+    # 这从物理层面证明了：原本正常的指针发生了位翻转，导致 CPU 瞬间踩到了非法内存黑洞，从而触发 Page Fault 宕机。
     pass "实际地址（CR2）0x${ADDR_ACT_HEX} 不可读 → 确认为非法地址 ✓"
 else
+    # 【巧合警告】
+    # 如果翻转后的地址竟然能读出数据，说明指针翻转后“碰巧”落在了另一个合法的内存页。
+    # 这依然是严重的错误，会导致内核读到脏数据并发生逻辑崩溃，但不会直接引发 CR2 缺页异常，需要人工额外留意。
     warn "实际地址读取结果: ${RD_ACT}（若能读取，说明翻转后地址碰巧映射到其他区域）"
 fi
