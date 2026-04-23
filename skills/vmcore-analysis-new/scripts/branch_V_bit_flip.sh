@@ -108,30 +108,43 @@ extract_from_edac() {
 # ── 来源3：CR2 vs per-cpu 期望地址 XOR（原脚本核心逻辑）────────────────────
 extract_from_cr2_percpu() {
     # 从 bt -r 提取 CR2
+    # crash 输出格式示例：  CR2: ffff8f26fe4d5c10
+    # 用 grep -i 找含 CR2 的行，再用 grep -oE 取 12~16 位十六进制串（避免变长 lookbehind）
     local CR2_RAW
     CR2_RAW=$(echo "${BT_REG}" \
-        | grep -iP 'CR2' \
-        | grep -oP '(?<=[:\s])[0-9a-fA-F]{12,16}' \
+        | grep -i 'CR2' \
+        | grep -oE '[0-9a-fA-F]{12,16}' \
         | head -1 || true)
     # bt -r 找不到时，回退到 dmesg log
     [[ -z "${CR2_RAW}" ]] && \
-        CR2_RAW=$(echo "${RAW_LOG}" | grep -iP 'CR2' \
-            | grep -oP '[0-9a-fA-F]{12,16}' | head -1 || true)
+        CR2_RAW=$(echo "${RAW_LOG}" \
+            | grep -i 'CR2' \
+            | grep -oE '[0-9a-fA-F]{12,16}' | head -1 || true)
 
     [[ -z "${CR2_RAW}" ]] && { warn "CR2 无法提取，来源3 跳过"; return 1; }
 
     # 提取 per-cpu base
+    # crash 输出格式示例：
+    #   __per_cpu_offset[23] = 0xffff8fa6fe4c0000
+    #   $1 = 18446612134651961344       ← 十进制，无 0x
+    # 用 awk 按 = 号切割取最后一列，再过滤十六进制/十进制数值，兼容所有格式
     local PERCPU_BASE
-    PERCPU_BASE=$(echo "${PERCPU_OUT}" \
-        | grep -oP '(?<==\s{0,4})0x[0-9a-fA-F]+|[0-9a-fA-F]{12,16}' \
-        | head -1 | sed 's/0x//' || true)
+    PERCPU_BASE=$(echo "${PERCPU_OUT}" | awk -F'=' '{print $NF}' \
+        | grep -oE '(0x)?[0-9a-fA-F]{12,16}' | head -1 | sed 's/0x//' || true)
+    # 若 crash 输出的是十进制大整数，用 python3 转换
+    if [[ -z "${PERCPU_BASE}" ]]; then
+        local DEC_VAL
+        DEC_VAL=$(echo "${PERCPU_OUT}" | awk -F'=' '{print $NF}' \
+            | grep -oE '[0-9]{15,20}' | head -1 || true)
+        [[ -n "${DEC_VAL}" ]] && \
+            PERCPU_BASE=$(python3 -c "print(format(${DEC_VAL}, 'x'))" 2>/dev/null || true)
+    fi
     [[ -z "${PERCPU_BASE}" ]] && { warn "__per_cpu_offset 无法提取，来源3 跳过"; return 1; }
 
-    # 提取 __preempt_count 偏移
+    # 提取 __preempt_count 偏移（同样用 awk + 宽字符类正则，避免变长 lookbehind）
     local PREEMPT_OFFSET
-    PREEMPT_OFFSET=$(echo "${PREEMPT_OUT}" \
-        | grep -oP '(?<==\s{0,4})0x[0-9a-fA-F]+|[0-9a-fA-F]{4,16}' \
-        | head -1 | sed 's/0x//' || true)
+    PREEMPT_OFFSET=$(echo "${PREEMPT_OUT}" | awk -F'=' '{print $NF}' \
+        | grep -oE '(0x)?[0-9a-fA-F]{4,16}' | head -1 | sed 's/0x//' || true)
     # 兜底：使用已知固定偏移
     [[ -z "${PREEMPT_OFFSET}" ]] && PREEMPT_OFFSET="15c10"
 
