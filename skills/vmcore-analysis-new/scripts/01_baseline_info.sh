@@ -35,20 +35,74 @@ OUT_DIR="/tmp/vmcore_analysis_$(date +%Y%m%d%H%M%S)"
 mkdir -p "${OUT_DIR}"
 echo "并行收集临时目录: ${OUT_DIR}"
 
+CRASH_TIMEOUT_COMMON="${CRASH_TIMEOUT_COMMON:-600s}"
+CRASH_TIMEOUT_LOG="${CRASH_TIMEOUT_LOG:-900s}"
+CRASH_TIMEOUT_BT_A="${CRASH_TIMEOUT_BT_A:-900s}"
+CRASH_TIMEOUT_DIS="${CRASH_TIMEOUT_DIS:-180s}"
+
 # 封装 crash 命令执行，改为后台并行执行并输出到文件
 # 参数1: crash内部命令, 参数2: 输出文件名, 参数3: 描述信息
 run_crash_async() {
   local cmd="$1"
   local out_file="${OUT_DIR}/$2"
+  local raw_file="${out_file}.raw"
+  local err_file="${out_file}.err"
   local desc="$3"
+  local timeout_s="${4:-${CRASH_TIMEOUT_COMMON}}"
   echo "正在收集: ${desc} ..."
   (
-    if echo "$cmd" | timeout 180s crash -s "${VMLINUX}" "${VMCORE}" 2>/dev/null | grep -v "^WARNING: active task" > "${out_file}"; then
+    if ! command -v crash >/dev/null 2>&1; then
+      echo "crash 命令不存在（PATH: ${PATH}）" > "${err_file}"
+      : > "${out_file}"
+      echo "  [失败] ${desc} -> ${out_file} (stderr: ${err_file})" >> "${OUT_DIR}/summary.txt"
+      exit 0
+    fi
+
+    set +e
+    printf '%s\nquit\n' "$cmd" | timeout "${timeout_s}" crash -s "${VMLINUX}" "${VMCORE}" > "${raw_file}" 2>"${err_file}"
+    local crash_rc=$?
+    set -e
+
+    grep -v "^WARNING: active task" "${raw_file}" > "${out_file}" || true
+
+    if [[ $crash_rc -eq 0 ]]; then
+      rm -f "${raw_file}" "${err_file}" || true
       echo "  [成功] ${desc} -> ${out_file}" >> "${OUT_DIR}/summary.txt"
     else
-      echo "  [失败/超时] ${desc} -> ${out_file}" >> "${OUT_DIR}/summary.txt"
+      echo "  [失败/超时 rc=${crash_rc}] ${desc} -> ${out_file} (stderr: ${err_file})" >> "${OUT_DIR}/summary.txt"
     fi
   ) &
+}
+
+run_crash_sync() {
+  local cmd="$1"
+  local out_file="${OUT_DIR}/$2"
+  local raw_file="${out_file}.raw"
+  local err_file="${out_file}.err"
+  local desc="$3"
+  local timeout_s="$4"
+
+  echo "正在收集: ${desc} ..."
+  if ! command -v crash >/dev/null 2>&1; then
+    echo "crash 命令不存在（PATH: ${PATH}）" > "${err_file}"
+    : > "${out_file}"
+    echo "  [失败] ${desc} -> ${out_file} (stderr: ${err_file})" >> "${OUT_DIR}/summary.txt"
+    return 0
+  fi
+
+  set +e
+  printf '%s\nquit\n' "$cmd" | timeout "${timeout_s}" crash -s "${VMLINUX}" "${VMCORE}" > "${raw_file}" 2>"${err_file}"
+  local crash_rc=$?
+  set -e
+
+  grep -v "^WARNING: active task" "${raw_file}" > "${out_file}" || true
+
+  if [[ $crash_rc -eq 0 ]]; then
+    rm -f "${raw_file}" "${err_file}" || true
+    echo "  [成功] ${desc} -> ${out_file}" >> "${OUT_DIR}/summary.txt"
+  else
+    echo "  [失败/超时 rc=${crash_rc}] ${desc} -> ${out_file} (stderr: ${err_file})" >> "${OUT_DIR}/summary.txt"
+  fi
 }
 
 # 检测源码目录
@@ -66,6 +120,7 @@ echo " 生成时间：$(date)" >> "${OUT_DIR}/summary.txt"
 echo " vmcore  ：${VMCORE}" >> "${OUT_DIR}/summary.txt"
 echo " vmlinux ：${VMLINUX}" >> "${OUT_DIR}/summary.txt"
 echo " 源码目录：${SRC_STATUS}" >> "${OUT_DIR}/summary.txt"
+echo " 超时设置：common=${CRASH_TIMEOUT_COMMON}, log=${CRASH_TIMEOUT_LOG}, bt-a=${CRASH_TIMEOUT_BT_A}, dis=${CRASH_TIMEOUT_DIS}" >> "${OUT_DIR}/summary.txt"
 echo " 结果目录：${OUT_DIR}" >> "${OUT_DIR}/summary.txt"
 echo "==================================================================" >> "${OUT_DIR}/summary.txt"
 echo "" >> "${OUT_DIR}/summary.txt"
@@ -75,15 +130,15 @@ echo ""
 echo "正在并行收集各项信息，请耐心等待..."
 echo "------------------------------------------------------------------"
 
-run_crash_async 'sys'    "sys.txt"    "系统基础信息 (sys)"
-run_crash_async 'log'    "log.txt"    "内核日志 (log)"
-run_crash_async 'bt'     "bt.txt"     "当前崩溃调用栈 (bt)"
-run_crash_async 'bt -l'  "bt_l.txt"  "带行号调用栈 (bt -l)"
-run_crash_async 'bt -a'  "bt_a.txt"  "所有CPU调用栈 (bt -a)"
-run_crash_async 'bt -f'  "bt_f.txt"  "调用栈与寄存器 (bt -f)"
-run_crash_async 'mod'    "mod.txt"    "已加载内核模块 (mod)"
-run_crash_async 'kmem -i' "kmem_i.txt" "内存状态概览 (kmem -i)"
-run_crash_async 'ps'     "ps.txt"     "进程状态概览 (ps)"
+run_crash_async 'sys'    "sys.txt"    "系统基础信息 (sys)" "${CRASH_TIMEOUT_COMMON}"
+run_crash_async 'log'    "log.txt"    "内核日志 (log)" "${CRASH_TIMEOUT_LOG}"
+run_crash_async 'bt'     "bt.txt"     "当前崩溃调用栈 (bt)" "${CRASH_TIMEOUT_COMMON}"
+run_crash_async 'bt -l'  "bt_l.txt"  "带行号调用栈 (bt -l)" "${CRASH_TIMEOUT_COMMON}"
+run_crash_async 'bt -a'  "bt_a.txt"  "所有CPU调用栈 (bt -a)" "${CRASH_TIMEOUT_BT_A}"
+run_crash_async 'bt -f'  "bt_f.txt"  "调用栈与寄存器 (bt -f)" "${CRASH_TIMEOUT_COMMON}"
+run_crash_async 'mod'    "mod.txt"    "已加载内核模块 (mod)" "${CRASH_TIMEOUT_COMMON}"
+run_crash_async 'kmem -i' "kmem_i.txt" "内存状态概览 (kmem -i)" "${CRASH_TIMEOUT_COMMON}"
+run_crash_async 'ps'     "ps.txt"     "进程状态概览 (ps)" "${CRASH_TIMEOUT_COMMON}"
 
 wait
 
@@ -92,12 +147,7 @@ wait
 # --------------------------------------------------------------------------
 RIP_FUNC=$(grep -m 1 -E '^ *#0' "${OUT_DIR}/bt.txt" 2>/dev/null | awk '{print $NF}' || true)
 if [[ -n "$RIP_FUNC" ]]; then
-  echo "正在收集: 崩溃地址反汇编 (dis -l $RIP_FUNC) ..."
-  if echo "dis -l $RIP_FUNC" | timeout 60s crash -s "${VMLINUX}" "${VMCORE}" 2>/dev/null | grep -v "^WARNING: active task" > "${OUT_DIR}/dis_l.txt"; then
-    echo "  [成功] 崩溃地址反汇编 (dis) -> ${OUT_DIR}/dis_l.txt" >> "${OUT_DIR}/summary.txt"
-  else
-    echo "  [失败/超时] 崩溃地址反汇编 (dis) -> ${OUT_DIR}/dis_l.txt" >> "${OUT_DIR}/summary.txt"
-  fi
+  run_crash_sync "dis -l ${RIP_FUNC}" "dis_l.txt" "崩溃地址反汇编 (dis -l ${RIP_FUNC})" "${CRASH_TIMEOUT_DIS}"
 else
   echo "  [跳过] 崩溃地址反汇编 (dis) -> 未提取到 RIP_FUNC" >> "${OUT_DIR}/summary.txt"
 fi
