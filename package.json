@@ -11,6 +11,9 @@
   },
   "license": "MIT",
   "author": "witty-diagnosis-agent",
+  "engines": {
+    "node": ">=20.0.0"
+  },
   "type": "module",
   "main": "dist/index.js",
   "exports": {
