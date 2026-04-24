@@ -1,4 +1,5 @@
 import { FUXI_SUB_PERMISSION, getFuxiSubPrompt } from "../agents/fuxi/fuxi-sub/system-prompt";
+import { AGENT_LOCALIZATION, l } from "../agents/shared/localization";
 import { resolvePromptAppend } from "../agents/builtin-agents/resolve-file-uri";
 import { AGENT_MODEL_REQUIREMENTS } from "../shared/model-requirements";
 import {
@@ -27,6 +28,7 @@ export async function buildFuxiSubAgentConfig(params: {
   pluginFuxiSubOverride: FuxiSubOverride | undefined;
   userCategories: Record<string, CategoryConfig> | undefined;
   currentModel: string | undefined;
+  outputLanguage: "zh" | "en";
 }): Promise<Record<string, unknown>> {
   const categoryConfig = params.pluginFuxiSubOverride?.category
     ? resolveCategoryConfig(params.pluginFuxiSubOverride.category, params.userCategories)
@@ -69,9 +71,9 @@ export async function buildFuxiSubAgentConfig(params: {
     ...(resolvedModel ? { model: resolvedModel } : {}),
     ...(variantToUse ? { variant: variantToUse } : {}),
     mode: "subagent",
-    prompt: await getFuxiSubPrompt(resolvedModel),
+    prompt: await getFuxiSubPrompt(resolvedModel, params.outputLanguage),
     permission: FUXI_SUB_PERMISSION,
-    description: `${(params.configAgentPlan?.description as string) ?? "Plan agent"} (FuxiSub - WittyDiagnosisAgent)`,
+    description: `${(params.configAgentPlan?.description as string) ?? l(AGENT_LOCALIZATION["fuxi-sub"].description, params.outputLanguage)}`,
     color: (params.configAgentPlan?.color as string) ?? "#FF5722",
     ...(temperatureToUse !== undefined ? { temperature: temperatureToUse } : {}),
     ...(topPToUse !== undefined ? { top_p: topPToUse } : {}),

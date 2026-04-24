@@ -17,9 +17,10 @@ export function buildAgent(
   categories?: CategoriesConfig,
   gitMasterConfig?: GitMasterConfig,
   browserProvider?: BrowserAutomationProvider,
-  disabledSkills?: Set<string>
+  disabledSkills?: Set<string>,
+  outputLanguage?: "zh" | "en"
 ): AgentConfig {
-  const base = isFactory(source) ? source(model) : { ...source }
+  const base = isFactory(source) ? source(model, outputLanguage) : { ...source }
   const categoryConfigs: Record<string, CategoryConfig> = mergeCategories(categories)
 
   const agentWithCategory = base as AgentConfig & { category?: string; skills?: string[]; variant?: string }

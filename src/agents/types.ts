@@ -12,7 +12,7 @@ export type AgentMode = "primary" | "subagent" | "all"
  * Agent factory function with static mode property.
  * Mode is exposed as static property for pre-instantiation access.
  */
-export type AgentFactory = ((model: string) => AgentConfig) & {
+export type AgentFactory = ((model: string, outputLanguage?: "zh" | "en") => AgentConfig) & {
   mode: AgentMode
 }
 

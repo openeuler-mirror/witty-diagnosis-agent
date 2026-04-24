@@ -5,6 +5,7 @@ import { FUXI_PLAN_TEMPLATE } from "./plan-template"
 import { FUXI_BEHAVIORAL_SUMMARY } from "./behavioral-summary"
 import { isGptModel, isGeminiModel } from "../../types"
 import { getSharedEnvPrompt } from "../../shared-env-prompt"
+import { buildGlobalLanguageInstruction } from "../../dynamic-agent-prompt-builder"
 
 /**
  * Combined Fuxi-Sub system prompt
@@ -21,7 +22,9 @@ export const FUXI_SUB_PERMISSION = {
   webfetch: "allow" as const,
 }
 
-export async function getFuxiSubPrompt(model?: string): Promise<string> {
+export async function getFuxiSubPrompt(model?: string, outputLanguage: "zh" | "en" = "zh"): Promise<string> {
+  void model;
   const extraPrompt = await getSharedEnvPrompt();
-  return FUXI_SUB_SYSTEM_PROMPT + extraPrompt;
+  const langPrompt = buildGlobalLanguageInstruction(outputLanguage);
+  return FUXI_SUB_SYSTEM_PROMPT + `\n\n${langPrompt}\n\n` + extraPrompt;
 }

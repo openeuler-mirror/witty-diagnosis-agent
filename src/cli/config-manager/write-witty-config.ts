@@ -43,7 +43,7 @@ export function writeWittyConfig(installConfig: InstallConfig): ConfigMergeResul
           return { success: true, configPath: wittyConfigPath }
         }
 
-        const merged = deepMergeRecord(newConfig, existing)
+        const merged = deepMergeRecord(existing, newConfig)
         writeFileSync(wittyConfigPath, JSON.stringify(merged, null, 2) + "\n")
       } catch (parseErr) {
         if (parseErr instanceof SyntaxError) {

@@ -5,6 +5,7 @@ import { FUXI_PLAN_TEMPLATE } from "./plan-template"
 import { FUXI_BEHAVIORAL_SUMMARY } from "./behavioral-summary"
 import { isGptModel, isGeminiModel } from "../../types"
 import { getSharedEnvPrompt } from "../../shared-env-prompt"
+import { buildGlobalLanguageInstruction } from "../../dynamic-agent-prompt-builder"
 
 /**
  * Combined Fuxi system prompt (Claude-optimized, default).
@@ -49,7 +50,8 @@ export function getFuxiPromptSource(model?: string): FuxiPromptSource {
  * Gemini models → Gemini-optimized prompt (aggressive tool-call enforcement, thinking checkpoints)
  * Default (Claude, etc.) → Claude-optimized prompt (modular sections)
  */
-export async function getFuxiPrompt(model?: string): Promise<string> {
+export async function getFuxiPrompt(model?: string, outputLanguage: "zh" | "en" = "zh"): Promise<string> {
   const extraPrompt = await getSharedEnvPrompt();
-  return FUXI_SYSTEM_PROMPT + extraPrompt;
+  const langPrompt = buildGlobalLanguageInstruction(outputLanguage);
+  return FUXI_SYSTEM_PROMPT + `\n\n${langPrompt}\n\n` + extraPrompt;
 }

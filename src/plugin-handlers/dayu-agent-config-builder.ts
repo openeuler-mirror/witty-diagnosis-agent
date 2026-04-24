@@ -1,4 +1,5 @@
 import { DAYU_PERMISSION, getDayuPrompt } from "../agents/dayu";
+import { AGENT_LOCALIZATION, l } from "../agents/shared/localization";
 import { resolvePromptAppend } from "../agents/builtin-agents/resolve-file-uri";
 import { AGENT_MODEL_REQUIREMENTS } from "../shared/model-requirements";
 import {
@@ -27,6 +28,7 @@ export async function buildDayuAgentConfig(params: {
   pluginDayuOverride: DayuOverride | undefined;
   userCategories: Record<string, CategoryConfig> | undefined;
   currentModel: string | undefined;
+  outputLanguage: "zh" | "en";
 }): Promise<Record<string, unknown>> {
   const categoryConfig = params.pluginDayuOverride?.category
     ? resolveCategoryConfig(params.pluginDayuOverride.category, params.userCategories)
@@ -69,9 +71,9 @@ export async function buildDayuAgentConfig(params: {
     ...(resolvedModel ? { model: resolvedModel } : {}),
     ...(variantToUse ? { variant: variantToUse } : {}),
     mode: "all",
-    prompt: await getDayuPrompt(resolvedModel),
+    prompt: await getDayuPrompt(resolvedModel, params.outputLanguage),
     permission: DAYU_PERMISSION,
-    description: `${(params.configAgentPlan?.description as string) ?? "Plan agent"} (Dayu - WittyDiagnosisAgent)`,
+    description: `${(params.configAgentPlan?.description as string) ?? l(AGENT_LOCALIZATION["dayu"].description, params.outputLanguage)}`,
     color: (params.configAgentPlan?.color as string) ?? "#2196F3",
     ...(temperatureToUse !== undefined ? { temperature: temperatureToUse } : {}),
     ...(topPToUse !== undefined ? { top_p: topPToUse } : {}),

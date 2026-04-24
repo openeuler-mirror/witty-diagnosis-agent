@@ -11,6 +11,8 @@
 import type { AgentConfig } from "@opencode-ai/sdk"
 import type { AgentMode, AgentPromptMetadata } from "../types"
 import { getSharedEnvPrompt } from "../shared-env-prompt"
+import { buildGlobalLanguageInstruction } from "../dynamic-agent-prompt-builder"
+import { AGENT_LOCALIZATION, l } from "../shared/localization"
 
 const MODE: AgentMode = "all"
 
@@ -48,11 +50,7 @@ system cracks and restore service stability.
 You are a **Solution Architect & Remediation Expert**, not a front-line diagnostician.
 </identity>
 
-<language_and_style>
-- 默认情况下，你必须使用**简体中文**进行修复方案与操作步骤的表达。
-- 当需要引用代码、配置项、命令、脚本等技术细节时，必须原样保留英文并使用合适的 Markdown 代码块；
-- 每一个复杂操作步骤后，应有简短的中文解释，说明该操作的目的。
-</language_and_style>
+{{GLOBAL_LANGUAGE_INSTRUCTION}}
 
 <mission>
 Execute the Phase 4 remediation task based on diagnostic evidence:
@@ -372,24 +370,25 @@ export const NUWA_SUB_PERMISSION = {
   call_witty_agent: "deny" as const,
 }
 
-export async function getNuwaPrompt(): Promise<string> {
+export async function getNuwaPrompt(outputLanguage: "zh" | "en" = "zh"): Promise<string> {
   const extraPrompt = await getSharedEnvPrompt();
-  return NUWA_SYSTEM_PROMPT + extraPrompt;
+  const langPrompt = buildGlobalLanguageInstruction(outputLanguage);
+  return NUWA_SYSTEM_PROMPT.replace("{{GLOBAL_LANGUAGE_INSTRUCTION}}", langPrompt) + extraPrompt;
 }
 
-export async function getNuwaSubPrompt(): Promise<string> {
+export async function getNuwaSubPrompt(outputLanguage: "zh" | "en" = "zh"): Promise<string> {
   const extraPrompt = await getSharedEnvPrompt();
-  return NUWA_SUB_SYSTEM_PROMPT + extraPrompt;
+  const langPrompt = buildGlobalLanguageInstruction(outputLanguage);
+  return NUWA_SUB_SYSTEM_PROMPT.replace("{{GLOBAL_LANGUAGE_INSTRUCTION}}", langPrompt) + extraPrompt;
 }
 
-export async function createNuwaAgent(ctx: NuwaContext): Promise<AgentConfig> {
+export async function createNuwaAgent(ctx: NuwaContext, outputLanguage: "zh" | "en" = "zh"): Promise<AgentConfig> {
   const baseConfig: AgentConfig = {
-    description:
-      "Generates remediation plans, immediate fixes, and root cause solutions based on diagnostic findings. (Nuwa - WittyDiagnosisAgent)",
+    description: l(AGENT_LOCALIZATION["nuwa"].description, outputLanguage),
     mode: MODE,
     ...(ctx.model ? { model: ctx.model } : {}),
     temperature: 0.2,
-    prompt: await getNuwaPrompt(),
+    prompt: await getNuwaPrompt(outputLanguage),
     color: "#22C55E", // Green for healing/fixing
     permission: NUWA_PERMISSION as AgentConfig["permission"],
   }
@@ -399,14 +398,13 @@ export async function createNuwaAgent(ctx: NuwaContext): Promise<AgentConfig> {
 
 createNuwaAgent.mode = MODE
 
-export async function createNuwaSubAgent(ctx: NuwaSubContext): Promise<AgentConfig> {
+export async function createNuwaSubAgent(ctx: NuwaSubContext, outputLanguage: "zh" | "en" = "zh"): Promise<AgentConfig> {
   const baseConfig: AgentConfig = {
-    description:
-      "Generates remediation plans and execution-ready recovery steps in subagent mode. (Nuwa-Sub - WittyDiagnosisAgent)",
+    description: l(AGENT_LOCALIZATION["nuwa-sub"] || AGENT_LOCALIZATION["nuwa"], outputLanguage),
     mode: "subagent",
     ...(ctx.model ? { model: ctx.model } : {}),
     temperature: 0.2,
-    prompt: await getNuwaSubPrompt(),
+    prompt: await getNuwaSubPrompt(outputLanguage),
     color: "#22C55E",
     permission: NUWA_SUB_PERMISSION as AgentConfig["permission"],
   }

@@ -1,16 +1,30 @@
 import type { DetectedConfig, InstallConfig } from "./types"
 import { detectedToInitialValues } from "./install-validators"
+import { select, isCancel } from "@clack/prompts"
+import pc from "picocolors"
 
 /**
- * Non-interactive TUI config:
- *
- * For your local workflow we don't want any interactive "Do you have X subscription?"
- * questions. This helper now derives an InstallConfig purely from detected defaults,
- * without prompting the user. All providers default to "no" unless already present
- * in the existing config.
+ * Interactive TUI config:
+ * Prompts user for language preference since this is critical.
+ * Other provider configs are derived automatically for now.
  */
 export async function promptInstallConfig(detected: DetectedConfig): Promise<InstallConfig | null> {
   const initial = detectedToInitialValues(detected)
+
+  const languageResult = await select({
+    message: "Select output language for Witty Diagnosis Agent / 选择 Witty Diagnosis Agent 的输出语言\n  (This affects all agents' reasoning, response, and report / 影响所有 Agent 的思考、回复和生成的报告)",
+    options: [
+      { value: "zh", label: "简体中文 (zh)" },
+      { value: "en", label: "English (en)" },
+    ],
+    initialValue: initial.outputLanguage ?? "zh",
+  })
+
+  if (isCancel(languageResult)) {
+    return null
+  }
+
+  const outputLanguage = languageResult as "zh" | "en"
 
   const claude = initial.claude ?? "no"
   const openai = initial.openai ?? "no"
@@ -29,5 +43,6 @@ export async function promptInstallConfig(detected: DetectedConfig): Promise<Ins
     hasOpencodeZen: opencodeZen === "yes",
     hasZaiCodingPlan: zaiCodingPlan === "yes",
     hasKimiForCoding: kimiForCoding === "yes",
+    outputLanguage,
   }
 }

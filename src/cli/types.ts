@@ -11,6 +11,7 @@ export interface InstallArgs {
   opencodeZen?: string
   zaiCodingPlan?: string
   kimiForCoding?: string
+  outputLanguage?: "zh" | "en"
 }
 
 export interface InstallConfig {
@@ -22,6 +23,7 @@ export interface InstallConfig {
   hasOpencodeZen: boolean
   hasZaiCodingPlan: boolean
   hasKimiForCoding: boolean
+  outputLanguage: "zh" | "en"
 }
 
 export interface ConfigMergeResult {
@@ -40,4 +42,5 @@ export interface DetectedConfig {
   hasOpencodeZen: boolean
   hasZaiCodingPlan: boolean
   hasKimiForCoding: boolean
+  outputLanguage?: "zh" | "en"
 }

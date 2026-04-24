@@ -36,6 +36,7 @@ export function generateModelConfig(config: InstallConfig): GeneratedWittyConfig
   if (!hasAnyProvider) {
     return {
       $schema: SCHEMA_URL,
+      output_language: config.outputLanguage ?? "zh",
       agents: Object.fromEntries(
         Object.entries(CLI_AGENT_MODEL_REQUIREMENTS)
           .filter(([role, req]) => !(role === "sisyphus" && req.requiresAnyModel))
@@ -117,6 +118,7 @@ export function generateModelConfig(config: InstallConfig): GeneratedWittyConfig
 
   return {
     $schema: SCHEMA_URL,
+    output_language: config.outputLanguage ?? "zh",
     agents,
     categories,
   }

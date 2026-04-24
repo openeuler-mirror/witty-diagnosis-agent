@@ -149,6 +149,10 @@ export function validateNonTuiArgs(args: InstallArgs): { valid: boolean; errors:
     errors.push(`Invalid --kimi-for-coding value: ${args.kimiForCoding} (expected: no, yes)`)
   }
 
+  if (args.outputLanguage !== undefined && !["zh", "en"].includes(args.outputLanguage)) {
+    errors.push(`Invalid --output-language value: ${args.outputLanguage} (expected: zh, en)`)
+  }
+
   return { valid: errors.length === 0, errors }
 }
 
@@ -162,6 +166,7 @@ export function argsToConfig(args: InstallArgs): InstallConfig {
     hasOpencodeZen: args.opencodeZen === "yes",
     hasZaiCodingPlan: args.zaiCodingPlan === "yes",
     hasKimiForCoding: args.kimiForCoding === "yes",
+    outputLanguage: (args.outputLanguage as "zh" | "en") ?? "zh",
   }
 }
 
@@ -173,6 +178,7 @@ export function detectedToInitialValues(detected: DetectedConfig): {
   opencodeZen: BooleanArg
   zaiCodingPlan: BooleanArg
   kimiForCoding: BooleanArg
+  outputLanguage: "zh" | "en"
 } {
   let claude: ClaudeSubscription = "no"
   if (detected.hasClaude) {
@@ -187,6 +193,7 @@ export function detectedToInitialValues(detected: DetectedConfig): {
     opencodeZen: detected.hasOpencodeZen ? "yes" : "no",
     zaiCodingPlan: detected.hasZaiCodingPlan ? "yes" : "no",
     kimiForCoding: detected.hasKimiForCoding ? "yes" : "no",
+    outputLanguage: detected.outputLanguage ?? "zh",
   }
 }
 

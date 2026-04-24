@@ -5,7 +5,8 @@ import type {
   AvailableSkill,
   AvailableCategory,
 } from "../dynamic-agent-prompt-builder";
-import { categorizeTools } from "../dynamic-agent-prompt-builder";
+import { categorizeTools, buildGlobalLanguageInstruction } from "../dynamic-agent-prompt-builder";
+import { AGENT_LOCALIZATION, l } from "../shared/localization";
 
 export const MODE = "all";
 
@@ -104,6 +105,7 @@ export function buildBaizePrompt(
   skills: AvailableSkill[],
   categories: AvailableCategory[],
   useTaskSystem: boolean,
+  outputLanguage: "zh" | "en",
 ): string {
   const skillsGuide = skills.length > 0 ? `
 ### 关于分析类 Skills 的使用 (Analytical Skills)
@@ -137,14 +139,7 @@ ${skills.map(s => `- **\`${s.name}\`**: ${s.description}`).join("\n")}
 
 当遇到阻塞时：优先尝试换思路、拆解问题、挑战隐含假设、参考历史案例；向用户提问只能作为最后手段。
 
-## Language & Style
-
-- 默认情况下，你必须使用**简体中文**进行分析、推理、结论与建议的表达。
-  - 只有当用户**明确要求用英文分析**时，才能整体切换为英文输出；否则，即便问题中包含部分英文，也要以中文为主。
-  - 你可以引用少量英文片段（如日志行、字段名、错误信息），但这些英文只能作为「证据原文」，必须配套中文解释与总结。
-- 对于本项目的诊断场景：
-  - **分析结论、影响评估、以及后续建议，一律用清晰的简体中文表达。**
-  - 禁止输出大段只包含英文的分析段落；如需展示较长英文日志或堆栈，必须在前后用中文解释其含义和结论。
+${buildGlobalLanguageInstruction(outputLanguage)}
 
 ## Intelligent O&M Analysis Context (Phase 1.4 - Baize)
 
@@ -215,6 +210,7 @@ export function createBaizeAgent(
   availableSkills?: AvailableSkill[],
   availableCategories?: AvailableCategory[],
   useTaskSystem = false,
+  outputLanguage: "zh" | "en" = "zh",
 ): AgentConfig {
   const tools = availableToolNames ? categorizeTools(availableToolNames) : [];
   const skills = availableSkills ?? [];
@@ -226,12 +222,12 @@ export function createBaizeAgent(
         skills,
         categories,
         useTaskSystem,
+        outputLanguage,
       )
-    : buildBaizePrompt([], tools, skills, categories, useTaskSystem);
+    : buildBaizePrompt([], tools, skills, categories, useTaskSystem, outputLanguage);
 
   return {
-    description:
-      "Baize (Analysis & Report) — Phase 1.4 \"白泽 / Baize - 分析与报告\" agent for the Intelligent O&M System. Dynamically loads skills based on scenarios (Fault Diagnosis, Health Inspection, etc.). Reads upstream reports, aggregates evidence, performs core analysis according to the loaded skill, and writes final structured reports to ~/.witty-diagnosis-agent/baize/reports/. (Baize - WittyDiagnosisAgent)",
+    description: l(AGENT_LOCALIZATION["baize"].description, outputLanguage),
     mode: MODE,
     ...(model ? { model } : {}),
     maxTokens: 32000,
