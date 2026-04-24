@@ -18,13 +18,13 @@ Bit Flip 检查工具 - 验证两值 XOR 是否为 2 的幂（即是否仅 1-bit
     $0 --help | -h
 
 参数:
-    expected_value    预期值（十进制或十六进制，如 69、0x45、0xffff8fa6fe4d0000）
+    expected_value    预期值（十进制或十六进制，如 100、0xDEADBEEF、0xfffffffbb3a01000）
     actual_value      实际值（同上；支持完整 64 位指针，需本机有 python3）
 
 示例:
-    $0 69 134217797
-    $0 0x45 0x08000045
-    $0 0xffff8fa6fe4d5c10 0xffff8f26fe4d5c10
+    $0 100 134217828
+    $0 0xDEADBEEF 0xDEACBEEF
+    $0 0xffffffffb3a01000 0xfffffffbb3a01000
 
 EOF
     exit 0
