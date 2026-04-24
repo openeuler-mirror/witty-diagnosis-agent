@@ -59,5 +59,16 @@ export async function getSharedEnvPrompt(): Promise<string> {
   extraPrompt += `\`\`\`\n`;
   extraPrompt += `\n**注意：仅在最终结果时，才允许输出完整的无压缩的内容（如排查方案、分析报告等）。**\n`;
 
+  extraPrompt += `\n# 输出文件路径规范 (Output File Path Specification)\n`;
+  extraPrompt += `**重要：所有 Agent 协作时，必须在输出结果时明确标注输出文件的绝对路径。**\n\n`;
+  extraPrompt += `1. **结果必须包含路径** — 每当生成文件（报告、计划、诊断结果等）时，必须在输出末尾明确标注：\n`;
+  extraPrompt += `   📁 **输出文件路径**：`{绝对路径}`\n\n`;
+  extraPrompt += `2. **路径必须是绝对路径** — 禁止使用 \`~\`、相对路径或通配符，必须给出完整绝对路径。\n\n`;
+  extraPrompt += `3. **下游 Agent 引用规则** — 后续 Agent 读取前序产物时，必须引用前序输出的确切绝对路径，不得自行在目录中匹配查找。\n\n`;
+  extraPrompt += `**输出格式示例：**\n`;
+  extraPrompt += `\`\`\`\n`;
+  extraPrompt += `## 诊断结果\n\n已完成 XX 诊断分析。\n\n📁 **输出文件路径**：\n- 诊断报告：`~/.witty-diagnosis-agent/dayu/report/xxx.md`\n- 原始数据：`~/.witty-diagnosis-agent/kuafu/xxx.json`\n\n下一步：交由 Baize 进行根因分析\n`;
+  extraPrompt += `\`\`\`\n`;
+
   return extraPrompt;
 }
