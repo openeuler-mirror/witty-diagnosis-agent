@@ -50,7 +50,7 @@ print_step 1 4 "Checking Environment"
 
 # Node.js Check
 if ! command -v node &> /dev/null; then
-  print_error "Node.js not found. Please install Node.js (>=18.0.0)."
+  print_error "Node.js not found. Please install Node.js (>=20.0.0)."
   exit 1
 fi
 

@@ -48,7 +48,7 @@ Witty 智能诊断Agent采用“Agent-Skill-工具-知识”四层解耦架构�
 
 ## 环境要求
 
-- 运行环境：Node.js (>=18.0.0)
+- 运行环境：Node.js (>=20.0.0)
 - 依赖工具：已安装[OpenCode](https://opencode.ai/)
 - 依赖工具：已安装 [Ansible](https://docs.ansible.com/ansible/latest/installation_guide/)（`ansible` 命令须在系统 PATH 中可用，可通过 `ansible --version` 提前验证）
 
