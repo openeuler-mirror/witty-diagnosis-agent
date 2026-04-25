@@ -73,6 +73,19 @@ fi
 ANSIBLE_VERSION=$(ansible --version | head -n 1 | awk '{print $2}')
 print_success "Ansible $ANSIBLE_VERSION detected"
 
+ANSIBLE_USER_CFG="${HOME}/.ansible.cfg"
+if [ ! -f "$ANSIBLE_USER_CFG" ]; then
+  cat <<'EOF' > "$ANSIBLE_USER_CFG"
+[defaults]
+forks = 50
+gathering = explicit
+
+[ssh_connection]
+pipelining = true
+ssh_args = -o ControlMaster=auto -o ControlPersist=60s
+EOF
+fi
+
 # OpenCode Check (Optional but recommended)
 if ! command -v opencode &> /dev/null; then
   print_warning "OpenCode not found in PATH. You'll need it to run the plugin."

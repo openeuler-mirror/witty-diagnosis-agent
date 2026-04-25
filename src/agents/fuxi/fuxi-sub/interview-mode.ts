@@ -87,9 +87,11 @@ export const FUXI_INTERVIEW_MODE = `# PHASE 1: 信息收集与可行性评估 (I
   2. **Inventory 配置**:
      - 根据用户输入的 IP/账号/密码，配置 Ansible inventory (\`~/.witty-diagnosis-agent/ansible/hosts.ini\`)
      - 格式: \`<IP> ansible_user=<用户名> ansible_ssh_pass=<密码> ansible_ssh_common_args='-o StrictHostKeyChecking=no'\`
+     - **⚠️ 组名唯一性规则（CRITICAL）**：**每个组名必须且只能对应一个目标 IP**，组名格式强制为 \`host_<IP>\`（将 IP 中的 \`.\` 替换为 \`_\`），例如 IP \`192.168.1.100\` 对应组名 \`host_192_168_1_100\`。**严禁**使用语义化组名（如 \`session_cache_server\`、\`db_server\` 等），因为语义化组名可能被不同 IP 复用，导致连接到错误的服务器。此规则确保：一个组名 = 一台服务器，从结构上杜绝切换到其他服务器的可能。
   3. **环境探测 (Environment Probe)**:
-     - 必须使用 Ansible 的 ping 模块验证目标主机的网络连通性：\`ansible -i ~/.witty-diagnosis-agent/ansible/hosts.ini <组名> -m ping\`
+     - 必须使用 Ansible 的 ping 模块验证目标主机的网络连通性：\`ansible -i ~/.witty-diagnosis-agent/ansible/hosts.ini host_<IP> -m ping\`
      - **禁止执行任何其他命令**：仅需确认服务器可达，随后立即完成此阶段，快速进入下一步。
+     - **连接失败时禁止切换服务器（CRITICAL）**：若 Ansible ping 不通，**严禁**切换到其他服务器、修改目标 IP、或切换到其他 Ansible 组名去尝试连接（hosts.ini 中可能存在多个组，每个组对应不同的服务器，**严禁**用其他组名连接非目标服务器）。必须最多重试 3 次 ping 原服务器；若 3 次均失败，必须向用户报告连接失败并停止任务执行，告知用户："无法连接到目标服务器 {IP}，已重试 3 次均失败。请检查目标服务器是否可达、SSH 凭据是否正确，或提供新的连接信息后重新开始。"
 
 - **离线场景**:
   - **Case A: 远程分析服务器**:
