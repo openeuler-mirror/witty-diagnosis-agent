@@ -161,6 +161,13 @@ Usage Examples:
         print("\n>>> OS Messages Diagnosis Results:")
         print(run_diagnose_script("diagnose_messages.py", sub_dirs["OS Messages"], pass_args))
 
+    # Step 3: Health rule compliance (no time filtering — snapshot-based).
+    # Prefer infocollect_logs as the primary input, fall back to root_dir.
+    health_input = sub_dirs["InfoCollect"] if os.path.exists(sub_dirs["InfoCollect"]) \
+                                           else root_dir
+    print("\n>>> Health Rule Compliance (Step 3):")
+    print(run_diagnose_script("diagnose_health_rules.py", health_input, "--format card"))
+
     print("\n====================================================")
     print("                Diagnosis Complete")
     print("====================================================")
