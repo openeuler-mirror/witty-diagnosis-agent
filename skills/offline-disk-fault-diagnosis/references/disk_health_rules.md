@@ -14,7 +14,7 @@
 
 ## 2. SAS 硬盘故障规则 (Hard Fault Rules)
 
-命中以下任一规则，则 **存活概率 = 0%**，建议 **立即更换** (`replacement: true`, `repairable: false`)。
+命中以下任一规则，则 **存活概率 = 0%**，建议 **立即更换** (`是否已更换: "是"`, `是否可修复: "否"`)。
 
 | 规则 ID | 规则描述 | 阈值 | 判定逻辑 |
 | :--- | :--- | :--- | :--- |
@@ -29,18 +29,18 @@
 
 命中以下任一规则，则 **存活概率 = 0%**，建议更换。
 
-| 规则 ID | 规则描述 | 阈值 | `repairable` | 判定说明 |
+| 规则 ID | 规则描述 | 阈值 | `是否可修复` | 判定说明 |
 | :--- | :--- | :--- | :--- | :--- |
-| SATA-R1 | SMART Error Log | != "No Errors Logged" | `false` | 存在硬件记录的错误日志 |
-| SATA-R2 | overall-health self-assessment | FAILED 或非 PASSED | `false` | 硬盘自评失败 |
-| SATA-R3 | Reallocated_Sector_Ct (RAW) | ≥ 1000 | `false` | 重映射扇区超限 |
-| SATA-R4 | Current_Pending_Sector (RAW) | ≥ 1000 | `false` | 待处理扇区超限 |
-| SATA-R5 | Offline_Uncorrectable (RAW) | ≥ 1000 | `false` | 离线不可纠正扇区超限 |
-| SATA-R6 | UDMA_CRC_Error_Count | ≠ 0 且持续增长 | `true` | 多为线缆/接口问题，更换可恢复 |
-| SATA-R7 | Raw_Read_Error_Rate WORST | ≤ Thresh × 1.05 | `true` | 读取错误率退化，可通过自检恢复 |
-| SATA-R8 | Seek_Error_Rate WORST | ≤ Thresh × 1.05 | `true` | 寻道错误率退化，可通过自检恢复 |
-| SATA-R9 | Spin_Up_Time VALUE | ≤ 判定阈值* | `true` | 机械老化，建议加强监控 |
-| SATA-R10 | Power_On_Hours | > 61320 h | `true` | 使用超 7 年，寿命预警 |
+| SATA-R1 | SMART Error Log | != "No Errors Logged" | `"否"` | 存在硬件记录的错误日志 |
+| SATA-R2 | overall-health self-assessment | FAILED 或非 PASSED | `"否"` | 硬盘自评失败 |
+| SATA-R3 | Reallocated_Sector_Ct (RAW) | ≥ 1000 | `"否"` | 重映射扇区超限 |
+| SATA-R4 | Current_Pending_Sector (RAW) | ≥ 1000 | `"否"` | 待处理扇区超限 |
+| SATA-R5 | Offline_Uncorrectable (RAW) | ≥ 1000 | `"否"` | 离线不可纠正扇区超限 |
+| SATA-R6 | UDMA_CRC_Error_Count | ≠ 0 且持续增长 | `"是"` | 多为线缆/接口问题，更换可恢复 |
+| SATA-R7 | Raw_Read_Error_Rate WORST | ≤ Thresh × 1.05 | `"是"` | 读取错误率退化，可通过自检恢复 |
+| SATA-R8 | Seek_Error_Rate WORST | ≤ Thresh × 1.05 | `"是"` | 寻道错误率退化，可通过自检恢复 |
+| SATA-R9 | Spin_Up_Time VALUE | ≤ 判定阈值* | `"是"` | 机械老化，建议加强监控 |
+| SATA-R10 | Power_On_Hours | > 61320 h | `"是"` | 使用超 7 年，寿命预警 |
 
 > \* **SATA-R9 阈值计算**: `VALUE <= 30% × (Default - Threshold) + Threshold`。WD 厂家 Default=200，其他=100。
 
@@ -76,14 +76,14 @@
 
 ## 5. 处置等级映射 (Action Level)
 
-### 5.1 存活概率 → 更换建议 (`replacement`)
-| 存活概率 (p) | 处置建议 | `replacement` |
+### 5.1 存活概率 → 更换建议 (`是否已更换`)
+| 存活概率 (p) | 处置建议 | `是否已更换` |
 | :--- | :--- | :--- |
-| p = 0% | 立即更换 | `true` |
-| p < 30% | 建议尽快更换 | `true` |
-| 30% ≤ p < 70% | 加强监控 | `false` |
-| p ≥ 70% | 维持运行 | `false` |
+| p = 0% | 立即更换 | `"是"` |
+| p < 30% | 建议尽快更换 | `"是"` |
+| 30% ≤ p < 70% | 加强监控 | `"否"` |
+| p ≥ 70% | 维持运行 | `"否"` |
 
-### 5.2 可修复性判定 (`repairable`)
-- **不可修复 (`false`)**: 命中任何涉及介质损坏 (R1-R5) 或自检失败 (R3) 的规则。
-- **可修复 (`true`)**: 仅命中链路问题 (R6)、性能退化 (R7-R9) 或寿命预警 (R10)；或未命中任何规则。
+### 5.2 可修复性判定 (`是否可修复`)
+- **不可修复 (`"否"`)**: 命中任何涉及介质损坏 (R1-R5) 或自检失败 (R3) 的规则。数据严重缺失时在字段内说明原因。
+- **可修复 (`"是"`)**: 仅命中链路问题 (R6)、性能退化 (R7-R9) 或寿命预警 (R10)；或未命中任何规则。数据严重缺失时在字段内说明原因。

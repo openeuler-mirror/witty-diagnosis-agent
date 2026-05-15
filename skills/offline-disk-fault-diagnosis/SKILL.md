@@ -258,13 +258,13 @@ python3 scripts/diagnose_messages.py <log_dir>
 
 | 字段 | 来源 | 缺失时表现 |
 | :--- | :--- | :--- |
-| `卷_id`（卷标识） | `diskmap.txt` / `mount` / `lsblk` | **必填**；缺失需说明原因 |
-| `SCSI 磁盘设备`（盘符） | smartctl / dmesg / phy_info | `null` |
-| `物理槽位` | iBMC SEL / sasraidlog | `null` |
-| `接口类型` | SAS / SATA / NVMe | `"Unknown"` |
-| `型号` / `序列号` | smartctl 信息段 | `null` |
-| `容量` | smartctl User Capacity | `null` |
-| `通电时间` | SMART ID 9 或 Accumulated time | `null` |
+| `卷_id`（卷标识） | `diskmap.txt` / `mount` / `lsblk` | **必填**；输出缺失原因说明 |
+| `SCSI 磁盘设备`（盘符） | smartctl / dmesg / phy_info | 输出缺失原因说明 |
+| `物理槽位` | iBMC SEL / sasraidlog | 输出缺失原因说明 |
+| `接口类型` | SAS / SATA / NVMe | `"Unknown"` 或原因说明 |
+| `型号` / `序列号` | smartctl 信息段 | 输出缺失原因说明 |
+| `容量` | smartctl User Capacity | 输出缺失原因说明 |
+| `通电时间` | SMART ID 9 或 Accumulated time | 输出缺失原因说明 |
 
 > ⚠️ **`卷_id` 要求**：若无映射证据，应在 `"分析原因"` 中提示补充信息，**严禁伪造**。
 
@@ -299,7 +299,7 @@ python3 scripts/diagnose_health_rules.py <log_dir> --include-passed
 - **数据冲突与时效纠错**：
   - **最新原则**：若脚本产出与模型自动检索结果不一致（如因盘符漂移导致的名称变更），模型必须以最接近故障时刻（T0）且逻辑闭环的证据为准，确保数据“最新且真实”。
   - **修正逻辑**：若模型纠正了脚本的错误输出（如识别出脚本解析了过时的旧配置），必须在 `分析原因` 中记录纠错依据。
-- 任何无法索取的字段标 `null`，严禁编造。
+- 任何无法索取的字段，应在对应字段位置输出具体的缺失原因说明字符串（如"日志缺失无法定位"），严禁输出 `null` 或占位符，严禁编造。
 
 ### 3.4 标准化诊断对象（Step 3 最终落地形式）
 
@@ -319,8 +319,8 @@ python3 scripts/diagnose_health_rules.py <log_dir> --include-passed
       "接口类型": "SATA",                     // "SAS" | "SATA" | "NVMe" | "Unknown"
       "容量": "20.0 TB",
       "通电时长小时": 16502,
-      "是否已更换": false,                    // 见规范 §5.1
-      "是否可修复": true,                     // 见规范 §5.2
+      "是否已更换": "否",                     // 见规范 §5.1
+      "是否可修复": "是",                     // 见规范 §5.2
       "半年存活概率": 0.933,                  // 见规范 §4
       "命中故障规则": [],                     // 命中规则 ID 及简述
       "分析原因": ["未命中任何故障规则"]        // 命中规则、退化指标的自然语言原因列表
@@ -330,7 +330,7 @@ python3 scripts/diagnose_health_rules.py <log_dir> --include-passed
 ```
 
 **字段规约**：
-- `"是否已更换"` / `"是否可修复"`：NVMe 或数据严重缺失时可为 `null`。
+- `"是否已更换"` / `"是否可修复"`：NVMe 或数据严重缺失时，在对应字段输出具体原因说明（如"NVMe 盘不适用此规则"或"缺少关键 SMART 记录无法判定"）。
 - `"分析原因"`：至少包含一条自然语言原因。
 
 **Step 3 完成标志**：
@@ -392,7 +392,7 @@ python3 scripts/diagnose_health_rules.py <log_dir> --include-passed
         <!-- DOMAIN_EXT_START-->
         ## 标题： 故障盘修复价值评估 
         <!-- DOMAIN_DATA_START-->
-        ### 卷_id / SCSI 磁盘设备
+        ### 卷_id - SCSI 磁盘设备
         1. 故障盘结论：[结论描述，含修复/更换建议及原因]
         2. 故障盘标准化诊断对象：
         ```json
