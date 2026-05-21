@@ -9,6 +9,10 @@ Witty 智能诊断 Agent 基于「假设-验证」（Hypothetico-Deductive）故
 - **端到端闭环自愈**：涵盖“现象分析、根因定界、生成报告、执行修复”全链路，提供一站式自动化运维。
 - **严格的安全管控**：诊断排查阶段严格只读，仅修复阶段按需赋予操作权限，且变更必经用户审批确认。
 
+<div align="center">
+  <img src="docs/assets/sys_crash_diag.gif" alt="系统宕机故障诊断" />
+</div>
+
 ### 架构与核心能力
 
 Witty 智能诊断 Agent 采用“Agent-Skill-工具-知识”四层解耦架构，兼具高灵活性与可扩展性。
@@ -43,6 +47,8 @@ Witty 智能诊断 Agent 采用“Agent-Skill-工具-知识”四层解耦架构
 
 > 💡 **更多基于 OS 全栈（硬件层 -> 内核层 -> 系统服务层）的诊断能力持续演进中...**
 
+---
+
 ### 快速开始
 
 #### 环境要求
@@ -74,6 +80,8 @@ cd witty-diagnosis-agent
 bash install.sh
 ```
 
+---
+
 ### 如何使用
 
 1. 启动 \*\*OpenCode \*\*。
@@ -96,7 +104,116 @@ bash install.sh
    
    <img src="docs/assets/guide_auto_diag_report.png" alt="诊断报告" width="800" />
 
-如需了解更多操作细节，可查阅[用户手册](docs/guide/MANUAL.md)；支持的诊断能力与功能说明详见[功能列表](docs/reference/features.html)。
+如需了解更多操作细节，可查阅[用户手册](docs/guide/MANUAL.md)；支持的诊断能力与功能说明详见[功能列表](docs/reference/features.md)。
+
+---
+
+### 进程 CORE 故障诊断示例
+
+本节以 WSL2 Ubuntu 系统为例，演示如何使用 Witty 智能诊断 Agent 分析进程 Core Dump 文件。本示例仅用于演示和体验智能诊断 Agent 的分析过程和输出报告。由于示例代码非常简单（空指针解引用），直接使用原生 OpenCode 或任何调试工具也能定位出根因。对于更复杂的生产环境故障，智能诊断 Agent 的系统化排查能力将展现更大优势。
+
+#### 1. 修改系统配置以获得进程 Core Dump 文件
+
+默认情况下，Linux 系统可能禁用了进程 core dump 功能。请使用 root 用户执行以下步骤启用：
+
+```bash
+# 查看当前 core dump 配置（0 表示禁用）
+ulimit -c
+
+# 临时启用 core dump（不限制文件大小）
+ulimit -c unlimited
+
+# 永久启用：在 /etc/security/limits.conf 末尾添加
+echo "* soft core unlimited" >> /etc/security/limits.conf
+echo "* hard core unlimited" >> /etc/security/limits.conf
+
+# 停用 apport（否则会拦截并吃掉 core 文件）
+sudo service apport stop
+sudo systemctl disable apport
+
+# 设置 core dump 文件存放路径和命名格式（当前目录）
+sudo sysctl -w kernel.core_pattern=core.%e.%p
+
+# 验证配置
+ulimit -c
+cat /proc/sys/kernel/core_pattern
+```
+
+> **说明**：`%e` 为进程名，`%p` 为进程 PID。core 文件将保存在当前工作目录。
+
+#### 2. 开发会产生 Core Dump 的示例 C 代码
+
+创建 `crash_demo.c` 文件：
+
+```c
+#include <stdio.h>
+#include <stdlib.h>
+
+void trigger_segfault() {
+    int *ptr = NULL;
+    *ptr = 42;
+}
+
+int main() {
+    printf("Starting crash demo...\n");
+    trigger_segfault();
+    return 0;
+}
+```
+
+**安装编译工具和 GDB**：
+
+```bash
+sudo apt update && sudo apt install -y gcc gdb
+```
+
+**编译（禁用优化，开启调试符号）**：
+
+```bash
+gcc -g -O0 -o crash_demo crash_demo.c
+```
+
+**运行**：
+
+```bash
+./crash_demo
+```
+
+执行后将触发段错误并产生 core dump 文件：
+
+```
+Starting crash demo...
+Segmentation fault (core dumped)
+```
+
+**查看生成的 core 文件**：
+
+```bash
+ls -la ./core.*
+```
+
+#### 3. 在 WSL 中启动 OpenCode 并使用智能诊断 Agent 分析
+
+**启动 OpenCode**：
+
+```bash
+opencode
+```
+
+**加载 Xuanyuan Agent**：执行 `/agents` 命令，选择 `Xuanyuan` Agent。
+
+**输入问题描述**：
+
+```
+分析/tmp/test目录下的core文件根因。
+```
+
+> **提示**：将 `/tmp/test` 替换为示例 C 代码所在的实际目录路径。
+
+系统将自动执行智能诊断流程，分析进程崩溃原因并输出诊断报告。
+
+---
+
 
 ### 如何贡献
 
@@ -110,6 +227,8 @@ bash install.sh
 
 - 提交 [issue](https://atomgit.com/openeuler/witty-diagnosis-agent/issues)
 - 发送邮件至 <intelligence@openeuler.org>
+
+---
 
 ### License
 
