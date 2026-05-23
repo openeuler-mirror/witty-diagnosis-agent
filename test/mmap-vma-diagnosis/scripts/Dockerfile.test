@@ -1,0 +1,35 @@
+# ---- Docker 测试环境 ----
+# 用于验证 mmap-vma-diagnosis skill 的故障注入和诊断
+FROM ubuntu:22.04
+
+RUN apt-get update -qq && \
+    DEBIAN_FRONTEND=noninteractive apt-get install -y -qq \
+        gcc make python3 procps iproute2 lsof strace util-linux \
+        gdb 2>&1 | tail -3 && \
+    apt-get clean
+
+# 诊断脚本目录
+RUN mkdir -p /skills/mmap-vma-diagnosis
+WORKDIR /test
+
+# 诊断脚本
+COPY ./diagnose_mapcount.sh /skills/mmap-vma-diagnosis/
+COPY ./diagnose_sigbus.sh /skills/mmap-vma-diagnosis/
+COPY ./diagnose_mlock.sh /skills/mmap-vma-diagnosis/
+COPY ./diagnose_shm.sh /skills/mmap-vma-diagnosis/
+COPY ./diagnose_fragmentation.sh /skills/mmap-vma-diagnosis/
+COPY ./collect_vma_info.sh /skills/mmap-vma-diagnosis/
+RUN chmod +x /skills/mmap-vma-diagnosis/*.sh
+
+# 故障注入程序
+COPY ./fault_mmap_exhaust.c /test/
+COPY ./fault_sigbus.c /test/
+COPY ./fault_mlock_limit.c /test/
+RUN gcc -o /test/fault_mmap_exhaust /test/fault_mmap_exhaust.c && \
+    gcc -o /test/fault_sigbus /test/fault_sigbus.c && \
+    gcc -o /test/fault_mlock_limit /test/fault_mlock_limit.c
+
+COPY ./entrypoint.sh /test/entrypoint.sh
+RUN chmod +x /test/entrypoint.sh
+
+CMD ["bash", "/test/entrypoint.sh"]
