@@ -25,10 +25,13 @@ RUN chmod +x /skills/mmap-vma-diagnosis/*.sh
 COPY ./fault_mmap_exhaust.c /test/
 COPY ./fault_sigbus.c /test/
 COPY ./fault_mlock_limit.c /test/
+COPY ./fault_shm_create.c /test/
+COPY ./fault_fragmentation.c /test/
 RUN gcc -o /test/fault_mmap_exhaust /test/fault_mmap_exhaust.c && \
     gcc -o /test/fault_sigbus /test/fault_sigbus.c && \
-    gcc -o /test/fault_mlock_limit /test/fault_mlock_limit.c
-
+    gcc -o /test/fault_mlock_limit /test/fault_mlock_limit.c && \
+    gcc -o /test/fault_shm_create /test/fault_shm_create.c && \
+    gcc -o /test/fault_fragmentation /test/fault_fragmentation.c -lpthread
 COPY ./entrypoint.sh /test/entrypoint.sh
 RUN chmod +x /test/entrypoint.sh
 
