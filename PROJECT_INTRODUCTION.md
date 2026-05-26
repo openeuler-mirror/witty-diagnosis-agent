@@ -1,4 +1,4 @@
-﻿这是一个由 openEuler sig-intelligence 社区维护的开源智能运维（AIOps）平台。
+这是一个由 openEuler sig-intelligence 社区维护的开源智能运维（AIOps）平台。
 
 我们为该项目贡献了 mmap-vma-diagnosis 诊断技能，专门用于 Linux 环境下的内存映射与虚拟地址空间故障诊断。该技能覆盖了六类最常见的 mmap 相关故障场景：vm.max_map_count 耗尽（Elasticsearch 中尤为常见）、SIGBUS 文件截断、mlock 超限、共享内存权限拒绝、地址空间碎片化以及通用 mmap 失败。
 

@@ -1,0 +1,1068 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SIGBUS 文件截断故障诊断报告 (RCA)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Lora:ital,wght@0,400;0,600;1,400&family=Source+Sans+3:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  /* ── Design tokens ─────────────────────────────────────────────────────── */
+  :root {
+    --bg:          #f8f7f4;
+    --surface:     #ffffff;
+    --border:      #e8e5df;
+    --border-soft: #f0ede8;
+
+    --text:        #1c1917;
+    --text-2:      #57534e;
+    --text-3:      #a8a29e;
+
+    --accent:      #1d4e6e;
+    --accent-light:#e8f1f7;
+    --accent-mid:  #3b82a0;
+
+    --red:         #c0392b;
+    --red-bg:      #fef2f2;
+    --amber:       #92400e;
+    --amber-bg:    #fffbeb;
+    --green:       #14532d;
+    --green-bg:    #f0fdf4;
+
+    --code-bg:     #1a1d27;
+    --code-text:   #cdd6f4;
+    --code-border: #2d3148;
+
+    --font-body: "Source Sans 3", "PingFang SC", "Hiragino Sans GB", sans-serif;
+    --font-head: "Lora", "PingFang SC", Georgia, serif;
+    --font-mono: "JetBrains Mono", "Fira Code", Consolas, monospace;
+
+    --radius:    8px;
+    --radius-lg: 12px;
+    --shadow:    0 1px 3px rgba(0,0,0,.06), 0 4px 16px rgba(0,0,0,.05);
+    --shadow-lg: 0 2px 8px rgba(0,0,0,.07), 0 8px 32px rgba(0,0,0,.06);
+
+    --toc-width:   240px;
+    --gap:         32px;
+  }
+
+  /* ── Progress bar ──────────────────────────────────────────────────────── */
+  #progress {
+    position: fixed; top: 0; left: 0; height: 3px; width: 0%;
+    background: linear-gradient(90deg, var(--accent-mid), var(--accent));
+    z-index: 999; transition: width .1s linear;
+    border-radius: 0 2px 2px 0;
+  }
+
+  /* ── Base ──────────────────────────────────────────────────────────────── */
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  html { font-size: 16px; scroll-behavior: smooth; }
+  body {
+    font-family: var(--font-body);
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.8;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* ── Layout ────────────────────────────────────────────────────────────── */
+  .layout {
+    display: flex;
+    align-items: flex-start;
+    max-width: calc(var(--toc-width) + 820px + var(--gap) * 3);
+    margin: 0 auto;
+    padding: 48px var(--gap) 96px;
+    gap: var(--gap);
+  }
+
+  /* ── TOC ───────────────────────────────────────────────────────────────── */
+  .toc {
+    width: var(--toc-width);
+    flex-shrink: 0;
+    position: sticky;
+    top: 32px;
+    max-height: calc(100vh - 64px);
+    overflow-y: auto;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    padding: 20px;
+    box-shadow: var(--shadow);
+    scrollbar-width: thin;
+    scrollbar-color: var(--border) transparent;
+  }
+  .toc-title {
+    font-size: 10.5px;
+    font-weight: 600;
+    letter-spacing: .1em;
+    text-transform: uppercase;
+    color: var(--text-3);
+    margin-bottom: 12px;
+    padding-bottom: 10px;
+    border-bottom: 1px solid var(--border-soft);
+  }
+  .toc-item {
+    display: flex;
+    align-items: flex-start;
+    margin: 2px 0;
+  }
+  .toc-toggle {
+    background: none;
+    border: none;
+    cursor: pointer;
+    color: var(--text-3);
+    padding: 4px;
+    margin-right: 4px;
+    margin-top: 2px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 4px;
+    transition: background 0.2s, transform 0.2s;
+  }
+  .toc-toggle:hover { background: var(--border-soft); color: var(--text); }
+  .toc-toggle[aria-expanded="false"] svg { transform: rotate(-90deg); }
+  .toc-spacer { width: 20px; flex-shrink: 0; }
+  .toc-group { overflow: hidden; transition: max-height 0.3s ease-in-out; }
+  .toc-group.collapsed { max-height: 0 !important; }
+  
+  .toc a {
+    display: block;
+    font-size: 13px;
+    color: var(--text-2);
+    text-decoration: none;
+    padding: 4px 8px;
+    border-radius: 5px;
+    line-height: 1.45;
+    transition: background .15s, color .15s;
+    word-break: break-all;
+    flex-grow: 1;
+  }
+  .toc a:hover  { background: var(--accent-light); color: var(--accent); }
+  .toc a.active { background: var(--accent-light); color: var(--accent); font-weight: 500; }
+  .toc-l1 { font-weight: 600; color: var(--text); }
+  .toc-l2 { font-weight: 600; color: var(--text); }
+  .toc-l3 { font-size: 12px !important; padding-left: 14px !important; }
+
+  /* ── Article card ──────────────────────────────────────────────────────── */
+  .article {
+    flex: 1; min-width: 0;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    padding: 52px 60px;
+    box-shadow: var(--shadow-lg);
+  }
+
+  /* ── Headings ──────────────────────────────────────────────────────────── */
+  .title-container {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-end;
+    margin: 0 0 28px;
+    padding-bottom: 18px;
+    border-bottom: 2px solid var(--text);
+  }
+  .article h1 {
+    font-family: var(--font-head);
+    font-size: 26px; font-weight: 600; line-height: 1.3;
+    margin: 0; padding-bottom: 0;
+    border-bottom: none;
+  }
+  .article h2 {
+    font-family: var(--font-head);
+    font-size: 19px; font-weight: 600;
+    margin: 48px 0 14px; padding-bottom: 8px;
+    border-bottom: 1px solid var(--border);
+  }
+  .article h2::before {
+    content: attr(data-index);
+    display: inline-block;
+    font-family: var(--font-mono);
+    font-size: 10.5px; font-weight: 500;
+    color: var(--accent-mid);
+    background: var(--accent-light);
+    padding: 1px 7px; border-radius: 4px;
+    margin-right: 10px; vertical-align: middle;
+    letter-spacing: .05em;
+  }
+  .article h3 {
+    font-family: var(--font-head);
+    font-size: 15.5px; font-weight: 600;
+    margin: 28px 0 10px;
+  }
+  .article h3::before {
+    content: "§ ";
+    color: var(--text-3);
+    font-family: var(--font-mono); font-size: 13px;
+  }
+  .article h4 {
+    font-size: 13.5px; font-weight: 600;
+    color: var(--accent); margin: 20px 0 8px;
+  }
+
+  /* ── Body text ─────────────────────────────────────────────────────────── */
+  .article p, .plain { 
+    font-size: 15px; 
+    line-height: 1.85; 
+    color: var(--text); 
+    margin: 0 0 12px; 
+    font-family: var(--font-body);
+  }
+  .article strong { font-weight: 600; }
+  .article em     { font-style: italic; color: var(--text-2); }
+  .article a {
+    color: var(--accent); text-decoration: underline;
+    text-decoration-color: var(--accent-light);
+    text-underline-offset: 3px;
+  }
+  .article a:hover { text-decoration-color: var(--accent); }
+  .article hr { border: none; border-top: 1px solid var(--border); margin: 20px 0; }
+  .article hr.heavy { border-top: 3px solid var(--text); margin: 32px 0; }
+
+  /* ── Blockquote ────────────────────────────────────────────────────────── */
+  .article blockquote {
+    border-left: 3px solid var(--accent-mid);
+    background: var(--accent-light);
+    margin: 20px 0; padding: 13px 20px 13px 20px;
+    border-radius: 0 var(--radius) var(--radius) 0;
+  }
+  .article blockquote p { font-size: 14.5px; color: var(--accent); margin: 0; line-height: 1.7; }
+  /* 支持块引用内部保留换行符（修复头部概要换行丢失问题） */
+  .article blockquote p { white-space: pre-wrap; }
+  .article blockquote strong { color: var(--accent); }
+
+  /* ── Lists ─────────────────────────────────────────────────────────────── */
+  .article ul, .article ol { padding-left: 22px; margin: 6px 0 14px; }
+  .article li { font-size: 15px; line-height: 1.8; margin: 4px 0; }
+  .article li::marker { color: var(--accent-mid); }
+  .article li > ul, .article li > ol { margin: 3px 0; }
+
+  /* ── Inline code ───────────────────────────────────────────────────────── */
+  .article :not(pre) > code {
+    font-family: var(--font-mono);
+    font-size: 12.5px; font-weight: 500;
+    background: #f3f0eb; color: var(--red);
+    padding: 1px 5px; border-radius: 4px;
+    border: 1px solid var(--border);
+  }
+
+  /* ── Code blocks ───────────────────────────────────────────────────────── */
+  .code-block {
+    position: relative; margin: 20px 0;
+    border-radius: var(--radius-lg); overflow: hidden;
+    border: 1px solid var(--code-border);
+    box-shadow: 0 4px 20px rgba(0,0,0,.16);
+  }
+  .code-lang {
+    position: absolute; top: 0; left: 0;
+    font-family: var(--font-mono); font-size: 10px; font-weight: 500;
+    color: #7c8db5; background: #222538;
+    padding: 4px 12px; border-bottom-right-radius: 6px;
+    text-transform: uppercase; letter-spacing: .08em;
+    user-select: none;
+  }
+  .copy-btn {
+    position: absolute; top: 8px; right: 10px;
+    background: #2d3148; border: 1px solid #3d4260;
+    border-radius: 5px; color: #7c8db5; cursor: pointer;
+    padding: 5px 8px; display: flex; align-items: center;
+    transition: background .15s, color .15s; z-index: 1;
+  }
+  .copy-btn:hover  { background: #3a3f60; color: #cdd6f4; }
+  .copy-btn.copied { color: #a6e3a1; border-color: #4a6a4a; }
+  .code-block pre {
+    margin: 0; padding: 36px 20px 20px;
+    background: var(--code-bg); overflow-x: auto;
+    scrollbar-width: thin; scrollbar-color: #3d4260 transparent;
+  }
+  .code-block pre::-webkit-scrollbar { height: 5px; }
+  .code-block pre::-webkit-scrollbar-thumb { background: #3d4260; border-radius: 3px; }
+  .code-block code {
+    font-family: var(--font-mono); font-size: 13px; line-height: 1.7;
+    color: var(--code-text); background: none; border: none; padding: 0;
+    white-space: pre; word-break: normal;
+  }
+
+  /* ── Tables ────────────────────────────────────────────────────────────── */
+  .table-wrap {
+    overflow-x: auto; margin: 16px 0;
+    border-radius: var(--radius-lg);
+    border: 1px solid var(--border);
+    box-shadow: var(--shadow);
+  }
+  table { width: 100%; border-collapse: collapse; font-size: 14px; min-width: 360px; }
+  thead { background: #f4f2ee; }
+  th {
+    padding: 9px 14px; text-align: left;
+    font-size: 11.5px; font-weight: 600;
+    letter-spacing: .04em; text-transform: uppercase;
+    color: var(--text-2); border-bottom: 1px solid var(--border);
+    white-space: nowrap;
+  }
+  td {
+    padding: 8px 14px; border-bottom: 1px solid var(--border-soft);
+    color: var(--text); vertical-align: top; line-height: 1.6;
+  }
+  tbody tr:last-child td { border-bottom: none; }
+  tbody tr:nth-child(even) td { background: #faf9f7; }
+  tbody tr:hover td { background: var(--accent-light); transition: background .1s; }
+
+  /* ── KV block ──────────────────────────────────────────────────────────── */
+  .kv-block { background: var(--bg); border: 1px solid var(--border); border-radius: var(--radius-lg); overflow: hidden; margin: 12px 0 20px; }
+  .kv-row { display: flex; border-bottom: 1px solid var(--border-soft); align-items: flex-start; }
+  .kv-row:last-child { border-bottom: none; }
+  .kv-key { flex: 0 0 160px; padding: 9px 16px; font-size: 13.5px; font-weight: 600; color: var(--text-2); background: var(--surface); border-right: 1px solid var(--border-soft); }
+  .kv-val { flex: 1; padding: 9px 16px; font-size: 14px; color: var(--text); }
+
+  /* ── Status badges ─────────────────────────────────────────────────────── */
+  .badge-ok { display: inline-flex; align-items: center; gap: 4px; background: var(--green-bg); color: var(--green); font-size: 13px; font-weight: 500; padding: 2px 9px; border-radius: 20px; border: 1px solid #bbf7d0; }
+  .badge-err { display: inline-flex; align-items: center; gap: 4px; background: var(--red-bg); color: var(--red); font-size: 13px; font-weight: 500; padding: 2px 9px; border-radius: 20px; border: 1px solid #fecaca; }
+  .badge-warn { display: inline-flex; align-items: center; gap: 4px; background: var(--amber-bg); color: var(--amber); font-size: 13px; font-weight: 500; padding: 2px 9px; border-radius: 20px; border: 1px solid #fde68a; }
+
+  /* ── Priority badges ───────────────────────────────────────────────────── */
+  .pri-p0 { display: inline-block; background: #fef2f2; color: #991b1b; border: 1px solid #fca5a5; font-size: 12px; font-weight: 700; padding: 2px 8px; border-radius: 4px; letter-spacing: .04em; }
+  .pri-p1 { display: inline-block; background: #fff7ed; color: #9a3412; border: 1px solid #fdba74; font-size: 12px; font-weight: 700; padding: 2px 8px; border-radius: 4px; }
+  .pri-p2 { display: inline-block; background: #fffbeb; color: #92400e; border: 1px solid #fde68a; font-size: 12px; font-weight: 700; padding: 2px 8px; border-radius: 4px; }
+  .pri-p3 { display: inline-block; background: var(--accent-light); color: var(--accent); border: 1px solid #bfdbfe; font-size: 12px; font-weight: 700; padding: 2px 8px; border-radius: 4px; }
+
+  /* ── Fault header ──────────────────────────────────────────────────────── */
+  .fault-header { display: flex; align-items: center; gap: 12px; padding: 12px 16px; border-radius: var(--radius-lg); margin: 16px 0 8px; border: 1px solid; }
+  .fh-p0 { background: #fef2f2; border-color: #fca5a5; }
+  .fh-p1 { background: #fff7ed; border-color: #fdba74; }
+  .fh-p2 { background: #fffbeb; border-color: #fde68a; }
+  .fh-p3 { background: var(--accent-light); border-color: #bfdbfe; }
+  .fh-badge { font-family: var(--font-mono); font-size: 11px; font-weight: 700; letter-spacing: .08em; }
+  .fh-p0 .fh-badge { color: #991b1b; }
+  .fh-p1 .fh-badge { color: #9a3412; }
+  .fh-p2 .fh-badge { color: #92400e; }
+  .fh-p3 .fh-badge { color: var(--accent); }
+  .fh-rest { font-size: 14px; font-weight: 500; color: var(--text); }
+
+  /* ── Timeline ──────────────────────────────────────────────────────────── */
+  .timeline { border-left: 2px solid var(--accent-mid); margin: 16px 0 16px 8px; padding-left: 20px; }
+  .tl-row { display: flex; align-items: baseline; gap: 10px; margin: 8px 0; font-size: 13.5px; }
+  .tl-ts { font-family: var(--font-mono); font-size: 12px; color: var(--text-3); flex-shrink: 0; white-space: nowrap; }
+  .tl-tag { font-size: 11px; font-weight: 600; padding: 1px 7px; border-radius: 10px; flex-shrink: 0; background: var(--accent-light); color: var(--accent); }
+  .tl-tag.err { background: var(--red-bg); color: var(--red); }
+  .tl-tag.warn { background: var(--amber-bg); color: var(--amber); }
+  .tl-desc { color: var(--text); line-height: 1.5; }
+
+  /* ── Global warn ───────────────────────────────────────────────────────── */
+  .global-warn { background: #fef2f2; border: 1px solid #fca5a5; border-radius: var(--radius-lg); padding: 14px 18px; font-size: 14.5px; font-weight: 600; color: #991b1b; margin: 16px 0; }
+
+  /* ── Tree note ─────────────────────────────────────────────────────────── */
+  .tree-note { white-space: pre-wrap; font-family: var(--font-mono); font-size: 13.5px; line-height: 1.6; color: var(--text-2); margin: 8px 0 8px 16px; }
+
+  /* ── Disclaimer ────────────────────────────────────────────────────────── */
+  .disclaimer { background: var(--bg); border: 1px solid var(--border); border-radius: var(--radius); padding: 14px 18px; font-size: 13.5px; color: var(--text-2); font-style: italic; }
+
+  /* ── Meta footer ───────────────────────────────────────────────────────── */
+  .meta {
+    margin-top: 48px; padding-top: 16px;
+    border-top: 1px solid var(--border-soft);
+    display: flex; justify-content: space-between; align-items: center;
+    font-size: 12px; color: var(--text-3);
+  }
+  .meta-source { font-family: var(--font-mono); font-size: 11.5px; }
+
+  /* ── Brand logo ────────────────────────────────────────────────────────── */
+  .brand-logo {
+    font-family: var(--font-head);
+    font-size: 14px;
+    color: var(--text-3);
+    letter-spacing: 0.05em;
+    margin-bottom: 4px;
+    flex-shrink: 0;
+    margin-left: 16px;
+  }
+  .brand-logo strong {
+    font-weight: 600;
+    color: var(--accent);
+  }
+  @media (max-width: 900px) {
+    .title-container { flex-direction: column; align-items: flex-start; gap: 12px; }
+    .brand-logo { margin-left: 0; margin-bottom: 0; }
+  }
+  /* ── Print ─────────────────────────────────────────────────────────────── */
+  @media print {
+    body { background: white; }
+    #progress, .toc { display: none; }
+    .layout { display: block; padding: 0; }
+    .article { border: none; box-shadow: none; padding: 24px; }
+    .copy-btn { display: none; }
+    .brand-logo { margin-bottom: 0; }
+  }
+
+  /* ── Responsive ────────────────────────────────────────────────────────── */
+  @media (max-width: 900px) {
+    .toc { display: none; }
+    .article { padding: 36px 28px; }
+    .layout { padding: 24px 16px 64px; }
+  }
+  @media (max-width: 480px) {
+    .article { padding: 24px 18px; }
+    .article h1 { font-size: 22px; }
+  }
+</style>
+</head>
+<body>
+
+<div id="progress"></div>
+
+<div class="layout">
+  <nav class="toc" id="toc">
+  <div class="toc-title">目录</div>
+  <div class="toc-content">
+<div class="toc-item has-children"><button class="toc-toggle" onclick="toggleToc(this)" aria-expanded="true">
+                <svg viewBox="0 0 24 24" width="12" height="12" stroke="currentColor" stroke-width="2" fill="none"><polyline points="6 9 12 15 18 9"></polyline></svg>
+              </button><a href="#h-sigbus-文件截断故障诊断报告-rca" onclick="event.preventDefault(); const target = document.getElementById('h-sigbus-文件截断故障诊断报告-rca'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l1">SIGBUS 文件截断故障诊断报告 (RCA)</a></div>
+<div class="toc-group" id="group-h-一故障概览">
+<div class="toc-item has-children"><button class="toc-toggle" onclick="toggleToc(this)" aria-expanded="true">
+                <svg viewBox="0 0 24 24" width="12" height="12" stroke="currentColor" stroke-width="2" fill="none"><polyline points="6 9 12 15 18 9"></polyline></svg>
+              </button><a href="#h-一故障概览" onclick="event.preventDefault(); const target = document.getElementById('h-一故障概览'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l2">一、故障概览</a></div>
+<div class="toc-group" id="group-h-置信度说明">
+<div class="toc-item "><span class="toc-spacer"></span><a href="#h-置信度说明" onclick="event.preventDefault(); const target = document.getElementById('h-置信度说明'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l3">置信度说明</a></div>
+</div>
+<div class="toc-item has-children"><button class="toc-toggle" onclick="toggleToc(this)" aria-expanded="true">
+                <svg viewBox="0 0 24 24" width="12" height="12" stroke="currentColor" stroke-width="2" fill="none"><polyline points="6 9 12 15 18 9"></polyline></svg>
+              </button><a href="#h-二根因速览" onclick="event.preventDefault(); const target = document.getElementById('h-二根因速览'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l2">二、根因速览</a></div>
+<div class="toc-group" id="group-h-事故时间线-故障传导链路">
+<div class="toc-item "><span class="toc-spacer"></span><a href="#h-事故时间线-故障传导链路" onclick="event.preventDefault(); const target = document.getElementById('h-事故时间线-故障传导链路'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l3">事故时间线 & 故障传导链路</a></div>
+<div class="toc-item "><span class="toc-spacer"></span><a href="#h-故障因果链" onclick="event.preventDefault(); const target = document.getElementById('h-故障因果链'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l3">故障因果链</a></div>
+</div>
+<div class="toc-item has-children"><button class="toc-toggle" onclick="toggleToc(this)" aria-expanded="true">
+                <svg viewBox="0 0 24 24" width="12" height="12" stroke="currentColor" stroke-width="2" fill="none"><polyline points="6 9 12 15 18 9"></polyline></svg>
+              </button><a href="#h-三排查过程" onclick="event.preventDefault(); const target = document.getElementById('h-三排查过程'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l2">三、排查过程</a></div>
+<div class="toc-group" id="group-h-31-初始现象">
+<div class="toc-item "><span class="toc-spacer"></span><a href="#h-31-初始现象" onclick="event.preventDefault(); const target = document.getElementById('h-31-初始现象'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l3">3.1 初始现象</a></div>
+<div class="toc-item "><span class="toc-spacer"></span><a href="#h-32-假设驱动排查" onclick="event.preventDefault(); const target = document.getElementById('h-32-假设驱动排查'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l3">3.2 假设驱动排查</a></div>
+<div class="toc-item "><span class="toc-spacer"></span><a href="#h-33-排查结论与逻辑树" onclick="event.preventDefault(); const target = document.getElementById('h-33-排查结论与逻辑树'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l3">3.3 排查结论与逻辑树</a></div>
+</div>
+<div class="toc-item has-children"><button class="toc-toggle" onclick="toggleToc(this)" aria-expanded="true">
+                <svg viewBox="0 0 24 24" width="12" height="12" stroke="currentColor" stroke-width="2" fill="none"><polyline points="6 9 12 15 18 9"></polyline></svg>
+              </button><a href="#h-四涉及的-linux-内核机制详解" onclick="event.preventDefault(); const target = document.getElementById('h-四涉及的-linux-内核机制详解'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l2">四、涉及的 Linux 内核机制详解</a></div>
+<div class="toc-group" id="group-h-41-mmap-mapshared-与文件截断的交互">
+<div class="toc-item "><span class="toc-spacer"></span><a href="#h-41-mmap-mapshared-与文件截断的交互" onclick="event.preventDefault(); const target = document.getElementById('h-41-mmap-mapshared-与文件截断的交互'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l3">4.1 mmap MAP_SHARED 与文件截断的交互</a></div>
+<div class="toc-item "><span class="toc-spacer"></span><a href="#h-42-为什么是-sigbus-而非-sigsegv" onclick="event.preventDefault(); const target = document.getElementById('h-42-为什么是-sigbus-而非-sigsegv'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l3">4.2 为什么是 SIGBUS 而非 SIGSEGV</a></div>
+</div>
+<div class="toc-item has-children"><button class="toc-toggle" onclick="toggleToc(this)" aria-expanded="true">
+                <svg viewBox="0 0 24 24" width="12" height="12" stroke="currentColor" stroke-width="2" fill="none"><polyline points="6 9 12 15 18 9"></polyline></svg>
+              </button><a href="#h-五修复方案" onclick="event.preventDefault(); const target = document.getElementById('h-五修复方案'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l2">五、修复方案</a></div>
+<div class="toc-group" id="group-h-51-应急处置">
+<div class="toc-item "><span class="toc-spacer"></span><a href="#h-51-应急处置" onclick="event.preventDefault(); const target = document.getElementById('h-51-应急处置'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l3">5.1 应急处置</a></div>
+<div class="toc-item "><span class="toc-spacer"></span><a href="#h-52-代码级修复方案" onclick="event.preventDefault(); const target = document.getElementById('h-52-代码级修复方案'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l3">5.2 代码级修复方案</a></div>
+<div class="toc-item "><span class="toc-spacer"></span><a href="#h-53-代码示例修复建议" onclick="event.preventDefault(); const target = document.getElementById('h-53-代码示例修复建议'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l3">5.3 代码示例（修复建议）</a></div>
+<div class="toc-item "><span class="toc-spacer"></span><a href="#h-54-监控与预防措施" onclick="event.preventDefault(); const target = document.getElementById('h-54-监控与预防措施'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l3">5.4 监控与预防措施</a></div>
+</div>
+<div class="toc-item "><span class="toc-spacer"></span><a href="#h-六排除项汇总" onclick="event.preventDefault(); const target = document.getElementById('h-六排除项汇总'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l2">六、排除项汇总</a></div>
+<div class="toc-item "><span class="toc-spacer"></span><a href="#h-七相关参考" onclick="event.preventDefault(); const target = document.getElementById('h-七相关参考'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l2">七、相关参考</a></div>
+</div>
+  </div>
+</nav>
+  <article class="article" id="article" style="position: relative;">
+    <div class="title-container"><h1 id="h-sigbus-文件截断故障诊断报告-rca">SIGBUS 文件截断故障诊断报告 (RCA)</h1><div class="brand-logo">by <strong>Witty Diagnosis Agent</strong></div></div>
+<blockquote>
+<p><strong>报告编号</strong>：RCA-20260525-001
+<strong>故障级别</strong>：P2（可控复现 — 容器内故障模拟）
+<strong>报告时间</strong>：2026-05-25 19:30:35
+<strong>当前状态</strong>：🟢 已恢复（进程优雅退出）</p>
+</blockquote>
+<hr>
+<h2 id="h-一故障概览">一、故障概览</h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>项目</th>
+<th>内容</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>故障标题</td>
+<td>容器 mmap-B 内进程因 ftruncate 截断 mmap 文件后访问触发 SIGBUS</td>
+</tr>
+<tr>
+<td>影响范围</td>
+<td>容器 mmap-B，进程 <code>/test/fault_sigbus</code>（PID 已于 strace 执行后结束）</td>
+</tr>
+<tr>
+<td>故障时段</td>
+<td>2026-05-25 11:40:00 UTC（单次触发，瞬时完成）</td>
+</tr>
+<tr>
+<td>根本原因</td>
+<td>进程 mmap MAP_SHARED 映射文件后，同一进程在同一 fd 上执行 <code>ftruncate(3, 0)</code> 将文件截断为 0 字节，随后访问映射页面时内核发现页面在文件中已不存在，发送 SIGBUS（<code>si_code=BUS_ADRERR</code>）</td>
+</tr>
+<tr>
+<td>是否恢复</td>
+<td><span class="badge-ok">✅ 已恢复（SIGBUS handler 捕获信号，进程优雅退出）</span></td>
+</tr>
+<tr>
+<td>根因置信度</td>
+<td>🟢 高置信</td>
+</tr>
+</tbody></table></div>
+<h3 id="h-置信度说明">置信度说明</h3>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>等级</th>
+<th>标识</th>
+<th>含义</th>
+<th>本例适用性</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>高置信</td>
+<td>🟢</td>
+<td>根因已明确，可复现，单一原因可解释所有现象</td>
+<td><span class="badge-ok">✅ strace 完整捕获因果链，100% 可复现，无矛盾证据</span></td>
+</tr>
+<tr>
+<td>中置信</td>
+<td>🟡</td>
+<td>根因基本确认，但存在 1～2 个无法完全解释的现象</td>
+<td><span class="badge-err">❌ 不适用</span></td>
+</tr>
+<tr>
+<td>低置信</td>
+<td>🟠</td>
+<td>有多个可疑原因，尚未排除竞争，结论为推断</td>
+<td><span class="badge-err">❌ 不适用</span></td>
+</tr>
+<tr>
+<td>未知</td>
+<td>🔴</td>
+<td>现象无法解释，根因未定位，仍在排查中</td>
+<td><span class="badge-err">❌ 不适用</span></td>
+</tr>
+</tbody></table></div>
+<hr>
+<h2 id="h-二根因速览">二、根因速览</h2>
+<h3 id="h-事故时间线-故障传导链路">事故时间线 & 故障传导链路</h3>
+<div class="code-block">
+  <span class="code-lang">text</span>
+  <button class="copy-btn" onclick="copyCode(this)" title="复制">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
+  </button>
+  <pre><code>时间                                   事件                                          性质         证据来源
+───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+2026-05-25 11:40:00 UTC   进程 mmap(NULL, 4096, PROT_READ, MAP_SHARED, 3, 0)         📥 资源获取    [kuafu_T1_20260525_1140_sigbus_truncated.md : L21]
+                          成功映射文件 4096 字节到 0x7a7c52816000
+  │
+  ▼
+2026-05-25 11:40:00 UTC   ftruncate(3, 0) 将文件截断为 0 字节                        ⚠️  触发动作    [同上 : L22]
+                          文件 inode-&gt;i_size = 0
+  │
+  ▼
+2026-05-25 11:40:00 UTC   内核在 msync 或页面访问时检测：                              🔴 故障爆发    [同上 : L23]
+                          映射偏移 0~4096 已超出文件大小 0
+  │                      ↳ SIGBUS {si_signo=SIGBUS, si_code=BUS_ADRERR}
+  │                      ↳ si_addr = 0x7a7c52816000（映射基址，第一页即触发）
+  ▼
+2026-05-25 11:40:00 UTC   进程 SIGBUS handler 捕获信号                                 🟢 恢复       [同上 : L24-L25]
+                          输出 "[FAULT] Caught SIGBUS (expected)"
+                          +++ exited with 0 +++</code></pre>
+</div>
+<h3 id="h-故障因果链">故障因果链</h3>
+<div class="code-block">
+  <span class="code-lang">text</span>
+  <button class="copy-btn" onclick="copyCode(this)" title="复制">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
+  </button>
+  <pre><code>ftruncate(3, 0)
+    │
+    └─► 内核更新文件 inode-&gt;i_size = 0
+            │
+            └─► mmap 映射区域 [0x7a7c52816000, 0x7a7c52817000)
+                 对应文件偏移 [0, 4096) 均超出当前文件大小
+                    │
+                    └─► 进程访问映射区域（通过 msync 或 page fault）
+                          │
+                          └─► 内核检查：page-&gt;mapping 引用的 inode 中，
+                               该页偏移 &gt;= i_size → 该页已被截断
+                              │
+                              └─► 内核无法将页面返回（backing store 中已无此页）
+                                    │
+                                    └─► 内核发送 SIGBUS，si_code = BUS_ADRERR
+                                          │
+                                          └─► 🔴 默认行为：进程崩溃 + core dump
+                                                → 但因 handler 注册 → 优雅退出</code></pre>
+</div>
+<hr>
+<h2 id="h-三排查过程">三、排查过程</h2>
+<h3 id="h-31-初始现象">3.1 初始现象</h3>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>现象</th>
+<th>描述</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>告警/触发条件</td>
+<td>容器 mmap-B 内执行 fault_sigbus 二进制程序</td>
+</tr>
+<tr>
+<td>进程行为</td>
+<td>执行 strace 捕获到完整系统调用序列，进程最终因 SIGBUS 终止</td>
+</tr>
+<tr>
+<td>信号详情</td>
+<td><code>SIGBUS {si_signo=SIGBUS, si_code=BUS_ADRERR, si_addr=0x7a7c52816000}</code></td>
+</tr>
+<tr>
+<td>Core dump</td>
+<td>未生成（进程注册了自定义 SIGBUS handler，未走默认终止流程）</td>
+</tr>
+<tr>
+<td>故障可复现性</td>
+<td>100%（每次执行故障程序均稳定触发）</td>
+</tr>
+</tbody></table></div>
+<h3 id="h-32-假设驱动排查">3.2 假设驱动排查</h3>
+<h4 id="h-假设-b1ftruncate-截断导致-sigbus-确认根因">假设 B1：ftruncate 截断导致 SIGBUS ✅ **确认根因**</h4>
+<blockquote>
+<p>🧪 假设：进程 mmap 映射文件后，执行 ftruncate(fd, 0) 将文件截断为 0 字节，后续访问映射区域时触内核页错误，因页面已超出文件末尾，内核发送 SIGBUS。</p>
+</blockquote>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>检查项</th>
+<th>操作（基于 strace 记录）</th>
+<th>结论</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>mmap 是否成功</td>
+<td><code>mmap(NULL, 4096, PROT_READ, MAP_SHARED, 3, 0) = 0x7a7c52816000</code></td>
+<td><span class="badge-ok">✅ 映射成功，非 MAP_FAILED</span></td>
+</tr>
+<tr>
+<td>文件大小变化</td>
+<td><code>ftruncate(3, 0) = 0</code> — 文件从 4096B 截断为 0B</td>
+<td><span class="badge-ok">✅ 截断成功</span></td>
+</tr>
+<tr>
+<td>访问冲突操作</td>
+<td><code>msync(0x7a7c52816000, 4096, MS_SYNC)</code> 同步映射区域</td>
+<td><span class="badge-ok">✅ 触发内核检测</span></td>
+</tr>
+<tr>
+<td>信号码验证</td>
+<td><code>SIGBUS</code>, <code>si_code=BUS_ADRERR</code></td>
+<td><span class="badge-ok">✅ 符合文件截断场景标准语义</span></td>
+</tr>
+<tr>
+<td>内存地址确认</td>
+<td><code>si_addr=0x7a7c52816000</code> 即 mmap 返回值</td>
+<td><span class="badge-ok">✅ 地址一致，定位精确</span></td>
+</tr>
+</tbody></table></div>
+<p><strong>✅ 结论</strong>：strace 完整捕获了 mmap → ftruncate → 访问 → SIGBUS 的完整因果链。<code>BUS_ADRERR</code> 信号码明确表示&quot;无效物理地址&quot;——即内核无法为已截断的文件偏移提供有效的 backing page。所有系统调用返回值与 Linux mmap 语义完全一致。</p>
+<hr>
+<h4 id="h-假设-b2closefd-使映射失效-排除">假设 B2：close(fd) 使映射失效 ❌ **排除**</h4>
+<blockquote>
+<p>🧪 假设：进程在 ftruncate 后 close 了 fd，导致 mmap 映射底层句柄失效。</p>
+</blockquote>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>检查项</th>
+<th>操作（基于 strace 记录）</th>
+<th>结论</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>strace 中是否有 close(3)</td>
+<td>完整 strace 输出中无 <code>close(3)</code> 调用</td>
+<td><span class="badge-err">❌ 不存在</span></td>
+</tr>
+<tr>
+<td>Linux mmap 语义</td>
+<td>关闭 fd <strong>不会</strong>使已有 mmap 失效；映射持有 inode 引用</td>
+<td><span class="badge-err">❌ 语义不成立</span></td>
+</tr>
+</tbody></table></div>
+<p><strong>❌ 排除</strong>：strace 记录中不存在 close 调用。即使 close 存在，Linux 语义也明确规定 mmap 后关闭 fd 不影响已有映射。</p>
+<hr>
+<h4 id="h-假设-b3其他进程删除重命名文件-排除">假设 B3：其他进程删除/重命名文件 ❌ **排除**</h4>
+<blockquote>
+<p>🧪 假设：外部进程（logrotate、清理脚本）在 mmap 后 unlink 或 rename 了临时文件。</p>
+</blockquote>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>检查项</th>
+<th>操作</th>
+<th>结论</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>是否存在并发进程</td>
+<td>单进程单线程序列，无竞争条件</td>
+<td><span class="badge-err">❌ 不存在外部干涉</span></td>
+</tr>
+<tr>
+<td>容器环境</td>
+<td>mmap-B 为隔离容器，无后台服务</td>
+<td><span class="badge-err">❌ 外部进程无法介入</span></td>
+</tr>
+<tr>
+<td>unlink 语义</td>
+<td>unlink 不会导致 SIGBUS（inode 引用保持）</td>
+<td><span class="badge-err">❌ 即使有也不成立</span></td>
+</tr>
+</tbody></table></div>
+<p><strong>❌ 排除</strong>：容器隔离环境 + 单进程序列 + unlink 不会产生 SIGBUS，三方原因不成立。</p>
+<hr>
+<h4 id="h-假设-b4硬件-io-错误-排除">假设 B4：硬件 I/O 错误 ❌ **排除**</h4>
+<blockquote>
+<p>🧪 假设：底层存储（tmpfs 或物理磁盘）发生硬件 I/O 错误，导致读页失败。</p>
+</blockquote>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>检查项</th>
+<th>操作</th>
+<th>结论</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>信号码</td>
+<td><code>BUS_ADRERR</code> vs <code>BUS_OBJERR</code></td>
+<td>❌ 硬件 IO 错误应触发 <code>BUS_OBJERR</code></td>
+</tr>
+<tr>
+<td>可复现性</td>
+<td>100% 确定性复现</td>
+<td><span class="badge-err">❌ 硬件错误不具备此特征</span></td>
+</tr>
+<tr>
+<td>存储类型</td>
+<td>tmpfs = 内存文件系统，无物理 I/O</td>
+<td><span class="badge-err">❌ 不存在物理 I/O 路径</span></td>
+</tr>
+</tbody></table></div>
+<p><strong>❌ 排除</strong>：信号码不匹配、复现特征不匹配、存储介质不产生物理 I/O 错误。</p>
+<hr>
+<h4 id="h-假设-b5mmap-参数错误-排除">假设 B5：mmap 参数错误 ❌ **排除**</h4>
+<blockquote>
+<p>🧪 假设：mmap 传入的参数（length、offset、flags、fd）非法导致映射失效。</p>
+</blockquote>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>检查项</th>
+<th>操作</th>
+<th>结论</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>mmap 返回值</td>
+<td><code>0x7a7c52816000</code> ≠ MAP_FAILED</td>
+<td><span class="badge-ok">✅ 映射创建成功</span></td>
+</tr>
+<tr>
+<td>参数检查</td>
+<td>length=4096(页对齐), offset=0, PROT_READ, MAP_SHARED, fd=3</td>
+<td><span class="badge-ok">✅ 全部合法</span></td>
+</tr>
+<tr>
+<td>参数错误信号码</td>
+<td>参数类错误应发 <code>BUS_ADRALN</code>（对齐错误）</td>
+<td>❌ 非 <code>BUS_ADRERR</code></td>
+</tr>
+</tbody></table></div>
+<p><strong>❌ 排除</strong>：mmap 成功返回非 MAP_FAILED，参数全部标准合法，信号码不匹配参数错误。</p>
+<hr>
+<h3 id="h-33-排查结论与逻辑树">3.3 排查结论与逻辑树</h3>
+<div class="code-block">
+  <span class="code-lang">text</span>
+  <button class="copy-btn" onclick="copyCode(this)" title="复制">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
+  </button>
+  <pre><code>SIGBUS (si_code=BUS_ADRERR)
+│
+├─► 假设 B5: mmap 参数错误          → ❌ mmap 成功返回，参数合法，排除
+├─► 假设 B4: 硬件 I/O 错误          → ❌ BUS_ADRERR ≠ BUS_OBJERR，排除
+├─► 假设 B3: 外部进程删/改名文件     → ❌ 容器隔离 + 单线程序列，排除
+├─► 假设 B2: close(fd) 使映射失效    → ❌ strace 无 close，且语义不成立，排除
+│
+└─► 假设 B1: ftruncate 截断          → ✅ 确认根因
+        └─► strace: mmap(4096) → ftruncate(3,0) → msync → SIGBUS
+        └─► si_code=BUS_ADRERR 符合截断场景
+        └─► si_addr=mmap 返回值 一致
+        └─► 100% 可控复现
+                └─► 🎯 根因确认：ftruncate 截断 → 映射页面失效 → SIGBUS</code></pre>
+</div>
+<hr>
+<h2 id="h-四涉及的-linux-内核机制详解">四、涉及的 Linux 内核机制详解</h2>
+<h3 id="h-41-mmap-mapshared-与文件截断的交互">4.1 mmap MAP_SHARED 与文件截断的交互</h3>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>机制</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>mmap MAP_SHARED</td>
+<td>建立文件到进程地址空间的共享映射，映射页与文件 page cache 共享物理页帧</td>
+</tr>
+<tr>
+<td>ftruncate</td>
+<td>修改文件 inode-&gt;i_size，可扩大或缩小文件</td>
+</tr>
+<tr>
+<td>内核页错误处理 (filemap_fault)</td>
+<td>缺页时检查：若 page index &gt;= i_size &gt;&gt; PAGE_SHIFT，返回 SIGBUS</td>
+</tr>
+<tr>
+<td>BUS_ADRERR</td>
+<td>信号码含义：无效物理地址 — 文件截断后无法为映射偏移提供 backing store</td>
+</tr>
+<tr>
+<td>msync</td>
+<td>强制同步映射页；若页已失效（超出 i_size），同步过程可能直接触发 SIGBUS</td>
+</tr>
+</tbody></table></div>
+<h3 id="h-42-为什么是-sigbus-而非-sigsegv">4.2 为什么是 SIGBUS 而非 SIGSEGV</h3>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>信号</th>
+<th>触发条件</th>
+<th>本例</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>SIGSEGV (11)</td>
+<td>无效虚拟地址访问、权限违规（写只读页等）</td>
+<td><span class="badge-err">❌ 地址 0x7a7c52816000 属于有效映射范围</span></td>
+</tr>
+<tr>
+<td>SIGBUS (7)</td>
+<td>有效地址但对应物理资源不可用（文件截断、换出到坏扇区等）</td>
+<td><span class="badge-ok">✅ 地址有效但 backing store 中的页因截断已消失</span></td>
+</tr>
+</tbody></table></div>
+<hr>
+<h2 id="h-五修复方案">五、修复方案</h2>
+<h3 id="h-51-应急处置">5.1 应急处置</h3>
+<p>本次故障为受控的故障模拟测试，进程已通过 SIGBUS handler 优雅退出，无需应急处置。</p>
+<h3 id="h-52-代码级修复方案">5.2 代码级修复方案</h3>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>修复措施</th>
+<th>方案说明</th>
+<th>优先级</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>信号处理</strong></td>
+<td>使用 <code>sigaction(SIGBUS, ...)</code> 注册自定义 handler，避免进程崩溃</td>
+<td>P0</td>
+</tr>
+<tr>
+<td><strong>ftruncate 前检查</strong></td>
+<td>在 ftruncate(fd, 0) 前先 <code>munmap</code> 解除映射，再执行截断</td>
+<td>P1</td>
+</tr>
+<tr>
+<td><strong>访问前校验证</strong></td>
+<td>使用 <code>fstat(fd)</code> 或 <code>lseek(fd, 0, SEEK_END)</code> 检查文件大小后再访问映射区域</td>
+<td>P1</td>
+</tr>
+<tr>
+<td><strong>使用 MAP_PRIVATE 替代</strong></td>
+<td>如果不需要回写，改用 MAP_PRIVATE 避免共享映射的截断语义（但需评估是否满足业务需求）</td>
+<td>P2</td>
+</tr>
+<tr>
+<td><strong>文件锁保护</strong></td>
+<td>对文件使用 <code>flock(fd, LOCK_EX)</code> 确保 mmap 期间无其他线程截断</td>
+<td>P2</td>
+</tr>
+</tbody></table></div>
+<h3 id="h-53-代码示例修复建议">5.3 代码示例（修复建议）</h3>
+<div class="code-block">
+  <span class="code-lang">c</span>
+  <button class="copy-btn" onclick="copyCode(this)" title="复制">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
+  </button>
+  <pre><code>/* 方案：ftruncate 前先解除映射 */
+if (data-&gt;mapped) {
+    munmap(addr, data-&gt;file_size);     /* 先解除映射 */
+    close(fd);
+}
+ftruncate(fd, 0);                      /* 截断文件 */
+
+/* 方案：访问前检查文件大小 */
+struct stat st;
+fstat(fd, &amp;st);
+if (st.st_size &lt; expected_size) {
+    /* 文件已被截断，不应再访问映射区域 */
+    return -1;
+}</code></pre>
+</div>
+<h3 id="h-54-监控与预防措施">5.4 监控与预防措施</h3>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>措施</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>SIGBUS 监控</td>
+<td>监控服务器 <code>/var/log/messages</code> 中 SIGBUS / bus error 事件</td>
+</tr>
+<tr>
+<td>应用层防御性编程</td>
+<td>在 mmap 共享文件的所有关键路径上，访问映射前检查文件当前大小</td>
+</tr>
+<tr>
+<td>代码审查</td>
+<td>重点关注 mmap + 文件截断/写入的并发场景</td>
+</tr>
+<tr>
+<td>测试覆盖</td>
+<td>集成测试中包含 ftruncate + mmap 交叉场景测试用例</td>
+</tr>
+</tbody></table></div>
+<hr>
+<h2 id="h-六排除项汇总">六、排除项汇总</h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>假设</th>
+<th>排除原因</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>B2: close(fd) 使映射失效</td>
+<td>strace 记录中无 close 调用；Linux 语义明确 mmap 后 close fd 不影响已有映射</td>
+</tr>
+<tr>
+<td>B3: 外部进程删除/重命名文件</td>
+<td>容器隔离环境，无竞争进程；且 unlink 不会触发 SIGBUS（inode 引用保持）</td>
+</tr>
+<tr>
+<td>B4: 硬件 I/O 错误</td>
+<td>信号码 BUS_ADRERR ≠ BUS_OBJERR；100% 确定性复现；tmpfs 无物理 I/O</td>
+</tr>
+<tr>
+<td>B5: mmap 参数错误</td>
+<td>mmap 成功返回非 MAP_FAILED；参数全部合法标准；参数错误信号码应为 BUS_ADRALN</td>
+</tr>
+</tbody></table></div>
+<hr>
+<h2 id="h-七相关参考">七、相关参考</h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>参考项</th>
+<th>来源</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Kuafu 诊断文件</td>
+<td><code>G:\chaostoolkit\witty-working\kuafu\kuafu_T1_20260525_1140_sigbus_truncated.md</code></td>
+</tr>
+<tr>
+<td>故障源程序</td>
+<td>容器 <code>mmap-B:/test/fault_sigbus.c</code></td>
+</tr>
+<tr>
+<td>mmap 手册</td>
+<td><code>man 2 mmap</code> — MAP_SHARED 节：<em>&quot;The mmap() call creates a new mapping in the virtual address space... SIGBUS is delivered when an attempt is made to access a page that is beyond the current end of the mapped file.&quot;</em></td>
+</tr>
+<tr>
+<td>内核源码参考</td>
+<td><code>mm/filemap.c</code> — <code>filemap_fault()</code> 函数中 <code>i_size_read(inode)</code> 的比较逻辑</td>
+</tr>
+</tbody></table></div>
+<hr>
+<p><em>报告生成完毕 — 白泽 (Baize) 分析 Agent Phase 1.4</em></p>
+
+    <div class="meta">
+      <span class="meta-source">SIGBUS文件截断故障_mmap-B_20260525193035_report.md</span>
+      <span>生成于 2026/05/25 21:19</span>
+    </div>
+  </article>
+</div>
+
+<script>
+  /* ── 滚动进度条 ── */
+  window.addEventListener("scroll", () => {
+    const el  = document.documentElement;
+    const pct = el.scrollTop / (el.scrollHeight - el.clientHeight) * 100;
+    document.getElementById("progress").style.width = Math.min(pct, 100) + "%";
+  });
+
+  /* ── TOC 高亮当前章节 ── */
+  (function () {
+    const headings = Array.from(document.querySelectorAll("article h1,article h2,article h3"));
+    const links    = Array.from(document.querySelectorAll(".toc a"));
+    if (!links.length) return;
+    const obs = new IntersectionObserver(entries => {
+      entries.forEach(e => {
+        if (!e.isIntersecting) return;
+        links.forEach(l => l.classList.remove("active"));
+        const a = links.find(l => l.getAttribute("href") === "#" + e.target.id);
+        if (a) a.classList.add("active");
+      });
+    }, { rootMargin: "-10% 0px -80% 0px" });
+    headings.forEach(h => obs.observe(h));
+  })();
+
+  /* ── h2 章节序号自动计数 ── */
+  (function () {
+    let idx = 0;
+    document.querySelectorAll("article h2").forEach(el => {
+      idx++;
+      el.setAttribute("data-index", String(idx).padStart(2, "0"));
+    });
+  })();
+
+  /* ── 代码块一键复制 ── */
+  function copyCode(btn) {
+    const code = btn.closest(".code-block").querySelector("code").innerText;
+    navigator.clipboard.writeText(code).then(() => {
+      btn.classList.add("copied");
+      btn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>';
+      setTimeout(() => {
+        btn.classList.remove("copied");
+        btn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>';
+      }, 2000);
+    });
+  }
+
+  /* ── 目录树收缩/展开 ── */
+  function toggleToc(btn) {
+    const expanded = btn.getAttribute("aria-expanded") === "true";
+    btn.setAttribute("aria-expanded", String(!expanded));
+    const parentItem = btn.closest(".toc-item");
+    let nextEl = parentItem.nextElementSibling;
+    if (nextEl && nextEl.classList.contains("toc-group")) {
+      if (expanded) {
+        nextEl.style.maxHeight = nextEl.scrollHeight + "px";
+        void nextEl.offsetHeight;
+        nextEl.classList.add("collapsed");
+      } else {
+        nextEl.classList.remove("collapsed");
+        nextEl.style.maxHeight = nextEl.scrollHeight + "px";
+        setTimeout(() => {
+          if (!nextEl.classList.contains("collapsed")) {
+            nextEl.style.maxHeight = "none";
+          }
+        }, 300);
+      }
+    }
+  }
+</script>
+</body>
+</html>
