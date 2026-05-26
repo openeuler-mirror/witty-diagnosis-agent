@@ -3,7 +3,6 @@ import pc from "picocolors"
 import type { ServerConnection } from "./types"
 import { getAvailableServerPort, isPortAvailable, DEFAULT_SERVER_PORT } from "../../shared/port-utils"
 import { withWorkingOpencodePath } from "./opencode-binary-resolver"
-import { env } from "node:process"
 
 function isPortStartFailure(error: unknown, port: number): boolean {
   if (!(error instanceof Error)) {
@@ -31,17 +30,6 @@ async function startServer(options: { signal: AbortSignal, port: number }): Prom
   return { client, cleanup: () => server.close() }
 }
 
-function createAuthenticatedClient(baseUrl: string): ReturnType<typeof createOpencodeClient> {
-  const headers: Record<string, string> = {}
-  const password = env.OPENCODE_SERVER_PASSWORD
-  if (password) {
-    const encoded = Buffer.from(`opencode:${password}`).toString("base64")
-    headers["Authorization"] = `Basic ${encoded}`
-  }
-
-  return createOpencodeClient({ baseUrl, headers })
-}
-
 export async function createServerConnection(options: {
   port?: number
   attach?: string
@@ -50,15 +38,9 @@ export async function createServerConnection(options: {
   const { port, attach, signal } = options
 
   if (attach !== undefined) {
-    if (env.OPENCODE_SERVER_PASSWORD) {
-      console.log(pc.dim("Attaching to existing server at"), pc.cyan(attach))
-      return { client: createAuthenticatedClient(attach), cleanup: () => {} }
-    }
-    // 无密码: 忽略 --attach, 启动自己的 server (createOpencode 自动处理鉴权)
-    console.log(pc.yellow("No OPENCODE_SERVER_PASSWORD set, starting own server"))
-    const autoPort = await getAvailableServerPort(DEFAULT_SERVER_PORT, "127.0.0.1")
-      .then(r => r.port).catch(() => DEFAULT_SERVER_PORT)
-    return await startServer({ signal, port: autoPort })
+    console.log(pc.dim("Attaching to existing server at"), pc.cyan(attach))
+    const client = createOpencodeClient({ baseUrl: attach })
+    return { client, cleanup: () => {} }
   }
 
   if (port !== undefined) {
@@ -83,12 +65,14 @@ export async function createServerConnection(options: {
         }
 
         console.log(pc.dim("Port"), pc.cyan(port.toString()), pc.dim("became occupied, attaching to existing server"))
-        return { client: createAuthenticatedClient(`http://127.0.0.1:${port}`), cleanup: () => {} }
+        const client = createOpencodeClient({ baseUrl: `http://127.0.0.1:${port}` })
+        return { client, cleanup: () => {} }
       }
     }
 
     console.log(pc.dim("Port"), pc.cyan(port.toString()), pc.dim("is occupied, attaching to existing server"))
-    return { client: createAuthenticatedClient(`http://127.0.0.1:${port}`), cleanup: () => {} }
+    const client = createOpencodeClient({ baseUrl: `http://127.0.0.1:${port}` })
+    return { client, cleanup: () => {} }
   }
 
   let selectedPort: number
@@ -108,7 +92,8 @@ export async function createServerConnection(options: {
     }
 
     console.log(pc.dim("Port range exhausted, attaching to existing server on"), pc.cyan(DEFAULT_SERVER_PORT.toString()))
-    return { client: createAuthenticatedClient(`http://127.0.0.1:${DEFAULT_SERVER_PORT}`), cleanup: () => {} }
+    const client = createOpencodeClient({ baseUrl: `http://127.0.0.1:${DEFAULT_SERVER_PORT}` })
+    return { client, cleanup: () => {} }
   }
 
   if (wasAutoSelected) {

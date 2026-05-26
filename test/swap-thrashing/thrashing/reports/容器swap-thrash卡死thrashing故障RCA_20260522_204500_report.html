@@ -1,0 +1,1078 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>故障诊断报告</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Lora:ital,wght@0,400;0,600;1,400&family=Source+Sans+3:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  /* ── Design tokens ─────────────────────────────────────────────────────── */
+  :root {
+    --bg:          #f8f7f4;
+    --surface:     #ffffff;
+    --border:      #e8e5df;
+    --border-soft: #f0ede8;
+
+    --text:        #1c1917;
+    --text-2:      #57534e;
+    --text-3:      #a8a29e;
+
+    --accent:      #1d4e6e;
+    --accent-light:#e8f1f7;
+    --accent-mid:  #3b82a0;
+
+    --red:         #c0392b;
+    --red-bg:      #fef2f2;
+    --amber:       #92400e;
+    --amber-bg:    #fffbeb;
+    --green:       #14532d;
+    --green-bg:    #f0fdf4;
+
+    --code-bg:     #1a1d27;
+    --code-text:   #cdd6f4;
+    --code-border: #2d3148;
+
+    --font-body: "Source Sans 3", "PingFang SC", "Hiragino Sans GB", sans-serif;
+    --font-head: "Lora", "PingFang SC", Georgia, serif;
+    --font-mono: "JetBrains Mono", "Fira Code", Consolas, monospace;
+
+    --radius:    8px;
+    --radius-lg: 12px;
+    --shadow:    0 1px 3px rgba(0,0,0,.06), 0 4px 16px rgba(0,0,0,.05);
+    --shadow-lg: 0 2px 8px rgba(0,0,0,.07), 0 8px 32px rgba(0,0,0,.06);
+
+    --toc-width:   240px;
+    --gap:         32px;
+  }
+
+  /* ── Progress bar ──────────────────────────────────────────────────────── */
+  #progress {
+    position: fixed; top: 0; left: 0; height: 3px; width: 0%;
+    background: linear-gradient(90deg, var(--accent-mid), var(--accent));
+    z-index: 999; transition: width .1s linear;
+    border-radius: 0 2px 2px 0;
+  }
+
+  /* ── Base ──────────────────────────────────────────────────────────────── */
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  html { font-size: 16px; scroll-behavior: smooth; }
+  body {
+    font-family: var(--font-body);
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.8;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* ── Layout ────────────────────────────────────────────────────────────── */
+  .layout {
+    display: flex;
+    align-items: flex-start;
+    max-width: calc(var(--toc-width) + 820px + var(--gap) * 3);
+    margin: 0 auto;
+    padding: 48px var(--gap) 96px;
+    gap: var(--gap);
+  }
+
+  /* ── TOC ───────────────────────────────────────────────────────────────── */
+  .toc {
+    width: var(--toc-width);
+    flex-shrink: 0;
+    position: sticky;
+    top: 32px;
+    max-height: calc(100vh - 64px);
+    overflow-y: auto;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    padding: 20px;
+    box-shadow: var(--shadow);
+    scrollbar-width: thin;
+    scrollbar-color: var(--border) transparent;
+  }
+  .toc-title {
+    font-size: 10.5px;
+    font-weight: 600;
+    letter-spacing: .1em;
+    text-transform: uppercase;
+    color: var(--text-3);
+    margin-bottom: 12px;
+    padding-bottom: 10px;
+    border-bottom: 1px solid var(--border-soft);
+  }
+  .toc-item {
+    display: flex;
+    align-items: flex-start;
+    margin: 2px 0;
+  }
+  .toc-toggle {
+    background: none;
+    border: none;
+    cursor: pointer;
+    color: var(--text-3);
+    padding: 4px;
+    margin-right: 4px;
+    margin-top: 2px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 4px;
+    transition: background 0.2s, transform 0.2s;
+  }
+  .toc-toggle:hover { background: var(--border-soft); color: var(--text); }
+  .toc-toggle[aria-expanded="false"] svg { transform: rotate(-90deg); }
+  .toc-spacer { width: 20px; flex-shrink: 0; }
+  .toc-group { overflow: hidden; transition: max-height 0.3s ease-in-out; }
+  .toc-group.collapsed { max-height: 0 !important; }
+  
+  .toc a {
+    display: block;
+    font-size: 13px;
+    color: var(--text-2);
+    text-decoration: none;
+    padding: 4px 8px;
+    border-radius: 5px;
+    line-height: 1.45;
+    transition: background .15s, color .15s;
+    word-break: break-all;
+    flex-grow: 1;
+  }
+  .toc a:hover  { background: var(--accent-light); color: var(--accent); }
+  .toc a.active { background: var(--accent-light); color: var(--accent); font-weight: 500; }
+  .toc-l1 { font-weight: 600; color: var(--text); }
+  .toc-l2 { font-weight: 600; color: var(--text); }
+  .toc-l3 { font-size: 12px !important; padding-left: 14px !important; }
+
+  /* ── Article card ──────────────────────────────────────────────────────── */
+  .article {
+    flex: 1; min-width: 0;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    padding: 52px 60px;
+    box-shadow: var(--shadow-lg);
+  }
+
+  /* ── Headings ──────────────────────────────────────────────────────────── */
+  .title-container {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-end;
+    margin: 0 0 28px;
+    padding-bottom: 18px;
+    border-bottom: 2px solid var(--text);
+  }
+  .article h1 {
+    font-family: var(--font-head);
+    font-size: 26px; font-weight: 600; line-height: 1.3;
+    margin: 0; padding-bottom: 0;
+    border-bottom: none;
+  }
+  .article h2 {
+    font-family: var(--font-head);
+    font-size: 19px; font-weight: 600;
+    margin: 48px 0 14px; padding-bottom: 8px;
+    border-bottom: 1px solid var(--border);
+  }
+  .article h2::before {
+    content: attr(data-index);
+    display: inline-block;
+    font-family: var(--font-mono);
+    font-size: 10.5px; font-weight: 500;
+    color: var(--accent-mid);
+    background: var(--accent-light);
+    padding: 1px 7px; border-radius: 4px;
+    margin-right: 10px; vertical-align: middle;
+    letter-spacing: .05em;
+  }
+  .article h3 {
+    font-family: var(--font-head);
+    font-size: 15.5px; font-weight: 600;
+    margin: 28px 0 10px;
+  }
+  .article h3::before {
+    content: "§ ";
+    color: var(--text-3);
+    font-family: var(--font-mono); font-size: 13px;
+  }
+  .article h4 {
+    font-size: 13.5px; font-weight: 600;
+    color: var(--accent); margin: 20px 0 8px;
+  }
+
+  /* ── Body text ─────────────────────────────────────────────────────────── */
+  .article p, .plain { 
+    font-size: 15px; 
+    line-height: 1.85; 
+    color: var(--text); 
+    margin: 0 0 12px; 
+    font-family: var(--font-body);
+  }
+  .article strong { font-weight: 600; }
+  .article em     { font-style: italic; color: var(--text-2); }
+  .article a {
+    color: var(--accent); text-decoration: underline;
+    text-decoration-color: var(--accent-light);
+    text-underline-offset: 3px;
+  }
+  .article a:hover { text-decoration-color: var(--accent); }
+  .article hr { border: none; border-top: 1px solid var(--border); margin: 20px 0; }
+  .article hr.heavy { border-top: 3px solid var(--text); margin: 32px 0; }
+
+  /* ── Blockquote ────────────────────────────────────────────────────────── */
+  .article blockquote {
+    border-left: 3px solid var(--accent-mid);
+    background: var(--accent-light);
+    margin: 20px 0; padding: 13px 20px 13px 20px;
+    border-radius: 0 var(--radius) var(--radius) 0;
+  }
+  .article blockquote p { font-size: 14.5px; color: var(--accent); margin: 0; line-height: 1.7; }
+  /* 支持块引用内部保留换行符（修复头部概要换行丢失问题） */
+  .article blockquote p { white-space: pre-wrap; }
+  .article blockquote strong { color: var(--accent); }
+
+  /* ── Lists ─────────────────────────────────────────────────────────────── */
+  .article ul, .article ol { padding-left: 22px; margin: 6px 0 14px; }
+  .article li { font-size: 15px; line-height: 1.8; margin: 4px 0; }
+  .article li::marker { color: var(--accent-mid); }
+  .article li > ul, .article li > ol { margin: 3px 0; }
+
+  /* ── Inline code ───────────────────────────────────────────────────────── */
+  .article :not(pre) > code {
+    font-family: var(--font-mono);
+    font-size: 12.5px; font-weight: 500;
+    background: #f3f0eb; color: var(--red);
+    padding: 1px 5px; border-radius: 4px;
+    border: 1px solid var(--border);
+  }
+
+  /* ── Code blocks ───────────────────────────────────────────────────────── */
+  .code-block {
+    position: relative; margin: 20px 0;
+    border-radius: var(--radius-lg); overflow: hidden;
+    border: 1px solid var(--code-border);
+    box-shadow: 0 4px 20px rgba(0,0,0,.16);
+  }
+  .code-lang {
+    position: absolute; top: 0; left: 0;
+    font-family: var(--font-mono); font-size: 10px; font-weight: 500;
+    color: #7c8db5; background: #222538;
+    padding: 4px 12px; border-bottom-right-radius: 6px;
+    text-transform: uppercase; letter-spacing: .08em;
+    user-select: none;
+  }
+  .copy-btn {
+    position: absolute; top: 8px; right: 10px;
+    background: #2d3148; border: 1px solid #3d4260;
+    border-radius: 5px; color: #7c8db5; cursor: pointer;
+    padding: 5px 8px; display: flex; align-items: center;
+    transition: background .15s, color .15s; z-index: 1;
+  }
+  .copy-btn:hover  { background: #3a3f60; color: #cdd6f4; }
+  .copy-btn.copied { color: #a6e3a1; border-color: #4a6a4a; }
+  .code-block pre {
+    margin: 0; padding: 36px 20px 20px;
+    background: var(--code-bg); overflow-x: auto;
+    scrollbar-width: thin; scrollbar-color: #3d4260 transparent;
+  }
+  .code-block pre::-webkit-scrollbar { height: 5px; }
+  .code-block pre::-webkit-scrollbar-thumb { background: #3d4260; border-radius: 3px; }
+  .code-block code {
+    font-family: var(--font-mono); font-size: 13px; line-height: 1.7;
+    color: var(--code-text); background: none; border: none; padding: 0;
+    white-space: pre; word-break: normal;
+  }
+
+  /* ── Tables ────────────────────────────────────────────────────────────── */
+  .table-wrap {
+    overflow-x: auto; margin: 16px 0;
+    border-radius: var(--radius-lg);
+    border: 1px solid var(--border);
+    box-shadow: var(--shadow);
+  }
+  table { width: 100%; border-collapse: collapse; font-size: 14px; min-width: 360px; }
+  thead { background: #f4f2ee; }
+  th {
+    padding: 9px 14px; text-align: left;
+    font-size: 11.5px; font-weight: 600;
+    letter-spacing: .04em; text-transform: uppercase;
+    color: var(--text-2); border-bottom: 1px solid var(--border);
+    white-space: nowrap;
+  }
+  td {
+    padding: 8px 14px; border-bottom: 1px solid var(--border-soft);
+    color: var(--text); vertical-align: top; line-height: 1.6;
+  }
+  tbody tr:last-child td { border-bottom: none; }
+  tbody tr:nth-child(even) td { background: #faf9f7; }
+  tbody tr:hover td { background: var(--accent-light); transition: background .1s; }
+
+  /* ── KV block ──────────────────────────────────────────────────────────── */
+  .kv-block { background: var(--bg); border: 1px solid var(--border); border-radius: var(--radius-lg); overflow: hidden; margin: 12px 0 20px; }
+  .kv-row { display: flex; border-bottom: 1px solid var(--border-soft); align-items: flex-start; }
+  .kv-row:last-child { border-bottom: none; }
+  .kv-key { flex: 0 0 160px; padding: 9px 16px; font-size: 13.5px; font-weight: 600; color: var(--text-2); background: var(--surface); border-right: 1px solid var(--border-soft); }
+  .kv-val { flex: 1; padding: 9px 16px; font-size: 14px; color: var(--text); }
+
+  /* ── Status badges ─────────────────────────────────────────────────────── */
+  .badge-ok { display: inline-flex; align-items: center; gap: 4px; background: var(--green-bg); color: var(--green); font-size: 13px; font-weight: 500; padding: 2px 9px; border-radius: 20px; border: 1px solid #bbf7d0; }
+  .badge-err { display: inline-flex; align-items: center; gap: 4px; background: var(--red-bg); color: var(--red); font-size: 13px; font-weight: 500; padding: 2px 9px; border-radius: 20px; border: 1px solid #fecaca; }
+  .badge-warn { display: inline-flex; align-items: center; gap: 4px; background: var(--amber-bg); color: var(--amber); font-size: 13px; font-weight: 500; padding: 2px 9px; border-radius: 20px; border: 1px solid #fde68a; }
+
+  /* ── Priority badges ───────────────────────────────────────────────────── */
+  .pri-p0 { display: inline-block; background: #fef2f2; color: #991b1b; border: 1px solid #fca5a5; font-size: 12px; font-weight: 700; padding: 2px 8px; border-radius: 4px; letter-spacing: .04em; }
+  .pri-p1 { display: inline-block; background: #fff7ed; color: #9a3412; border: 1px solid #fdba74; font-size: 12px; font-weight: 700; padding: 2px 8px; border-radius: 4px; }
+  .pri-p2 { display: inline-block; background: #fffbeb; color: #92400e; border: 1px solid #fde68a; font-size: 12px; font-weight: 700; padding: 2px 8px; border-radius: 4px; }
+  .pri-p3 { display: inline-block; background: var(--accent-light); color: var(--accent); border: 1px solid #bfdbfe; font-size: 12px; font-weight: 700; padding: 2px 8px; border-radius: 4px; }
+
+  /* ── Fault header ──────────────────────────────────────────────────────── */
+  .fault-header { display: flex; align-items: center; gap: 12px; padding: 12px 16px; border-radius: var(--radius-lg); margin: 16px 0 8px; border: 1px solid; }
+  .fh-p0 { background: #fef2f2; border-color: #fca5a5; }
+  .fh-p1 { background: #fff7ed; border-color: #fdba74; }
+  .fh-p2 { background: #fffbeb; border-color: #fde68a; }
+  .fh-p3 { background: var(--accent-light); border-color: #bfdbfe; }
+  .fh-badge { font-family: var(--font-mono); font-size: 11px; font-weight: 700; letter-spacing: .08em; }
+  .fh-p0 .fh-badge { color: #991b1b; }
+  .fh-p1 .fh-badge { color: #9a3412; }
+  .fh-p2 .fh-badge { color: #92400e; }
+  .fh-p3 .fh-badge { color: var(--accent); }
+  .fh-rest { font-size: 14px; font-weight: 500; color: var(--text); }
+
+  /* ── Timeline ──────────────────────────────────────────────────────────── */
+  .timeline { border-left: 2px solid var(--accent-mid); margin: 16px 0 16px 8px; padding-left: 20px; }
+  .tl-row { display: flex; align-items: baseline; gap: 10px; margin: 8px 0; font-size: 13.5px; }
+  .tl-ts { font-family: var(--font-mono); font-size: 12px; color: var(--text-3); flex-shrink: 0; white-space: nowrap; }
+  .tl-tag { font-size: 11px; font-weight: 600; padding: 1px 7px; border-radius: 10px; flex-shrink: 0; background: var(--accent-light); color: var(--accent); }
+  .tl-tag.err { background: var(--red-bg); color: var(--red); }
+  .tl-tag.warn { background: var(--amber-bg); color: var(--amber); }
+  .tl-desc { color: var(--text); line-height: 1.5; }
+
+  /* ── Global warn ───────────────────────────────────────────────────────── */
+  .global-warn { background: #fef2f2; border: 1px solid #fca5a5; border-radius: var(--radius-lg); padding: 14px 18px; font-size: 14.5px; font-weight: 600; color: #991b1b; margin: 16px 0; }
+
+  /* ── Tree note ─────────────────────────────────────────────────────────── */
+  .tree-note { white-space: pre-wrap; font-family: var(--font-mono); font-size: 13.5px; line-height: 1.6; color: var(--text-2); margin: 8px 0 8px 16px; }
+
+  /* ── Disclaimer ────────────────────────────────────────────────────────── */
+  .disclaimer { background: var(--bg); border: 1px solid var(--border); border-radius: var(--radius); padding: 14px 18px; font-size: 13.5px; color: var(--text-2); font-style: italic; }
+
+  /* ── Meta footer ───────────────────────────────────────────────────────── */
+  .meta {
+    margin-top: 48px; padding-top: 16px;
+    border-top: 1px solid var(--border-soft);
+    display: flex; justify-content: space-between; align-items: center;
+    font-size: 12px; color: var(--text-3);
+  }
+  .meta-source { font-family: var(--font-mono); font-size: 11.5px; }
+
+  /* ── Brand logo ────────────────────────────────────────────────────────── */
+  .brand-logo {
+    font-family: var(--font-head);
+    font-size: 14px;
+    color: var(--text-3);
+    letter-spacing: 0.05em;
+    margin-bottom: 4px;
+    flex-shrink: 0;
+    margin-left: 16px;
+  }
+  .brand-logo strong {
+    font-weight: 600;
+    color: var(--accent);
+  }
+  @media (max-width: 900px) {
+    .title-container { flex-direction: column; align-items: flex-start; gap: 12px; }
+    .brand-logo { margin-left: 0; margin-bottom: 0; }
+  }
+  /* ── Print ─────────────────────────────────────────────────────────────── */
+  @media print {
+    body { background: white; }
+    #progress, .toc { display: none; }
+    .layout { display: block; padding: 0; }
+    .article { border: none; box-shadow: none; padding: 24px; }
+    .copy-btn { display: none; }
+    .brand-logo { margin-bottom: 0; }
+  }
+
+  /* ── Responsive ────────────────────────────────────────────────────────── */
+  @media (max-width: 900px) {
+    .toc { display: none; }
+    .article { padding: 36px 28px; }
+    .layout { padding: 24px 16px 64px; }
+  }
+  @media (max-width: 480px) {
+    .article { padding: 24px 18px; }
+    .article h1 { font-size: 22px; }
+  }
+</style>
+</head>
+<body>
+
+<div id="progress"></div>
+
+<div class="layout">
+  <nav class="toc" id="toc">
+  <div class="toc-title">目录</div>
+  <div class="toc-content">
+<div class="toc-item has-children"><button class="toc-toggle" onclick="toggleToc(this)" aria-expanded="true">
+                <svg viewBox="0 0 24 24" width="12" height="12" stroke="currentColor" stroke-width="2" fill="none"><polyline points="6 9 12 15 18 9"></polyline></svg>
+              </button><a href="#h-故障诊断报告" onclick="event.preventDefault(); const target = document.getElementById('h-故障诊断报告'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l1">🔴 故障诊断报告</a></div>
+<div class="toc-group" id="group-h-一故障概览">
+<div class="toc-item has-children"><button class="toc-toggle" onclick="toggleToc(this)" aria-expanded="true">
+                <svg viewBox="0 0 24 24" width="12" height="12" stroke="currentColor" stroke-width="2" fill="none"><polyline points="6 9 12 15 18 9"></polyline></svg>
+              </button><a href="#h-一故障概览" onclick="event.preventDefault(); const target = document.getElementById('h-一故障概览'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l2">一、故障概览</a></div>
+<div class="toc-group" id="group-h-置信度说明">
+<div class="toc-item "><span class="toc-spacer"></span><a href="#h-置信度说明" onclick="event.preventDefault(); const target = document.getElementById('h-置信度说明'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l3">置信度说明</a></div>
+</div>
+<div class="toc-item has-children"><button class="toc-toggle" onclick="toggleToc(this)" aria-expanded="true">
+                <svg viewBox="0 0 24 24" width="12" height="12" stroke="currentColor" stroke-width="2" fill="none"><polyline points="6 9 12 15 18 9"></polyline></svg>
+              </button><a href="#h-二根因速览" onclick="event.preventDefault(); const target = document.getElementById('h-二根因速览'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l2">二、根因速览</a></div>
+<div class="toc-group" id="group-h-事故时间线-故障传导链路">
+<div class="toc-item "><span class="toc-spacer"></span><a href="#h-事故时间线-故障传导链路" onclick="event.preventDefault(); const target = document.getElementById('h-事故时间线-故障传导链路'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l3">事故时间线 & 故障传导链路</a></div>
+<div class="toc-item "><span class="toc-spacer"></span><a href="#h-故障因果链" onclick="event.preventDefault(); const target = document.getElementById('h-故障因果链'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l3">故障因果链</a></div>
+</div>
+<div class="toc-item has-children"><button class="toc-toggle" onclick="toggleToc(this)" aria-expanded="true">
+                <svg viewBox="0 0 24 24" width="12" height="12" stroke="currentColor" stroke-width="2" fill="none"><polyline points="6 9 12 15 18 9"></polyline></svg>
+              </button><a href="#h-三排查过程" onclick="event.preventDefault(); const target = document.getElementById('h-三排查过程'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l2">三、排查过程</a></div>
+<div class="toc-group" id="group-h-31-初始现象">
+<div class="toc-item "><span class="toc-spacer"></span><a href="#h-31-初始现象" onclick="event.preventDefault(); const target = document.getElementById('h-31-初始现象'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l3">3.1 初始现象</a></div>
+<div class="toc-item "><span class="toc-spacer"></span><a href="#h-32-假设驱动排查" onclick="event.preventDefault(); const target = document.getElementById('h-32-假设驱动排查'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l3">3.2 假设驱动排查</a></div>
+<div class="toc-item "><span class="toc-spacer"></span><a href="#h-33-排查结论" onclick="event.preventDefault(); const target = document.getElementById('h-33-排查结论'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l3">3.3 排查结论</a></div>
+</div>
+<div class="toc-item has-children"><button class="toc-toggle" onclick="toggleToc(this)" aria-expanded="true">
+                <svg viewBox="0 0 24 24" width="12" height="12" stroke="currentColor" stroke-width="2" fill="none"><polyline points="6 9 12 15 18 9"></polyline></svg>
+              </button><a href="#h-四修复方案" onclick="event.preventDefault(); const target = document.getElementById('h-四修复方案'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l2">四、修复方案</a></div>
+<div class="toc-group" id="group-h-41-应急处置已执行">
+<div class="toc-item "><span class="toc-spacer"></span><a href="#h-41-应急处置已执行" onclick="event.preventDefault(); const target = document.getElementById('h-41-应急处置已执行'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l3">4.1 应急处置（已执行）</a></div>
+<div class="toc-item "><span class="toc-spacer"></span><a href="#h-42-永久修复计划" onclick="event.preventDefault(); const target = document.getElementById('h-42-永久修复计划'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l3">4.2 永久修复计划</a></div>
+<div class="toc-item "><span class="toc-spacer"></span><a href="#h-43-验证建议" onclick="event.preventDefault(); const target = document.getElementById('h-43-验证建议'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l3">4.3 验证建议</a></div>
+</div>
+<div class="toc-item has-children"><button class="toc-toggle" onclick="toggleToc(this)" aria-expanded="true">
+                <svg viewBox="0 0 24 24" width="12" height="12" stroke="currentColor" stroke-width="2" fill="none"><polyline points="6 9 12 15 18 9"></polyline></svg>
+              </button><a href="#h-附录诊断证据汇总" onclick="event.preventDefault(); const target = document.getElementById('h-附录诊断证据汇总'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l2">附录：诊断证据汇总</a></div>
+<div class="toc-group" id="group-h-关键证据交叉引用">
+<div class="toc-item "><span class="toc-spacer"></span><a href="#h-关键证据交叉引用" onclick="event.preventDefault(); const target = document.getElementById('h-关键证据交叉引用'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l3">关键证据交叉引用</a></div>
+<div class="toc-item "><span class="toc-spacer"></span><a href="#h-诊断报告路径" onclick="event.preventDefault(); const target = document.getElementById('h-诊断报告路径'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l3">诊断报告路径</a></div>
+</div>
+</div>
+  </div>
+</nav>
+  <article class="article" id="article" style="position: relative;">
+    <div class="title-container"><h1 id="h-故障诊断报告">🔴 故障诊断报告</h1><div class="brand-logo">by <strong>Witty Diagnosis Agent</strong></div></div>
+<blockquote>
+<p><strong>报告编号</strong>：RCA-20260522-001
+<strong>故障级别</strong>：P1 / Critical
+<strong>报告时间</strong>：2026-05-22 20:45:00 CST
+<strong>当前状态</strong>：🟡 观察中（容器已退出但根因未修复，复现条件依旧存在）</p>
+</blockquote>
+<hr>
+<h2 id="h-一故障概览">一、故障概览</h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>项目</th>
+<th>内容</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>故障标题</td>
+<td>容器 swap-thrash-test 因 cgroup 内存限制过小引发 Swap Thrashing，导致容器卡死、宿主机响应极慢</td>
+</tr>
+<tr>
+<td>影响范围</td>
+<td>容器 <code>swap-thrash-test</code>（stress-ng 压测进程）→ 宿主机 localhost（WSL2），系统级响应变慢，IO wait 高达 14%</td>
+</tr>
+<tr>
+<td>故障时段</td>
+<td>2026-05-22 20:15:00 CST ～ 持续至诊断时刻（容器仍在运行或刚退出）</td>
+</tr>
+<tr>
+<td>根本原因</td>
+<td>容器 cgroup memory.max = 256MB 远小于 stress-ng 工作集需求（4 × 384MB = 1.5GB），内核被迫持续在容器 cgroup 层面执行匿名页换入换出（thrashing），swap 设备 IO 饱和导致系统卡死</td>
+</tr>
+<tr>
+<td>是否恢复</td>
+<td><span class="badge-err">❌ 未恢复（根因未修复，若重新运行相同配置的容器会再次触发）</span></td>
+</tr>
+<tr>
+<td>根因置信度</td>
+<td>🟢 高置信</td>
+</tr>
+</tbody></table></div>
+<h3 id="h-置信度说明">置信度说明</h3>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>等级</th>
+<th>标识</th>
+<th>含义</th>
+<th>示例场景</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>高置信</td>
+<td>🟢</td>
+<td>根因已明确，可复现，单一原因可解释所有现象</td>
+<td>本场景：cgroup 限制(256MB) &lt;&lt; workload(1.5GB)，三份独立报告交叉印证，指标完全吻合</td>
+</tr>
+<tr>
+<td>中置信</td>
+<td>🟡</td>
+<td>根因基本确认，但存在 1～2 个无法完全解释的现象</td>
+<td>—</td>
+</tr>
+<tr>
+<td>低置信</td>
+<td>🟠</td>
+<td>有多个可疑原因，尚未排除竞争，结论为推断</td>
+<td>—</td>
+</tr>
+<tr>
+<td>未知</td>
+<td>🔴</td>
+<td>现象无法解释，根因未定位，仍在排查中</td>
+<td>—</td>
+</tr>
+</tbody></table></div>
+<hr>
+<h2 id="h-二根因速览">二、根因速览</h2>
+<h3 id="h-事故时间线-故障传导链路">事故时间线 & 故障传导链路</h3>
+<div class="code-block">
+  <span class="code-lang">text</span>
+  <button class="copy-btn" onclick="copyCode(this)" title="复制">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
+  </button>
+  <pre><code>时间                         事件                                                    性质          溯源路径
+───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+2026-05-22 20:15:00 CST      容器 swap-thrash-test 启动，执行 stress-ng --vm 4           📈 触发      [T2 : 时间线T1]
+                                --vm-bytes 384M --page-in --vm-keep
+                              ↓ 4 个 VM worker 各分配 384MB，总需求 1.5GB
+                              ↓
+2026-05-22 20:15:00+ CST     cgroup memory.max=256MB 被瞬间占满                          ⚠️ 限流激活    [T1 : 容器配置]
+                              ↓ 内核进入 direct reclaim 路径
+                              ↓
+2026-05-22 20:15:01+ CST     匿名页被换出至 swap 设备 (/dev/sdc)                          🟡 压力积累    [T1 : 传播路径]
+                              ↓ stress-ng --page-in 立即触发 do_swap_page() 重新换入
+                              ↓
+2026-05-22 20:15:01+ CST     Swap Thrashing 循环形成                                      🔴 故障爆发    [T1 : 异常指标]
+                              ↓ si/so ≈ 50K~87K pages/s（阈值 60~80 倍）
+                              ↓ pgmajfault 265 万次，workingset refault 640 万次
+                              ↓
+2026-05-22 20:15:02+ CST     swap 设备 /dev/sdc IO 饱和（占总 IO 95%+）                    🔴 瓶颈形成    [T3 : 磁盘I/O]
+                              ↓ CPU iowait 飙升至 12~14%
+                              ↓ Load average 高达 5.70~6.00
+                              ↓
+2026-05-22 20:15:03+ CST     3/4 的 stress-ng VM worker 陷入 D 状态（不可中断睡眠）          🔴 系统瘫痪    [T1 : 系统表现]
+                              ↓ 容器卡死无响应，宿主机操作明显卡顿
+                              ↓
+2026-05-22 ~20:41 CST       诊断开始，三份 Kuafu 报告确认同一根因                         🔍 证据固定    [T1/T2/T3]</code></pre>
+</div>
+<h3 id="h-故障因果链">故障因果链</h3>
+<div class="code-block">
+  <span class="code-lang">text</span>
+  <button class="copy-btn" onclick="copyCode(this)" title="复制">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
+  </button>
+  <pre><code>[触发条件] 容器 swap-thrash-test 运行 stress-ng --vm 4 --vm-bytes 384M --page-in --vm-keep
+    └─► 4 × 384MB = 1.5GB 工作集 &gt;&gt; 容器 cgroup memory.max = 256MB
+        └─► 内核内存分配器进入 direct reclaim 路径
+            └─► kswapd/direct reclaim 大量扫描匿名页 LRU 链表（pgscan_anon 1903 万页）
+                └─► swap_writepage() 将匿名页换出至 /dev/sdc
+                    └─► stress-ng --page-in 立即触发 do_swap_page() → swap_readpage() 重新换入
+                        ↻ 换出→立即换入→再换出→再换入（Thrashing 锁定循环）
+                        └─► si/so 速率 50K~87K pages/s（超过 thrashing 阈值 1000 pages/s 的 60~80 倍）
+                            └─► pgmajfault 265 万次，workingset refault 640 万次
+                                └─► swap 设备 /dev/sdc IO 饱和，占系统总 IO 的 95%+
+                                    └─► CPU iowait 14%，Load 6.0，3/4 worker 进程 D 状态
+                                        └─► 🔴 容器卡死，宿主机系统响应极慢</code></pre>
+</div>
+<hr>
+<h2 id="h-三排查过程">三、排查过程</h2>
+<h3 id="h-31-初始现象">3.1 初始现象</h3>
+<ul>
+<li><strong>用户报告</strong>：容器 <code>swap-thrash-test</code> 卡死无响应，宿主机系统响应极慢</li>
+<li><strong>容器状态</strong>：处于 <code>Up</code> 状态约 3 分钟，但进程处于活跃争抢状态</li>
+<li><strong>Docker stats</strong>：容器 CPU 占用 <strong>165%</strong>，内存占用 <strong>99.85%（255.6MiB/256MiB）</strong></li>
+<li><strong>宿主机 vmstat</strong>：可运行进程 <strong>r=4~10</strong>，阻塞进程 <strong>b=1~3</strong>，CPU iowait <strong>13~14%</strong></li>
+<li><strong>关键日志/指标</strong>：<ul>
+<li>swap 设备 <code>/dev/sdc</code> 承担系统 <strong>95%+</strong> 的 IO 流量</li>
+<li>容器 Block I/O 在 4 分钟内达到 <strong>24.7GB 读入 / 24GB 写出</strong></li>
+</ul>
+</li>
+</ul>
+<hr>
+<h3 id="h-32-假设驱动排查">3.2 假设驱动排查</h3>
+<h4 id="h-假设-a宿主机全局内存不足">假设 A：宿主机全局内存不足</h4>
+<blockquote>
+<p>🧪 假设：宿主机物理内存耗尽，系统被迫大量使用 swap</p>
+</blockquote>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>检查项</th>
+<th>操作</th>
+<th>结论</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>MemAvailable</td>
+<td><code>cat /proc/meminfo</code> → MemAvailable=5.4GB/7.4GB</td>
+<td><span class="badge-ok">✅ 充足</span></td>
+</tr>
+<tr>
+<td>SwapFree</td>
+<td><code>free -h</code> → SwapFree=1.8GB/2GB</td>
+<td><span class="badge-ok">✅ 充裕</span></td>
+</tr>
+<tr>
+<td>OOM Killer</td>
+<td><code>dmesg</code> 无 oom-kill 记录</td>
+<td><span class="badge-ok">✅ 无 OOM</span></td>
+</tr>
+</tbody></table></div>
+<p><strong>❌ 排除</strong>：宿主机内存充裕，排除全局内存不足。</p>
+<hr>
+<h4 id="h-假设-bswap-空间耗尽">假设 B：swap 空间耗尽</h4>
+<blockquote>
+<p>🧪 假设：swap 分区用尽，内存回收失败</p>
+</blockquote>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>检查项</th>
+<th>操作</th>
+<th>结论</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>swap.current</td>
+<td>容器 swap 使用约 170~180MB</td>
+<td>🟡 未耗尽</td>
+</tr>
+<tr>
+<td>SwapFree</td>
+<td>宿主机 SwapFree=1.8GB/2GB = 使用率仅 8.5%</td>
+<td><span class="badge-ok">✅ 充裕</span></td>
+</tr>
+<tr>
+<td>memory.swap.events.fail</td>
+<td>仅 31 次（偶发触及 swap 上限）</td>
+<td><span class="badge-ok">✅ 非空间耗尽</span></td>
+</tr>
+</tbody></table></div>
+<p><strong>❌ 排除</strong>：swap 空间充裕，排除空间耗尽。</p>
+<hr>
+<h4 id="h-假设-coom-killer-触发进程被杀">假设 C：OOM Killer 触发进程被杀</h4>
+<blockquote>
+<p>🧪 假设：系统 OOM Killer 杀死了容器中的进程</p>
+</blockquote>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>检查项</th>
+<th>操作</th>
+<th>结论</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>memory.events.oom</td>
+<td>cgroup v2 → oom=0</td>
+<td><span class="badge-ok">✅ 无 OOM 事件</span></td>
+</tr>
+<tr>
+<td>memory.events.oom_kill</td>
+<td>0</td>
+<td><span class="badge-ok">✅ 无进程被杀</span></td>
+</tr>
+<tr>
+<td>容器 ExitCode</td>
+<td>=0（clean exit）</td>
+<td><span class="badge-ok">✅ 正常退出，非 SIGKILL</span></td>
+</tr>
+</tbody></table></div>
+<p><strong>❌ 排除</strong>：无 OOM Killer 触发。</p>
+<hr>
+<h4 id="h-假设-d磁盘swap-设备硬件故障">假设 D：磁盘/swap 设备硬件故障</h4>
+<blockquote>
+<p>🧪 假设：swap 设备发生硬件故障，IO 异常</p>
+</blockquote>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>检查项</th>
+<th>操作</th>
+<th>结论</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>dmesg I/O error</td>
+<td>无 I/O 超时或磁盘硬件错误日志</td>
+<td><span class="badge-ok">✅ 正常</span></td>
+</tr>
+<tr>
+<td>swapon</td>
+<td><code>/dev/sdc</code> 正常初始化，Priority=-2</td>
+<td><span class="badge-ok">✅ 正常</span></td>
+</tr>
+<tr>
+<td>设备类型</td>
+<td>rotational=1（机械盘后端），非 SSD</td>
+<td>🟡 性能有限但无故障</td>
+</tr>
+</tbody></table></div>
+<p><strong>❌ 排除</strong>：swap 设备无硬件故障。</p>
+<hr>
+<h4 id="h-假设-e容器-cgroup-内存限制过小导致-swap-thrashing-确认根因">假设 E：容器 cgroup 内存限制过小导致 Swap Thrashing ✅ 确认根因</h4>
+<blockquote>
+<p>🧪 假设：容器 cgroup memory.max = 256MB 远小于 stress-ng workload 1.5GB 需求，触发剧烈 thrashing</p>
+</blockquote>
+<p><strong>Step 1 — 确认 cgroup 内存限制与使用量</strong></p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>检查项</th>
+<th>值</th>
+<th>状态</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>容器 memory.max</td>
+<td>256 MB（268,435,456 bytes）</td>
+<td>🔴 严重过低</td>
+</tr>
+<tr>
+<td>容器 memory.current</td>
+<td>~256 MB（占用率 99.99%）</td>
+<td>🔴 触顶</td>
+</tr>
+<tr>
+<td>memory.events.max</td>
+<td><strong>125,554 次</strong>（持续约 5 分钟，即 ~382次/秒）</td>
+<td>🔴 极高</td>
+</tr>
+<tr>
+<td>容器 swap.max</td>
+<td>256 MB</td>
+<td>🟡 适中</td>
+</tr>
+<tr>
+<td>容器 swap.current</td>
+<td><del>170</del>180 MB</td>
+<td>🟡 持续增长</td>
+</tr>
+</tbody></table></div>
+<p><strong>Step 2 — 确认 Thrashing 内核指标</strong></p>
+<p>从三份诊断报告交叉印证：</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>指标</th>
+<th>T1 报告</th>
+<th>T2 报告</th>
+<th>T3 报告</th>
+<th>含义</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>si（换入速率）</td>
+<td>~78,972 pages/s</td>
+<td>~60,000 pages/s（~240MB/s）</td>
+<td>~56,412 pages/s</td>
+<td>大量页面从 swap 读回</td>
+</tr>
+<tr>
+<td>so（换出速率）</td>
+<td>~73,968 pages/s</td>
+<td>~57,000 pages/s（~228MB/s）</td>
+<td>~52,556 pages/s</td>
+<td>大量页面写入 swap</td>
+</tr>
+<tr>
+<td>pgmajfault</td>
+<td>2,651,409 次</td>
+<td>2,430,252 次</td>
+<td>—</td>
+<td>主缺页中断（每次需磁盘 IO）</td>
+</tr>
+<tr>
+<td>workingset_refault_anon</td>
+<td>5,854,905 次</td>
+<td>5,621,766 次</td>
+<td>—</td>
+<td>匿名页 refault（thrashing 核心特征）</td>
+</tr>
+<tr>
+<td>pgscan_anon</td>
+<td>19,722,068 页</td>
+<td>—</td>
+<td>19,033,294 页</td>
+<td>匿名页扫描量极大</td>
+</tr>
+<tr>
+<td>iowait</td>
+<td>13~14%</td>
+<td>13~14%</td>
+<td>12~14%</td>
+<td>CPU 大量等待 swap IO</td>
+</tr>
+<tr>
+<td>swap 设备 IO 占比</td>
+<td>—</td>
+<td>—</td>
+<td>95%+</td>
+<td>系统 IO 几乎被 swap 占满</td>
+</tr>
+</tbody></table></div>
+<p><strong>Step 3 — 确认进程状态恶化</strong></p>
+<ul>
+<li>3/4 的 stress-ng VM worker 进程处于 <strong>D 状态</strong>（不可中断睡眠，卡在 page fault → swap 读取路径）</li>
+<li>1/4 处于 R 状态但 CPU 占用达 102%（页表操作开销）</li>
+<li>容器 RSS ≈ 252MB，已占满 256MB cgroup 限制</li>
+</ul>
+<p><strong>✅ 结论：容器 cgroup memory.max（256MB）远小于 stress-ng 工作集需求（1.5GB），触发内核在 cgroup 层面进行极度频繁的匿名页换入换出（thrashing），si/so 速率超过正常阈值 60~80 倍，swap 设备 IO 饱和，系统响应瘫痪。</strong></p>
+<hr>
+<h3 id="h-33-排查结论">3.3 排查结论</h3>
+<div class="code-block">
+  <span class="code-lang">text</span>
+  <button class="copy-btn" onclick="copyCode(this)" title="复制">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
+  </button>
+  <pre><code>容器 swap-thrash-test 卡死 + 宿主机响应极慢
+│
+├─► 假设 A：宿主机全局内存不足          → ✅ 排除（MemAvailable 5.4GB/7.4GB）
+│
+├─► 假设 B：swap 空间耗尽               → ✅ 排除（SwapFree 1.8GB/2GB，仅用 8.5%）
+│
+├─► 假设 C：OOM Killer 进程被杀          → ✅ 排除（oom=0, oom_kill=0, ExitCode=0）
+│
+├─► 假设 D：磁盘/swap 设备硬件故障       → ✅ 排除（dmesg 无 I/O error）
+│
+└─► 假设 E：容器 cgroup 内存限制过小     → ❌ 确认根因 🎯
+        └─► memory.max = 256MB &lt;&lt; workload = 1.5GB
+            └─► 持续 direct reclaim → 匿名页换出 → --page-in 立即换入
+                └─► Thrashing 锁定循环（si+so &gt; 108K pages/s）
+                    └─► swap 设备 IO 饱和（占总 IO 95%+）
+                        └─► 3/4 worker D 状态，容器卡死</code></pre>
+</div>
+<hr>
+<h2 id="h-四修复方案">四、修复方案</h2>
+<h3 id="h-41-应急处置已执行">4.1 应急处置（已执行）</h3>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>步骤</th>
+<th>操作</th>
+<th>执行人</th>
+<th>时间</th>
+<th>效果</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>1</td>
+<td><code>docker stop swap-thrash-test</code></td>
+<td>系统/运维</td>
+<td>立即</td>
+<td>停止容器后 thrashing 立即消除，si/so 应降至接近 0，iowait 回落至 &lt; 2%</td>
+</tr>
+</tbody></table></div>
+<p>容器已正常退出（ExitCode=0），当前无需进一步紧急操作。但如果重新以相同配置启动，故障将立即复现。</p>
+<h3 id="h-42-永久修复计划">4.2 永久修复计划</h3>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>修复措施</th>
+<th>负责人</th>
+<th>完成时间</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>增大容器内存限制</strong>：将 <code>--memory</code> 从 256MB 提升至应用实际需求（建议 ≥2GB），如 <code>docker run --memory=&quot;2048m&quot; --memory-swap=&quot;2560m&quot;</code></td>
+<td>容器配置负责人</td>
+<td>待定</td>
+</tr>
+<tr>
+<td><strong>移除 <code>--vm-keep</code> 和 <code>--page-in</code> 参数</strong>：这两个参数人为制造 thrashing，生产环境不应使用</td>
+<td>应用开发团队</td>
+<td>待定</td>
+</tr>
+<tr>
+<td><strong>调整宿主机 swappiness</strong>：WSL2/容器场景建议调低至 10~20，减少匿名页换出倾向：<code>sysctl -w vm.swappiness=10</code>，并写入 <code>/etc/sysctl.conf</code> 持久化</td>
+<td>系统管理员</td>
+<td>待定</td>
+</tr>
+<tr>
+<td><strong>建立容器资源配置规范</strong>：容器 Memory 限制应基于业务负载实际峰值安全余量（推荐 +30% buffer），避免硬限制过小</td>
+<td>基础设施团队</td>
+<td>待定</td>
+</tr>
+<tr>
+<td><strong>配置 thrashing 监控告警</strong>：监控 <code>memory.events.max</code> 增长率（&gt;100次/分钟告警），以及 si/so 速率（&gt;1000 pages/s 告警），使用巡检脚本定期检测</td>
+<td>监控团队</td>
+<td>待定</td>
+</tr>
+<tr>
+<td><strong>评估 WSL2 swap 配置</strong>：在 <code>.wslconfig</code> 中考虑增大内存分配或调整 swap 大小，避免机械盘后端导致的 IO 性能瓶颈</td>
+<td>平台团队</td>
+<td>待定</td>
+</tr>
+</tbody></table></div>
+<h3 id="h-43-验证建议">4.3 验证建议</h3>
+<ol>
+<li><strong>调整后验证</strong>：运行 <code>vmstat 1 5</code> 观察 si/so 应降至 &lt; 100 pages/s，CPU iowait 回落到 &lt; 5%</li>
+<li><strong>长期监控</strong>：使用 <code>check_thrashing.sh</code> 脚本定期巡检，监控 <code>/proc/vmstat</code> 中的 <code>pgmajfault</code> 和 <code>workingset_refault_anon</code> 增长率</li>
+<li><strong>复现验证</strong>：以调整后的 memory 限制（≥2GB）重新启动容器，确认 stress-ng 正常运行而不触发 thrashing</li>
+</ol>
+<hr>
+<h2 id="h-附录诊断证据汇总">附录：诊断证据汇总</h2>
+<h3 id="h-关键证据交叉引用">关键证据交叉引用</h3>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>证据项</th>
+<th>T1 报告</th>
+<th>T2 报告</th>
+<th>T3 报告</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>容器 memory.max = 256MB</td>
+<td>第 42 行</td>
+<td>第 62 行</td>
+<td>第 88 行</td>
+</tr>
+<tr>
+<td>si/so 速率超阈值</td>
+<td>第 109<del>110 行（50K</del>87K pages/s）</td>
+<td>第 50~52 行（~240MB/s）</td>
+<td>第 77 行（峰值 425MB/s）</td>
+</tr>
+<tr>
+<td>pgmajfault</td>
+<td>第 71 行（2,651,409）</td>
+<td>第 45 行（2,430,252）</td>
+<td>—</td>
+</tr>
+<tr>
+<td>workingset_refault_anon</td>
+<td>第 53 行（5,854,905）</td>
+<td>第 46 行（5,621,766）</td>
+<td>—</td>
+</tr>
+<tr>
+<td>iowait</td>
+<td>第 21 行（13~14%）</td>
+<td>第 52 行（13~14%）</td>
+<td>第 14 行（12~14%）</td>
+</tr>
+<tr>
+<td>swap 设备 IO 占比</td>
+<td>—</td>
+<td>—</td>
+<td>第 63 行（95%+）</td>
+</tr>
+<tr>
+<td>3/4 worker D 状态</td>
+<td>第 20 行</td>
+<td>第 53 行</td>
+<td>—</td>
+</tr>
+<tr>
+<td>排除 OOM</td>
+<td>第 160 行</td>
+<td>第 30 行</td>
+<td>—</td>
+</tr>
+<tr>
+<td>宿主机内存充裕</td>
+<td>第 156 行</td>
+<td>第 31 行</td>
+<td>第 109 行</td>
+</tr>
+</tbody></table></div>
+<h3 id="h-诊断报告路径">诊断报告路径</h3>
+<ul>
+<li>T1: <code>/home/win11/.witty-diagnosis-agent/kuafu/kuafu_T1_20260522_122039.md</code></li>
+<li>T2: <code>/home/win11/.witty-diagnosis-agent/kuafu/kuafu_T2_20260522_121539.md</code></li>
+<li>T3: <code>/home/win11/.witty-diagnosis-agent/kuafu/kuafu_T3_20260522_204155.md</code></li>
+<li><strong>本 RCA 报告</strong>: <code>/home/win11/.witty-diagnosis-agent/baize/reports/容器swap-thrash卡死thrashing故障RCA_20260522_204500_report.md</code></li>
+</ul>
+
+    <div class="meta">
+      <span class="meta-source">容器swap-thrash卡死thrashing故障RCA_20260522_204500_report.md</span>
+      <span>生成于 2026/05/22 20:44</span>
+    </div>
+  </article>
+</div>
+
+<script>
+  /* ── 滚动进度条 ── */
+  window.addEventListener("scroll", () => {
+    const el  = document.documentElement;
+    const pct = el.scrollTop / (el.scrollHeight - el.clientHeight) * 100;
+    document.getElementById("progress").style.width = Math.min(pct, 100) + "%";
+  });
+
+  /* ── TOC 高亮当前章节 ── */
+  (function () {
+    const headings = Array.from(document.querySelectorAll("article h1,article h2,article h3"));
+    const links    = Array.from(document.querySelectorAll(".toc a"));
+    if (!links.length) return;
+    const obs = new IntersectionObserver(entries => {
+      entries.forEach(e => {
+        if (!e.isIntersecting) return;
+        links.forEach(l => l.classList.remove("active"));
+        const a = links.find(l => l.getAttribute("href") === "#" + e.target.id);
+        if (a) a.classList.add("active");
+      });
+    }, { rootMargin: "-10% 0px -80% 0px" });
+    headings.forEach(h => obs.observe(h));
+  })();
+
+  /* ── h2 章节序号自动计数 ── */
+  (function () {
+    let idx = 0;
+    document.querySelectorAll("article h2").forEach(el => {
+      idx++;
+      el.setAttribute("data-index", String(idx).padStart(2, "0"));
+    });
+  })();
+
+  /* ── 代码块一键复制 ── */
+  function copyCode(btn) {
+    const code = btn.closest(".code-block").querySelector("code").innerText;
+    navigator.clipboard.writeText(code).then(() => {
+      btn.classList.add("copied");
+      btn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>';
+      setTimeout(() => {
+        btn.classList.remove("copied");
+        btn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>';
+      }, 2000);
+    });
+  }
+
+  /* ── 目录树收缩/展开 ── */
+  function toggleToc(btn) {
+    const expanded = btn.getAttribute("aria-expanded") === "true";
+    btn.setAttribute("aria-expanded", String(!expanded));
+    const parentItem = btn.closest(".toc-item");
+    let nextEl = parentItem.nextElementSibling;
+    if (nextEl && nextEl.classList.contains("toc-group")) {
+      if (expanded) {
+        nextEl.style.maxHeight = nextEl.scrollHeight + "px";
+        void nextEl.offsetHeight;
+        nextEl.classList.add("collapsed");
+      } else {
+        nextEl.classList.remove("collapsed");
+        nextEl.style.maxHeight = nextEl.scrollHeight + "px";
+        setTimeout(() => {
+          if (!nextEl.classList.contains("collapsed")) {
+            nextEl.style.maxHeight = "none";
+          }
+        }, 300);
+      }
+    }
+  }
+</script>
+</body>
+</html>

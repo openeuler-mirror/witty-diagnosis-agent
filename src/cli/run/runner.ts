@@ -1,8 +1,4 @@
 import pc from "picocolors"
-import { readFileSync, writeFileSync, existsSync, readdirSync } from "node:fs"
-import { join, resolve, dirname, basename, extname } from "node:path"
-import { homedir } from "node:os"
-import { marked } from "marked"
 import type { RunOptions, RunContext } from "./types"
 import { createEventState, processEvents, serializeError } from "./events"
 import { loadPluginConfig } from "../../plugin-config"
@@ -108,42 +104,6 @@ export async function run(options: RunOptions): Promise<number> {
         query: { directory },
       })
       const exitCode = await pollForCompletion(ctx, eventState, abortController)
-
-      // Auto-convert unconverted MD reports in baize/reports to HTML
-      try {
-        const wittyHome = join(homedir(), ".witty-diagnosis-agent")
-        const reportsDir = join(wittyHome, "baize", "reports")
-        if (existsSync(reportsDir)) {
-          for (const file of readdirSync(reportsDir)) {
-            if (!file.endsWith(".md")) continue
-            const htmlFile = file.slice(0, -3) + ".html"
-            if (existsSync(join(reportsDir, htmlFile))) continue
-            const mdPath = join(reportsDir, file)
-            const htmlPath = join(reportsDir, htmlFile)
-            const mdContent = readFileSync(mdPath, "utf-8")
-            const htmlContent = marked.parse(mdContent, { async: false }) as string
-            const fullHtml = `<!DOCTYPE html>
-<html lang="zh-CN">
-<head><meta charset="UTF-8"><title>${file.replace(/_/g, " ")}</title>
-<style>
-body{max-width:960px;margin:0 auto;padding:20px;font-family:-apple-system,BlinkMacSystemFont,sans-serif;line-height:1.6;color:#333}
-pre{background:#f5f5f5;padding:12px;border-radius:6px;overflow-x:auto}
-code{background:#f0f0f0;padding:2px 5px;border-radius:3px}
-table{border-collapse:collapse;width:100%;margin:16px 0}
-th,td{border:1px solid #ddd;padding:8px;text-align:left}
-th{background:#f0f0f0}
-h1,h2,h3{color:#1a1a1a;margin-top:24px}
-blockquote{border-left:4px solid #ddd;padding-left:16px;color:#666}
-hr{border:none;border-top:2px solid #eee;margin:24px 0}
-</style></head>
-<body>${htmlContent}</body></html>`
-            writeFileSync(htmlPath, fullHtml, "utf-8")
-            console.log(pc.green(`✅ HTML report generated: ${htmlPath}`))
-          }
-        }
-      } catch {
-        // Non-fatal: auto-conversion is best-effort
-      }
 
       // Abort the event stream to stop the processor
       abortController.abort()

@@ -97,10 +97,8 @@ export async function startTask(
     })
     log("[background-agent] tmux callback completed, waiting")
     await new Promise(r => setTimeout(r, TMUX_CALLBACK_DELAY_MS))
-  } else if (!isInsideTmux()) {
-    log("[background-agent] Non-interactive mode: background session will run headless via SDK polling")
   } else {
-    log("[background-agent] SKIP tmux callback - tmux not enabled")
+    log("[background-agent] SKIP tmux callback - conditions not met")
   }
 
   task.status = "running"

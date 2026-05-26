@@ -183,13 +183,15 @@ interface DayuOrchestrationResult {
 - **Write**：仅用于在所有 Task 完成后，将诊断执行结果汇总写入 \`~/.witty-diagnosis-agent/dayu/report/\` 下带时间戳的汇总 Markdown（见 2.4）
 调用 Kuafu 的标准形式（务必保证参数是合法 JSON 对象）：
 
-- 在 **Plan Execution** 或 **Direct Input** 模式下，若用户或 Plan 中提供了**远端主机的 IP / 用户名 / 密码**，你必须**先**用 Read 检查 \`~/.witty-diagnosis-agent/ansible/hosts.ini\`：**若该 IP 已存在于某组且可连通**，则**直接沿用该组名**填入 [Fault Context] 的 Access，不要新建组或改写 inventory；**仅当 IP 不存在或连通失败时**，再用 Write/Bash 按格式追加/更新到合适组下，**然后**委派 Kuafu；在 \`prompt\` 的 [Fault Context] 中不写明文密码。
+- 在 **Plan Execution** 或 **Direct Input** 模式下，若用户或 Plan 中提供了**远端主机的 IP / 用户名 / 密码**，你必须**先**用 Read 检查 \`~/.witty-diagnosis-agent/ansible/hosts.ini\`：**若该 IP 已存在于某组**，则**直接沿用该组名**填入 [Fault Context] 的 Access，不要新建组或改写 inventory；**仅当 IP 不存在时**，再按 \`host_<IP>\` 格式新建组并用 Write/Bash 追加到 inventory，**然后**委派 Kuafu；在 \`prompt\` 的 [Fault Context] 中不写明文密码。
+- **⚠️ Ansible 组名唯一性规则（CRITICAL）**：**每个组名必须且只能对应一个目标 IP**，组名格式强制为 \`host_<IP>\`（将 IP 中的 \`.\` 替换为 \`_\`），例如 IP \`192.168.1.100\` 对应组名 \`host_192_168_1_100\`。**严禁**使用语义化组名（如 \`session_cache_server\`、\`db_server\` 等），因为语义化组名可能被不同 IP 复用，导致连接到错误的服务器。此规则确保：一个组名 = 一台服务器，从结构上杜绝切换到其他服务器的可能。
+- **⚠️ 连接失败时禁止切换服务器（CRITICAL）**：若目标服务器 Ansible ping 不通，**严禁**擅自切换到其他服务器、修改目标 IP、或切换到其他 Ansible 组名去尝试连接（hosts.ini 中可能存在多个组，每个组对应不同的服务器，**严禁**用其他组名连接非目标服务器）。必须最多重试 3 次连接原服务器；若 3 次均失败，必须向用户报告连接失败并停止任务执行，告知用户："无法连接到目标服务器 {IP}，已重试 3 次均失败。请检查目标服务器是否可达、SSH 凭据是否正确，或提供新的连接信息后重新开始。"
 - **Ansible 环境检查**：在执行远程操作前，必须先检查本地是否安装了 Ansible (\`ansible --version\`)，若未安装则根据操作系统自动安装。
 - 调用 Kuafu 时，\`prompt\` 中必须包含一个清晰的 **[Fault Context] 区块**：
   - 用户原始问题 / 描述、故障现象、故障时间、场景类型（在线/离线）
   - Target（目标主机 IP 或标识）
   - **Access（必须使用 Ansible）**：
-    - 填 **Ansible 组名**（若 hosts.ini 中已有用户目标 IP 所在组则**沿用该组名**，否则由 Fuxi/你根据场景取，仅字母/数字/下划线，勿用连字符），由 Kuafu 使用 \`ansible -i ~/.witty-diagnosis-agent/ansible/hosts.ini <组名>\` 执行。
+    - 填 **Ansible 组名**（格式必须为 \`host_<IP>\`，若 hosts.ini 中已有用户目标 IP 所在组则**沿用该组名**，否则按 \`host_<IP>\` 格式新建），由 Kuafu 使用 \`ansible -i ~/.witty-diagnosis-agent/ansible/hosts.ini <组名>\` 执行。
 - 在其后再给出 **[Task] 区块**，写清诊断目标、期望的检查范围。
 - **注意：在 [Task] 区块中，执行方式约束和输出要求必须严格按照以下固定格式输出，不要自行展开或增加具体的分析步骤和输出列表**。
 

@@ -1,0 +1,1205 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>内存映射 / 虚拟地址空间故障诊断报告</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Lora:ital,wght@0,400;0,600;1,400&family=Source+Sans+3:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  /* ── Design tokens ─────────────────────────────────────────────────────── */
+  :root {
+    --bg:          #f8f7f4;
+    --surface:     #ffffff;
+    --border:      #e8e5df;
+    --border-soft: #f0ede8;
+
+    --text:        #1c1917;
+    --text-2:      #57534e;
+    --text-3:      #a8a29e;
+
+    --accent:      #1d4e6e;
+    --accent-light:#e8f1f7;
+    --accent-mid:  #3b82a0;
+
+    --red:         #c0392b;
+    --red-bg:      #fef2f2;
+    --amber:       #92400e;
+    --amber-bg:    #fffbeb;
+    --green:       #14532d;
+    --green-bg:    #f0fdf4;
+
+    --code-bg:     #1a1d27;
+    --code-text:   #cdd6f4;
+    --code-border: #2d3148;
+
+    --font-body: "Source Sans 3", "PingFang SC", "Hiragino Sans GB", sans-serif;
+    --font-head: "Lora", "PingFang SC", Georgia, serif;
+    --font-mono: "JetBrains Mono", "Fira Code", Consolas, monospace;
+
+    --radius:    8px;
+    --radius-lg: 12px;
+    --shadow:    0 1px 3px rgba(0,0,0,.06), 0 4px 16px rgba(0,0,0,.05);
+    --shadow-lg: 0 2px 8px rgba(0,0,0,.07), 0 8px 32px rgba(0,0,0,.06);
+
+    --toc-width:   240px;
+    --gap:         32px;
+  }
+
+  /* ── Progress bar ──────────────────────────────────────────────────────── */
+  #progress {
+    position: fixed; top: 0; left: 0; height: 3px; width: 0%;
+    background: linear-gradient(90deg, var(--accent-mid), var(--accent));
+    z-index: 999; transition: width .1s linear;
+    border-radius: 0 2px 2px 0;
+  }
+
+  /* ── Base ──────────────────────────────────────────────────────────────── */
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  html { font-size: 16px; scroll-behavior: smooth; }
+  body {
+    font-family: var(--font-body);
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.8;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* ── Layout ────────────────────────────────────────────────────────────── */
+  .layout {
+    display: flex;
+    align-items: flex-start;
+    max-width: calc(var(--toc-width) + 820px + var(--gap) * 3);
+    margin: 0 auto;
+    padding: 48px var(--gap) 96px;
+    gap: var(--gap);
+  }
+
+  /* ── TOC ───────────────────────────────────────────────────────────────── */
+  .toc {
+    width: var(--toc-width);
+    flex-shrink: 0;
+    position: sticky;
+    top: 32px;
+    max-height: calc(100vh - 64px);
+    overflow-y: auto;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    padding: 20px;
+    box-shadow: var(--shadow);
+    scrollbar-width: thin;
+    scrollbar-color: var(--border) transparent;
+  }
+  .toc-title {
+    font-size: 10.5px;
+    font-weight: 600;
+    letter-spacing: .1em;
+    text-transform: uppercase;
+    color: var(--text-3);
+    margin-bottom: 12px;
+    padding-bottom: 10px;
+    border-bottom: 1px solid var(--border-soft);
+  }
+  .toc-item {
+    display: flex;
+    align-items: flex-start;
+    margin: 2px 0;
+  }
+  .toc-toggle {
+    background: none;
+    border: none;
+    cursor: pointer;
+    color: var(--text-3);
+    padding: 4px;
+    margin-right: 4px;
+    margin-top: 2px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 4px;
+    transition: background 0.2s, transform 0.2s;
+  }
+  .toc-toggle:hover { background: var(--border-soft); color: var(--text); }
+  .toc-toggle[aria-expanded="false"] svg { transform: rotate(-90deg); }
+  .toc-spacer { width: 20px; flex-shrink: 0; }
+  .toc-group { overflow: hidden; transition: max-height 0.3s ease-in-out; }
+  .toc-group.collapsed { max-height: 0 !important; }
+  
+  .toc a {
+    display: block;
+    font-size: 13px;
+    color: var(--text-2);
+    text-decoration: none;
+    padding: 4px 8px;
+    border-radius: 5px;
+    line-height: 1.45;
+    transition: background .15s, color .15s;
+    word-break: break-all;
+    flex-grow: 1;
+  }
+  .toc a:hover  { background: var(--accent-light); color: var(--accent); }
+  .toc a.active { background: var(--accent-light); color: var(--accent); font-weight: 500; }
+  .toc-l1 { font-weight: 600; color: var(--text); }
+  .toc-l2 { font-weight: 600; color: var(--text); }
+  .toc-l3 { font-size: 12px !important; padding-left: 14px !important; }
+
+  /* ── Article card ──────────────────────────────────────────────────────── */
+  .article {
+    flex: 1; min-width: 0;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    padding: 52px 60px;
+    box-shadow: var(--shadow-lg);
+  }
+
+  /* ── Headings ──────────────────────────────────────────────────────────── */
+  .title-container {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-end;
+    margin: 0 0 28px;
+    padding-bottom: 18px;
+    border-bottom: 2px solid var(--text);
+  }
+  .article h1 {
+    font-family: var(--font-head);
+    font-size: 26px; font-weight: 600; line-height: 1.3;
+    margin: 0; padding-bottom: 0;
+    border-bottom: none;
+  }
+  .article h2 {
+    font-family: var(--font-head);
+    font-size: 19px; font-weight: 600;
+    margin: 48px 0 14px; padding-bottom: 8px;
+    border-bottom: 1px solid var(--border);
+  }
+  .article h2::before {
+    content: attr(data-index);
+    display: inline-block;
+    font-family: var(--font-mono);
+    font-size: 10.5px; font-weight: 500;
+    color: var(--accent-mid);
+    background: var(--accent-light);
+    padding: 1px 7px; border-radius: 4px;
+    margin-right: 10px; vertical-align: middle;
+    letter-spacing: .05em;
+  }
+  .article h3 {
+    font-family: var(--font-head);
+    font-size: 15.5px; font-weight: 600;
+    margin: 28px 0 10px;
+  }
+  .article h3::before {
+    content: "§ ";
+    color: var(--text-3);
+    font-family: var(--font-mono); font-size: 13px;
+  }
+  .article h4 {
+    font-size: 13.5px; font-weight: 600;
+    color: var(--accent); margin: 20px 0 8px;
+  }
+
+  /* ── Body text ─────────────────────────────────────────────────────────── */
+  .article p, .plain { 
+    font-size: 15px; 
+    line-height: 1.85; 
+    color: var(--text); 
+    margin: 0 0 12px; 
+    font-family: var(--font-body);
+  }
+  .article strong { font-weight: 600; }
+  .article em     { font-style: italic; color: var(--text-2); }
+  .article a {
+    color: var(--accent); text-decoration: underline;
+    text-decoration-color: var(--accent-light);
+    text-underline-offset: 3px;
+  }
+  .article a:hover { text-decoration-color: var(--accent); }
+  .article hr { border: none; border-top: 1px solid var(--border); margin: 20px 0; }
+  .article hr.heavy { border-top: 3px solid var(--text); margin: 32px 0; }
+
+  /* ── Blockquote ────────────────────────────────────────────────────────── */
+  .article blockquote {
+    border-left: 3px solid var(--accent-mid);
+    background: var(--accent-light);
+    margin: 20px 0; padding: 13px 20px 13px 20px;
+    border-radius: 0 var(--radius) var(--radius) 0;
+  }
+  .article blockquote p { font-size: 14.5px; color: var(--accent); margin: 0; line-height: 1.7; }
+  /* 支持块引用内部保留换行符（修复头部概要换行丢失问题） */
+  .article blockquote p { white-space: pre-wrap; }
+  .article blockquote strong { color: var(--accent); }
+
+  /* ── Lists ─────────────────────────────────────────────────────────────── */
+  .article ul, .article ol { padding-left: 22px; margin: 6px 0 14px; }
+  .article li { font-size: 15px; line-height: 1.8; margin: 4px 0; }
+  .article li::marker { color: var(--accent-mid); }
+  .article li > ul, .article li > ol { margin: 3px 0; }
+
+  /* ── Inline code ───────────────────────────────────────────────────────── */
+  .article :not(pre) > code {
+    font-family: var(--font-mono);
+    font-size: 12.5px; font-weight: 500;
+    background: #f3f0eb; color: var(--red);
+    padding: 1px 5px; border-radius: 4px;
+    border: 1px solid var(--border);
+  }
+
+  /* ── Code blocks ───────────────────────────────────────────────────────── */
+  .code-block {
+    position: relative; margin: 20px 0;
+    border-radius: var(--radius-lg); overflow: hidden;
+    border: 1px solid var(--code-border);
+    box-shadow: 0 4px 20px rgba(0,0,0,.16);
+  }
+  .code-lang {
+    position: absolute; top: 0; left: 0;
+    font-family: var(--font-mono); font-size: 10px; font-weight: 500;
+    color: #7c8db5; background: #222538;
+    padding: 4px 12px; border-bottom-right-radius: 6px;
+    text-transform: uppercase; letter-spacing: .08em;
+    user-select: none;
+  }
+  .copy-btn {
+    position: absolute; top: 8px; right: 10px;
+    background: #2d3148; border: 1px solid #3d4260;
+    border-radius: 5px; color: #7c8db5; cursor: pointer;
+    padding: 5px 8px; display: flex; align-items: center;
+    transition: background .15s, color .15s; z-index: 1;
+  }
+  .copy-btn:hover  { background: #3a3f60; color: #cdd6f4; }
+  .copy-btn.copied { color: #a6e3a1; border-color: #4a6a4a; }
+  .code-block pre {
+    margin: 0; padding: 36px 20px 20px;
+    background: var(--code-bg); overflow-x: auto;
+    scrollbar-width: thin; scrollbar-color: #3d4260 transparent;
+  }
+  .code-block pre::-webkit-scrollbar { height: 5px; }
+  .code-block pre::-webkit-scrollbar-thumb { background: #3d4260; border-radius: 3px; }
+  .code-block code {
+    font-family: var(--font-mono); font-size: 13px; line-height: 1.7;
+    color: var(--code-text); background: none; border: none; padding: 0;
+    white-space: pre; word-break: normal;
+  }
+
+  /* ── Tables ────────────────────────────────────────────────────────────── */
+  .table-wrap {
+    overflow-x: auto; margin: 16px 0;
+    border-radius: var(--radius-lg);
+    border: 1px solid var(--border);
+    box-shadow: var(--shadow);
+  }
+  table { width: 100%; border-collapse: collapse; font-size: 14px; min-width: 360px; }
+  thead { background: #f4f2ee; }
+  th {
+    padding: 9px 14px; text-align: left;
+    font-size: 11.5px; font-weight: 600;
+    letter-spacing: .04em; text-transform: uppercase;
+    color: var(--text-2); border-bottom: 1px solid var(--border);
+    white-space: nowrap;
+  }
+  td {
+    padding: 8px 14px; border-bottom: 1px solid var(--border-soft);
+    color: var(--text); vertical-align: top; line-height: 1.6;
+  }
+  tbody tr:last-child td { border-bottom: none; }
+  tbody tr:nth-child(even) td { background: #faf9f7; }
+  tbody tr:hover td { background: var(--accent-light); transition: background .1s; }
+
+  /* ── KV block ──────────────────────────────────────────────────────────── */
+  .kv-block { background: var(--bg); border: 1px solid var(--border); border-radius: var(--radius-lg); overflow: hidden; margin: 12px 0 20px; }
+  .kv-row { display: flex; border-bottom: 1px solid var(--border-soft); align-items: flex-start; }
+  .kv-row:last-child { border-bottom: none; }
+  .kv-key { flex: 0 0 160px; padding: 9px 16px; font-size: 13.5px; font-weight: 600; color: var(--text-2); background: var(--surface); border-right: 1px solid var(--border-soft); }
+  .kv-val { flex: 1; padding: 9px 16px; font-size: 14px; color: var(--text); }
+
+  /* ── Status badges ─────────────────────────────────────────────────────── */
+  .badge-ok { display: inline-flex; align-items: center; gap: 4px; background: var(--green-bg); color: var(--green); font-size: 13px; font-weight: 500; padding: 2px 9px; border-radius: 20px; border: 1px solid #bbf7d0; }
+  .badge-err { display: inline-flex; align-items: center; gap: 4px; background: var(--red-bg); color: var(--red); font-size: 13px; font-weight: 500; padding: 2px 9px; border-radius: 20px; border: 1px solid #fecaca; }
+  .badge-warn { display: inline-flex; align-items: center; gap: 4px; background: var(--amber-bg); color: var(--amber); font-size: 13px; font-weight: 500; padding: 2px 9px; border-radius: 20px; border: 1px solid #fde68a; }
+
+  /* ── Priority badges ───────────────────────────────────────────────────── */
+  .pri-p0 { display: inline-block; background: #fef2f2; color: #991b1b; border: 1px solid #fca5a5; font-size: 12px; font-weight: 700; padding: 2px 8px; border-radius: 4px; letter-spacing: .04em; }
+  .pri-p1 { display: inline-block; background: #fff7ed; color: #9a3412; border: 1px solid #fdba74; font-size: 12px; font-weight: 700; padding: 2px 8px; border-radius: 4px; }
+  .pri-p2 { display: inline-block; background: #fffbeb; color: #92400e; border: 1px solid #fde68a; font-size: 12px; font-weight: 700; padding: 2px 8px; border-radius: 4px; }
+  .pri-p3 { display: inline-block; background: var(--accent-light); color: var(--accent); border: 1px solid #bfdbfe; font-size: 12px; font-weight: 700; padding: 2px 8px; border-radius: 4px; }
+
+  /* ── Fault header ──────────────────────────────────────────────────────── */
+  .fault-header { display: flex; align-items: center; gap: 12px; padding: 12px 16px; border-radius: var(--radius-lg); margin: 16px 0 8px; border: 1px solid; }
+  .fh-p0 { background: #fef2f2; border-color: #fca5a5; }
+  .fh-p1 { background: #fff7ed; border-color: #fdba74; }
+  .fh-p2 { background: #fffbeb; border-color: #fde68a; }
+  .fh-p3 { background: var(--accent-light); border-color: #bfdbfe; }
+  .fh-badge { font-family: var(--font-mono); font-size: 11px; font-weight: 700; letter-spacing: .08em; }
+  .fh-p0 .fh-badge { color: #991b1b; }
+  .fh-p1 .fh-badge { color: #9a3412; }
+  .fh-p2 .fh-badge { color: #92400e; }
+  .fh-p3 .fh-badge { color: var(--accent); }
+  .fh-rest { font-size: 14px; font-weight: 500; color: var(--text); }
+
+  /* ── Timeline ──────────────────────────────────────────────────────────── */
+  .timeline { border-left: 2px solid var(--accent-mid); margin: 16px 0 16px 8px; padding-left: 20px; }
+  .tl-row { display: flex; align-items: baseline; gap: 10px; margin: 8px 0; font-size: 13.5px; }
+  .tl-ts { font-family: var(--font-mono); font-size: 12px; color: var(--text-3); flex-shrink: 0; white-space: nowrap; }
+  .tl-tag { font-size: 11px; font-weight: 600; padding: 1px 7px; border-radius: 10px; flex-shrink: 0; background: var(--accent-light); color: var(--accent); }
+  .tl-tag.err { background: var(--red-bg); color: var(--red); }
+  .tl-tag.warn { background: var(--amber-bg); color: var(--amber); }
+  .tl-desc { color: var(--text); line-height: 1.5; }
+
+  /* ── Global warn ───────────────────────────────────────────────────────── */
+  .global-warn { background: #fef2f2; border: 1px solid #fca5a5; border-radius: var(--radius-lg); padding: 14px 18px; font-size: 14.5px; font-weight: 600; color: #991b1b; margin: 16px 0; }
+
+  /* ── Tree note ─────────────────────────────────────────────────────────── */
+  .tree-note { white-space: pre-wrap; font-family: var(--font-mono); font-size: 13.5px; line-height: 1.6; color: var(--text-2); margin: 8px 0 8px 16px; }
+
+  /* ── Disclaimer ────────────────────────────────────────────────────────── */
+  .disclaimer { background: var(--bg); border: 1px solid var(--border); border-radius: var(--radius); padding: 14px 18px; font-size: 13.5px; color: var(--text-2); font-style: italic; }
+
+  /* ── Meta footer ───────────────────────────────────────────────────────── */
+  .meta {
+    margin-top: 48px; padding-top: 16px;
+    border-top: 1px solid var(--border-soft);
+    display: flex; justify-content: space-between; align-items: center;
+    font-size: 12px; color: var(--text-3);
+  }
+  .meta-source { font-family: var(--font-mono); font-size: 11.5px; }
+
+  /* ── Brand logo ────────────────────────────────────────────────────────── */
+  .brand-logo {
+    font-family: var(--font-head);
+    font-size: 14px;
+    color: var(--text-3);
+    letter-spacing: 0.05em;
+    margin-bottom: 4px;
+    flex-shrink: 0;
+    margin-left: 16px;
+  }
+  .brand-logo strong {
+    font-weight: 600;
+    color: var(--accent);
+  }
+  @media (max-width: 900px) {
+    .title-container { flex-direction: column; align-items: flex-start; gap: 12px; }
+    .brand-logo { margin-left: 0; margin-bottom: 0; }
+  }
+  /* ── Print ─────────────────────────────────────────────────────────────── */
+  @media print {
+    body { background: white; }
+    #progress, .toc { display: none; }
+    .layout { display: block; padding: 0; }
+    .article { border: none; box-shadow: none; padding: 24px; }
+    .copy-btn { display: none; }
+    .brand-logo { margin-bottom: 0; }
+  }
+
+  /* ── Responsive ────────────────────────────────────────────────────────── */
+  @media (max-width: 900px) {
+    .toc { display: none; }
+    .article { padding: 36px 28px; }
+    .layout { padding: 24px 16px 64px; }
+  }
+  @media (max-width: 480px) {
+    .article { padding: 24px 18px; }
+    .article h1 { font-size: 22px; }
+  }
+</style>
+</head>
+<body>
+
+<div id="progress"></div>
+
+<div class="layout">
+  <nav class="toc" id="toc">
+  <div class="toc-title">目录</div>
+  <div class="toc-content">
+<div class="toc-item has-children"><button class="toc-toggle" onclick="toggleToc(this)" aria-expanded="true">
+                <svg viewBox="0 0 24 24" width="12" height="12" stroke="currentColor" stroke-width="2" fill="none"><polyline points="6 9 12 15 18 9"></polyline></svg>
+              </button><a href="#h-内存映射-虚拟地址空间故障诊断报告" onclick="event.preventDefault(); const target = document.getElementById('h-内存映射-虚拟地址空间故障诊断报告'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l1">内存映射 / 虚拟地址空间故障诊断报告</a></div>
+<div class="toc-group" id="group-h-一故障概览">
+<div class="toc-item has-children"><button class="toc-toggle" onclick="toggleToc(this)" aria-expanded="true">
+                <svg viewBox="0 0 24 24" width="12" height="12" stroke="currentColor" stroke-width="2" fill="none"><polyline points="6 9 12 15 18 9"></polyline></svg>
+              </button><a href="#h-一故障概览" onclick="event.preventDefault(); const target = document.getElementById('h-一故障概览'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l2">一、故障概览</a></div>
+<div class="toc-group" id="group-h-置信度说明">
+<div class="toc-item "><span class="toc-spacer"></span><a href="#h-置信度说明" onclick="event.preventDefault(); const target = document.getElementById('h-置信度说明'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l3">置信度说明</a></div>
+</div>
+<div class="toc-item has-children"><button class="toc-toggle" onclick="toggleToc(this)" aria-expanded="true">
+                <svg viewBox="0 0 24 24" width="12" height="12" stroke="currentColor" stroke-width="2" fill="none"><polyline points="6 9 12 15 18 9"></polyline></svg>
+              </button><a href="#h-二根因速览" onclick="event.preventDefault(); const target = document.getElementById('h-二根因速览'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l2">二、根因速览</a></div>
+<div class="toc-group" id="group-h-事故时间线-故障传导链路">
+<div class="toc-item "><span class="toc-spacer"></span><a href="#h-事故时间线-故障传导链路" onclick="event.preventDefault(); const target = document.getElementById('h-事故时间线-故障传导链路'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l3">事故时间线 & 故障传导链路</a></div>
+<div class="toc-item "><span class="toc-spacer"></span><a href="#h-故障因果链" onclick="event.preventDefault(); const target = document.getElementById('h-故障因果链'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l3">故障因果链</a></div>
+</div>
+<div class="toc-item has-children"><button class="toc-toggle" onclick="toggleToc(this)" aria-expanded="true">
+                <svg viewBox="0 0 24 24" width="12" height="12" stroke="currentColor" stroke-width="2" fill="none"><polyline points="6 9 12 15 18 9"></polyline></svg>
+              </button><a href="#h-三排查过程" onclick="event.preventDefault(); const target = document.getElementById('h-三排查过程'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l2">三、排查过程</a></div>
+<div class="toc-group" id="group-h-31-初始现象">
+<div class="toc-item "><span class="toc-spacer"></span><a href="#h-31-初始现象" onclick="event.preventDefault(); const target = document.getElementById('h-31-初始现象'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l3">3.1 初始现象</a></div>
+<div class="toc-item "><span class="toc-spacer"></span><a href="#h-32-假设驱动排查" onclick="event.preventDefault(); const target = document.getElementById('h-32-假设驱动排查'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l3">3.2 假设驱动排查</a></div>
+<div class="toc-item "><span class="toc-spacer"></span><a href="#h-33-排查结论与逻辑树" onclick="event.preventDefault(); const target = document.getElementById('h-33-排查结论与逻辑树'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l3">3.3 排查结论与逻辑树</a></div>
+</div>
+<div class="toc-item has-children"><button class="toc-toggle" onclick="toggleToc(this)" aria-expanded="true">
+                <svg viewBox="0 0 24 24" width="12" height="12" stroke="currentColor" stroke-width="2" fill="none"><polyline points="6 9 12 15 18 9"></polyline></svg>
+              </button><a href="#h-四修复方案" onclick="event.preventDefault(); const target = document.getElementById('h-四修复方案'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l2">四、修复方案</a></div>
+<div class="toc-group" id="group-h-41-应急处置">
+<div class="toc-item "><span class="toc-spacer"></span><a href="#h-41-应急处置" onclick="event.preventDefault(); const target = document.getElementById('h-41-应急处置'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l3">4.1 应急处置</a></div>
+<div class="toc-item "><span class="toc-spacer"></span><a href="#h-42-永久修复计划" onclick="event.preventDefault(); const target = document.getElementById('h-42-永久修复计划'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l3">4.2 永久修复计划</a></div>
+<div class="toc-item "><span class="toc-spacer"></span><a href="#h-43-预防措施" onclick="event.preventDefault(); const target = document.getElementById('h-43-预防措施'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l3">4.3 预防措施</a></div>
+</div>
+<div class="toc-item "><span class="toc-spacer"></span><a href="#h-五排除项汇总" onclick="event.preventDefault(); const target = document.getElementById('h-五排除项汇总'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l2">五、排除项汇总</a></div>
+<div class="toc-item "><span class="toc-spacer"></span><a href="#h-六关键证据清单" onclick="event.preventDefault(); const target = document.getElementById('h-六关键证据清单'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l2">六、关键证据清单</a></div>
+<div class="toc-item has-children"><button class="toc-toggle" onclick="toggleToc(this)" aria-expanded="true">
+                <svg viewBox="0 0 24 24" width="12" height="12" stroke="currentColor" stroke-width="2" fill="none"><polyline points="6 9 12 15 18 9"></polyline></svg>
+              </button><a href="#h-七附录" onclick="event.preventDefault(); const target = document.getElementById('h-七附录'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l2">七、附录</a></div>
+<div class="toc-group" id="group-h-a-故障场景参数表">
+<div class="toc-item "><span class="toc-spacer"></span><a href="#h-a-故障场景参数表" onclick="event.preventDefault(); const target = document.getElementById('h-a-故障场景参数表'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l3">A. 故障场景参数表</a></div>
+<div class="toc-item "><span class="toc-spacer"></span><a href="#h-b-推荐的-ulimit-配置值" onclick="event.preventDefault(); const target = document.getElementById('h-b-推荐的-ulimit-配置值'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l3">B. 推荐的 ulimit 配置值</a></div>
+</div>
+</div>
+  </div>
+</nav>
+  <article class="article" id="article" style="position: relative;">
+    <div class="title-container"><h1 id="h-内存映射-虚拟地址空间故障诊断报告">内存映射 / 虚拟地址空间故障诊断报告</h1><div class="brand-logo">by <strong>Witty Diagnosis Agent</strong></div></div>
+<blockquote>
+<p><strong>报告编号</strong>：RCA-20260525-001
+<strong>故障级别</strong>：P2 — 应用功能受损
+<strong>报告时间</strong>：2026-05-25 19:38:17
+<strong>当前状态</strong>：🔴 待修复</p>
+</blockquote>
+<hr>
+<h2 id="h-一故障概览">一、故障概览</h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>项目</th>
+<th>内容</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>故障标题</td>
+<td>容器 mmap-C 内用户 tu 调用 mlock(9KB) 返回 ENOMEM (errno=12)</td>
+</tr>
+<tr>
+<td>影响范围</td>
+<td>容器 mmap-C (ID: 9cabf3afbded)，用户 tu (uid=1000) 下的进程</td>
+</tr>
+<tr>
+<td>故障时段</td>
+<td>2026-05-25 11:45:00 UTC ～ 持续中</td>
+</tr>
+<tr>
+<td>根本原因</td>
+<td>用户 tu 的 RLIMIT_MEMLOCK soft/hard 均为 8KB，远低于应用 mlock(9KB) 请求所需的最小 12KB (3 页)，且登录 shell 隐式锁定约 4KB 后，实际可用锁定内存仅剩约 4KB (1 页)</td>
+</tr>
+<tr>
+<td>是否恢复</td>
+<td><span class="badge-err">❌ 未恢复（需手动提高 ulimit 配置）</span></td>
+</tr>
+<tr>
+<td>根因置信度</td>
+<td>🟢 高置信</td>
+</tr>
+</tbody></table></div>
+<h3 id="h-置信度说明">置信度说明</h3>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>等级</th>
+<th>标识</th>
+<th>含义</th>
+<th>判定依据</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>高置信</td>
+<td>🟢</td>
+<td>根因已明确，可复现，单一原因可解释所有现象</td>
+<td>mlock(4096) 成功 vs mlock(4097) 失败，边界清晰；<code>/proc/&lt;PID&gt;/limits</code> 确认限制为 8KB；root 用户 unlimited 无此问题；100% 可复现</td>
+</tr>
+</tbody></table></div>
+<hr>
+<h2 id="h-二根因速览">二、根因速览</h2>
+<h3 id="h-事故时间线-故障传导链路">事故时间线 & 故障传导链路</h3>
+<div class="code-block">
+  <span class="code-lang">text</span>
+  <button class="copy-btn" onclick="copyCode(this)" title="复制">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
+  </button>
+  <pre><code>时间                                   事件                                          性质         证据来源
+──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+2026-05-25 11:45:00                   容器 mmap-C 启动，用户 tu 的 shell 启动         ⚙️ 初始化     [kuafu/kuafu_T1_20260525_mlock_diagnosis.md:19-23]
+  │
+  ▼
+（shell 初始化时）                       libc/ld-linux 隐式锁定 ~4KB 内存                🟡 消耗       [kuafu/kuafu_T1_20260525_mlock_diagnosis.md:71-75]
+  │                                     这些不体现在 VmLck 中，但计入 RLIMIT_MEMLOCK
+  │
+  ▼
+2026-05-25 11:45:00                    应用调用 mlock(9216) = 9KB 请求锁定内存          🔴 故障触发    [kuafu/kuafu_T1_20260525_mlock_diagnosis.md:54-65]
+  │
+  ▼
+（即时）                                 内核检查 RLIMIT_MEMLOCK = 8KB                   ⚠️ 限制检查    [kuafu/kuafu_T1_20260525_mlock_diagnosis.md:30-39]
+  │                                     当前已锁定 ~4KB + 新请求 9KB = ~13KB &gt; 8KB
+  │
+  ▼
+（即时）                                 mlock() 返回 -1，errno=12 (ENOMEM)              ❌ 失败        [kuafu/kuafu_T1_20260525_mlock_diagnosis.md:64-65]
+  │
+  ▼
+2026-05-25 11:45:00                    应用收到 "Cannot allocate memory" 错误            🔴 故障显现    [kuafu/kuafu_T1_20260525_mlock_diagnosis.md:5-12]
+  │                                     功能受损</code></pre>
+</div>
+<h3 id="h-故障因果链">故障因果链</h3>
+<div class="code-block">
+  <span class="code-lang">text</span>
+  <button class="copy-btn" onclick="copyCode(this)" title="复制">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
+  </button>
+  <pre><code>容器 mmap-C 配置：RLIMIT_MEMLOCK=8KB (soft/hard)
+    │
+    ├─► 登录 shell (su - tu) 启动时消耗 ~4KB 隐式锁定内存（libc/ld-linux）
+    │      └─► 实际可用锁定内存仅剩 ~4KB（1 个页面）
+    │
+    └─► 应用调用 mlock(9KB)
+           │
+           ├─► 内核按页对齐 → 实际需要锁定 3 页 = 12KB
+           │
+           ├─► 检查 RLIMIT_MEMLOCK 计数器：
+           │      当前已锁定 ~4KB + 请求 12KB = 总锁定 ~16KB
+           │      限制 8KB → ❌ 超限
+           │
+           └─► 内核返回 -1, errno=12 (ENOMEM)
+                  └─► 🔴 mlock 失败，应用功能受损</code></pre>
+</div>
+<hr>
+<h2 id="h-三排查过程">三、排查过程</h2>
+<h3 id="h-31-初始现象">3.1 初始现象</h3>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>现象</th>
+<th>描述</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>容器状态</td>
+<td>mmap-C (ID: 9cabf3afbded) 运行中，Up 2 分钟</td>
+</tr>
+<tr>
+<td>用户</td>
+<td>tu (uid=1000, gid=1000)，非 root 用户</td>
+</tr>
+<tr>
+<td>故障表现</td>
+<td>调用 <code>mlock(9216)</code> = 9KB 返回 -1，errno=12 (Cannot allocate memory)</td>
+</tr>
+<tr>
+<td>关键日志</td>
+<td>无内核日志（mlock ENOMEM 是用户态错误，不写入 dmesg）</td>
+</tr>
+</tbody></table></div>
+<h3 id="h-32-假设驱动排查">3.2 假设驱动排查</h3>
+<h4 id="h-假设-c1rlimitmemlock-限制过小-确认根因">假设 C1：RLIMIT_MEMLOCK 限制过小 ✅ **确认根因**</h4>
+<blockquote>
+<p>🧪 假设：用户 tu 的 RLIMIT_MEMLOCK soft/hard 均为 8KB，当应用尝试 mlock 超过此限制时被内核拒绝。</p>
+</blockquote>
+<p><strong>Step 1 — 确认用户 memlock 限制</strong></p>
+<div class="code-block">
+  <span class="code-lang">bash</span>
+  <button class="copy-btn" onclick="copyCode(this)" title="复制">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
+  </button>
+  <pre><code>ulimit -l    → 8 (8KB)
+ulimit -H -l → 8 (8KB)</code></pre>
+</div>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>检查项</th>
+<th>操作 / 命令</th>
+<th>结论</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Soft 限制</td>
+<td><code>ulimit -l</code> = 8KB</td>
+<td><span class="badge-ok">✅ 确认 soft=8192 bytes</span></td>
+</tr>
+<tr>
+<td>Hard 限制</td>
+<td><code>ulimit -H -l</code> = 8KB</td>
+<td><span class="badge-ok">✅ 确认 hard=8192 bytes</span></td>
+</tr>
+<tr>
+<td>进程 limits</td>
+<td><code>cat /proc/&lt;PID&gt;/limits | grep &quot;Max locked memory&quot;</code></td>
+<td><span class="badge-ok">✅ soft=8192, hard=8192</span></td>
+</tr>
+</tbody></table></div>
+<p><strong>Step 2 — 边界测试验证</strong></p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>mlock 请求</th>
+<th align="center">页数 (4KB/页)</th>
+<th>返回值</th>
+<th>errno</th>
+<th>结果</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>4096 B (4.0KB)</td>
+<td align="center">1</td>
+<td>0</td>
+<td>0</td>
+<td><span class="badge-ok">✅ SUCCESS</span></td>
+</tr>
+<tr>
+<td>4097 B (≈4.0KB)</td>
+<td align="center">2</td>
+<td>-1</td>
+<td>12</td>
+<td><span class="badge-err">❌ ENOMEM</span></td>
+</tr>
+<tr>
+<td>7168 B (7.0KB)</td>
+<td align="center">2</td>
+<td>-1</td>
+<td>12</td>
+<td><span class="badge-err">❌ ENOMEM</span></td>
+</tr>
+<tr>
+<td>8192 B (8.0KB)</td>
+<td align="center">2</td>
+<td>-1</td>
+<td>12</td>
+<td><span class="badge-err">❌ ENOMEM</span></td>
+</tr>
+<tr>
+<td>9216 B (9.0KB)</td>
+<td align="center">3</td>
+<td>-1</td>
+<td>12</td>
+<td><span class="badge-err">❌ ENOMEM</span></td>
+</tr>
+</tbody></table></div>
+<p><strong>关键发现</strong>：<code>mlock(4096)</code> = 1 页成功，<code>mlock(4097)</code> = 2 页（8KB，恰好等于限制值）却失败。说明存在隐式锁定消耗。</p>
+<p><strong>Step 3 — 分析隐式锁定</strong></p>
+<ul>
+<li>登录 shell (<code>su - tu -c</code>) 启动时，libc/ld-linux 加载会产生内部锁定页面（如 <code>dl_init</code>, vsyscall 等）</li>
+<li>这些不体现在 <code>/proc/self/status</code> 的 <code>VmLck</code> 字段（VmLck: 0 kB）</li>
+<li>但实际计入内核的 RLIMIT_MEMLOCK 计数器</li>
+<li>因此实际可用锁定内存 = 8KB - ~4KB = ~4KB</li>
+<li>任何超过 1 页（4KB）的 mlock 请求都会超限</li>
+</ul>
+<p><strong>✅ 结论：RLIMIT_MEMLOCK=8KB 过小，加上 shell 隐式锁定消耗，实际可用仅 ~4KB，应用 mlock(9KB) 需 3 页 (12KB) 远超限制。</strong></p>
+<hr>
+<h4 id="h-假设-c2root-用户无此问题有无-capsysresource-的对比验证">假设 C2：root 用户无此问题（有无 CAP_SYS_RESOURCE 的对比验证）</h4>
+<blockquote>
+<p>🧪 假设：root 用户因具备 CAP_SYS_RESOURCE 能力，不受 RLIMIT_MEMLOCK 限制。</p>
+</blockquote>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>检查项</th>
+<th>操作 / 命令</th>
+<th>结论</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Root 进程 memlock</td>
+<td><code>cat /proc/&lt;PID&gt;/limits</code> (root 进程)</td>
+<td><span class="badge-ok">✅ Max locked memory = unlimited/unlimited</span></td>
+</tr>
+<tr>
+<td>用户 tu 进程 memlock</td>
+<td><code>cat /proc/&lt;PID&gt;/limits</code> (tu 进程)</td>
+<td><span class="badge-ok">✅ Max locked memory = 8192/8192 bytes</span></td>
+</tr>
+</tbody></table></div>
+<p><strong>✅ 结论：root 用户 unlimited 无限制，非 root 用户 tu 受限于 8KB。此假设被作为排除项，但验证结果强化了根因定位。</strong></p>
+<hr>
+<h4 id="h-假设-c3容器-ulimit-继承问题">假设 C3：容器 ulimit 继承问题</h4>
+<blockquote>
+<p>🧪 假设：容器启动参数中指定了 <code>--ulimit memlock=8:8</code>，或者从宿主机继承的默认值不足。</p>
+</blockquote>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>检查项</th>
+<th>操作 / 命令</th>
+<th>结论</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>容器进程限制</td>
+<td><code>cat /proc/&lt;PID&gt;/limits</code></td>
+<td><span class="badge-ok">✅ 确认限制为 8KB/8KB</span></td>
+</tr>
+<tr>
+<td>容器的 ulimit 设置</td>
+<td>docker inspect / 启动命令</td>
+<td>非 root 用户默认 memlock = 8KB（Linux 发行版默认值）</td>
+</tr>
+</tbody></table></div>
+<p><strong>✅ 结论：容器默认继承了 Linux 发行版的 RLIMIT_MEMLOCK 默认值（8KB），这在大多数发行版中是针对非特权用户的默认值。容器未单独设置 <code>--ulimit memlock</code>。</strong></p>
+<hr>
+<h4 id="h-假设-c4系统物理内存不足">假设 C4：系统物理内存不足</h4>
+<blockquote>
+<p>🧪 假设：系统物理内存耗尽，mlock 即使满足 RLIMIT_MEMLOCK 也无法锁定页面。</p>
+</blockquote>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>检查项</th>
+<th>操作 / 命令</th>
+<th>结论</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>系统内存</td>
+<td>容器正常运行，mlock(4096) 成功</td>
+<td><span class="badge-ok">✅ 排除 — 4KB 可锁定，说明系统有足够物理内存</span></td>
+</tr>
+<tr>
+<td>内核日志</td>
+<td><code>dmesg -T | grep -i mlock</code></td>
+<td><span class="badge-ok">✅ 无 OOM 或内存不足条目</span></td>
+</tr>
+</tbody></table></div>
+<p><strong>❌ 排除：系统物理内存充足，mlock(4KB) 成功即为证据。</strong></p>
+<hr>
+<h4 id="h-假设-c5内核cgroup-内存限制">假设 C5：内核/cgroup 内存限制</h4>
+<blockquote>
+<p>🧪 假设：容器的 cgroup memory.limit_in_bytes 限制导致 mlock 失败。</p>
+</blockquote>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>检查项</th>
+<th>操作 / 命令</th>
+<th>结论</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>cgroup 限制</td>
+<td>容器正常运行中</td>
+<td><span class="badge-ok">✅ 排除 — 如果 cgroup 限制导致，mlock(4096) 也会失败</span></td>
+</tr>
+<tr>
+<td>与 RLIMIT 优先级</td>
+<td>内核先检查 RLIMIT_MEMLOCK，再检查 cgroup</td>
+<td><span class="badge-ok">✅ 实际上 RLIMIT 限制先触发，9KB 请求在 RLIMIT 阶段即被拒绝</span></td>
+</tr>
+</tbody></table></div>
+<p><strong>❌ 排除：cgroup 限制不是故障原因。即使 cgroup 无限制，RLIMIT_MEMLOCK=8KB 也会独立导致失败。</strong></p>
+<hr>
+<h4 id="h-假设-c6内核版本差异导致的行为变化">假设 C6：内核版本差异导致的行为变化</h4>
+<blockquote>
+<p>🧪 假设：不同内核版本对 mlock 的 RLIMIT_MEMLOCK 计数方式存在差异。</p>
+</blockquote>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>检查项</th>
+<th>操作 / 命令</th>
+<th>结论</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>隐式锁定行为</td>
+<td>libc/ld-linux 内部锁定进程自身资源</td>
+<td><span class="badge-ok">✅ 这是 Linux 内核通用行为，几乎所有版本均如此</span></td>
+</tr>
+<tr>
+<td>历史兼容性</td>
+<td>Linux 长期以来的 mlock 实现</td>
+<td><span class="badge-ok">✅ 不完全排除，但非本故障的主要因素</span></td>
+</tr>
+</tbody></table></div>
+<p><strong>🟡 未完全排除：不同内核版本对隐式锁定的处理有细微差异，但无论差异如何，在 8KB 限制下 mlock(9KB) 必然失败。此假设对修复方案无实质影响。</strong></p>
+<hr>
+<h3 id="h-33-排查结论与逻辑树">3.3 排查结论与逻辑树</h3>
+<div class="code-block">
+  <span class="code-lang">text</span>
+  <button class="copy-btn" onclick="copyCode(this)" title="复制">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
+  </button>
+  <pre><code>mlock(9KB) → ENOMEM (errno=12)
+│
+├─► [C4] 系统物理内存不足              → ❌ 排除（mlock(4KB) 成功）
+│
+├─► [C5] cgroup 内存限制              → ❌ 排除（先触发的是 RLIMIT 检查）
+│
+├─► [C6] 内核版本差异                  → 🟡 未完全排除（但非主因）
+│
+├─► [C2] root/CAP_SYS_RESOURCE       → ✅ 验证通过（root unlimited，tu=8KB）
+│
+├─► [C3] 容器 ulimit 继承             → ✅ 确认（未设置 --ulimit memlock）
+│
+└─► [C1] RLIMIT_MEMLOCK=8KB 过小      → 🎯 **根因确认**
+        │
+        ├─► shell 隐式锁定 ~4KB         → ⚠️ 加剧因素
+        │   （libc/ld-linux 内部锁定，不计入 VmLck）
+        │
+        └─► mlock(9KB) 需 3 页 = 12KB  → ❌ 超限
+            （加上已锁定 ~4KB → 总 ~16KB &gt;&gt; 8KB）
+            └─► 🎯 根因：RLIMIT_MEMLOCK 配置过低</code></pre>
+</div>
+<hr>
+<h2 id="h-四修复方案">四、修复方案</h2>
+<h3 id="h-41-应急处置">4.1 应急处置</h3>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>步骤</th>
+<th>操作</th>
+<th>执行人</th>
+<th>时间</th>
+<th>效果</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>1</td>
+<td>临时提高容器内用户 tu 的 memlock 限制</td>
+<td>系统/人工</td>
+<td>故障时</td>
+<td>允许当前进程继续运行</td>
+</tr>
+<tr>
+<td>2</td>
+<td>评估将应用切换到 root 用户运行（不推荐，安全风险）</td>
+<td>人工</td>
+<td>—</td>
+<td>绕过限制（不推荐）</td>
+</tr>
+</tbody></table></div>
+<p><strong>即时缓解命令（在容器内执行）</strong>：</p>
+<div class="code-block">
+  <span class="code-lang">bash</span>
+  <button class="copy-btn" onclick="copyCode(this)" title="复制">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
+  </button>
+  <pre><code># 方案 A：通过 prlimit 即时调整（需要 root/sudo）
+prlimit --pid &lt;PID&gt; --memlock=65536:65536
+
+# 方案 B：重新启动容器时指定 ulimit
+docker run --ulimit memlock=65536:65536 ... mmap-C</code></pre>
+</div>
+<h3 id="h-42-永久修复计划">4.2 永久修复计划</h3>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>修复措施</th>
+<th>负责人</th>
+<th>完成时间</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>在 docker-compose.yaml 或 Pod spec 中设置 <code>ulimits.memlock.soft=65536</code> 和 <code>ulimits.memlock.hard=65536</code></td>
+<td>配置管理员</td>
+<td>待定</td>
+</tr>
+<tr>
+<td>或在容器启动命令中增加 <code>--ulimit memlock=65536:65536</code></td>
+<td>部署团队</td>
+<td>待定</td>
+</tr>
+<tr>
+<td>或在 <code>/etc/security/limits.conf</code> 中为 tu 用户配置 <code>tu soft memlock 65536</code> / <code>tu hard memlock 65536</code></td>
+<td>系统管理员</td>
+<td>待定</td>
+</tr>
+<tr>
+<td>应用侧评估：确认是否可减少 mlock 请求大小，或使用 <code>mlock2()</code> 按需锁定</td>
+<td>研发团队</td>
+<td>待定</td>
+</tr>
+</tbody></table></div>
+<p><strong>推荐配置值</strong>：至少 64KB（65536 bytes），理由如下：</p>
+<ul>
+<li>应用请求 9KB → 按页对齐后需要 12KB</li>
+<li>进程自身隐式锁定 ~4KB</li>
+<li>留有余量避免边界问题 → 推荐 ≥ 64KB</li>
+</ul>
+<h3 id="h-43-预防措施">4.3 预防措施</h3>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>措施</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>部署前检查清单</td>
+<td>所有需要 mlock 的容器应在部署文档中注明所需的最小 memlock 值</td>
+</tr>
+<tr>
+<td>容器模板标准化</td>
+<td>在容器镜像或编排模板中预置适当的 ulimit 配置</td>
+</tr>
+<tr>
+<td>监控告警</td>
+<td>添加对 mlock 失败（errno=12）的应用日志监控</td>
+</tr>
+<tr>
+<td>非 root 用户权限基线</td>
+<td>建立非 root 用户容器化的 priviledge/resource 基线文档</td>
+</tr>
+</tbody></table></div>
+<hr>
+<h2 id="h-五排除项汇总">五、排除项汇总</h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>假设</th>
+<th>描述</th>
+<th>排除结论</th>
+<th>排除依据</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>C4</td>
+<td>系统物理内存不足导致 mlock 失败</td>
+<td><span class="badge-err">❌ 已排除</span></td>
+<td>mlock(4KB) 成功，证明系统有足够物理内存</td>
+</tr>
+<tr>
+<td>C5</td>
+<td>cgroup memory.limit 限制了 mlock</td>
+<td><span class="badge-err">❌ 已排除</span></td>
+<td>RLIMIT 检查在 cgroup 之前触发且优先拒绝；mlock(4KB) 成功</td>
+</tr>
+<tr>
+<td>C6</td>
+<td>内核版本差异导致 mlock 行为异常</td>
+<td>🟡 未完全排除</td>
+<td>隐式锁定行为在不同内核版本间有细微差异，但非主因；无论差异如何，8KB 限制下 9KB 请求必然失败</td>
+</tr>
+</tbody></table></div>
+<hr>
+<h2 id="h-六关键证据清单">六、关键证据清单</h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>#</th>
+<th>证据</th>
+<th>来源</th>
+<th>行号</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>1</td>
+<td>容器 mmap-C 正常运行</td>
+<td>kuafu_T1_20260525_mlock_diagnosis.md</td>
+<td>L19-23</td>
+</tr>
+<tr>
+<td>2</td>
+<td>用户 tu 的 ulimit -l = 8，ulimit -H -l = 8</td>
+<td>kuafu_T1_20260525_mlock_diagnosis.md</td>
+<td>L30-39</td>
+</tr>
+<tr>
+<td>3</td>
+<td>mlock(4096) 成功；mlock(4097) 起全部失败返回 ENOMEM</td>
+<td>kuafu_T1_20260525_mlock_diagnosis.md</td>
+<td>L54-65</td>
+</tr>
+<tr>
+<td>4</td>
+<td>进程 limits 确认 Max locked memory = 8192/8192 bytes</td>
+<td>kuafu_T1_20260525_mlock_diagnosis.md</td>
+<td>L80-92</td>
+</tr>
+<tr>
+<td>5</td>
+<td>root 进程 Max locked memory = unlimited/unlimited</td>
+<td>kuafu_T1_20260525_mlock_diagnosis.md</td>
+<td>L81-84</td>
+</tr>
+<tr>
+<td>6</td>
+<td>VmLck = 0 kB，隐式锁定不计入</td>
+<td>kuafu_T1_20260525_mlock_diagnosis.md</td>
+<td>L96-104</td>
+</tr>
+<tr>
+<td>7</td>
+<td>内核日志无 mlock 相关条目（正常行为）</td>
+<td>kuafu_T1_20260525_mlock_diagnosis.md</td>
+<td>L43-49</td>
+</tr>
+</tbody></table></div>
+<hr>
+<h2 id="h-七附录">七、附录</h2>
+<h3 id="h-a-故障场景参数表">A. 故障场景参数表</h3>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>参数</th>
+<th>值</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>容器 ID</td>
+<td>9cabf3afbded</td>
+</tr>
+<tr>
+<td>容器名</td>
+<td>mmap-C</td>
+</tr>
+<tr>
+<td>用户</td>
+<td>tu (uid=1000, gid=1000)</td>
+</tr>
+<tr>
+<td>应用请求</td>
+<td>mlock(9216) = 9KB</td>
+</tr>
+<tr>
+<td>RLIMIT_MEMLOCK (soft)</td>
+<td>8KB (8192 bytes)</td>
+</tr>
+<tr>
+<td>RLIMIT_MEMLOCK (hard)</td>
+<td>8KB (8192 bytes)</td>
+</tr>
+<tr>
+<td>页大小</td>
+<td>4KB</td>
+</tr>
+<tr>
+<td>请求页数</td>
+<td>3 页（向上取整）</td>
+</tr>
+<tr>
+<td>隐式锁定</td>
+<td>~4KB（1 页，libc/ld-linux 内部）</td>
+</tr>
+<tr>
+<td>实际可用</td>
+<td>~4KB（1 页）</td>
+</tr>
+<tr>
+<td>返回值</td>
+<td>-1</td>
+</tr>
+<tr>
+<td>errno</td>
+<td>12 (ENOMEM)</td>
+</tr>
+<tr>
+<td>内核日志</td>
+<td>无（正常行为）</td>
+</tr>
+</tbody></table></div>
+<h3 id="h-b-推荐的-ulimit-配置值">B. 推荐的 ulimit 配置值</h3>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>场景</th>
+<th>推荐值</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>当前故障修复</td>
+<td>64KB (65536)</td>
+<td>满足 9KB 请求 + 隐式锁定 + 余量</td>
+</tr>
+<tr>
+<td>通用容器</td>
+<td>64KB～1MB</td>
+<td>适用于大多数需要 mlock 的轻量应用</td>
+</tr>
+<tr>
+<td>Elasticsearch</td>
+<td>unlimited</td>
+<td>ES 官方要求 bootstrap.memory_lock=true 时需 unlimited</td>
+</tr>
+<tr>
+<td>高安全隔离</td>
+<td>按需精确设置</td>
+<td>不建议设 unlimited 以维持最小权限原则</td>
+</tr>
+</tbody></table></div>
+
+    <div class="meta">
+      <span class="meta-source">容器mlock超限故障_9cabf3afbded_20260525193817_report.md</span>
+      <span>生成于 2026/05/25 21:19</span>
+    </div>
+  </article>
+</div>
+
+<script>
+  /* ── 滚动进度条 ── */
+  window.addEventListener("scroll", () => {
+    const el  = document.documentElement;
+    const pct = el.scrollTop / (el.scrollHeight - el.clientHeight) * 100;
+    document.getElementById("progress").style.width = Math.min(pct, 100) + "%";
+  });
+
+  /* ── TOC 高亮当前章节 ── */
+  (function () {
+    const headings = Array.from(document.querySelectorAll("article h1,article h2,article h3"));
+    const links    = Array.from(document.querySelectorAll(".toc a"));
+    if (!links.length) return;
+    const obs = new IntersectionObserver(entries => {
+      entries.forEach(e => {
+        if (!e.isIntersecting) return;
+        links.forEach(l => l.classList.remove("active"));
+        const a = links.find(l => l.getAttribute("href") === "#" + e.target.id);
+        if (a) a.classList.add("active");
+      });
+    }, { rootMargin: "-10% 0px -80% 0px" });
+    headings.forEach(h => obs.observe(h));
+  })();
+
+  /* ── h2 章节序号自动计数 ── */
+  (function () {
+    let idx = 0;
+    document.querySelectorAll("article h2").forEach(el => {
+      idx++;
+      el.setAttribute("data-index", String(idx).padStart(2, "0"));
+    });
+  })();
+
+  /* ── 代码块一键复制 ── */
+  function copyCode(btn) {
+    const code = btn.closest(".code-block").querySelector("code").innerText;
+    navigator.clipboard.writeText(code).then(() => {
+      btn.classList.add("copied");
+      btn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>';
+      setTimeout(() => {
+        btn.classList.remove("copied");
+        btn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>';
+      }, 2000);
+    });
+  }
+
+  /* ── 目录树收缩/展开 ── */
+  function toggleToc(btn) {
+    const expanded = btn.getAttribute("aria-expanded") === "true";
+    btn.setAttribute("aria-expanded", String(!expanded));
+    const parentItem = btn.closest(".toc-item");
+    let nextEl = parentItem.nextElementSibling;
+    if (nextEl && nextEl.classList.contains("toc-group")) {
+      if (expanded) {
+        nextEl.style.maxHeight = nextEl.scrollHeight + "px";
+        void nextEl.offsetHeight;
+        nextEl.classList.add("collapsed");
+      } else {
+        nextEl.classList.remove("collapsed");
+        nextEl.style.maxHeight = nextEl.scrollHeight + "px";
+        setTimeout(() => {
+          if (!nextEl.classList.contains("collapsed")) {
+            nextEl.style.maxHeight = "none";
+          }
+        }, 300);
+      }
+    }
+  }
+</script>
+</body>
+</html>

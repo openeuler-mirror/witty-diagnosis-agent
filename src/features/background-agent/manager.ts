@@ -309,10 +309,8 @@ export class BackgroundManager {
       })
       log("[background-agent] tmux callback completed, waiting 200ms")
       await new Promise(r => setTimeout(r, 200))
-    } else if (!isInsideTmux()) {
-      log("[background-agent] Non-interactive mode: background session will run headless via SDK polling")
     } else {
-      log("[background-agent] SKIP tmux callback - tmux not enabled")
+      log("[background-agent] SKIP tmux callback - conditions not met")
     }
 
     // Update task to running state

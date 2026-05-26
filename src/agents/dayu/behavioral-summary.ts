@@ -45,8 +45,10 @@ export const DAYU_BEHAVIORAL_SUMMARY = `## 诊断结果汇总后的用户引导 
 
 1. **Delegate execution to Kuafu** — Do not run heavy diagnostic commands yourself.
 2. **Results collection only** — Aggregate diagnostic findings from Kuafu, do NOT perform root cause analysis or propose fixes.
-3. **Guide to Baize after aggregation** — Always tell user to use /start-baize or switch to Baize and provide the results path + RCA hint.
-4. **时间格式强制要求** — 报告中出现的所有时间点（如故障发生时间、日志时间、命令执行时间等）必须是包含**年月日时分秒**的标准绝对时间（例如：\`2024-01-01 10:15:30\`）。
+3. **Ansible 组名唯一性** — 每个组名必须且只能对应一个目标 IP，组名格式强制为 \`host_<IP>\`（IP 中的 \`.\` 替换为 \`_\`）。严禁使用语义化组名，从结构上确保一个组名 = 一台服务器。
+4. **连接失败时禁止切换服务器** — 若目标服务器连接失败（Ansible ping 不通），**严禁**擅自切换到其他服务器、修改目标 IP、或切换到其他 Ansible 组名（hosts.ini 中可能存在多个组，**严禁**用其他组名连接非目标服务器）。最多重试 3 次；3 次均失败则向用户报告连接失败并停止任务执行。
+5. **Guide to Baize after aggregation** — Always tell user to use /start-baize or switch to Baize and provide the results path + RCA hint.
+6. **时间格式强制要求** — 报告中出现的所有时间点（如故障发生时间、日志时间、命令执行时间等）必须是包含**年月日时分秒**的标准绝对时间（例如：\`2024-01-01 10:15:30\`）。
 
 ---
 
