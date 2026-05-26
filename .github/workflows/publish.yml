@@ -1,0 +1,161 @@
+name: publish
+run-name: "${{ format('release {0}', inputs.version || inputs.bump) }}"
+
+on:
+  workflow_dispatch:
+    inputs:
+      bump:
+        description: "Bump major, minor, or patch"
+        required: true
+        type: choice
+        default: patch
+        options:
+          - patch
+          - minor
+          - major
+      version:
+        description: "Override version (e.g., 3.0.0-beta.6). Takes precedence over bump."
+        required: false
+        type: string
+        required: false
+        type: string
+
+concurrency: ${{ github.workflow }}-${{ github.ref }}
+
+permissions:
+  contents: write
+  id-token: write
+  actions: write
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+      - run: bun install
+      - run: bun test
+
+  typecheck:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+      - run: bun install
+      - run: bun run typecheck
+
+  setup:
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      dist_tag: ${{ steps.version.outputs.dist_tag }}
+      skip: ${{ steps.check.outputs.skip }}
+    steps:
+      - name: Calculate version
+        id: version
+        run: |
+          VERSION="${{ inputs.version }}"
+          if [ -z "$VERSION" ]; then
+            PREV=$(curl -s -o /dev/null -w "%{http_code}" https://registry.npmjs.org/witty-diagnosis-agent/latest | grep -q "200" && curl -s https://registry.npmjs.org/witty-diagnosis-agent/latest | jq -r '.version' || echo "0.0.0")
+            BASE="${PREV%%-*}"
+            IFS='.' read -r MAJOR MINOR PATCH <<< "$BASE"
+            case "${{ inputs.bump }}" in
+              major) VERSION="$((MAJOR+1)).0.0" ;;
+              minor) VERSION="${MAJOR}.$((MINOR+1)).0" ;;
+              *) VERSION="${MAJOR}.${MINOR}.$((PATCH+1))" ;;
+            esac
+          fi
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          
+          if [[ "$VERSION" == *"-"* ]]; then
+            DIST_TAG=$(echo "$VERSION" | cut -d'-' -f2 | cut -d'.' -f1)
+            echo "dist_tag=${DIST_TAG:-next}" >> $GITHUB_OUTPUT
+          else
+            echo "dist_tag=" >> $GITHUB_OUTPUT
+          fi
+          echo "Version: $VERSION"
+
+      - name: Check if already published
+        id: check
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          STATUS=$(curl -s -o /dev/null -w "%{http_code}" "https://registry.npmjs.org/witty-diagnosis-agent/${VERSION}")
+          if [ "$STATUS" = "200" ]; then
+            echo "skip=true" >> $GITHUB_OUTPUT
+          else
+            echo "skip=false" >> $GITHUB_OUTPUT
+          fi
+
+  publish-main:
+    runs-on: ubuntu-latest
+    needs: [setup]
+    if: needs.setup.outputs.skip != 'true'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - run: git fetch --force --tags
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          registry-url: "https://registry.npmjs.org"
+
+      - name: Install dependencies
+        run: bun install
+
+      - name: Update version
+        run: |
+          VERSION="${{ needs.setup.outputs.version }}"
+          # Update package version
+          jq --arg v "$VERSION" '.version = $v' package.json > tmp.json && mv tmp.json package.json
+
+      - name: Build main package
+        run: bun run build
+
+      - name: Publish main package
+        run: |
+          TAG_ARG=""
+          DIST_TAG="${{ needs.setup.outputs.dist_tag }}"
+          if [ -n "$DIST_TAG" ]; then
+            TAG_ARG="--tag $DIST_TAG"
+          fi
+          npm publish --access public --provenance $TAG_ARG
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+          NPM_CONFIG_PROVENANCE: true
+
+      - name: Git commit and tag
+        run: |
+          VERSION="${{ needs.setup.outputs.version }}"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git config user.name "github-actions[bot]"
+          git add package.json
+          git diff --cached --quiet || git commit -m "release: v${VERSION}"
+          git tag -f "v${VERSION}"
+          git push origin --tags --force
+          git push origin HEAD || echo "Branch push failed (non-critical)"
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  release:
+    runs-on: ubuntu-latest
+    needs: [setup, publish-main]
+    if: needs.setup.outputs.skip != 'true'
+    steps:
+      - uses: actions/checkout@v4
+      - name: Create GitHub release
+        run: |
+          VERSION="${{ needs.setup.outputs.version }}"
+          gh release create "v${VERSION}" --title "v${VERSION}" --generate-notes
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}

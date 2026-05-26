@@ -1,0 +1,241 @@
+import { tool, type ToolDefinition } from "@opencode-ai/plugin"
+import type { DelegateTaskArgs, ToolContextWithMetadata, DelegateTaskToolOptions } from "./types"
+import { CATEGORY_DESCRIPTIONS } from "./constants"
+import { mergeCategories } from "../../shared/merge-categories"
+import { log } from "../../shared/logger"
+import { buildSystemContent } from "./prompt-builder"
+import type {
+  AvailableCategory,
+  AvailableSkill,
+} from "../../agents/dynamic-agent-prompt-builder"
+import {
+  resolveSkillContent,
+  resolveParentContext,
+  executeBackgroundContinuation,
+  executeSyncContinuation,
+  resolveCategoryExecution,
+  resolveSubagentExecution,
+  executeUnstableAgentTask,
+  executeBackgroundTask,
+  executeSyncTask,
+} from "./executor"
+
+export { resolveCategoryConfig } from "./categories"
+export type { SyncSessionCreatedEvent, DelegateTaskToolOptions, BuildSystemContentInput } from "./types"
+export { buildSystemContent } from "./prompt-builder"
+
+const DEFAULT_CATEGORY_AGENT = "fuxi"
+
+export function createDelegateTask(options: DelegateTaskToolOptions): ToolDefinition {
+  const { userCategories } = options
+
+  const allCategories = mergeCategories(userCategories)
+  const categoryNames = Object.keys(allCategories)
+  const categoryExamples = categoryNames.join(", ")
+
+  const availableCategories: AvailableCategory[] = options.availableCategories
+    ?? Object.entries(allCategories).map(([name, categoryConfig]) => {
+      const userDesc = userCategories?.[name]?.description
+      const builtinDesc = CATEGORY_DESCRIPTIONS[name]
+      const description = userDesc || builtinDesc || "General tasks"
+      return {
+        name,
+        description,
+        model: categoryConfig.model,
+      }
+    })
+
+  const availableSkills: AvailableSkill[] = options.availableSkills ?? []
+
+  const categoryList = categoryNames.map(name => {
+    const userDesc = userCategories?.[name]?.description
+    const builtinDesc = CATEGORY_DESCRIPTIONS[name]
+    const desc = userDesc || builtinDesc
+    return desc ? `  - ${name}: ${desc}` : `  - ${name}`
+  }).join("\n")
+
+  const description = `Spawn agent task with direct agent selection.
+  
+  ⚠️  CRITICAL: You MUST provide subagent_type.
+  
+  **CORRECT - Using subagent_type:**
+  \`\`\`
+  task(subagent_type="fuxi", load_skills=[], description="Find patterns", prompt="...", run_in_background=true)
+  \`\`\`
+  
+  REQUIRED:
+  - subagent_type: For direct agent invocation (fuxi, dayu, kuafu, baize, etc.)
+
+  - load_skills: ALWAYS REQUIRED. Pass [] if no skills needed, or ["skill-1", "skill-2"] for category tasks.
+  - category: Optional category for the task.
+    Available categories:
+  ${categoryList}
+  - subagent_type: Use specific agent directly (explore, librarian, oracle, metis, momus)
+  - run_in_background: true=async (returns task_id), false=sync (waits). Default: false. Use background=true ONLY for parallel exploration with 5+ independent queries.
+  - session_id: Existing Task session to continue (from previous task output). Continues agent with FULL CONTEXT PRESERVED - saves tokens, maintains continuity.
+  - command: The command that triggered this task (optional, for slash command tracking).
+  
+  **WHEN TO USE session_id:**
+  - Task failed/incomplete → session_id with "fix: [specific issue]"
+  - Need follow-up on previous result → session_id with additional question
+  - Multi-turn conversation with same agent → always session_id instead of new task
+  
+  Prompts MUST be in English.`
+
+  return tool({
+    description,
+    args: {
+      load_skills: tool.schema.array(tool.schema.string()).optional().describe("Skill names to inject. REQUIRED - pass [] if no skills needed."),
+      description: tool.schema.string().describe("Short task description (3-5 words)"),
+      prompt: tool.schema.string().describe("Full detailed prompt for the agent"),
+      run_in_background: tool.schema.boolean().describe("true=async (returns task_id), false=sync (waits). Default: false"),
+      category: tool.schema.string().optional().describe(`Optional category for the task. If provided, subagent_type will be ignored and Fuxi will be used.`),
+      subagent_type: tool.schema.string().describe("REQUIRED. The specific agent to invoke (e.g., fuxi, dayu, kuafu, baize)."),
+      session_id: tool.schema.string().optional().describe("Existing Task session to continue"),
+      command: tool.schema.string().optional().describe("The command that triggered this task"),
+    },
+    async execute(args: DelegateTaskArgs, toolContext) {
+      const ctx = toolContext as ToolContextWithMetadata
+
+      if (args.category) {
+        if (args.subagent_type && args.subagent_type !== DEFAULT_CATEGORY_AGENT) {
+          log("[task] category provided - overriding subagent_type to default category agent", {
+            category: args.category,
+            subagent_type: args.subagent_type,
+          })
+        }
+        args.subagent_type = DEFAULT_CATEGORY_AGENT
+      }
+      await ctx.metadata?.({
+        title: args.description,
+      })
+
+      if (args.run_in_background === undefined) {
+        throw new Error(`Invalid arguments: 'run_in_background' parameter is REQUIRED. Use run_in_background=false for task delegation, run_in_background=true only for parallel exploration.`)
+      }
+      if (typeof args.load_skills === "string") {
+        try {
+          const parsed = JSON.parse(args.load_skills)
+          args.load_skills = Array.isArray(parsed) ? parsed : []
+        } catch {
+          args.load_skills = []
+        }
+      }
+      if (args.load_skills === undefined || args.load_skills === null) {
+        args.load_skills = []
+      }
+
+      const runInBackground = args.run_in_background === true
+
+      const { content: skillContent, contents: skillContents, error: skillError } = await resolveSkillContent(args.load_skills, {
+        gitMasterConfig: options.gitMasterConfig,
+        browserProvider: options.browserProvider,
+        disabledSkills: options.disabledSkills,
+        directory: options.directory,
+      })
+      if (skillError) {
+        return skillError
+      }
+
+      const parentContext = await resolveParentContext(ctx, options.client)
+
+      if (args.session_id) {
+        if (runInBackground) {
+          return executeBackgroundContinuation(args, ctx, options, parentContext)
+        }
+        return executeSyncContinuation(args, ctx, options)
+      }
+
+      if (!args.subagent_type) {
+        return `Invalid arguments: Must provide subagent_type.`
+      }
+
+      let systemDefaultModel: string | undefined
+      try {
+        const openCodeConfig = await options.client.config.get()
+        systemDefaultModel = (openCodeConfig as { data?: { model?: string } })?.data?.model
+      } catch {
+        systemDefaultModel = undefined
+      }
+
+      const inheritedModel = parentContext.model
+        ? `${parentContext.model.providerID}/${parentContext.model.modelID}`
+        : undefined
+
+      let agentToUse: string
+      let categoryModel: { providerID: string; modelID: string; variant?: string } | undefined
+      let categoryPromptAppend: string | undefined
+      let modelInfo: import("../../features/task-toast-manager/types").ModelFallbackInfo | undefined
+      let actualModel: string | undefined
+      let isUnstableAgent = false
+      let fallbackChain: import("../../shared/model-requirements").FallbackEntry[] | undefined
+      let maxPromptTokens: number | undefined
+
+      if (args.category) {
+        const resolution = await resolveCategoryExecution(args, options, inheritedModel, systemDefaultModel)
+        if (resolution.error) {
+          return resolution.error
+        }
+        agentToUse = resolution.agentToUse
+        categoryModel = resolution.categoryModel
+        categoryPromptAppend = resolution.categoryPromptAppend
+        modelInfo = resolution.modelInfo
+        actualModel = resolution.actualModel
+        isUnstableAgent = resolution.isUnstableAgent
+        fallbackChain = resolution.fallbackChain
+        maxPromptTokens = resolution.maxPromptTokens
+
+        const isRunInBackgroundExplicitlyFalse = args.run_in_background === false || args.run_in_background === "false" as unknown as boolean
+
+        log("[task] unstable agent detection", {
+          category: args.category,
+          actualModel,
+          isUnstableAgent,
+          run_in_background_value: args.run_in_background,
+          run_in_background_type: typeof args.run_in_background,
+          isRunInBackgroundExplicitlyFalse,
+          willForceBackground: isUnstableAgent && isRunInBackgroundExplicitlyFalse,
+        })
+
+        if (isUnstableAgent && isRunInBackgroundExplicitlyFalse) {
+          const systemContent = buildSystemContent({
+            skillContent,
+            skillContents,
+            categoryPromptAppend,
+            agentName: agentToUse,
+            maxPromptTokens,
+            model: categoryModel,
+            availableCategories,
+            availableSkills,
+          })
+          return executeUnstableAgentTask(args, ctx, options, parentContext, agentToUse, categoryModel, systemContent, actualModel)
+        }
+      } else {
+        const resolution = await resolveSubagentExecution(args, options, parentContext.agent, categoryExamples, inheritedModel)
+        if (resolution.error) {
+          return resolution.error
+        }
+        agentToUse = resolution.agentToUse
+        categoryModel = resolution.categoryModel
+        fallbackChain = resolution.fallbackChain
+      }
+
+      const systemContent = buildSystemContent({
+        skillContent,
+        skillContents,
+        categoryPromptAppend,
+        agentName: agentToUse,
+        maxPromptTokens,
+        model: categoryModel,
+        availableCategories,
+        availableSkills,
+      })
+
+      if (runInBackground) {
+        return executeBackgroundTask(args, ctx, options, parentContext, agentToUse, categoryModel, systemContent, fallbackChain)
+      }
+
+      return executeSyncTask(args, ctx, options, parentContext, agentToUse, categoryModel, systemContent, modelInfo, fallbackChain)
+    },
+  })
+}

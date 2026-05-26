@@ -1,0 +1,1191 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>故障诊断报告</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Lora:ital,wght@0,400;0,600;1,400&family=Source+Sans+3:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  /* ── Design tokens ─────────────────────────────────────────────────────── */
+  :root {
+    --bg:          #f8f7f4;
+    --surface:     #ffffff;
+    --border:      #e8e5df;
+    --border-soft: #f0ede8;
+
+    --text:        #1c1917;
+    --text-2:      #57534e;
+    --text-3:      #a8a29e;
+
+    --accent:      #1d4e6e;
+    --accent-light:#e8f1f7;
+    --accent-mid:  #3b82a0;
+
+    --red:         #c0392b;
+    --red-bg:      #fef2f2;
+    --amber:       #92400e;
+    --amber-bg:    #fffbeb;
+    --green:       #14532d;
+    --green-bg:    #f0fdf4;
+
+    --code-bg:     #1a1d27;
+    --code-text:   #cdd6f4;
+    --code-border: #2d3148;
+
+    --font-body: "Source Sans 3", "PingFang SC", "Hiragino Sans GB", sans-serif;
+    --font-head: "Lora", "PingFang SC", Georgia, serif;
+    --font-mono: "JetBrains Mono", "Fira Code", Consolas, monospace;
+
+    --radius:    8px;
+    --radius-lg: 12px;
+    --shadow:    0 1px 3px rgba(0,0,0,.06), 0 4px 16px rgba(0,0,0,.05);
+    --shadow-lg: 0 2px 8px rgba(0,0,0,.07), 0 8px 32px rgba(0,0,0,.06);
+
+    --toc-width:   240px;
+    --gap:         32px;
+  }
+
+  /* ── Progress bar ──────────────────────────────────────────────────────── */
+  #progress {
+    position: fixed; top: 0; left: 0; height: 3px; width: 0%;
+    background: linear-gradient(90deg, var(--accent-mid), var(--accent));
+    z-index: 999; transition: width .1s linear;
+    border-radius: 0 2px 2px 0;
+  }
+
+  /* ── Base ──────────────────────────────────────────────────────────────── */
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  html { font-size: 16px; scroll-behavior: smooth; }
+  body {
+    font-family: var(--font-body);
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.8;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* ── Layout ────────────────────────────────────────────────────────────── */
+  .layout {
+    display: flex;
+    align-items: flex-start;
+    max-width: calc(var(--toc-width) + 820px + var(--gap) * 3);
+    margin: 0 auto;
+    padding: 48px var(--gap) 96px;
+    gap: var(--gap);
+  }
+
+  /* ── TOC ───────────────────────────────────────────────────────────────── */
+  .toc {
+    width: var(--toc-width);
+    flex-shrink: 0;
+    position: sticky;
+    top: 32px;
+    max-height: calc(100vh - 64px);
+    overflow-y: auto;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    padding: 20px;
+    box-shadow: var(--shadow);
+    scrollbar-width: thin;
+    scrollbar-color: var(--border) transparent;
+  }
+  .toc-title {
+    font-size: 10.5px;
+    font-weight: 600;
+    letter-spacing: .1em;
+    text-transform: uppercase;
+    color: var(--text-3);
+    margin-bottom: 12px;
+    padding-bottom: 10px;
+    border-bottom: 1px solid var(--border-soft);
+  }
+  .toc-item {
+    display: flex;
+    align-items: flex-start;
+    margin: 2px 0;
+  }
+  .toc-toggle {
+    background: none;
+    border: none;
+    cursor: pointer;
+    color: var(--text-3);
+    padding: 4px;
+    margin-right: 4px;
+    margin-top: 2px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 4px;
+    transition: background 0.2s, transform 0.2s;
+  }
+  .toc-toggle:hover { background: var(--border-soft); color: var(--text); }
+  .toc-toggle[aria-expanded="false"] svg { transform: rotate(-90deg); }
+  .toc-spacer { width: 20px; flex-shrink: 0; }
+  .toc-group { overflow: hidden; transition: max-height 0.3s ease-in-out; }
+  .toc-group.collapsed { max-height: 0 !important; }
+  
+  .toc a {
+    display: block;
+    font-size: 13px;
+    color: var(--text-2);
+    text-decoration: none;
+    padding: 4px 8px;
+    border-radius: 5px;
+    line-height: 1.45;
+    transition: background .15s, color .15s;
+    word-break: break-all;
+    flex-grow: 1;
+  }
+  .toc a:hover  { background: var(--accent-light); color: var(--accent); }
+  .toc a.active { background: var(--accent-light); color: var(--accent); font-weight: 500; }
+  .toc-l1 { font-weight: 600; color: var(--text); }
+  .toc-l2 { font-weight: 600; color: var(--text); }
+  .toc-l3 { font-size: 12px !important; padding-left: 14px !important; }
+
+  /* ── Article card ──────────────────────────────────────────────────────── */
+  .article {
+    flex: 1; min-width: 0;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    padding: 52px 60px;
+    box-shadow: var(--shadow-lg);
+  }
+
+  /* ── Headings ──────────────────────────────────────────────────────────── */
+  .title-container {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-end;
+    margin: 0 0 28px;
+    padding-bottom: 18px;
+    border-bottom: 2px solid var(--text);
+  }
+  .article h1 {
+    font-family: var(--font-head);
+    font-size: 26px; font-weight: 600; line-height: 1.3;
+    margin: 0; padding-bottom: 0;
+    border-bottom: none;
+  }
+  .article h2 {
+    font-family: var(--font-head);
+    font-size: 19px; font-weight: 600;
+    margin: 48px 0 14px; padding-bottom: 8px;
+    border-bottom: 1px solid var(--border);
+  }
+  .article h2::before {
+    content: attr(data-index);
+    display: inline-block;
+    font-family: var(--font-mono);
+    font-size: 10.5px; font-weight: 500;
+    color: var(--accent-mid);
+    background: var(--accent-light);
+    padding: 1px 7px; border-radius: 4px;
+    margin-right: 10px; vertical-align: middle;
+    letter-spacing: .05em;
+  }
+  .article h3 {
+    font-family: var(--font-head);
+    font-size: 15.5px; font-weight: 600;
+    margin: 28px 0 10px;
+  }
+  .article h3::before {
+    content: "§ ";
+    color: var(--text-3);
+    font-family: var(--font-mono); font-size: 13px;
+  }
+  .article h4 {
+    font-size: 13.5px; font-weight: 600;
+    color: var(--accent); margin: 20px 0 8px;
+  }
+
+  /* ── Body text ─────────────────────────────────────────────────────────── */
+  .article p, .plain { 
+    font-size: 15px; 
+    line-height: 1.85; 
+    color: var(--text); 
+    margin: 0 0 12px; 
+    font-family: var(--font-body);
+  }
+  .article strong { font-weight: 600; }
+  .article em     { font-style: italic; color: var(--text-2); }
+  .article a {
+    color: var(--accent); text-decoration: underline;
+    text-decoration-color: var(--accent-light);
+    text-underline-offset: 3px;
+  }
+  .article a:hover { text-decoration-color: var(--accent); }
+  .article hr { border: none; border-top: 1px solid var(--border); margin: 20px 0; }
+  .article hr.heavy { border-top: 3px solid var(--text); margin: 32px 0; }
+
+  /* ── Blockquote ────────────────────────────────────────────────────────── */
+  .article blockquote {
+    border-left: 3px solid var(--accent-mid);
+    background: var(--accent-light);
+    margin: 20px 0; padding: 13px 20px 13px 20px;
+    border-radius: 0 var(--radius) var(--radius) 0;
+  }
+  .article blockquote p { font-size: 14.5px; color: var(--accent); margin: 0; line-height: 1.7; }
+  /* 支持块引用内部保留换行符（修复头部概要换行丢失问题） */
+  .article blockquote p { white-space: pre-wrap; }
+  .article blockquote strong { color: var(--accent); }
+
+  /* ── Lists ─────────────────────────────────────────────────────────────── */
+  .article ul, .article ol { padding-left: 22px; margin: 6px 0 14px; }
+  .article li { font-size: 15px; line-height: 1.8; margin: 4px 0; }
+  .article li::marker { color: var(--accent-mid); }
+  .article li > ul, .article li > ol { margin: 3px 0; }
+
+  /* ── Inline code ───────────────────────────────────────────────────────── */
+  .article :not(pre) > code {
+    font-family: var(--font-mono);
+    font-size: 12.5px; font-weight: 500;
+    background: #f3f0eb; color: var(--red);
+    padding: 1px 5px; border-radius: 4px;
+    border: 1px solid var(--border);
+  }
+
+  /* ── Code blocks ───────────────────────────────────────────────────────── */
+  .code-block {
+    position: relative; margin: 20px 0;
+    border-radius: var(--radius-lg); overflow: hidden;
+    border: 1px solid var(--code-border);
+    box-shadow: 0 4px 20px rgba(0,0,0,.16);
+  }
+  .code-lang {
+    position: absolute; top: 0; left: 0;
+    font-family: var(--font-mono); font-size: 10px; font-weight: 500;
+    color: #7c8db5; background: #222538;
+    padding: 4px 12px; border-bottom-right-radius: 6px;
+    text-transform: uppercase; letter-spacing: .08em;
+    user-select: none;
+  }
+  .copy-btn {
+    position: absolute; top: 8px; right: 10px;
+    background: #2d3148; border: 1px solid #3d4260;
+    border-radius: 5px; color: #7c8db5; cursor: pointer;
+    padding: 5px 8px; display: flex; align-items: center;
+    transition: background .15s, color .15s; z-index: 1;
+  }
+  .copy-btn:hover  { background: #3a3f60; color: #cdd6f4; }
+  .copy-btn.copied { color: #a6e3a1; border-color: #4a6a4a; }
+  .code-block pre {
+    margin: 0; padding: 36px 20px 20px;
+    background: var(--code-bg); overflow-x: auto;
+    scrollbar-width: thin; scrollbar-color: #3d4260 transparent;
+  }
+  .code-block pre::-webkit-scrollbar { height: 5px; }
+  .code-block pre::-webkit-scrollbar-thumb { background: #3d4260; border-radius: 3px; }
+  .code-block code {
+    font-family: var(--font-mono); font-size: 13px; line-height: 1.7;
+    color: var(--code-text); background: none; border: none; padding: 0;
+    white-space: pre; word-break: normal;
+  }
+
+  /* ── Tables ────────────────────────────────────────────────────────────── */
+  .table-wrap {
+    overflow-x: auto; margin: 16px 0;
+    border-radius: var(--radius-lg);
+    border: 1px solid var(--border);
+    box-shadow: var(--shadow);
+  }
+  table { width: 100%; border-collapse: collapse; font-size: 14px; min-width: 360px; }
+  thead { background: #f4f2ee; }
+  th {
+    padding: 9px 14px; text-align: left;
+    font-size: 11.5px; font-weight: 600;
+    letter-spacing: .04em; text-transform: uppercase;
+    color: var(--text-2); border-bottom: 1px solid var(--border);
+    white-space: nowrap;
+  }
+  td {
+    padding: 8px 14px; border-bottom: 1px solid var(--border-soft);
+    color: var(--text); vertical-align: top; line-height: 1.6;
+  }
+  tbody tr:last-child td { border-bottom: none; }
+  tbody tr:nth-child(even) td { background: #faf9f7; }
+  tbody tr:hover td { background: var(--accent-light); transition: background .1s; }
+
+  /* ── KV block ──────────────────────────────────────────────────────────── */
+  .kv-block { background: var(--bg); border: 1px solid var(--border); border-radius: var(--radius-lg); overflow: hidden; margin: 12px 0 20px; }
+  .kv-row { display: flex; border-bottom: 1px solid var(--border-soft); align-items: flex-start; }
+  .kv-row:last-child { border-bottom: none; }
+  .kv-key { flex: 0 0 160px; padding: 9px 16px; font-size: 13.5px; font-weight: 600; color: var(--text-2); background: var(--surface); border-right: 1px solid var(--border-soft); }
+  .kv-val { flex: 1; padding: 9px 16px; font-size: 14px; color: var(--text); }
+
+  /* ── Status badges ─────────────────────────────────────────────────────── */
+  .badge-ok { display: inline-flex; align-items: center; gap: 4px; background: var(--green-bg); color: var(--green); font-size: 13px; font-weight: 500; padding: 2px 9px; border-radius: 20px; border: 1px solid #bbf7d0; }
+  .badge-err { display: inline-flex; align-items: center; gap: 4px; background: var(--red-bg); color: var(--red); font-size: 13px; font-weight: 500; padding: 2px 9px; border-radius: 20px; border: 1px solid #fecaca; }
+  .badge-warn { display: inline-flex; align-items: center; gap: 4px; background: var(--amber-bg); color: var(--amber); font-size: 13px; font-weight: 500; padding: 2px 9px; border-radius: 20px; border: 1px solid #fde68a; }
+
+  /* ── Priority badges ───────────────────────────────────────────────────── */
+  .pri-p0 { display: inline-block; background: #fef2f2; color: #991b1b; border: 1px solid #fca5a5; font-size: 12px; font-weight: 700; padding: 2px 8px; border-radius: 4px; letter-spacing: .04em; }
+  .pri-p1 { display: inline-block; background: #fff7ed; color: #9a3412; border: 1px solid #fdba74; font-size: 12px; font-weight: 700; padding: 2px 8px; border-radius: 4px; }
+  .pri-p2 { display: inline-block; background: #fffbeb; color: #92400e; border: 1px solid #fde68a; font-size: 12px; font-weight: 700; padding: 2px 8px; border-radius: 4px; }
+  .pri-p3 { display: inline-block; background: var(--accent-light); color: var(--accent); border: 1px solid #bfdbfe; font-size: 12px; font-weight: 700; padding: 2px 8px; border-radius: 4px; }
+
+  /* ── Fault header ──────────────────────────────────────────────────────── */
+  .fault-header { display: flex; align-items: center; gap: 12px; padding: 12px 16px; border-radius: var(--radius-lg); margin: 16px 0 8px; border: 1px solid; }
+  .fh-p0 { background: #fef2f2; border-color: #fca5a5; }
+  .fh-p1 { background: #fff7ed; border-color: #fdba74; }
+  .fh-p2 { background: #fffbeb; border-color: #fde68a; }
+  .fh-p3 { background: var(--accent-light); border-color: #bfdbfe; }
+  .fh-badge { font-family: var(--font-mono); font-size: 11px; font-weight: 700; letter-spacing: .08em; }
+  .fh-p0 .fh-badge { color: #991b1b; }
+  .fh-p1 .fh-badge { color: #9a3412; }
+  .fh-p2 .fh-badge { color: #92400e; }
+  .fh-p3 .fh-badge { color: var(--accent); }
+  .fh-rest { font-size: 14px; font-weight: 500; color: var(--text); }
+
+  /* ── Timeline ──────────────────────────────────────────────────────────── */
+  .timeline { border-left: 2px solid var(--accent-mid); margin: 16px 0 16px 8px; padding-left: 20px; }
+  .tl-row { display: flex; align-items: baseline; gap: 10px; margin: 8px 0; font-size: 13.5px; }
+  .tl-ts { font-family: var(--font-mono); font-size: 12px; color: var(--text-3); flex-shrink: 0; white-space: nowrap; }
+  .tl-tag { font-size: 11px; font-weight: 600; padding: 1px 7px; border-radius: 10px; flex-shrink: 0; background: var(--accent-light); color: var(--accent); }
+  .tl-tag.err { background: var(--red-bg); color: var(--red); }
+  .tl-tag.warn { background: var(--amber-bg); color: var(--amber); }
+  .tl-desc { color: var(--text); line-height: 1.5; }
+
+  /* ── Global warn ───────────────────────────────────────────────────────── */
+  .global-warn { background: #fef2f2; border: 1px solid #fca5a5; border-radius: var(--radius-lg); padding: 14px 18px; font-size: 14.5px; font-weight: 600; color: #991b1b; margin: 16px 0; }
+
+  /* ── Tree note ─────────────────────────────────────────────────────────── */
+  .tree-note { white-space: pre-wrap; font-family: var(--font-mono); font-size: 13.5px; line-height: 1.6; color: var(--text-2); margin: 8px 0 8px 16px; }
+
+  /* ── Disclaimer ────────────────────────────────────────────────────────── */
+  .disclaimer { background: var(--bg); border: 1px solid var(--border); border-radius: var(--radius); padding: 14px 18px; font-size: 13.5px; color: var(--text-2); font-style: italic; }
+
+  /* ── Meta footer ───────────────────────────────────────────────────────── */
+  .meta {
+    margin-top: 48px; padding-top: 16px;
+    border-top: 1px solid var(--border-soft);
+    display: flex; justify-content: space-between; align-items: center;
+    font-size: 12px; color: var(--text-3);
+  }
+  .meta-source { font-family: var(--font-mono); font-size: 11.5px; }
+
+  /* ── Brand logo ────────────────────────────────────────────────────────── */
+  .brand-logo {
+    font-family: var(--font-head);
+    font-size: 14px;
+    color: var(--text-3);
+    letter-spacing: 0.05em;
+    margin-bottom: 4px;
+    flex-shrink: 0;
+    margin-left: 16px;
+  }
+  .brand-logo strong {
+    font-weight: 600;
+    color: var(--accent);
+  }
+  @media (max-width: 900px) {
+    .title-container { flex-direction: column; align-items: flex-start; gap: 12px; }
+    .brand-logo { margin-left: 0; margin-bottom: 0; }
+  }
+  /* ── Print ─────────────────────────────────────────────────────────────── */
+  @media print {
+    body { background: white; }
+    #progress, .toc { display: none; }
+    .layout { display: block; padding: 0; }
+    .article { border: none; box-shadow: none; padding: 24px; }
+    .copy-btn { display: none; }
+    .brand-logo { margin-bottom: 0; }
+  }
+
+  /* ── Responsive ────────────────────────────────────────────────────────── */
+  @media (max-width: 900px) {
+    .toc { display: none; }
+    .article { padding: 36px 28px; }
+    .layout { padding: 24px 16px 64px; }
+  }
+  @media (max-width: 480px) {
+    .article { padding: 24px 18px; }
+    .article h1 { font-size: 22px; }
+  }
+</style>
+</head>
+<body>
+
+<div id="progress"></div>
+
+<div class="layout">
+  <nav class="toc" id="toc">
+  <div class="toc-title">目录</div>
+  <div class="toc-content">
+<div class="toc-item has-children"><button class="toc-toggle" onclick="toggleToc(this)" aria-expanded="true">
+                <svg viewBox="0 0 24 24" width="12" height="12" stroke="currentColor" stroke-width="2" fill="none"><polyline points="6 9 12 15 18 9"></polyline></svg>
+              </button><a href="#h-故障诊断报告" onclick="event.preventDefault(); const target = document.getElementById('h-故障诊断报告'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l1">🔴 故障诊断报告</a></div>
+<div class="toc-group" id="group-h-一故障概览">
+<div class="toc-item has-children"><button class="toc-toggle" onclick="toggleToc(this)" aria-expanded="true">
+                <svg viewBox="0 0 24 24" width="12" height="12" stroke="currentColor" stroke-width="2" fill="none"><polyline points="6 9 12 15 18 9"></polyline></svg>
+              </button><a href="#h-一故障概览" onclick="event.preventDefault(); const target = document.getElementById('h-一故障概览'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l2">一、故障概览</a></div>
+<div class="toc-group" id="group-h-置信度说明">
+<div class="toc-item "><span class="toc-spacer"></span><a href="#h-置信度说明" onclick="event.preventDefault(); const target = document.getElementById('h-置信度说明'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l3">置信度说明</a></div>
+</div>
+<div class="toc-item has-children"><button class="toc-toggle" onclick="toggleToc(this)" aria-expanded="true">
+                <svg viewBox="0 0 24 24" width="12" height="12" stroke="currentColor" stroke-width="2" fill="none"><polyline points="6 9 12 15 18 9"></polyline></svg>
+              </button><a href="#h-二根因速览" onclick="event.preventDefault(); const target = document.getElementById('h-二根因速览'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l2">二、根因速览</a></div>
+<div class="toc-group" id="group-h-事故时间线-故障传导链路">
+<div class="toc-item "><span class="toc-spacer"></span><a href="#h-事故时间线-故障传导链路" onclick="event.preventDefault(); const target = document.getElementById('h-事故时间线-故障传导链路'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l3">事故时间线 & 故障传导链路</a></div>
+<div class="toc-item "><span class="toc-spacer"></span><a href="#h-故障因果链" onclick="event.preventDefault(); const target = document.getElementById('h-故障因果链'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l3">故障因果链</a></div>
+</div>
+<div class="toc-item has-children"><button class="toc-toggle" onclick="toggleToc(this)" aria-expanded="true">
+                <svg viewBox="0 0 24 24" width="12" height="12" stroke="currentColor" stroke-width="2" fill="none"><polyline points="6 9 12 15 18 9"></polyline></svg>
+              </button><a href="#h-三排查过程" onclick="event.preventDefault(); const target = document.getElementById('h-三排查过程'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l2">三、排查过程</a></div>
+<div class="toc-group" id="group-h-31-初始现象">
+<div class="toc-item "><span class="toc-spacer"></span><a href="#h-31-初始现象" onclick="event.preventDefault(); const target = document.getElementById('h-31-初始现象'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l3">3.1 初始现象</a></div>
+<div class="toc-item "><span class="toc-spacer"></span><a href="#h-32-假设驱动排查hypotheses-driven-analysis" onclick="event.preventDefault(); const target = document.getElementById('h-32-假设驱动排查hypotheses-driven-analysis'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l3">3.2 假设驱动排查（Hypotheses-Driven Analysis）</a></div>
+<div class="toc-item "><span class="toc-spacer"></span><a href="#h-33-排查结论与逻辑树" onclick="event.preventDefault(); const target = document.getElementById('h-33-排查结论与逻辑树'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l3">3.3 排查结论与逻辑树</a></div>
+</div>
+<div class="toc-item has-children"><button class="toc-toggle" onclick="toggleToc(this)" aria-expanded="true">
+                <svg viewBox="0 0 24 24" width="12" height="12" stroke="currentColor" stroke-width="2" fill="none"><polyline points="6 9 12 15 18 9"></polyline></svg>
+              </button><a href="#h-四关键数据交叉验证" onclick="event.preventDefault(); const target = document.getElementById('h-四关键数据交叉验证'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l2">四、关键数据交叉验证</a></div>
+<div class="toc-group" id="group-h-mmap-enomem-层t2-证据">
+<div class="toc-item "><span class="toc-spacer"></span><a href="#h-mmap-enomem-层t2-证据" onclick="event.preventDefault(); const target = document.getElementById('h-mmap-enomem-层t2-证据'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l3">mmap ENOMEM 层（T2 证据）</a></div>
+<div class="toc-item "><span class="toc-spacer"></span><a href="#h-内存回收层t1-证据" onclick="event.preventDefault(); const target = document.getElementById('h-内存回收层t1-证据'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l3">内存回收层（T1 证据）</a></div>
+<div class="toc-item "><span class="toc-spacer"></span><a href="#h-oom-killer-层t1-证据" onclick="event.preventDefault(); const target = document.getElementById('h-oom-killer-层t1-证据'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l3">OOM Killer 层（T1 证据）</a></div>
+</div>
+<div class="toc-item has-children"><button class="toc-toggle" onclick="toggleToc(this)" aria-expanded="true">
+                <svg viewBox="0 0 24 24" width="12" height="12" stroke="currentColor" stroke-width="2" fill="none"><polyline points="6 9 12 15 18 9"></polyline></svg>
+              </button><a href="#h-五修复方案" onclick="event.preventDefault(); const target = document.getElementById('h-五修复方案'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l2">五、修复方案</a></div>
+<div class="toc-group" id="group-h-51-应急处置">
+<div class="toc-item "><span class="toc-spacer"></span><a href="#h-51-应急处置" onclick="event.preventDefault(); const target = document.getElementById('h-51-应急处置'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l3">5.1 应急处置</a></div>
+<div class="toc-item "><span class="toc-spacer"></span><a href="#h-52-永久修复计划" onclick="event.preventDefault(); const target = document.getElementById('h-52-永久修复计划'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l3">5.2 永久修复计划</a></div>
+<div class="toc-item "><span class="toc-spacer"></span><a href="#h-53-恢复脚本参考" onclick="event.preventDefault(); const target = document.getElementById('h-53-恢复脚本参考'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l3">5.3 恢复脚本参考</a></div>
+</div>
+</div>
+  </div>
+</nav>
+  <article class="article" id="article" style="position: relative;">
+    <div class="title-container"><h1 id="h-故障诊断报告">🔴 故障诊断报告</h1><div class="brand-logo">by <strong>Witty Diagnosis Agent</strong></div></div>
+<blockquote>
+<p><strong>报告编号</strong>: RCA-20260525-224030-001
+<strong>故障级别</strong>: P1 / Critical
+<strong>报告时间</strong>: 2026-05-25 22:40:00 UTC
+<strong>当前状态</strong>: 🟡 观察中（容器已重启，进程已终止）</p>
+</blockquote>
+<hr>
+<h2 id="h-一故障概览">一、故障概览</h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>项目</th>
+<th>内容</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>故障标题</td>
+<td>容器 pcr-witty 因 <code>vm.max_map_count=5000</code> 极低限制触发 mmap ENOMEM，进而引发全局 OOM 回收风暴与进程被 kill</td>
+</tr>
+<tr>
+<td>影响范围</td>
+<td>容器 <code>pcr-witty</code> 内运行的内存压力测试（Python PID 33 + <code>fault_reclaim_s</code> 高地址空间进程）；容器 Host 节点全局内存子系统</td>
+</tr>
+<tr>
+<td>故障时段</td>
+<td>2026-05-25 ~14:34:44 UTC ～ 2026-05-25 ~14:39:51 UTC（两次 OOM kill 时间点）</td>
+</tr>
+<tr>
+<td>根本原因</td>
+<td>双重触发：(1) 容器 cgroup 覆写 <code>vm.max_map_count=5000</code> 仅为内核默认值 65530 的 7.6%，导致 Python 进程 mmap 4.95GB 时提前触达 VMA 上限返回 ENOMEM；(2) <code>fault_reclaim_s</code> 压力测试工具异常分配 6.5TB 虚拟地址空间（正常应为百 GB 级）→ page tables 膨胀至 6.4GB（占用 40% 物理内存）→ 触发极端 direct reclaim + 全局 OOM killer</td>
+</tr>
+<tr>
+<td>是否恢复</td>
+<td>❌ 未恢复（容器已重启，进程已终止。底层 <code>vm.max_map_count=5000</code> 配置仍为低风险状态，但故障期间的压力已消退。）</td>
+</tr>
+<tr>
+<td>根因置信度</td>
+<td>🟡 中置信（故障期间进程已销毁，VMA 实时数据无法获取；mmap ENOMEM 的直接触发条件是 VMA 上限 vs 地址空间碎片化无法 100% 定论）</td>
+</tr>
+</tbody></table></div>
+<h3 id="h-置信度说明">置信度说明</h3>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>等级</th>
+<th>标识</th>
+<th>含义</th>
+<th>示例场景</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>高置信</td>
+<td>🟢</td>
+<td>根因已明确，可复现，单一原因可解释所有现象</td>
+<td>SQL 无索引 → 复现后加索引立即恢复</td>
+</tr>
+<tr>
+<td>中置信</td>
+<td>🟡</td>
+<td>根因基本确认，但存在 1～2 个无法完全解释的现象</td>
+<td>定位到慢查询，但流量突增原因待查</td>
+</tr>
+<tr>
+<td>低置信</td>
+<td>🟠</td>
+<td>有多个可疑原因，尚未排除竞争，结论为推断</td>
+<td>多个组件同时异常，无法判断触发顺序</td>
+</tr>
+<tr>
+<td>未知</td>
+<td>🔴</td>
+<td>现象无法解释，根因未定位，仍在排查中</td>
+<td>服务偶发崩溃，日志无异常，无法复现</td>
+</tr>
+</tbody></table></div>
+<hr>
+<h2 id="h-二根因速览">二、根因速览</h2>
+<h3 id="h-事故时间线-故障传导链路">事故时间线 & 故障传导链路</h3>
+<div class="code-block">
+  <span class="code-lang">text</span>
+  <button class="copy-btn" onclick="copyCode(this)" title="复制">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
+  </button>
+  <pre><code>时间                          事件                                                         性质          溯源路径
+──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+2026-05-25 ~14:20:00?         Python PID 33 启动 mmap 压力分配（目标 4.95GB）                   📈 外部触发    [/proc/vmstat, T2 分析]
+  │
+  ▼
+2026-05-25 ~14:20-14:30?      max_map_count=5000 → mmap 已达 VMA 上限 → ENOMEM                 ⚠️ 隐患激活    [kuafu_T2_20260525_224030_mmap_enomem.md:13]
+  │                            overcommit_memory=1 (Always) 下仍失败 → 非 overcommit 问题
+  │                            最可能原因：容器 cgroup 命名空间覆写 max_map_count=5000
+  ▼
+2026-05-25 ~14:30-14:34?      fault_reclaim_s 进程启动，持续 mmap 分配直至 6.5TB 虚拟地址空间     🟡 异常积累    [kuafu_T1_20260525_224030_oom_reclaim.md:78-94]
+  │                            page tables 随之膨胀至 6.4GB（8 字节/PTE → ~860M 个 PTE）
+  │                            物理内存 16GB，page tables 已吞噬约 40%
+  ▼
+2026-05-25 14:34:44 UTC       第一次 OOM killer 触发：fault_reclaim_s (PID 20893) 被 kill       🔴 故障爆发    [kuafu_T1_20260525_224030_oom_reclaim.md:76-84]
+  │                            total-vm=6.5TB, anon-rss=8.4GB, pgtables=6.1GB
+  │
+  ▼
+2026-05-25 14:34-14:39        系统内存压力 persist：新 fault_reclaim_s 进程 (PID 21383) 继续运行   🟡 二次积累    [kuafu_T1_20260525_224030_oom_reclaim.md:86-94]
+  │                            allocstall_normal=2400, allocstall_movable=4666
+  │                            pgscan_direct=2,445,150, pgscan_kswapd=7,891,748
+  │                            共扫描 10.3M 页（~40GB），仅回收 2.4M 页（回收率 23%）
+  ▼
+2026-05-25 14:39:51 UTC       第二次 OOM killer 触发：fault_reclaim_s (PID 21383) 被 kill       🔴 故障复发    [kuafu_T1_20260525_224030_oom_reclaim.md:86-94]
+  │                            total-vm=6.5TB, pgtables=6.1GB
+  ▼
+2026-05-25 ~14:40+            容器重启，仅剩 PID 1: sleep 3600                                  🟢 故障停歇    [kuafu_T2_20260525_224030_mmap_enomem.md:33-38]
+                              系统当前空闲 ~14.4GB，page cache ~226MB，水流恢复正常</code></pre>
+</div>
+<h3 id="h-故障因果链">故障因果链</h3>
+<div class="code-block">
+  <span class="code-lang">text</span>
+  <button class="copy-btn" onclick="copyCode(this)" title="复制">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
+  </button>
+  <pre><code>容器 pcr-witty cgroup 覆写 vm.max_map_count=5000（极低）
+    │
+    ├─► Python PID 33 mmap 4.95GB → VMA 上限耗尽 → 返回 ENOMEM
+    │       └─► 内存压力测试进入异常分支
+    │
+    └─► fault_reclaim_s 进程启动（LTP 风格压力测试）
+            │   mmap 分配策略异常 → 分配至 6.5TB 虚拟地址空间
+            │   （预期行为：应在数 GB 范围内停止）
+            └─► page tables 膨胀至 6.4GB（PTE × ~860M 条目）
+                    └─► 物理内存 16GB - 6.4GB page tables = 仅剩 ~9.6GB 可供匿名页/文件页
+                            └─► allocstall 爆发：7,066 次直接分配 stall
+                                    └─► pgscan 爆发：10.3M 页扫描（~40GB 虚拟地址遍历）
+                                            └─► 直接回收效率 23%（pgsteal/pgscan = 2.4M/10.3M）
+                                                    └─► kswapd 高水位快速命中 22 次（水位频繁震荡）
+                                                            └─► 第一次 OOM killer (PID 20893)
+                                                                    └─► 故障未彻底消除 → 新进程续跑 → 第二次 OOM (PID 21383)
+                                                                            └─► 🔴 容器被迫重启</code></pre>
+</div>
+<hr>
+<h2 id="h-三排查过程">三、排查过程</h2>
+<h3 id="h-31-初始现象">3.1 初始现象</h3>
+<ul>
+<li><strong>容器环境</strong>: <code>pcr-witty</code>，运行 LTP/kernel selftests 风格内存压力测试</li>
+<li><strong>直接表象 1（用户感知）</strong>: Python 进程 mmap 分配 4951MB 返回 ENOMEM</li>
+<li><strong>直接表象 2（系统告警）</strong>: 两次 OOM killer 事件触发，进程被杀死</li>
+<li><strong>系统级告警信号</strong>:<ul>
+<li><code>allocstall_normal=2400</code>, <code>allocstall_movable=4666</code>（合计 7,066 次 direct reclaim stall）</li>
+<li><code>pgscan_direct=2,445,150</code>, <code>pgscan_kswapd=7,891,748</code>（合计 10.3M 页扫描）</li>
+<li><code>pgmajfault=40,198</code>（严重缺页中断异常）</li>
+<li><code>pgpgout=31,531,452</code>（约 126GB 换出 — 极大量）</li>
+<li>PSI 累计: <code>some total=3,690,070</code>, <code>full total=3,656,733</code></li>
+</ul>
+</li>
+</ul>
+<hr>
+<h3 id="h-32-假设驱动排查hypotheses-driven-analysis">3.2 假设驱动排查（Hypotheses-Driven Analysis）</h3>
+<blockquote>
+<p>以下基于 <code>fault-rca-report-generation</code> 方法论，采用 <strong>5 个独立假设</strong> 对 page cache / reclaim 风暴进行系统性排查。</p>
+</blockquote>
+<hr>
+<h4 id="h-假设-akswapd-cpu-过载-水位震荡kswapd-high-cpu-watermark-thrashing">假设 A：kswapd CPU 过载 / 水位震荡（kswapd High CPU / Watermark Thrashing）</h4>
+<blockquote>
+<p>🧪 <strong>假设</strong>: kswapd 内核线程因持续扫描大量页面而耗尽 CPU，导致无法及时补充 watermarks → 进程陷入 direct reclaim</p>
+</blockquote>
+<p><strong>证据收集与验证：</strong></p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>检查项</th>
+<th>操作（基于诊断数据）</th>
+<th>结论</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>pgscan_kswapd</td>
+<td>7,891,748 页（约 30GB 虚拟地址扫描）</td>
+<td><span class="badge-ok">✅ 极高</span></td>
+</tr>
+<tr>
+<td>kswapd_low_wmark_hit_quickly</td>
+<td>4 次</td>
+<td><span class="badge-ok">✅ kswapd 低水位被快速命中</span></td>
+</tr>
+<tr>
+<td>kswapd_high_wmark_hit_quickly</td>
+<td>22 次</td>
+<td><span class="badge-ok">✅ kswapd 高水位被快速命中 — 水位频繁震荡</span></td>
+</tr>
+<tr>
+<td>pageoutrun</td>
+<td>29 次</td>
+<td><span class="badge-ok">✅ kswapd 实际运行</span></td>
+</tr>
+<tr>
+<td>pgsteal_kswapd vs pgscan_kswapd</td>
+<td>回收 2,007,684 / 扫描 7,891,748 = 回收率 25%</td>
+<td><span class="badge-warn">⚠️ 回收效率低</span></td>
+</tr>
+<tr>
+<td>当前空闲内存</td>
+<td>14.4GB（故障已消退，无法捕获实时 CPU）</td>
+<td>⏭ 仅能推断</td>
+</tr>
+</tbody></table></div>
+<p><strong>推理链路</strong>:</p>
+<ul>
+<li>kswapd 在故障期间运行了 29 次，扫描 7.9M 页，但仅回收 2.0M 页（25% 效率）。</li>
+<li>高水位命中 22 次说明：kswapd 刚把水位推高，又被快速消耗回落 → 典型 <strong>thrashing 模式</strong>。</li>
+<li>直接原因：page tables 占用了 6.4GB 物理内存，导致可用页面池大幅缩小 → 水位易跌穿。</li>
+</ul>
+<p><strong>✅ 确认子因子：kswapd 水位震荡属于回收效率低下的表现，是故障链中的中间态，非根因。</strong></p>
+<hr>
+<h4 id="h-假设-bdirect-reclaim-延迟与分配卡顿direct-reclaim-latency">假设 B：Direct Reclaim 延迟与分配卡顿（Direct Reclaim Latency）</h4>
+<blockquote>
+<p>🧪 <strong>假设</strong>: 大量进程因 direct reclaim 而 stall，导致分配超时、内存分配全面堵塞</p>
+</blockquote>
+<p><strong>证据收集与验证：</strong></p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>检查项</th>
+<th>操作（基于诊断数据）</th>
+<th>结论</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>allocstall_normal</td>
+<td>2,400 次</td>
+<td><span class="badge-ok">✅ 严重</span></td>
+</tr>
+<tr>
+<td>allocstall_movable</td>
+<td>4,666 次</td>
+<td><span class="badge-ok">✅ 非常严重</span></td>
+</tr>
+<tr>
+<td>pgscan_direct</td>
+<td>2,445,150 页</td>
+<td><span class="badge-ok">✅ 直接回收海量扫描</span></td>
+</tr>
+<tr>
+<td>pgsteal_direct</td>
+<td>仅 349,083 页</td>
+<td><span class="badge-warn">⚠️ 回收率仅 14%</span></td>
+</tr>
+<tr>
+<td>PSI some total</td>
+<td>3,690,070</td>
+<td><span class="badge-ok">✅ 累计压力极大</span></td>
+</tr>
+<tr>
+<td>PSI full total</td>
+<td>3,656,733</td>
+<td><span class="badge-ok">✅ 进程长时间 stall</span></td>
+</tr>
+</tbody></table></div>
+<p><strong>推理链路</strong>:</p>
+<ul>
+<li>7,066 次 direct reclaim stall 表明大量内存分配请求无法直接从 buddy 系统获取页面。</li>
+<li>直接扫描 2.4M 页却只回收 349K 页（回收率 14%）→ 大量扫描未产生有效回收。</li>
+<li>原因：被扫描的绝大多数页面是 <code>fault_reclaim_s</code> 的匿名页（pgscan_anon=9,804,683），但这些页面在 OOM kill 之前并未大量释放（被 active 引用）。</li>
+</ul>
+<p><strong>✅ 确认子因子：direct reclaim 广泛发生、效率极低，是故障的症状而非根因。当回收率不足 15% 时，OOM killer 几乎是必然结局。</strong></p>
+<hr>
+<h4 id="h-假设-c脏页回写风暴dirty-writeback-storm">假设 C：脏页回写风暴（Dirty Writeback Storm）</h4>
+<blockquote>
+<p>🧪 <strong>假设</strong>: 大量脏页积压 → writeback 占满 IO → 页面回收卡在等待回写完成</p>
+</blockquote>
+<p><strong>证据收集与验证：</strong></p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>检查项</th>
+<th>操作（基于诊断数据）</th>
+<th>结论</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Dirty (当前)</td>
+<td>192 kB</td>
+<td><span class="badge-err">❌ 极少量</span></td>
+</tr>
+<tr>
+<td>Writeback (当前)</td>
+<td>0</td>
+<td><span class="badge-err">❌ 无回写</span></td>
+</tr>
+<tr>
+<td>pgscan_file</td>
+<td>532,215 页</td>
+<td><span class="badge-err">❌ 文件页扫描仅占 5% 总量</span></td>
+</tr>
+<tr>
+<td>pgsteal_file</td>
+<td>310,295 页</td>
+<td><span class="badge-err">❌ 文件页回收很少</span></td>
+</tr>
+<tr>
+<td>页类型占比</td>
+<td>anon:98% vs file:2%</td>
+<td><span class="badge-err">❌ 压力集中在匿名页，非文件页</span></td>
+</tr>
+</tbody></table></div>
+<p><strong>推理链路</strong>:</p>
+<ul>
+<li>回收压力集中在匿名页（pgscan_anon=9.8M vs pgscan_file=0.53M），文件页回写不是瓶颈。</li>
+<li>当前 Dirty 极低（192KB），Writeback=0，故障期间也未见脏页爆发迹象（文件页扫描才 0.5M 页）。</li>
+<li>压力测试工具 <code>fault_reclaim_s</code> 主要分配匿名映射（mmap MAP_ANONYMOUS），不涉及文件脏页。</li>
+</ul>
+<p><strong>❌ 排除</strong>：脏页回写风暴不是本次故障的贡献因素。回收风暴是匿名页驱动，与文件页回写无关。</p>
+<hr>
+<h4 id="h-假设-dpage-cache-过度使用-缓存膨胀page-cache-overuse">假设 D：Page Cache 过度使用 / 缓存膨胀（Page Cache Overuse）</h4>
+<blockquote>
+<p>🧪 <strong>假设</strong>: page cache 占用过多内存 → 压缩了可用匿名页空间 → 加剧回收压力</p>
+</blockquote>
+<p><strong>证据收集与验证：</strong></p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>检查项</th>
+<th>操作（基于诊断数据）</th>
+<th>结论</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Cached (当前)</td>
+<td>231,624 kB (~226MB)</td>
+<td><span class="badge-err">❌ 正常水平</span></td>
+</tr>
+<tr>
+<td>Active(file)</td>
+<td>56,396 kB (~55MB)</td>
+<td><span class="badge-err">❌ 正常</span></td>
+</tr>
+<tr>
+<td>Inactive(file)</td>
+<td>178,940 kB (~175MB)</td>
+<td><span class="badge-err">❌ 正常</span></td>
+</tr>
+<tr>
+<td>unevictable</td>
+<td>0</td>
+<td><span class="badge-err">❌ 无不回收页</span></td>
+</tr>
+<tr>
+<td>cgroup inactive_file</td>
+<td>8,351,744 字节 (~8MB)</td>
+<td><span class="badge-err">❌ 正常</span></td>
+</tr>
+<tr>
+<td>cgroup active_file</td>
+<td>5,816,320 字节 (~5.5MB)</td>
+<td><span class="badge-err">❌ 正常</span></td>
+</tr>
+</tbody></table></div>
+<p><strong>推理链路</strong>:</p>
+<ul>
+<li>无论当前（226MB cache）还是故障时（cgroup 统计仅 ~13.5MB 文件页），page cache 占比均微不足道。</li>
+<li>16GB 系统内存被 page tables 占据 6.4GB（40%），而非 page cache。</li>
+<li>主力压力来源于 <code>fault_reclaim_s</code> 匿名页分配，不是 page cache 膨胀导致。</li>
+</ul>
+<p><strong>❌ 排除</strong>：Page cache 占用正常，不是回收压力的来源。真正的物理内存吞噬者是 <strong>page tables</strong>，而非 page cache。</p>
+<hr>
+<h4 id="h-假设-edropcaches-人为触发-误操作dropcaches-misuse">假设 E：drop_caches 人为触发 / 误操作（drop_caches Misuse）</h4>
+<blockquote>
+<p>🧪 <strong>假设</strong>: 有人工执行 <code>echo 3 &gt; /proc/sys/vm/drop_caches</code> 或类似操作，强制清空 page cache → 触发大量 refault 和回收</p>
+</blockquote>
+<p><strong>证据收集与验证：</strong></p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>检查项</th>
+<th>操作（基于诊断数据）</th>
+<th>结论</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>workingset_refault_file</td>
+<td>444 次</td>
+<td><span class="badge-err">❌ 极低 refault</span></td>
+</tr>
+<tr>
+<td>workingset_refault_anon</td>
+<td>154 次</td>
+<td><span class="badge-err">❌ 极低 refault</span></td>
+</tr>
+<tr>
+<td>kswapd_high_wmark_hit_quickly</td>
+<td>22 次 — 但非典型 drop_caches 后模式</td>
+<td><span class="badge-err">❌ 不匹配</span></td>
+</tr>
+<tr>
+<td>Cached 仅 226MB</td>
+<td>已无 cache 可 drop</td>
+<td><span class="badge-err">❌ 当前无证据</span></td>
+</tr>
+<tr>
+<td>NR 压力集中于匿名页</td>
+<td>drop_caches 主要影响文件页</td>
+<td><span class="badge-err">❌ 不匹配</span></td>
+</tr>
+</tbody></table></div>
+<p><strong>推理链路</strong>:</p>
+<ul>
+<li>drop_caches 触发后，典型现象是：page cache 瞬间暴跌 → 后续访问大量 refault（refault 计数器显著升高）。但这里 refault 值极低（444 file + 154 anon）。</li>
+<li>回收压力 98% 集中在匿名页，这与 drop_caches（作用于文件页）的行为不符。</li>
+<li>压力测试为明显预期行为（LTP/kernel selftests 风格），无人工误操作线索。</li>
+</ul>
+<p><strong>❌ 排除</strong>：drop_caches 误操作未在本故障中发生。</p>
+<hr>
+<h3 id="h-33-排查结论与逻辑树">3.3 排查结论与逻辑树</h3>
+<div class="code-block">
+  <span class="code-lang">text</span>
+  <button class="copy-btn" onclick="copyCode(this)" title="复制">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
+  </button>
+  <pre><code>mmap ENOMEM → 容器 OOM 系统回收风暴
+│
+├─► HYPOTHESIS C: 脏页回写风暴            → ❌ 排除（匿名页占 98%，无脏页/回写）
+├─► HYPOTHESIS D: Page Cache 过度使用     → ❌ 排除（cache 仅 226MB，非根因）
+├─► HYPOTHESIS E: drop_caches 误操作      → ❌ 排除（refault 极低，压力在匿名页）
+│
+├─► HYPOTHESIS A: kswapd 水位震荡          → ✅ 确认（高水位命中 22 次，thrashing 模式）
+│       └─► 但此为中间传导，非根因
+│
+├─► HYPOTHESIS B: Direct Reclaim 低效      → ✅ 确认（7K+ stall，回收率 &lt;15%）
+│       └─► 此为故障症状，非根因
+│
+└─► 🎯 根因确认（双重触发）
+        │
+        ├─► 【触因 1】容器 vm.max_map_count=5000
+        │       └─► Python PID 33 mmap 4.95GB 提前触达 VMA 上限 → ENOMEM
+        │       └─► 证据：当前值 5000（仅为默认 65530 的 7.6%）
+        │       └─► 证据：overcommit_memory=1（非 overcommit 导致）
+        │       └─► 置信度：🟡 中（故障进程已销毁，VMA 实时数据不可得）
+        │
+        └─► 【触因 2】fault_reclaim_s 异常分配 6.5TB 虚拟地址空间
+                └─► page tables 膨胀至 6.4GB（PTE × 860M 条目）
+                └─► 物理内存 40% 被页表吞噬
+                └─► allocstall 7,066 次 + pgscan 10.3M 页 → 回收率 23%
+                └─► 2 次 OOM killer 触发
+                └─► 置信度：🟢 高（dmesg OOM 日志、vmstat 数据明确）</code></pre>
+</div>
+<hr>
+<h2 id="h-四关键数据交叉验证">四、关键数据交叉验证</h2>
+<h3 id="h-mmap-enomem-层t2-证据">mmap ENOMEM 层（T2 证据）</h3>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>参数</th>
+<th>当前值</th>
+<th>内核默认值</th>
+<th>降幅</th>
+<th>风险</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>vm.max_map_count</code></td>
+<td>5,000</td>
+<td>65,530</td>
+<td>92.4% 缩减</td>
+<td>🔴 临界 — Java/Python 大量 mmap 极易触顶</td>
+</tr>
+<tr>
+<td><code>overcommit_memory</code></td>
+<td>1 (Always)</td>
+<td>0 (Heuristic)</td>
+<td>—</td>
+<td>🟢 非限制因素</td>
+</tr>
+<tr>
+<td><code>Committed_AS</code></td>
+<td>~2.2GB</td>
+<td>—</td>
+<td>—</td>
+<td>🟢 当前正常</td>
+</tr>
+</tbody></table></div>
+<h3 id="h-内存回收层t1-证据">内存回收层（T1 证据）</h3>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>计数器</th>
+<th>值</th>
+<th>物理含义</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>allocstall_normal + allocstall_movable</code></td>
+<td>7,066 次</td>
+<td>每次代表一次分配 stall，严重程度极高</td>
+</tr>
+<tr>
+<td><code>pgscan_direct</code></td>
+<td>2,445,150 页</td>
+<td>直接回收扫描 ~9.3GB，占整体扫描 24%</td>
+</tr>
+<tr>
+<td><code>pgscan_kswapd</code></td>
+<td>7,891,748 页</td>
+<td>kswapd 扫描 ~30GB</td>
+</tr>
+<tr>
+<td><code>pgsteal_total</code></td>
+<td>2,356,767 页</td>
+<td>回收 ~9GB，整体回收率 23%</td>
+</tr>
+<tr>
+<td><code>pgsteal_direct</code></td>
+<td>349,083 页</td>
+<td>直接回收仅 ~1.3GB，回收率 14%</td>
+</tr>
+<tr>
+<td><code>pgpgin / pgpgout</code></td>
+<td>4.9M / 31.5M 页</td>
+<td>大量换入换出（swap thrashing）</td>
+</tr>
+<tr>
+<td><code>pgmajfault</code></td>
+<td>40,198 次</td>
+<td>严重缺页中断激增</td>
+</tr>
+</tbody></table></div>
+<h3 id="h-oom-killer-层t1-证据">OOM Killer 层（T1 证据）</h3>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>事件</th>
+<th>时间 (UTC)</th>
+<th>PID</th>
+<th>total-vm</th>
+<th>pgtables</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>1st OOM</td>
+<td>2026-05-25 14:34:44</td>
+<td>20893</td>
+<td>6,556,265,176 kB (~6.5TB)</td>
+<td>6,427,712 kB (~6.1GB)</td>
+</tr>
+<tr>
+<td>2nd OOM</td>
+<td>2026-05-25 14:39:51</td>
+<td>21383</td>
+<td>6,538,320,600 kB (~6.5TB)</td>
+<td>6,410,112 kB (~6.1GB)</td>
+</tr>
+</tbody></table></div>
+<hr>
+<h2 id="h-五修复方案">五、修复方案</h2>
+<h3 id="h-51-应急处置">5.1 应急处置</h3>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>步骤</th>
+<th>操作</th>
+<th>执行人</th>
+<th>时间</th>
+<th>效果</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>1</td>
+<td>OOM killer 自动触发，已杀死异常进程</td>
+<td>内核</td>
+<td>14:34 / 14:39 UTC</td>
+<td>短期恢复</td>
+</tr>
+<tr>
+<td>2</td>
+<td>容器自动/手动重启（当前仅剩 PID 1: sleep）</td>
+<td>编排系统/人工</td>
+<td>14:40+ UTC</td>
+<td>故障已消退</td>
+</tr>
+<tr>
+<td>3</td>
+<td>当前状态确认：MemFree=14.4GB, Cached=226MB, PageTables=6.5MB</td>
+<td>人工</td>
+<td>22:40 UTC</td>
+<td><span class="badge-ok">✅ 系统正常</span></td>
+</tr>
+</tbody></table></div>
+<h3 id="h-52-永久修复计划">5.2 永久修复计划</h3>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>修复措施</th>
+<th>具体操作</th>
+<th>负责人</th>
+<th>优先级</th>
+<th>完成时间</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>提高 <code>vm.max_map_count</code></strong></td>
+<td>在容器 Dockerfile 或启动参数中设置 <code>--sysctl vm.max_map_count=262144</code>（或显式调至 65530+）</td>
+<td>容器平台团队</td>
+<td>P0</td>
+<td>尽快</td>
+</tr>
+<tr>
+<td><strong>约束容器内存上限</strong></td>
+<td>设置 <code>memory.max</code> 为合理值（如 8GB～12GB），避免单容器耗尽全局 Buddy 内存池</td>
+<td>容器平台团队</td>
+<td>P1</td>
+<td>尽快</td>
+</tr>
+<tr>
+<td><strong>修复压力测试工具</strong></td>
+<td><code>fault_reclaim_s</code> 分配 6.5TB 虚拟地址空间属异常行为，应修复为合理范围分配（如 &lt;64GB 虚拟地址）</td>
+<td>测试开发团队</td>
+<td>P1</td>
+<td>下个迭代</td>
+</tr>
+<tr>
+<td><strong>内核参数持久化</strong></td>
+<td><code>/etc/sysctl.d/99-override.conf</code> 中添加 <code>vm.max_map_count=262144</code>，cgroup namespace 不覆写此值</td>
+<td>基础架构团队</td>
+<td>P1</td>
+<td>下个迭代</td>
+</tr>
+<tr>
+<td><strong>监控告警增强</strong></td>
+<td>增加 page tables 使用率监控（&gt;1GB 告警）、allocstall 计数监控（&gt;100/min 告警）</td>
+<td>监控团队</td>
+<td>P2</td>
+<td>下个迭代</td>
+</tr>
+</tbody></table></div>
+<h3 id="h-53-恢复脚本参考">5.3 恢复脚本参考</h3>
+<p>如需在运行中修改容器 sysctl 参数（以 Docker 为例）：</p>
+<div class="code-block">
+  <span class="code-lang">bash</span>
+  <button class="copy-btn" onclick="copyCode(this)" title="复制">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
+  </button>
+  <pre><code># 方式一：容器启动时设置
+docker run --sysctl vm.max_map_count=262144 ...
+
+# 方式二：已有容器（需重启）
+docker update --sysctl vm.max_map_count=262144 pcr-witty
+docker restart pcr-witty</code></pre>
+</div>
+<hr>
+<p><strong>报告生成于</strong>: 2026-05-25 22:40:00 UTC
+<strong>数据来源</strong>:</p>
+<ul>
+<li>[<code>G:\witty-diagnosis-agent\dayu\report\kuafu_T1_20260525_224030_oom_reclaim.md</code>]</li>
+<li>[<code>G:\witty-diagnosis-agent\dayu\report\kuafu_T2_20260525_224030_mmap_enomem.md</code>]</li>
+</ul>
+
+    <div class="meta">
+      <span class="meta-source">容器pcr-witty_mmap_ENOMEM_OOM回收风暴_20260525_224030_report.md</span>
+      <span>生成于 2026/05/25 22:46</span>
+    </div>
+  </article>
+</div>
+
+<script>
+  /* ── 滚动进度条 ── */
+  window.addEventListener("scroll", () => {
+    const el  = document.documentElement;
+    const pct = el.scrollTop / (el.scrollHeight - el.clientHeight) * 100;
+    document.getElementById("progress").style.width = Math.min(pct, 100) + "%";
+  });
+
+  /* ── TOC 高亮当前章节 ── */
+  (function () {
+    const headings = Array.from(document.querySelectorAll("article h1,article h2,article h3"));
+    const links    = Array.from(document.querySelectorAll(".toc a"));
+    if (!links.length) return;
+    const obs = new IntersectionObserver(entries => {
+      entries.forEach(e => {
+        if (!e.isIntersecting) return;
+        links.forEach(l => l.classList.remove("active"));
+        const a = links.find(l => l.getAttribute("href") === "#" + e.target.id);
+        if (a) a.classList.add("active");
+      });
+    }, { rootMargin: "-10% 0px -80% 0px" });
+    headings.forEach(h => obs.observe(h));
+  })();
+
+  /* ── h2 章节序号自动计数 ── */
+  (function () {
+    let idx = 0;
+    document.querySelectorAll("article h2").forEach(el => {
+      idx++;
+      el.setAttribute("data-index", String(idx).padStart(2, "0"));
+    });
+  })();
+
+  /* ── 代码块一键复制 ── */
+  function copyCode(btn) {
+    const code = btn.closest(".code-block").querySelector("code").innerText;
+    navigator.clipboard.writeText(code).then(() => {
+      btn.classList.add("copied");
+      btn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>';
+      setTimeout(() => {
+        btn.classList.remove("copied");
+        btn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>';
+      }, 2000);
+    });
+  }
+
+  /* ── 目录树收缩/展开 ── */
+  function toggleToc(btn) {
+    const expanded = btn.getAttribute("aria-expanded") === "true";
+    btn.setAttribute("aria-expanded", String(!expanded));
+    const parentItem = btn.closest(".toc-item");
+    let nextEl = parentItem.nextElementSibling;
+    if (nextEl && nextEl.classList.contains("toc-group")) {
+      if (expanded) {
+        nextEl.style.maxHeight = nextEl.scrollHeight + "px";
+        void nextEl.offsetHeight;
+        nextEl.classList.add("collapsed");
+      } else {
+        nextEl.classList.remove("collapsed");
+        nextEl.style.maxHeight = nextEl.scrollHeight + "px";
+        setTimeout(() => {
+          if (!nextEl.classList.contains("collapsed")) {
+            nextEl.style.maxHeight = "none";
+          }
+        }, 300);
+      }
+    }
+  }
+</script>
+</body>
+</html>
