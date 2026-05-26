@@ -60,8 +60,20 @@ echo "  SigCgt (16 进制): ${sigcgt_hex}"
 # 将 16 进制转换为 10 进制，检查 SIGPIPE(13) bit
 # bit position for SIGPIPE = 13 - 1 = 12
 # 在掩码中，bit 0 对应 SIG1，bit 12 对应 SIG13
-sigign_dec=$((16#${sigign_hex} 2>/dev/null || true))
-sigcgt_dec=$((16#${sigcgt_hex} 2>/dev/null || true))
+
+# 取最后 8 字符（低 32 位，SIGPIPE 在第 13 位完全覆盖）
+sigign_trim=${sigign_hex: -8}
+sigcgt_trim=${sigcgt_hex: -8}
+
+# 去除前导零避免 bash 解析大数问题（但保留 0 的情况）
+sigign_trim=${sigign_trim##+(0)}
+sigcgt_trim=${sigcgt_trim##+(0)}
+sigign_trim=${sigign_trim:-0}
+sigcgt_trim=${sigcgt_trim:-0}
+
+# 转换为十进制（trim 后的值在 32 位范围内）
+sigign_dec=$((16#${sigign_trim}))
+sigcgt_dec=$((16#${sigcgt_trim}))
 
 sigpipe_ignored=$(( (sigign_dec >> 12) & 1 ))
 sigpipe_caught=$(( (sigcgt_dec >> 12) & 1 ))

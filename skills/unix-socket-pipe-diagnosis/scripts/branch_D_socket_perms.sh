@@ -89,19 +89,24 @@ echo "    不应为 other 可写（除非明确需要）"
 echo "    owner 应匹配运行服务的用户"
 echo ""
 
-while read -r sock; do
+while IFS= read -r sock; do
   if [[ -n "$sock" ]]; then
     perm=$(stat -c '%a' "$sock" 2>/dev/null || echo "0000")
     owner=$(stat -c '%U' "$sock" 2>/dev/null || echo "?")
-    # 检查权限是否过松
     world_writable=$(( 10#${perm} & 0002 ))
+    owner_readable=$(( 10#${perm} & 0400 ))
     if [[ $world_writable -ne 0 ]]; then
       echo "  ⚠ ${sock} 权限 ${perm} 对其他用户可写（不安全）"
+    elif [[ $owner_readable -eq 0 ]] && { [[ $perm = 0000 ]] || [[ $perm = 0 ]]; }; then
+      echo "  ⚠ ${sock} 权限 ${perm} 完全无权限（无法连接或通信）"
+    elif [[ $owner_readable -eq 0 ]]; then
+      echo "  ⚠ ${sock} 权限 ${perm} owner 无读写权（可能过于严格）"
     else
       echo "  OK ${sock} 权限 ${perm} 所有者 ${owner}"
     fi
   fi
-done < "${OUT_DIR}/socket_files.txt" | tee "${OUT_DIR}/perm_audit.txt"
+done < "${OUT_DIR}/socket_files.txt" > "${OUT_DIR}/perm_audit_raw.txt"
+cat "${OUT_DIR}/perm_audit_raw.txt" | tee "${OUT_DIR}/perm_audit.txt"
 
 # D6. 结论
 echo ""

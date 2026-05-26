@@ -98,11 +98,12 @@ echo "  -----------------------------------------------------"
 
 sampled_data=()
 for i in 1 2 3; do
+  ts=$(date +%T)
   if command -v lsof &>/dev/null; then
     total=$(lsof -p "${TARGET_PID}" 2>/dev/null | wc -l)
     u=$(lsof -p "${TARGET_PID}" 2>/dev/null | grep -c "unix" || true)
     a=$(lsof -p "${TARGET_PID}" 2>/dev/null | grep -c "anon_inode" || true)
-    p=$(lsof -p "${TARGET_PID}" 2>/dev/null | grep -c "FIFO\|pipe" || true)
+    p=$(lsof -p "${TARGET_PID}" 2>/dev/null | grep -c "FIFO\\|pipe" || true)
   else
     total=$(ls -1 "/proc/${TARGET_PID}/fd" 2>/dev/null | wc -l)
     u=$(grep -c "socket:" "/proc/${TARGET_PID}/fd" 2>/dev/null || true)

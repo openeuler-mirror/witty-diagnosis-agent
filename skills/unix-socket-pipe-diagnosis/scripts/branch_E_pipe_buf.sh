@@ -4,7 +4,7 @@
 # 用途：管道缓冲区满诊断
 # 使用：bash branch_E_pipe_buf.sh [target_pid]
 # 参数：
-#   $1  目标 PID（可选；不指定则全系统检测 D 状态写阻塞）
+#   $1  目标 PID（可选；不指定则全系统检测 pipe 写阻塞）
 # =============================================================================
 
 set -euo pipefail
@@ -14,7 +14,7 @@ TARGET_PID="${1:-}"
 if [[ "${1:-}" == "--help" ]] || [[ "${1:-}" == "-h" ]]; then
   echo "用途：管道缓冲区满诊断"
   echo "使用：bash $0 [target_pid]"
-  echo "  target_pid: 目标 PID（可选；不指定则全系统检测 D 状态写阻塞）"
+  echo "  target_pid: 目标 PID（可选；不指定则全系统检测 pipe 写阻塞）"
   exit 0
 fi
 
@@ -100,32 +100,36 @@ elif [[ -n "$TARGET_PID" ]]; then
   done | tee "${OUT_DIR}/pipe_buffer_sizes.txt"
 fi
 
-# E5. 查找 D 状态写阻塞进程
+# E5. 查找 pipe 写阻塞进程（D 状态或 S 状态 + pipe_write wchan）
 echo ""
-echo "【E5】D 状态进程检测（可能 pipe 写阻塞）"
+echo "【E5】pipe 写阻塞进程检测"
 echo "------------------------------------------------------------------"
 if command -v ps &>/dev/null; then
-  ps -eo pid,stat,wchan:32,comm 2>/dev/null | grep '^ *[0-9]\+ D' | tee "${OUT_DIR}/d_state_processes.txt"
-  d_count=$(wc -l < "${OUT_DIR}/d_state_processes.txt" 2>/dev/null || true)
-  echo ""
-  echo "  D 状态进程总数: ${d_count}"
+  # 先找所有 D 状态进程
+  ps -eo pid,stat,wchan:32,comm 2>/dev/null | grep '^ *[0-9]\+ D' > "${OUT_DIR}/all_blocked_procs.txt" || true
+  # 再找所有 wchan 包含 pipe 的进程（无论状态）
+  ps -eo pid,stat,wchan:32,comm 2>/dev/null | grep -i 'pipe' >> "${OUT_DIR}/all_blocked_procs.txt" || true
+  # 去重
+  sort -u "${OUT_DIR}/all_blocked_procs.txt" -o "${OUT_DIR}/all_blocked_procs.txt" 2>/dev/null || true
+
+  # 挑出 pipe 相关阻塞
+  grep -E 'pipe_wait|pipe_write|pipe_read' "${OUT_DIR}/all_blocked_procs.txt" 2>/dev/null > "${OUT_DIR}/pipe_blocked_procs.txt" || true
+  pipe_count=$(wc -l < "${OUT_DIR}/pipe_blocked_procs.txt" 2>/dev/null || true)
+  echo "  pipe 阻塞进程数: ${pipe_count}"
 fi
 
-# E6. 检查是否 pipe_wait
+# E6. pipe 阻塞详情
 echo ""
-echo "【E6】pipe_wait 阻塞检查"
+echo "【E6】pipe 阻塞详情"
 echo "------------------------------------------------------------------"
-while read -r line; do
-  d_pid=$(echo "$line" | awk '{print $1}')
-  if [[ -n "$d_pid" ]] && [[ -f "/proc/${d_pid}/wchan" ]]; then
-    wchan=$(cat "/proc/${d_pid}/wchan" 2>/dev/null || echo "?")
-    if [[ "$wchan" == *"pipe"* ]] || [[ "$wchan" == *"wait"* ]]; then
-      echo "  ⚠ PID ${d_pid} (D 状态) 阻塞在: ${wchan} —— 疑似 pipe 写阻塞"
-    else
-      echo "  PID ${d_pid} wchan: ${wchan}（非 pipe 阻塞）"
-    fi
+while IFS= read -r line; do
+  p_pid=$(echo "$line" | awk '{print $1}')
+  if [[ -n "$p_pid" ]] && [[ -f "/proc/${p_pid}/wchan" ]]; then
+    wchan=$(cat "/proc/${p_pid}/wchan" 2>/dev/null || echo "?")
+    pstat=$(echo "$line" | awk '{print $2}')
+    echo "  ⚠ PID ${p_pid} (状态 ${pstat}) 阻塞在: ${wchan} —— 疑似 pipe 写阻塞"
   fi
-done < "${OUT_DIR}/d_state_processes.txt" 2>/dev/null | tee "${OUT_DIR}/pipe_wait_check.txt"
+done < "${OUT_DIR}/pipe_blocked_procs.txt" 2>/dev/null | tee "${OUT_DIR}/pipe_wait_check.txt"
 
 # E7. 结论
 echo ""
@@ -133,14 +137,13 @@ echo "=================================================================="
 echo " 分支E 诊断结论"
 echo "=================================================================="
 
-pipe_blocked=$(grep -c "⚠" "${OUT_DIR}/pipe_wait_check.txt" 2>/dev/null || true)
+pipe_blocked=$(wc -l < "${OUT_DIR}/pipe_wait_check.txt" 2>/dev/null || true)
 
 cat << EOF
   pipe-max-size: $(cat /proc/sys/fs/pipe-max-size 2>/dev/null || echo 'N/A')
-  D 状态进程数: ${d_count:-0}
-  pipe_wait 阻塞进程数: ${pipe_blocked}
+  pipe 阻塞进程数: ${pipe_blocked}
 
-  结论: $( [[ $pipe_blocked -gt 0 ]] && echo "⚠ 检测到 pipe 写阻塞进程，建议："
+  结论: $( [[ ${pipe_blocked} -gt 0 ]] && echo "⚠ 检测到 pipe 写阻塞进程，建议："
   echo "    - 增大 pipe-max-size: echo N > /proc/sys/fs/pipe-max-size"
   echo "    - 检查读端进程是否已退出或处理过慢"
   echo "    - 考虑使用 socketpair 替代 pipe" || echo "无 pipe 写阻塞迹象" )
