@@ -1,0 +1,1138 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>故障诊断报告：容器 pcr-pc Page Cache 过度膨胀分析</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Lora:ital,wght@0,400;0,600;1,400&family=Source+Sans+3:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  /* ── Design tokens ─────────────────────────────────────────────────────── */
+  :root {
+    --bg:          #f8f7f4;
+    --surface:     #ffffff;
+    --border:      #e8e5df;
+    --border-soft: #f0ede8;
+
+    --text:        #1c1917;
+    --text-2:      #57534e;
+    --text-3:      #a8a29e;
+
+    --accent:      #1d4e6e;
+    --accent-light:#e8f1f7;
+    --accent-mid:  #3b82a0;
+
+    --red:         #c0392b;
+    --red-bg:      #fef2f2;
+    --amber:       #92400e;
+    --amber-bg:    #fffbeb;
+    --green:       #14532d;
+    --green-bg:    #f0fdf4;
+
+    --code-bg:     #1a1d27;
+    --code-text:   #cdd6f4;
+    --code-border: #2d3148;
+
+    --font-body: "Source Sans 3", "PingFang SC", "Hiragino Sans GB", sans-serif;
+    --font-head: "Lora", "PingFang SC", Georgia, serif;
+    --font-mono: "JetBrains Mono", "Fira Code", Consolas, monospace;
+
+    --radius:    8px;
+    --radius-lg: 12px;
+    --shadow:    0 1px 3px rgba(0,0,0,.06), 0 4px 16px rgba(0,0,0,.05);
+    --shadow-lg: 0 2px 8px rgba(0,0,0,.07), 0 8px 32px rgba(0,0,0,.06);
+
+    --toc-width:   240px;
+    --gap:         32px;
+  }
+
+  /* ── Progress bar ──────────────────────────────────────────────────────── */
+  #progress {
+    position: fixed; top: 0; left: 0; height: 3px; width: 0%;
+    background: linear-gradient(90deg, var(--accent-mid), var(--accent));
+    z-index: 999; transition: width .1s linear;
+    border-radius: 0 2px 2px 0;
+  }
+
+  /* ── Base ──────────────────────────────────────────────────────────────── */
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  html { font-size: 16px; scroll-behavior: smooth; }
+  body {
+    font-family: var(--font-body);
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.8;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* ── Layout ────────────────────────────────────────────────────────────── */
+  .layout {
+    display: flex;
+    align-items: flex-start;
+    max-width: calc(var(--toc-width) + 820px + var(--gap) * 3);
+    margin: 0 auto;
+    padding: 48px var(--gap) 96px;
+    gap: var(--gap);
+  }
+
+  /* ── TOC ───────────────────────────────────────────────────────────────── */
+  .toc {
+    width: var(--toc-width);
+    flex-shrink: 0;
+    position: sticky;
+    top: 32px;
+    max-height: calc(100vh - 64px);
+    overflow-y: auto;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    padding: 20px;
+    box-shadow: var(--shadow);
+    scrollbar-width: thin;
+    scrollbar-color: var(--border) transparent;
+  }
+  .toc-title {
+    font-size: 10.5px;
+    font-weight: 600;
+    letter-spacing: .1em;
+    text-transform: uppercase;
+    color: var(--text-3);
+    margin-bottom: 12px;
+    padding-bottom: 10px;
+    border-bottom: 1px solid var(--border-soft);
+  }
+  .toc-item {
+    display: flex;
+    align-items: flex-start;
+    margin: 2px 0;
+  }
+  .toc-toggle {
+    background: none;
+    border: none;
+    cursor: pointer;
+    color: var(--text-3);
+    padding: 4px;
+    margin-right: 4px;
+    margin-top: 2px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 4px;
+    transition: background 0.2s, transform 0.2s;
+  }
+  .toc-toggle:hover { background: var(--border-soft); color: var(--text); }
+  .toc-toggle[aria-expanded="false"] svg { transform: rotate(-90deg); }
+  .toc-spacer { width: 20px; flex-shrink: 0; }
+  .toc-group { overflow: hidden; transition: max-height 0.3s ease-in-out; }
+  .toc-group.collapsed { max-height: 0 !important; }
+  
+  .toc a {
+    display: block;
+    font-size: 13px;
+    color: var(--text-2);
+    text-decoration: none;
+    padding: 4px 8px;
+    border-radius: 5px;
+    line-height: 1.45;
+    transition: background .15s, color .15s;
+    word-break: break-all;
+    flex-grow: 1;
+  }
+  .toc a:hover  { background: var(--accent-light); color: var(--accent); }
+  .toc a.active { background: var(--accent-light); color: var(--accent); font-weight: 500; }
+  .toc-l1 { font-weight: 600; color: var(--text); }
+  .toc-l2 { font-weight: 600; color: var(--text); }
+  .toc-l3 { font-size: 12px !important; padding-left: 14px !important; }
+
+  /* ── Article card ──────────────────────────────────────────────────────── */
+  .article {
+    flex: 1; min-width: 0;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    padding: 52px 60px;
+    box-shadow: var(--shadow-lg);
+  }
+
+  /* ── Headings ──────────────────────────────────────────────────────────── */
+  .title-container {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-end;
+    margin: 0 0 28px;
+    padding-bottom: 18px;
+    border-bottom: 2px solid var(--text);
+  }
+  .article h1 {
+    font-family: var(--font-head);
+    font-size: 26px; font-weight: 600; line-height: 1.3;
+    margin: 0; padding-bottom: 0;
+    border-bottom: none;
+  }
+  .article h2 {
+    font-family: var(--font-head);
+    font-size: 19px; font-weight: 600;
+    margin: 48px 0 14px; padding-bottom: 8px;
+    border-bottom: 1px solid var(--border);
+  }
+  .article h2::before {
+    content: attr(data-index);
+    display: inline-block;
+    font-family: var(--font-mono);
+    font-size: 10.5px; font-weight: 500;
+    color: var(--accent-mid);
+    background: var(--accent-light);
+    padding: 1px 7px; border-radius: 4px;
+    margin-right: 10px; vertical-align: middle;
+    letter-spacing: .05em;
+  }
+  .article h3 {
+    font-family: var(--font-head);
+    font-size: 15.5px; font-weight: 600;
+    margin: 28px 0 10px;
+  }
+  .article h3::before {
+    content: "§ ";
+    color: var(--text-3);
+    font-family: var(--font-mono); font-size: 13px;
+  }
+  .article h4 {
+    font-size: 13.5px; font-weight: 600;
+    color: var(--accent); margin: 20px 0 8px;
+  }
+
+  /* ── Body text ─────────────────────────────────────────────────────────── */
+  .article p, .plain { 
+    font-size: 15px; 
+    line-height: 1.85; 
+    color: var(--text); 
+    margin: 0 0 12px; 
+    font-family: var(--font-body);
+  }
+  .article strong { font-weight: 600; }
+  .article em     { font-style: italic; color: var(--text-2); }
+  .article a {
+    color: var(--accent); text-decoration: underline;
+    text-decoration-color: var(--accent-light);
+    text-underline-offset: 3px;
+  }
+  .article a:hover { text-decoration-color: var(--accent); }
+  .article hr { border: none; border-top: 1px solid var(--border); margin: 20px 0; }
+  .article hr.heavy { border-top: 3px solid var(--text); margin: 32px 0; }
+
+  /* ── Blockquote ────────────────────────────────────────────────────────── */
+  .article blockquote {
+    border-left: 3px solid var(--accent-mid);
+    background: var(--accent-light);
+    margin: 20px 0; padding: 13px 20px 13px 20px;
+    border-radius: 0 var(--radius) var(--radius) 0;
+  }
+  .article blockquote p { font-size: 14.5px; color: var(--accent); margin: 0; line-height: 1.7; }
+  /* 支持块引用内部保留换行符（修复头部概要换行丢失问题） */
+  .article blockquote p { white-space: pre-wrap; }
+  .article blockquote strong { color: var(--accent); }
+
+  /* ── Lists ─────────────────────────────────────────────────────────────── */
+  .article ul, .article ol { padding-left: 22px; margin: 6px 0 14px; }
+  .article li { font-size: 15px; line-height: 1.8; margin: 4px 0; }
+  .article li::marker { color: var(--accent-mid); }
+  .article li > ul, .article li > ol { margin: 3px 0; }
+
+  /* ── Inline code ───────────────────────────────────────────────────────── */
+  .article :not(pre) > code {
+    font-family: var(--font-mono);
+    font-size: 12.5px; font-weight: 500;
+    background: #f3f0eb; color: var(--red);
+    padding: 1px 5px; border-radius: 4px;
+    border: 1px solid var(--border);
+  }
+
+  /* ── Code blocks ───────────────────────────────────────────────────────── */
+  .code-block {
+    position: relative; margin: 20px 0;
+    border-radius: var(--radius-lg); overflow: hidden;
+    border: 1px solid var(--code-border);
+    box-shadow: 0 4px 20px rgba(0,0,0,.16);
+  }
+  .code-lang {
+    position: absolute; top: 0; left: 0;
+    font-family: var(--font-mono); font-size: 10px; font-weight: 500;
+    color: #7c8db5; background: #222538;
+    padding: 4px 12px; border-bottom-right-radius: 6px;
+    text-transform: uppercase; letter-spacing: .08em;
+    user-select: none;
+  }
+  .copy-btn {
+    position: absolute; top: 8px; right: 10px;
+    background: #2d3148; border: 1px solid #3d4260;
+    border-radius: 5px; color: #7c8db5; cursor: pointer;
+    padding: 5px 8px; display: flex; align-items: center;
+    transition: background .15s, color .15s; z-index: 1;
+  }
+  .copy-btn:hover  { background: #3a3f60; color: #cdd6f4; }
+  .copy-btn.copied { color: #a6e3a1; border-color: #4a6a4a; }
+  .code-block pre {
+    margin: 0; padding: 36px 20px 20px;
+    background: var(--code-bg); overflow-x: auto;
+    scrollbar-width: thin; scrollbar-color: #3d4260 transparent;
+  }
+  .code-block pre::-webkit-scrollbar { height: 5px; }
+  .code-block pre::-webkit-scrollbar-thumb { background: #3d4260; border-radius: 3px; }
+  .code-block code {
+    font-family: var(--font-mono); font-size: 13px; line-height: 1.7;
+    color: var(--code-text); background: none; border: none; padding: 0;
+    white-space: pre; word-break: normal;
+  }
+
+  /* ── Tables ────────────────────────────────────────────────────────────── */
+  .table-wrap {
+    overflow-x: auto; margin: 16px 0;
+    border-radius: var(--radius-lg);
+    border: 1px solid var(--border);
+    box-shadow: var(--shadow);
+  }
+  table { width: 100%; border-collapse: collapse; font-size: 14px; min-width: 360px; }
+  thead { background: #f4f2ee; }
+  th {
+    padding: 9px 14px; text-align: left;
+    font-size: 11.5px; font-weight: 600;
+    letter-spacing: .04em; text-transform: uppercase;
+    color: var(--text-2); border-bottom: 1px solid var(--border);
+    white-space: nowrap;
+  }
+  td {
+    padding: 8px 14px; border-bottom: 1px solid var(--border-soft);
+    color: var(--text); vertical-align: top; line-height: 1.6;
+  }
+  tbody tr:last-child td { border-bottom: none; }
+  tbody tr:nth-child(even) td { background: #faf9f7; }
+  tbody tr:hover td { background: var(--accent-light); transition: background .1s; }
+
+  /* ── KV block ──────────────────────────────────────────────────────────── */
+  .kv-block { background: var(--bg); border: 1px solid var(--border); border-radius: var(--radius-lg); overflow: hidden; margin: 12px 0 20px; }
+  .kv-row { display: flex; border-bottom: 1px solid var(--border-soft); align-items: flex-start; }
+  .kv-row:last-child { border-bottom: none; }
+  .kv-key { flex: 0 0 160px; padding: 9px 16px; font-size: 13.5px; font-weight: 600; color: var(--text-2); background: var(--surface); border-right: 1px solid var(--border-soft); }
+  .kv-val { flex: 1; padding: 9px 16px; font-size: 14px; color: var(--text); }
+
+  /* ── Status badges ─────────────────────────────────────────────────────── */
+  .badge-ok { display: inline-flex; align-items: center; gap: 4px; background: var(--green-bg); color: var(--green); font-size: 13px; font-weight: 500; padding: 2px 9px; border-radius: 20px; border: 1px solid #bbf7d0; }
+  .badge-err { display: inline-flex; align-items: center; gap: 4px; background: var(--red-bg); color: var(--red); font-size: 13px; font-weight: 500; padding: 2px 9px; border-radius: 20px; border: 1px solid #fecaca; }
+  .badge-warn { display: inline-flex; align-items: center; gap: 4px; background: var(--amber-bg); color: var(--amber); font-size: 13px; font-weight: 500; padding: 2px 9px; border-radius: 20px; border: 1px solid #fde68a; }
+
+  /* ── Priority badges ───────────────────────────────────────────────────── */
+  .pri-p0 { display: inline-block; background: #fef2f2; color: #991b1b; border: 1px solid #fca5a5; font-size: 12px; font-weight: 700; padding: 2px 8px; border-radius: 4px; letter-spacing: .04em; }
+  .pri-p1 { display: inline-block; background: #fff7ed; color: #9a3412; border: 1px solid #fdba74; font-size: 12px; font-weight: 700; padding: 2px 8px; border-radius: 4px; }
+  .pri-p2 { display: inline-block; background: #fffbeb; color: #92400e; border: 1px solid #fde68a; font-size: 12px; font-weight: 700; padding: 2px 8px; border-radius: 4px; }
+  .pri-p3 { display: inline-block; background: var(--accent-light); color: var(--accent); border: 1px solid #bfdbfe; font-size: 12px; font-weight: 700; padding: 2px 8px; border-radius: 4px; }
+
+  /* ── Fault header ──────────────────────────────────────────────────────── */
+  .fault-header { display: flex; align-items: center; gap: 12px; padding: 12px 16px; border-radius: var(--radius-lg); margin: 16px 0 8px; border: 1px solid; }
+  .fh-p0 { background: #fef2f2; border-color: #fca5a5; }
+  .fh-p1 { background: #fff7ed; border-color: #fdba74; }
+  .fh-p2 { background: #fffbeb; border-color: #fde68a; }
+  .fh-p3 { background: var(--accent-light); border-color: #bfdbfe; }
+  .fh-badge { font-family: var(--font-mono); font-size: 11px; font-weight: 700; letter-spacing: .08em; }
+  .fh-p0 .fh-badge { color: #991b1b; }
+  .fh-p1 .fh-badge { color: #9a3412; }
+  .fh-p2 .fh-badge { color: #92400e; }
+  .fh-p3 .fh-badge { color: var(--accent); }
+  .fh-rest { font-size: 14px; font-weight: 500; color: var(--text); }
+
+  /* ── Timeline ──────────────────────────────────────────────────────────── */
+  .timeline { border-left: 2px solid var(--accent-mid); margin: 16px 0 16px 8px; padding-left: 20px; }
+  .tl-row { display: flex; align-items: baseline; gap: 10px; margin: 8px 0; font-size: 13.5px; }
+  .tl-ts { font-family: var(--font-mono); font-size: 12px; color: var(--text-3); flex-shrink: 0; white-space: nowrap; }
+  .tl-tag { font-size: 11px; font-weight: 600; padding: 1px 7px; border-radius: 10px; flex-shrink: 0; background: var(--accent-light); color: var(--accent); }
+  .tl-tag.err { background: var(--red-bg); color: var(--red); }
+  .tl-tag.warn { background: var(--amber-bg); color: var(--amber); }
+  .tl-desc { color: var(--text); line-height: 1.5; }
+
+  /* ── Global warn ───────────────────────────────────────────────────────── */
+  .global-warn { background: #fef2f2; border: 1px solid #fca5a5; border-radius: var(--radius-lg); padding: 14px 18px; font-size: 14.5px; font-weight: 600; color: #991b1b; margin: 16px 0; }
+
+  /* ── Tree note ─────────────────────────────────────────────────────────── */
+  .tree-note { white-space: pre-wrap; font-family: var(--font-mono); font-size: 13.5px; line-height: 1.6; color: var(--text-2); margin: 8px 0 8px 16px; }
+
+  /* ── Disclaimer ────────────────────────────────────────────────────────── */
+  .disclaimer { background: var(--bg); border: 1px solid var(--border); border-radius: var(--radius); padding: 14px 18px; font-size: 13.5px; color: var(--text-2); font-style: italic; }
+
+  /* ── Meta footer ───────────────────────────────────────────────────────── */
+  .meta {
+    margin-top: 48px; padding-top: 16px;
+    border-top: 1px solid var(--border-soft);
+    display: flex; justify-content: space-between; align-items: center;
+    font-size: 12px; color: var(--text-3);
+  }
+  .meta-source { font-family: var(--font-mono); font-size: 11.5px; }
+
+  /* ── Brand logo ────────────────────────────────────────────────────────── */
+  .brand-logo {
+    font-family: var(--font-head);
+    font-size: 14px;
+    color: var(--text-3);
+    letter-spacing: 0.05em;
+    margin-bottom: 4px;
+    flex-shrink: 0;
+    margin-left: 16px;
+  }
+  .brand-logo strong {
+    font-weight: 600;
+    color: var(--accent);
+  }
+  @media (max-width: 900px) {
+    .title-container { flex-direction: column; align-items: flex-start; gap: 12px; }
+    .brand-logo { margin-left: 0; margin-bottom: 0; }
+  }
+  /* ── Print ─────────────────────────────────────────────────────────────── */
+  @media print {
+    body { background: white; }
+    #progress, .toc { display: none; }
+    .layout { display: block; padding: 0; }
+    .article { border: none; box-shadow: none; padding: 24px; }
+    .copy-btn { display: none; }
+    .brand-logo { margin-bottom: 0; }
+  }
+
+  /* ── Responsive ────────────────────────────────────────────────────────── */
+  @media (max-width: 900px) {
+    .toc { display: none; }
+    .article { padding: 36px 28px; }
+    .layout { padding: 24px 16px 64px; }
+  }
+  @media (max-width: 480px) {
+    .article { padding: 24px 18px; }
+    .article h1 { font-size: 22px; }
+  }
+</style>
+</head>
+<body>
+
+<div id="progress"></div>
+
+<div class="layout">
+  <nav class="toc" id="toc">
+  <div class="toc-title">目录</div>
+  <div class="toc-content">
+<div class="toc-item has-children"><button class="toc-toggle" onclick="toggleToc(this)" aria-expanded="true">
+                <svg viewBox="0 0 24 24" width="12" height="12" stroke="currentColor" stroke-width="2" fill="none"><polyline points="6 9 12 15 18 9"></polyline></svg>
+              </button><a href="#h-故障诊断报告容器-pcr-pc-page-cache-过度膨胀分析" onclick="event.preventDefault(); const target = document.getElementById('h-故障诊断报告容器-pcr-pc-page-cache-过度膨胀分析'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l1">🔴 故障诊断报告：容器 pcr-pc Page Cache 过度膨胀分析</a></div>
+<div class="toc-group" id="group-h-一故障概览">
+<div class="toc-item has-children"><button class="toc-toggle" onclick="toggleToc(this)" aria-expanded="true">
+                <svg viewBox="0 0 24 24" width="12" height="12" stroke="currentColor" stroke-width="2" fill="none"><polyline points="6 9 12 15 18 9"></polyline></svg>
+              </button><a href="#h-一故障概览" onclick="event.preventDefault(); const target = document.getElementById('h-一故障概览'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l2">一、故障概览</a></div>
+<div class="toc-group" id="group-h-置信度说明">
+<div class="toc-item "><span class="toc-spacer"></span><a href="#h-置信度说明" onclick="event.preventDefault(); const target = document.getElementById('h-置信度说明'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l3">置信度说明</a></div>
+</div>
+<div class="toc-item has-children"><button class="toc-toggle" onclick="toggleToc(this)" aria-expanded="true">
+                <svg viewBox="0 0 24 24" width="12" height="12" stroke="currentColor" stroke-width="2" fill="none"><polyline points="6 9 12 15 18 9"></polyline></svg>
+              </button><a href="#h-二根因速览" onclick="event.preventDefault(); const target = document.getElementById('h-二根因速览'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l2">二、根因速览</a></div>
+<div class="toc-group" id="group-h-事故时间线与故障传导链路">
+<div class="toc-item "><span class="toc-spacer"></span><a href="#h-事故时间线与故障传导链路" onclick="event.preventDefault(); const target = document.getElementById('h-事故时间线与故障传导链路'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l3">事故时间线与故障传导链路</a></div>
+<div class="toc-item "><span class="toc-spacer"></span><a href="#h-故障因果链" onclick="event.preventDefault(); const target = document.getElementById('h-故障因果链'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l3">故障因果链</a></div>
+</div>
+<div class="toc-item has-children"><button class="toc-toggle" onclick="toggleToc(this)" aria-expanded="true">
+                <svg viewBox="0 0 24 24" width="12" height="12" stroke="currentColor" stroke-width="2" fill="none"><polyline points="6 9 12 15 18 9"></polyline></svg>
+              </button><a href="#h-三排查过程" onclick="event.preventDefault(); const target = document.getElementById('h-三排查过程'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l2">三、排查过程</a></div>
+<div class="toc-group" id="group-h-31-初始现象">
+<div class="toc-item "><span class="toc-spacer"></span><a href="#h-31-初始现象" onclick="event.preventDefault(); const target = document.getElementById('h-31-初始现象'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l3">3.1 初始现象</a></div>
+<div class="toc-item "><span class="toc-spacer"></span><a href="#h-32-假设驱动排查" onclick="event.preventDefault(); const target = document.getElementById('h-32-假设驱动排查'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l3">3.2 假设驱动排查</a></div>
+<div class="toc-item "><span class="toc-spacer"></span><a href="#h-33-排查结论与逻辑树" onclick="event.preventDefault(); const target = document.getElementById('h-33-排查结论与逻辑树'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l3">3.3 排查结论与逻辑树</a></div>
+</div>
+<div class="toc-item "><span class="toc-spacer"></span><a href="#h-四排除假设汇总" onclick="event.preventDefault(); const target = document.getElementById('h-四排除假设汇总'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l2">四、排除假设汇总</a></div>
+<div class="toc-item has-children"><button class="toc-toggle" onclick="toggleToc(this)" aria-expanded="true">
+                <svg viewBox="0 0 24 24" width="12" height="12" stroke="currentColor" stroke-width="2" fill="none"><polyline points="6 9 12 15 18 9"></polyline></svg>
+              </button><a href="#h-五风险等级与置信度评估" onclick="event.preventDefault(); const target = document.getElementById('h-五风险等级与置信度评估'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l2">五、风险等级与置信度评估</a></div>
+<div class="toc-group" id="group-h-风险矩阵">
+<div class="toc-item "><span class="toc-spacer"></span><a href="#h-风险矩阵" onclick="event.preventDefault(); const target = document.getElementById('h-风险矩阵'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l3">风险矩阵</a></div>
+<div class="toc-item "><span class="toc-spacer"></span><a href="#h-根因置信度评估" onclick="event.preventDefault(); const target = document.getElementById('h-根因置信度评估'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l3">根因置信度评估</a></div>
+</div>
+<div class="toc-item has-children"><button class="toc-toggle" onclick="toggleToc(this)" aria-expanded="true">
+                <svg viewBox="0 0 24 24" width="12" height="12" stroke="currentColor" stroke-width="2" fill="none"><polyline points="6 9 12 15 18 9"></polyline></svg>
+              </button><a href="#h-六修复方案" onclick="event.preventDefault(); const target = document.getElementById('h-六修复方案'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l2">六、修复方案</a></div>
+<div class="toc-group" id="group-h-61-应急处置可选">
+<div class="toc-item "><span class="toc-spacer"></span><a href="#h-61-应急处置可选" onclick="event.preventDefault(); const target = document.getElementById('h-61-应急处置可选'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l3">6.1 应急处置（可选）</a></div>
+<div class="toc-item "><span class="toc-spacer"></span><a href="#h-62-永久修复计划" onclick="event.preventDefault(); const target = document.getElementById('h-62-永久修复计划'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l3">6.2 永久修复计划</a></div>
+<div class="toc-item "><span class="toc-spacer"></span><a href="#h-63-可选调优非紧急" onclick="event.preventDefault(); const target = document.getElementById('h-63-可选调优非紧急'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l3">6.3 可选调优（非紧急）</a></div>
+</div>
+</div>
+  </div>
+</nav>
+  <article class="article" id="article" style="position: relative;">
+    <div class="title-container"><h1 id="h-故障诊断报告容器-pcr-pc-page-cache-过度膨胀分析">🔴 故障诊断报告：容器 pcr-pc Page Cache 过度膨胀分析</h1><div class="brand-logo">by <strong>Witty Diagnosis Agent</strong></div></div>
+<blockquote>
+<p><strong>报告编号</strong>：RCA-20260525-001
+<strong>故障级别</strong>：P2（中等风险）
+<strong>报告时间</strong>：2026-05-25 23:37:25 UTC
+<strong>当前状态</strong>：🟡 观察中（当前无内存压力，但存在多处隐患）</p>
+</blockquote>
+<hr>
+<h2 id="h-一故障概览">一、故障概览</h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>项目</th>
+<th>内容</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>故障标题</td>
+<td>容器 pcr-pc Page Cache 过度膨胀至 8.7GB（54.6% MemTotal），99% 为冷缓存</td>
+</tr>
+<tr>
+<td>影响范围</td>
+<td>容器 pcr-pc（Docker 容器，运行于 WSL2 VM），宿主机可能因无 cgroup 限制受影响</td>
+</tr>
+<tr>
+<td>故障时段</td>
+<td>2026-05-25 15:13 UTC（容器启动）～ 持续观察中</td>
+</tr>
+<tr>
+<td>根本原因</td>
+<td><strong>三个大文件（4GB+2GB+2GB）被顺序读取触发内核 Page Cache 填充，同时容器无 cgroup 内存限制，且 vfs_cache_pressure=100（默认值）未主动回收冷缓存</strong></td>
+</tr>
+<tr>
+<td>是否恢复</td>
+<td><span class="badge-ok">✅ 当前已部分恢复（Cached 从 8.7GB 回落至 5.9GB），但根本原因未消除</span></td>
+</tr>
+<tr>
+<td>根因置信度</td>
+<td>🟢 高置信</td>
+</tr>
+</tbody></table></div>
+<h3 id="h-置信度说明">置信度说明</h3>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>等级</th>
+<th>标识</th>
+<th>含义</th>
+<th>示例场景</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>高置信</td>
+<td>🟢</td>
+<td>根因已明确，可复现，单一原因可解释所有现象</td>
+<td>fincore 确认 3 个大文件占缓存 98%，Active/Inactive=1:100，PSI=0</td>
+</tr>
+<tr>
+<td>中置信</td>
+<td>🟡</td>
+<td>根因基本确认，但存在 1～2 个无法完全解释的现象</td>
+<td>—</td>
+</tr>
+<tr>
+<td>低置信</td>
+<td>🟠</td>
+<td>有多个可疑原因，尚未排除竞争，结论为推断</td>
+<td>—</td>
+</tr>
+<tr>
+<td>未知</td>
+<td>🔴</td>
+<td>现象无法解释，根因未定位，仍在排查中</td>
+<td>—</td>
+</tr>
+</tbody></table></div>
+<hr>
+<h2 id="h-二根因速览">二、根因速览</h2>
+<h3 id="h-事故时间线与故障传导链路">事故时间线与故障传导链路</h3>
+<div class="code-block">
+  <span class="code-lang">text</span>
+  <button class="copy-btn" onclick="copyCode(this)" title="复制">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
+  </button>
+  <pre><code>时间（UTC）               事件                                                      性质          溯源路径
+──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+2026-05-25 ~15:13        容器 pcr-pc 启动（PID 1: sleep 3600）                          🟢 启动       [T1: 6.容器基本状态]
+    │
+    ▼
+2026-05-25 ~(未知)       测试文件创建：/tmp/pagecache_test (4GB) / pc2 (2GB) / pc3 (2GB)   📝 操作触发   [T1: 4.1 大文件缓存占用]
+    │                     并被顺序读取
+    ▼
+2026-05-25 ~(未知)       Page Cache 膨胀至峰值 8.7GB（Cached/MemTotal=54.6%）              🔴 指标告警   [用户原始报告]
+    │                     内核将文件页缓存至 Page Cache
+    │                     Inactive(file) 占比 99%+（一次读取后从未再访问）
+    ▼
+2026-05-25 ~(未知)       fault_reclaim_s 进程两次被宿主机 OOM killer 杀死                  🔴 宿主机OOM  [T3: 3.2 宿主机 OOM 事件]
+    │                     虚拟地址空间 6.25TB，页表开销 6.1GB（异常！）
+    │                     间隔约 5 分钟，可能反复拉起
+    │                     （此事件与 Page Cache 膨胀的关联性待确认）
+    ▼
+2026-05-25 23:37         Kuafu 诊断执行：
+                           - Cached 回落至 5.9GB（36.9% MemTotal）
+                           - PSI 所有窗口 = 0.00
+                           - mem.pressure = 0
+                           - kswapd 水线触发仅 22/4 次（历史累计）
+                           - Memory.current = 5.66GB（97.3% 为 Page Cache）                 🟡 观察中     [T1/T2/T3]
+                           - 无 cgroup OOM 事件
+                           - 无内存压力</code></pre>
+</div>
+<h3 id="h-故障因果链">故障因果链</h3>
+<div class="code-block">
+  <span class="code-lang">text</span>
+  <button class="copy-btn" onclick="copyCode(this)" title="复制">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
+  </button>
+  <pre><code>外部操作：三个大文件被顺序读取（/tmp/pagecache_test 4GB + pc2 2GB + pc3 2GB）
+    │
+    ├─► 内核 Page Cache 填充机制自动缓存文件页面
+    │       │
+    │       ├─► Cached 峰值达 8.7GB（占 MemTotal 54.6%）
+    │       │       │
+    │       │       ├─► fincore 确认 3 文件占缓存 98%（~5.5GB / 5.9GB）
+    │       │       │
+    │       │       └─► Active(file)=58MB / Inactive(file)=5,847MB（1:100）
+    │       │               └─► 全部为冷缓存，缺乏 locality
+    │       │
+    │       └─► 容器无 cgroup 内存限制（memory.max = max）
+    │               └─► Page Cache 无上限约束，可无限增长至宿主机内存耗尽
+    │
+    ├─► 内核回收机制未主动介入
+    │       │
+    │       ├─► vfs_cache_pressure=100（默认值）→ 对 dentry/inode 无偏向回收
+    │       ├─► swappiness=60（默认值）→ Page Cache 与匿名页回收优先级相当
+    │       └─► MemAvailable=14.4GB → 内核判定无回收必要
+    │
+    └─► 宿主机 OOM（fault_reclaim_s 进程）[需进一步调查]
+            │
+            ├─► 虚拟内存 6.25TB，RSS 8.4GB
+            ├─► 页表开销异常 6.1GB（正常应为 ~8MB）
+            └─► 与 Page Cache 膨胀可能独立，但共享同一宿主机内存资源</code></pre>
+</div>
+<hr>
+<h2 id="h-三排查过程">三、排查过程</h2>
+<h3 id="h-31-初始现象">3.1 初始现象</h3>
+<ul>
+<li><strong>用户报告指标</strong>：Cached = 8,726,280 kB（8.3GB，54.6% of MemTotal）</li>
+<li><strong>容器状态</strong>：pcr-pc，PID 1 为 <code>sleep 3600</code>（空闲容器），System Load = 0.01</li>
+<li><strong>影响</strong>：Page Cache 占比超过 MemTotal 一半，引发对内存压力和 OOM 风险的担忧</li>
+</ul>
+<hr>
+<h3 id="h-32-假设驱动排查">3.2 假设驱动排查</h3>
+<h4 id="h-假设-d1大文件读取导致-page-cache-增长-确认根因">假设 D1：大文件读取导致 Page Cache 增长 ✅ 确认根因</h4>
+<blockquote>
+<p>🧪 <strong>假设</strong>：容器内 <code>/tmp/</code> 下的大文件被顺序读取，触发了内核的 Page Cache 填充机制，导致缓存膨胀</p>
+</blockquote>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>检查项</th>
+<th>操作（基于真实诊断数据）</th>
+<th>结论</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Page Cache 总量确认</td>
+<td><code>cat /proc/meminfo</code> → Cached=5,906,152 kB（诊断时值）</td>
+<td><span class="badge-ok">✅ 确认 Cached 占 MemTotal 36.9%（峰值 54.6%）</span></td>
+</tr>
+<tr>
+<td>大文件缓存定位</td>
+<td><code>fincore</code> 扫描 <code>/tmp/pagecache_test</code>(4GB)、<code>pc2</code>(2GB)、<code>pc3</code>(2GB)</td>
+<td>✅ 3 文件缓存合计 ~5.5GB，占当前 Cached 的 <strong>98%</strong></td>
+</tr>
+<tr>
+<td>页面冷热状态</td>
+<td>Active(file)=58,356 kB / Inactive(file)=5,847,208 kB，比值 <strong>1:100</strong></td>
+<td><span class="badge-ok">✅ 99%+ 为冷缓存，仅被读取一次未被再次访问</span></td>
+</tr>
+<tr>
+<td>幽灵文件检测</td>
+<td><code>lsof +L1</code> 检查已删除但被 fd 持有的文件</td>
+<td><span class="badge-ok">✅ 无输出，不存在 deleted-but-open 问题</span></td>
+</tr>
+<tr>
+<td>Shmem 异常检测</td>
+<td>Shmem=2,700 kB（仅 2.6MB）</td>
+<td><span class="badge-ok">✅ 排除共享内存占用问题</span></td>
+</tr>
+</tbody></table></div>
+<p><strong>✅ 结论：三个测试文件的读取行为直接导致 Page Cache 膨胀。fincore 证实 98% 的缓存被这 3 个文件占据，属于典型的大文件顺序读取缓存场景。</strong></p>
+<hr>
+<h4 id="h-假设-d2vfscachepressure-设置过小导致缓存不回收-排除">假设 D2：vfs_cache_pressure 设置过小导致缓存不回收 ❌ 排除</h4>
+<blockquote>
+<p>🧪 <strong>假设</strong>：<code>vm.vfs_cache_pressure</code> 值偏低导致内核不愿意回收 dentry/inode 缓存</p>
+</blockquote>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>检查项</th>
+<th>操作（基于真实诊断数据）</th>
+<th>结论</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>当前值确认</td>
+<td><code>sysctl vm.vfs_cache_pressure</code> → <strong>100</strong>（默认值）</td>
+<td><span class="badge-ok">✅ 为系统默认值，无异常调优</span></td>
+</tr>
+<tr>
+<td>dentry 缓存量</td>
+<td>dentry slab = 34,146 obj × 192B = ~6.4 MB</td>
+<td><span class="badge-ok">✅ 极低，无膨胀</span></td>
+</tr>
+<tr>
+<td>ext4_inode 缓存量</td>
+<td>ext4_inode_cache = 3,309 obj × 1168B = ~3.7 MB</td>
+<td><span class="badge-ok">✅ 极低，无膨胀</span></td>
+</tr>
+<tr>
+<td>Slab 总占比</td>
+<td>Slab/MemTotal = 304MB / 15.99GB = <strong>1.90%</strong></td>
+<td><span class="badge-ok">✅ 无异常</span></td>
+</tr>
+</tbody></table></div>
+<p><strong>❌ 排除：vfs_cache_pressure=100 为默认值，且 dentry/inode 用量极低，不存在因该参数导致缓存不回收的问题。该假设不能解释 Page Cache 膨胀现象。</strong></p>
+<hr>
+<h4 id="h-假设-d3shmemtmpfs-过度使用导致内存占用-排除">假设 D3：shmem/tmpfs 过度使用导致内存占用 ❌ 排除</h4>
+<blockquote>
+<p>🧪 <strong>假设</strong>：共享内存（shmem）或 tmpfs 文件系统过度使用导致内存占用</p>
+</blockquote>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>检查项</th>
+<th>操作（基于真实诊断数据）</th>
+<th>结论</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Shmem 值确认</td>
+<td><code>/proc/meminfo</code> → Shmem=2,700 kB（~2.6MB）</td>
+<td><span class="badge-ok">✅ 极小，忽略不计</span></td>
+</tr>
+<tr>
+<td>tmpfs 挂载检查</td>
+<td><code>df -h</code> → tmpfs 64M, shm 64M 均未使用</td>
+<td><span class="badge-ok">✅ 无 tmpfs 溢出</span></td>
+</tr>
+<tr>
+<td>cgroup file_mapped</td>
+<td>cgroup memory.stat → file_mapped=32,768 bytes</td>
+<td><span class="badge-ok">✅ 映射文件页极少</span></td>
+</tr>
+</tbody></table></div>
+<p><strong>❌ 排除：Shmem 仅 2.6MB，tmpfs 挂载点无使用，共享内存和 tmpfs 对内存占用几乎无贡献。</strong></p>
+<hr>
+<h4 id="h-假设-d4应用-mmap-映射未释放导致缓存残留-排除">假设 D4：应用 mmap 映射未释放导致缓存残留 ❌ 排除</h4>
+<blockquote>
+<p>🧪 <strong>假设</strong>：应用程序通过 <code>mmap()</code> 映射大文件后未 <code>munmap()</code>，导致缓存页面被锁定</p>
+</blockquote>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>检查项</th>
+<th>操作（基于真实诊断数据）</th>
+<th>结论</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Mapped 值确认</td>
+<td><code>/proc/meminfo</code> → Mapped=128,772 kB（~126MB）</td>
+<td><span class="badge-ok">✅ 仅 126MB，远小于 5.9GB</span></td>
+</tr>
+<tr>
+<td>进程 RSS 检查</td>
+<td><code>ps aux</code> → PID 1 仅 RSS=1,536 kB</td>
+<td><span class="badge-ok">✅ 唯一进程几乎无内存占用</span></td>
+</tr>
+<tr>
+<td>幽灵文件检测</td>
+<td><code>lsof +L1</code> → 无输出</td>
+<td><span class="badge-ok">✅ 无进程持有已删除文件的映射</span></td>
+</tr>
+</tbody></table></div>
+<p><strong>❌ 排除：Mapped 内存仅 126MB，容器内仅运行 <code>sleep 3600</code>，不存在 mmap 未释放的情况。Page Cache 的增长来源是常规文件读取（read() 系统调用），而非 mmap 映射。</strong></p>
+<hr>
+<h4 id="h-假设-d5内核回收行为异常导致-page-cache-未被正常回收-排除">假设 D5：内核回收行为异常导致 Page Cache 未被正常回收 ❌ 排除</h4>
+<blockquote>
+<p>🧪 <strong>假设</strong>：内核 LRU 回收机制异常或内存碎片导致无法有效回收 Page Cache</p>
+</blockquote>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>检查项</th>
+<th>操作（基于真实诊断数据）</th>
+<th>结论</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>PSI 压力检查</td>
+<td>PSI some/full avg10/60/300 = <strong>0.00</strong></td>
+<td><span class="badge-ok">✅ 当前无任何内存压力感知</span></td>
+</tr>
+<tr>
+<td>kswapd 水线触发</td>
+<td>kswapd_high_wmark_hit_quickly=22, low=4（历史累计）</td>
+<td><span class="badge-ok">✅ 极低触发频率</span></td>
+</tr>
+<tr>
+<td>直接回收历史</td>
+<td>pgscan_direct=2,445,150 / pgsteal_direct=349,083（效率14.3%）</td>
+<td><span class="badge-ok">✅ 历史存在轻度直接回收，但当前无活动</span></td>
+</tr>
+<tr>
+<td>文件页回收效率</td>
+<td>pgscan_file=532,215 / pgsteal_file=310,295（效率<strong>58.3%</strong>）</td>
+<td><span class="badge-ok">✅ 文件页回收效率良好</span></td>
+</tr>
+<tr>
+<td>cgroup memory.pressure</td>
+<td>some avg10=0.00, full avg10=0.00</td>
+<td><span class="badge-ok">✅ Cgroup 级也无压力</span></td>
+</tr>
+<tr>
+<td>MemAvailable</td>
+<td>MemAvailable=15,062,352 kB（<strong>94.2%</strong> 可用）</td>
+<td><span class="badge-ok">✅ 系统判定内存充裕</span></td>
+</tr>
+<tr>
+<td>内存压缩活动</td>
+<td>compact_migrate_scanned=21.6亿</td>
+<td><span class="badge-warn">⚠️ 碎片整理活动频繁但非阻塞</span></td>
+</tr>
+</tbody></table></div>
+<p><strong>❌ 排除：内核回收行为正常。PSI=0、MemAvailable=14.4GB 表明内核认为当前无需回收 Page Cache。历史上文件页回收效率 58.3% 表现良好。检查到的内存压缩扫描频繁（21亿+）值得关注，但未导致实际回收阻滞。内核没有&quot;错误地&quot;保留 Page Cache，而是根据 LRU 算法和可用内存水位线的正常行为。</strong></p>
+<hr>
+<h3 id="h-33-排查结论与逻辑树">3.3 排查结论与逻辑树</h3>
+<div class="code-block">
+  <span class="code-lang">text</span>
+  <button class="copy-btn" onclick="copyCode(this)" title="复制">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
+  </button>
+  <pre><code>Page Cache 膨胀至 8.7GB (54.6% MemTotal)
+│
+├─► D1：大文件读取导致缓存增长 → ✅ 确认（fincore 确证 3 文件占 98%）
+│     └─► /tmp/pagecache_test (4GB) + pc2 (2GB) + pc3 (2GB)
+│           └─► 顺序 read() → 内核 Page Cache 自动填充
+│                 └─► Inactive(file) 占 99%+ → 仅读一次，未被再次访问
+│
+├─► D2：vfs_cache_pressure 太小 → ❌ 排除（v=100 默认值，dentry/inode 极少）
+├─► D3：shmem/tmpfs 过度使用 → ❌ 排除（shmem=2.6MB，tmpfs 未使用）
+├─► D4：mmap 映射未释放 → ❌ 排除（Mapped=126MB，仅 sleep 进程）
+│
+└─► D5：内核回收行为异常 → ❌ 排除（PSI=0，文件页回收效率 58.3%）
+      │
+      ├─► 但发现了间接风险：
+      │     ├─► 容器无 cgroup memory 限制（memory.max = max）
+      │     ├─► 宿主机 fault_reclaim_s 进程 2 次 OOM（页表 6.1GB 异常）
+      │     └─► compact_migrate_scanned 极高（21亿+）
+      │
+      └─► 🎯 **根本原因：三个大文件的读取操作 + 未设置 cgroup 内存限制**</code></pre>
+</div>
+<hr>
+<h2 id="h-四排除假设汇总">四、排除假设汇总</h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>假设编号</th>
+<th>假设内容</th>
+<th>排除状态</th>
+<th>排除依据</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>D1</td>
+<td>大文件读取导致 Page Cache 增长</td>
+<td>✅ <strong>确认为根因</strong></td>
+<td>fincore 确证 3 文件占缓存 98%，峰值 8.7GB</td>
+</tr>
+<tr>
+<td>D2</td>
+<td>vfs_cache_pressure 设置过小</td>
+<td><span class="badge-err">❌ 排除</span></td>
+<td>默认值 100，dentry/inode 用量极低</td>
+</tr>
+<tr>
+<td>D3</td>
+<td>shmem/tmpfs 过度使用</td>
+<td><span class="badge-err">❌ 排除</span></td>
+<td>Shmem=2.6MB，tmpfs 未使用</td>
+</tr>
+<tr>
+<td>D4</td>
+<td>应用 mmap 映射未释放</td>
+<td><span class="badge-err">❌ 排除</span></td>
+<td>Mapped=126MB，容器仅运行 sleep</td>
+</tr>
+<tr>
+<td>D5</td>
+<td>内核回收行为异常</td>
+<td><span class="badge-err">❌ 排除</span></td>
+<td>PSI=0，MemAvailable=14.4GB，文件页回收效率 58.3%</td>
+</tr>
+</tbody></table></div>
+<hr>
+<h2 id="h-五风险等级与置信度评估">五、风险等级与置信度评估</h2>
+<h3 id="h-风险矩阵">风险矩阵</h3>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>风险维度</th>
+<th>评分</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Page Cache 膨胀</td>
+<td>🟡 中</td>
+<td>当前回落至 5.9GB（36.9%），但无限制保护</td>
+</tr>
+<tr>
+<td>cgroup 内存限制缺失</td>
+<td>🔴 <strong>高</strong></td>
+<td>memory.max = max，容器可耗尽宿主机全部内存</td>
+</tr>
+<tr>
+<td>宿主机 OOM 历史</td>
+<td>🔴 <strong>高</strong></td>
+<td>fault_reclaim_s 两次被 OOM killer 杀死，页表异常</td>
+</tr>
+<tr>
+<td>当前内存压力</td>
+<td>🟢 低</td>
+<td>PSI=0，MemAvailable=14.4GB（94.2%）</td>
+</tr>
+<tr>
+<td>回收效率</td>
+<td>🟢 低</td>
+<td>文件页回收效率 58.3%，Inactive(file) 随时可回收</td>
+</tr>
+<tr>
+<td>Slab 膨胀</td>
+<td>🟢 低</td>
+<td>Slab/MemTotal=1.90%，dentry/inode 无膨胀</td>
+</tr>
+<tr>
+<td>Swap 风险</td>
+<td>🟢 低</td>
+<td>Swap 使用 207MB（4.9%），swap.current=0</td>
+</tr>
+<tr>
+<td>内存碎片化</td>
+<td>🟡 中</td>
+<td>compact_migrate_scanned=21.6亿，碎片整理活跃</td>
+</tr>
+<tr>
+<td><strong>综合风险</strong></td>
+<td><strong>🟡 P2（中等风险）</strong></td>
+<td>当前无紧迫压力，但无限制保护和宿主机 OOM 历史构成潜在威胁</td>
+</tr>
+</tbody></table></div>
+<h3 id="h-根因置信度评估">根因置信度评估</h3>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>根因候选</th>
+<th>支持证据（正向）</th>
+<th>反对证据（反向）</th>
+<th>置信度</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>D1：大文件读取 → Page Cache 膨胀</strong></td>
+<td>fincore 确证 98% 缓存来自 3 文件；Active/Inactive=1:100（冷缓存）；PSI=0 排除回收异常</td>
+<td>Cached 已从 8.7GB 回落至 5.9GB，说明部分缓存已被回收</td>
+<td>🟢 <strong>高置信</strong></td>
+</tr>
+<tr>
+<td><strong>cgroup 无限制</strong></td>
+<td>memory.max=max, HostConfig.Memory=0；cgroup OOM 为 0 但这是双刃剑</td>
+<td>当前 MemAvailable 充裕，限制缺失未直接导致故障</td>
+<td>🟢 <strong>高置信</strong>（是独立风险因素）</td>
+</tr>
+</tbody></table></div>
+<hr>
+<h2 id="h-六修复方案">六、修复方案</h2>
+<h3 id="h-61-应急处置可选">6.1 应急处置（可选）</h3>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>步骤</th>
+<th>操作</th>
+<th>执行人</th>
+<th>预期效果</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>1</td>
+<td><code>rm /tmp/pagecache_test /tmp/pc2 /tmp/pc3</code> 删除测试文件</td>
+<td>系统管理员</td>
+<td>内核自动回收对应的 Page Cache</td>
+</tr>
+<tr>
+<td>2</td>
+<td>确认文件创建来源</td>
+<td>系统管理员</td>
+<td>防止文件被重复创建和缓存</td>
+</tr>
+</tbody></table></div>
+<h3 id="h-62-永久修复计划">6.2 永久修复计划</h3>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>优先级</th>
+<th>修复措施</th>
+<th>说明</th>
+<th>执行人</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>P0</strong></td>
+<td><strong>为容器设置 cgroup 内存限制</strong></td>
+<td><code>docker update --memory=&lt;合理上限&gt; pcr-pc</code>，建议根据业务实际需求设置（如 8GB~12GB），防止 Page Cache 无限制增长</td>
+<td>系统管理员</td>
+</tr>
+<tr>
+<td><strong>P0</strong></td>
+<td><strong>排查 <code>fault_reclaim_s</code> 进程异常</strong></td>
+<td>该进程虚拟内存 6.25TB，页表 6.1GB 极不正常，可能为测试进程或存在内存泄漏/映射异常。分析其源代码或启动参数</td>
+<td>SRE/开发团队</td>
+</tr>
+<tr>
+<td><strong>P1</strong></td>
+<td><strong>设置 Memory Reservation（软限制）</strong></td>
+<td><code>--memory-reservation=&lt;值&gt;</code> 确保宿主机内存紧张时优先回收此容器的 Page Cache</td>
+<td>系统管理员</td>
+</tr>
+<tr>
+<td><strong>P1</strong></td>
+<td><strong>确认测试文件的业务归属</strong></td>
+<td>排查 <code>/tmp/pagecache_test</code>、<code>pc2</code>、<code>pc3</code> 的创建源（应用、测试脚本、或恶意行为）</td>
+<td>系统管理员</td>
+</tr>
+<tr>
+<td><strong>P2</strong></td>
+<td><strong>监控 Page Cache 趋势</strong></td>
+<td>设置告警：当 Cached/MemTotal &gt; 50% 时告警，监控 Inactive(file) 占比变化</td>
+<td>监控团队</td>
+</tr>
+<tr>
+<td><strong>P2</strong></td>
+<td><strong>监控 <code>fault_reclaim_s</code> 进程状态</strong></td>
+<td>确保该进程不再触发 OOM，若为测试进程应清理或限制其内存</td>
+<td>监控团队</td>
+</tr>
+<tr>
+<td><strong>P3</strong></td>
+<td><strong>使用 cgroup memory.current 替换 docker stats 监控</strong></td>
+<td>docker stats 显示的 171.7MB 与实际 5.66GB 差异巨大，应改用 cgroup memory.current 获取真实内存占用</td>
+<td>监控团队</td>
+</tr>
+</tbody></table></div>
+<h3 id="h-63-可选调优非紧急">6.3 可选调优（非紧急）</h3>
+<p>以下调优参数在当前状态下<strong>非必需</strong>，但可作为预防性优化：</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>参数</th>
+<th>当前值</th>
+<th>建议值</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>vm.swappiness</code></td>
+<td>60</td>
+<td>30</td>
+<td>降低内核倾向回收匿名页的权重，在内存紧张时更优先回收 Page Cache</td>
+</tr>
+<tr>
+<td><code>vm.vfs_cache_pressure</code></td>
+<td>100</td>
+<td>200</td>
+<td>在 dentry/inode 缓存高时偏向回收，当前场景需求不高</td>
+</tr>
+<tr>
+<td>cgroup memory.max</td>
+<td>max</td>
+<td>根据业务设定</td>
+<td><strong>最关键的防护措施</strong></td>
+</tr>
+</tbody></table></div>
+<hr>
+<p><em>报告由 witty-diagnosis-agent / Baize (Phase 1.4) 自动生成</em>
+<em>数据来源：Kuafu T1 (pagecache_growth), T2 (reclaim_pressure), T3 (cgroup_memory)</em>
+<em>生成时间：2026-05-25 23:37:25 UTC</em></p>
+
+    <div class="meta">
+      <span class="meta-source">容器pcr-pc_PageCache膨胀分析_20260525_233725_report.md</span>
+      <span>生成于 2026/05/25 23:41</span>
+    </div>
+  </article>
+</div>
+
+<script>
+  /* ── 滚动进度条 ── */
+  window.addEventListener("scroll", () => {
+    const el  = document.documentElement;
+    const pct = el.scrollTop / (el.scrollHeight - el.clientHeight) * 100;
+    document.getElementById("progress").style.width = Math.min(pct, 100) + "%";
+  });
+
+  /* ── TOC 高亮当前章节 ── */
+  (function () {
+    const headings = Array.from(document.querySelectorAll("article h1,article h2,article h3"));
+    const links    = Array.from(document.querySelectorAll(".toc a"));
+    if (!links.length) return;
+    const obs = new IntersectionObserver(entries => {
+      entries.forEach(e => {
+        if (!e.isIntersecting) return;
+        links.forEach(l => l.classList.remove("active"));
+        const a = links.find(l => l.getAttribute("href") === "#" + e.target.id);
+        if (a) a.classList.add("active");
+      });
+    }, { rootMargin: "-10% 0px -80% 0px" });
+    headings.forEach(h => obs.observe(h));
+  })();
+
+  /* ── h2 章节序号自动计数 ── */
+  (function () {
+    let idx = 0;
+    document.querySelectorAll("article h2").forEach(el => {
+      idx++;
+      el.setAttribute("data-index", String(idx).padStart(2, "0"));
+    });
+  })();
+
+  /* ── 代码块一键复制 ── */
+  function copyCode(btn) {
+    const code = btn.closest(".code-block").querySelector("code").innerText;
+    navigator.clipboard.writeText(code).then(() => {
+      btn.classList.add("copied");
+      btn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>';
+      setTimeout(() => {
+        btn.classList.remove("copied");
+        btn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>';
+      }, 2000);
+    });
+  }
+
+  /* ── 目录树收缩/展开 ── */
+  function toggleToc(btn) {
+    const expanded = btn.getAttribute("aria-expanded") === "true";
+    btn.setAttribute("aria-expanded", String(!expanded));
+    const parentItem = btn.closest(".toc-item");
+    let nextEl = parentItem.nextElementSibling;
+    if (nextEl && nextEl.classList.contains("toc-group")) {
+      if (expanded) {
+        nextEl.style.maxHeight = nextEl.scrollHeight + "px";
+        void nextEl.offsetHeight;
+        nextEl.classList.add("collapsed");
+      } else {
+        nextEl.classList.remove("collapsed");
+        nextEl.style.maxHeight = nextEl.scrollHeight + "px";
+        setTimeout(() => {
+          if (!nextEl.classList.contains("collapsed")) {
+            nextEl.style.maxHeight = "none";
+          }
+        }, 300);
+      }
+    }
+  }
+</script>
+</body>
+</html>

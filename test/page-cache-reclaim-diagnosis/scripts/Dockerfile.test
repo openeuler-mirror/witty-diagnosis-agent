@@ -1,0 +1,17 @@
+FROM ubuntu:22.04
+RUN apt-get update -qq && DEBIAN_FRONTEND=noninteractive apt-get install -y -qq gcc make python3 procps strace sysstat bc 2>&1 | tail -3 && apt-get clean
+RUN mkdir -p /skills/page-cache-reclaim-diagnosis
+WORKDIR /test
+COPY ./collect_page_cache_info.sh /skills/page-cache-reclaim-diagnosis/
+COPY ./diagnose_kswapd.sh /skills/page-cache-reclaim-diagnosis/
+COPY ./diagnose_direct_reclaim.sh /skills/page-cache-reclaim-diagnosis/
+COPY ./diagnose_dirty_writeback.sh /skills/page-cache-reclaim-diagnosis/
+COPY ./diagnose_page_cache_overuse.sh /skills/page-cache-reclaim-diagnosis/
+COPY ./diagnose_drop_caches.sh /skills/page-cache-reclaim-diagnosis/
+COPY ./entrypoint.sh /test/
+RUN chmod +x /skills/page-cache-reclaim-diagnosis/*.sh /test/entrypoint.sh
+COPY ./fault_dirty_storm.c /test/
+COPY ./fault_drop_caches.c /test/
+COPY ./fault_reclaim_pressure.sh /test/
+RUN gcc -o /test/fault_dirty_storm /test/fault_dirty_storm.c && gcc -o /test/fault_drop_caches /test/fault_drop_caches.c
+CMD ["bash", "/test/entrypoint.sh"]

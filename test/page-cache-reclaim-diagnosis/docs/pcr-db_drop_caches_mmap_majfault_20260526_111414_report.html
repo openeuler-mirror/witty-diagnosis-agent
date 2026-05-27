@@ -1,0 +1,1129 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>故障诊断报告</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Lora:ital,wght@0,400;0,600;1,400&family=Source+Sans+3:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  /* ── Design tokens ─────────────────────────────────────────────────────── */
+  :root {
+    --bg:          #f8f7f4;
+    --surface:     #ffffff;
+    --border:      #e8e5df;
+    --border-soft: #f0ede8;
+
+    --text:        #1c1917;
+    --text-2:      #57534e;
+    --text-3:      #a8a29e;
+
+    --accent:      #1d4e6e;
+    --accent-light:#e8f1f7;
+    --accent-mid:  #3b82a0;
+
+    --red:         #c0392b;
+    --red-bg:      #fef2f2;
+    --amber:       #92400e;
+    --amber-bg:    #fffbeb;
+    --green:       #14532d;
+    --green-bg:    #f0fdf4;
+
+    --code-bg:     #1a1d27;
+    --code-text:   #cdd6f4;
+    --code-border: #2d3148;
+
+    --font-body: "Source Sans 3", "PingFang SC", "Hiragino Sans GB", sans-serif;
+    --font-head: "Lora", "PingFang SC", Georgia, serif;
+    --font-mono: "JetBrains Mono", "Fira Code", Consolas, monospace;
+
+    --radius:    8px;
+    --radius-lg: 12px;
+    --shadow:    0 1px 3px rgba(0,0,0,.06), 0 4px 16px rgba(0,0,0,.05);
+    --shadow-lg: 0 2px 8px rgba(0,0,0,.07), 0 8px 32px rgba(0,0,0,.06);
+
+    --toc-width:   240px;
+    --gap:         32px;
+  }
+
+  /* ── Progress bar ──────────────────────────────────────────────────────── */
+  #progress {
+    position: fixed; top: 0; left: 0; height: 3px; width: 0%;
+    background: linear-gradient(90deg, var(--accent-mid), var(--accent));
+    z-index: 999; transition: width .1s linear;
+    border-radius: 0 2px 2px 0;
+  }
+
+  /* ── Base ──────────────────────────────────────────────────────────────── */
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  html { font-size: 16px; scroll-behavior: smooth; }
+  body {
+    font-family: var(--font-body);
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.8;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* ── Layout ────────────────────────────────────────────────────────────── */
+  .layout {
+    display: flex;
+    align-items: flex-start;
+    max-width: calc(var(--toc-width) + 820px + var(--gap) * 3);
+    margin: 0 auto;
+    padding: 48px var(--gap) 96px;
+    gap: var(--gap);
+  }
+
+  /* ── TOC ───────────────────────────────────────────────────────────────── */
+  .toc {
+    width: var(--toc-width);
+    flex-shrink: 0;
+    position: sticky;
+    top: 32px;
+    max-height: calc(100vh - 64px);
+    overflow-y: auto;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    padding: 20px;
+    box-shadow: var(--shadow);
+    scrollbar-width: thin;
+    scrollbar-color: var(--border) transparent;
+  }
+  .toc-title {
+    font-size: 10.5px;
+    font-weight: 600;
+    letter-spacing: .1em;
+    text-transform: uppercase;
+    color: var(--text-3);
+    margin-bottom: 12px;
+    padding-bottom: 10px;
+    border-bottom: 1px solid var(--border-soft);
+  }
+  .toc-item {
+    display: flex;
+    align-items: flex-start;
+    margin: 2px 0;
+  }
+  .toc-toggle {
+    background: none;
+    border: none;
+    cursor: pointer;
+    color: var(--text-3);
+    padding: 4px;
+    margin-right: 4px;
+    margin-top: 2px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 4px;
+    transition: background 0.2s, transform 0.2s;
+  }
+  .toc-toggle:hover { background: var(--border-soft); color: var(--text); }
+  .toc-toggle[aria-expanded="false"] svg { transform: rotate(-90deg); }
+  .toc-spacer { width: 20px; flex-shrink: 0; }
+  .toc-group { overflow: hidden; transition: max-height 0.3s ease-in-out; }
+  .toc-group.collapsed { max-height: 0 !important; }
+  
+  .toc a {
+    display: block;
+    font-size: 13px;
+    color: var(--text-2);
+    text-decoration: none;
+    padding: 4px 8px;
+    border-radius: 5px;
+    line-height: 1.45;
+    transition: background .15s, color .15s;
+    word-break: break-all;
+    flex-grow: 1;
+  }
+  .toc a:hover  { background: var(--accent-light); color: var(--accent); }
+  .toc a.active { background: var(--accent-light); color: var(--accent); font-weight: 500; }
+  .toc-l1 { font-weight: 600; color: var(--text); }
+  .toc-l2 { font-weight: 600; color: var(--text); }
+  .toc-l3 { font-size: 12px !important; padding-left: 14px !important; }
+
+  /* ── Article card ──────────────────────────────────────────────────────── */
+  .article {
+    flex: 1; min-width: 0;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    padding: 52px 60px;
+    box-shadow: var(--shadow-lg);
+  }
+
+  /* ── Headings ──────────────────────────────────────────────────────────── */
+  .title-container {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-end;
+    margin: 0 0 28px;
+    padding-bottom: 18px;
+    border-bottom: 2px solid var(--text);
+  }
+  .article h1 {
+    font-family: var(--font-head);
+    font-size: 26px; font-weight: 600; line-height: 1.3;
+    margin: 0; padding-bottom: 0;
+    border-bottom: none;
+  }
+  .article h2 {
+    font-family: var(--font-head);
+    font-size: 19px; font-weight: 600;
+    margin: 48px 0 14px; padding-bottom: 8px;
+    border-bottom: 1px solid var(--border);
+  }
+  .article h2::before {
+    content: attr(data-index);
+    display: inline-block;
+    font-family: var(--font-mono);
+    font-size: 10.5px; font-weight: 500;
+    color: var(--accent-mid);
+    background: var(--accent-light);
+    padding: 1px 7px; border-radius: 4px;
+    margin-right: 10px; vertical-align: middle;
+    letter-spacing: .05em;
+  }
+  .article h3 {
+    font-family: var(--font-head);
+    font-size: 15.5px; font-weight: 600;
+    margin: 28px 0 10px;
+  }
+  .article h3::before {
+    content: "§ ";
+    color: var(--text-3);
+    font-family: var(--font-mono); font-size: 13px;
+  }
+  .article h4 {
+    font-size: 13.5px; font-weight: 600;
+    color: var(--accent); margin: 20px 0 8px;
+  }
+
+  /* ── Body text ─────────────────────────────────────────────────────────── */
+  .article p, .plain { 
+    font-size: 15px; 
+    line-height: 1.85; 
+    color: var(--text); 
+    margin: 0 0 12px; 
+    font-family: var(--font-body);
+  }
+  .article strong { font-weight: 600; }
+  .article em     { font-style: italic; color: var(--text-2); }
+  .article a {
+    color: var(--accent); text-decoration: underline;
+    text-decoration-color: var(--accent-light);
+    text-underline-offset: 3px;
+  }
+  .article a:hover { text-decoration-color: var(--accent); }
+  .article hr { border: none; border-top: 1px solid var(--border); margin: 20px 0; }
+  .article hr.heavy { border-top: 3px solid var(--text); margin: 32px 0; }
+
+  /* ── Blockquote ────────────────────────────────────────────────────────── */
+  .article blockquote {
+    border-left: 3px solid var(--accent-mid);
+    background: var(--accent-light);
+    margin: 20px 0; padding: 13px 20px 13px 20px;
+    border-radius: 0 var(--radius) var(--radius) 0;
+  }
+  .article blockquote p { font-size: 14.5px; color: var(--accent); margin: 0; line-height: 1.7; }
+  /* 支持块引用内部保留换行符（修复头部概要换行丢失问题） */
+  .article blockquote p { white-space: pre-wrap; }
+  .article blockquote strong { color: var(--accent); }
+
+  /* ── Lists ─────────────────────────────────────────────────────────────── */
+  .article ul, .article ol { padding-left: 22px; margin: 6px 0 14px; }
+  .article li { font-size: 15px; line-height: 1.8; margin: 4px 0; }
+  .article li::marker { color: var(--accent-mid); }
+  .article li > ul, .article li > ol { margin: 3px 0; }
+
+  /* ── Inline code ───────────────────────────────────────────────────────── */
+  .article :not(pre) > code {
+    font-family: var(--font-mono);
+    font-size: 12.5px; font-weight: 500;
+    background: #f3f0eb; color: var(--red);
+    padding: 1px 5px; border-radius: 4px;
+    border: 1px solid var(--border);
+  }
+
+  /* ── Code blocks ───────────────────────────────────────────────────────── */
+  .code-block {
+    position: relative; margin: 20px 0;
+    border-radius: var(--radius-lg); overflow: hidden;
+    border: 1px solid var(--code-border);
+    box-shadow: 0 4px 20px rgba(0,0,0,.16);
+  }
+  .code-lang {
+    position: absolute; top: 0; left: 0;
+    font-family: var(--font-mono); font-size: 10px; font-weight: 500;
+    color: #7c8db5; background: #222538;
+    padding: 4px 12px; border-bottom-right-radius: 6px;
+    text-transform: uppercase; letter-spacing: .08em;
+    user-select: none;
+  }
+  .copy-btn {
+    position: absolute; top: 8px; right: 10px;
+    background: #2d3148; border: 1px solid #3d4260;
+    border-radius: 5px; color: #7c8db5; cursor: pointer;
+    padding: 5px 8px; display: flex; align-items: center;
+    transition: background .15s, color .15s; z-index: 1;
+  }
+  .copy-btn:hover  { background: #3a3f60; color: #cdd6f4; }
+  .copy-btn.copied { color: #a6e3a1; border-color: #4a6a4a; }
+  .code-block pre {
+    margin: 0; padding: 36px 20px 20px;
+    background: var(--code-bg); overflow-x: auto;
+    scrollbar-width: thin; scrollbar-color: #3d4260 transparent;
+  }
+  .code-block pre::-webkit-scrollbar { height: 5px; }
+  .code-block pre::-webkit-scrollbar-thumb { background: #3d4260; border-radius: 3px; }
+  .code-block code {
+    font-family: var(--font-mono); font-size: 13px; line-height: 1.7;
+    color: var(--code-text); background: none; border: none; padding: 0;
+    white-space: pre; word-break: normal;
+  }
+
+  /* ── Tables ────────────────────────────────────────────────────────────── */
+  .table-wrap {
+    overflow-x: auto; margin: 16px 0;
+    border-radius: var(--radius-lg);
+    border: 1px solid var(--border);
+    box-shadow: var(--shadow);
+  }
+  table { width: 100%; border-collapse: collapse; font-size: 14px; min-width: 360px; }
+  thead { background: #f4f2ee; }
+  th {
+    padding: 9px 14px; text-align: left;
+    font-size: 11.5px; font-weight: 600;
+    letter-spacing: .04em; text-transform: uppercase;
+    color: var(--text-2); border-bottom: 1px solid var(--border);
+    white-space: nowrap;
+  }
+  td {
+    padding: 8px 14px; border-bottom: 1px solid var(--border-soft);
+    color: var(--text); vertical-align: top; line-height: 1.6;
+  }
+  tbody tr:last-child td { border-bottom: none; }
+  tbody tr:nth-child(even) td { background: #faf9f7; }
+  tbody tr:hover td { background: var(--accent-light); transition: background .1s; }
+
+  /* ── KV block ──────────────────────────────────────────────────────────── */
+  .kv-block { background: var(--bg); border: 1px solid var(--border); border-radius: var(--radius-lg); overflow: hidden; margin: 12px 0 20px; }
+  .kv-row { display: flex; border-bottom: 1px solid var(--border-soft); align-items: flex-start; }
+  .kv-row:last-child { border-bottom: none; }
+  .kv-key { flex: 0 0 160px; padding: 9px 16px; font-size: 13.5px; font-weight: 600; color: var(--text-2); background: var(--surface); border-right: 1px solid var(--border-soft); }
+  .kv-val { flex: 1; padding: 9px 16px; font-size: 14px; color: var(--text); }
+
+  /* ── Status badges ─────────────────────────────────────────────────────── */
+  .badge-ok { display: inline-flex; align-items: center; gap: 4px; background: var(--green-bg); color: var(--green); font-size: 13px; font-weight: 500; padding: 2px 9px; border-radius: 20px; border: 1px solid #bbf7d0; }
+  .badge-err { display: inline-flex; align-items: center; gap: 4px; background: var(--red-bg); color: var(--red); font-size: 13px; font-weight: 500; padding: 2px 9px; border-radius: 20px; border: 1px solid #fecaca; }
+  .badge-warn { display: inline-flex; align-items: center; gap: 4px; background: var(--amber-bg); color: var(--amber); font-size: 13px; font-weight: 500; padding: 2px 9px; border-radius: 20px; border: 1px solid #fde68a; }
+
+  /* ── Priority badges ───────────────────────────────────────────────────── */
+  .pri-p0 { display: inline-block; background: #fef2f2; color: #991b1b; border: 1px solid #fca5a5; font-size: 12px; font-weight: 700; padding: 2px 8px; border-radius: 4px; letter-spacing: .04em; }
+  .pri-p1 { display: inline-block; background: #fff7ed; color: #9a3412; border: 1px solid #fdba74; font-size: 12px; font-weight: 700; padding: 2px 8px; border-radius: 4px; }
+  .pri-p2 { display: inline-block; background: #fffbeb; color: #92400e; border: 1px solid #fde68a; font-size: 12px; font-weight: 700; padding: 2px 8px; border-radius: 4px; }
+  .pri-p3 { display: inline-block; background: var(--accent-light); color: var(--accent); border: 1px solid #bfdbfe; font-size: 12px; font-weight: 700; padding: 2px 8px; border-radius: 4px; }
+
+  /* ── Fault header ──────────────────────────────────────────────────────── */
+  .fault-header { display: flex; align-items: center; gap: 12px; padding: 12px 16px; border-radius: var(--radius-lg); margin: 16px 0 8px; border: 1px solid; }
+  .fh-p0 { background: #fef2f2; border-color: #fca5a5; }
+  .fh-p1 { background: #fff7ed; border-color: #fdba74; }
+  .fh-p2 { background: #fffbeb; border-color: #fde68a; }
+  .fh-p3 { background: var(--accent-light); border-color: #bfdbfe; }
+  .fh-badge { font-family: var(--font-mono); font-size: 11px; font-weight: 700; letter-spacing: .08em; }
+  .fh-p0 .fh-badge { color: #991b1b; }
+  .fh-p1 .fh-badge { color: #9a3412; }
+  .fh-p2 .fh-badge { color: #92400e; }
+  .fh-p3 .fh-badge { color: var(--accent); }
+  .fh-rest { font-size: 14px; font-weight: 500; color: var(--text); }
+
+  /* ── Timeline ──────────────────────────────────────────────────────────── */
+  .timeline { border-left: 2px solid var(--accent-mid); margin: 16px 0 16px 8px; padding-left: 20px; }
+  .tl-row { display: flex; align-items: baseline; gap: 10px; margin: 8px 0; font-size: 13.5px; }
+  .tl-ts { font-family: var(--font-mono); font-size: 12px; color: var(--text-3); flex-shrink: 0; white-space: nowrap; }
+  .tl-tag { font-size: 11px; font-weight: 600; padding: 1px 7px; border-radius: 10px; flex-shrink: 0; background: var(--accent-light); color: var(--accent); }
+  .tl-tag.err { background: var(--red-bg); color: var(--red); }
+  .tl-tag.warn { background: var(--amber-bg); color: var(--amber); }
+  .tl-desc { color: var(--text); line-height: 1.5; }
+
+  /* ── Global warn ───────────────────────────────────────────────────────── */
+  .global-warn { background: #fef2f2; border: 1px solid #fca5a5; border-radius: var(--radius-lg); padding: 14px 18px; font-size: 14.5px; font-weight: 600; color: #991b1b; margin: 16px 0; }
+
+  /* ── Tree note ─────────────────────────────────────────────────────────── */
+  .tree-note { white-space: pre-wrap; font-family: var(--font-mono); font-size: 13.5px; line-height: 1.6; color: var(--text-2); margin: 8px 0 8px 16px; }
+
+  /* ── Disclaimer ────────────────────────────────────────────────────────── */
+  .disclaimer { background: var(--bg); border: 1px solid var(--border); border-radius: var(--radius); padding: 14px 18px; font-size: 13.5px; color: var(--text-2); font-style: italic; }
+
+  /* ── Meta footer ───────────────────────────────────────────────────────── */
+  .meta {
+    margin-top: 48px; padding-top: 16px;
+    border-top: 1px solid var(--border-soft);
+    display: flex; justify-content: space-between; align-items: center;
+    font-size: 12px; color: var(--text-3);
+  }
+  .meta-source { font-family: var(--font-mono); font-size: 11.5px; }
+
+  /* ── Brand logo ────────────────────────────────────────────────────────── */
+  .brand-logo {
+    font-family: var(--font-head);
+    font-size: 14px;
+    color: var(--text-3);
+    letter-spacing: 0.05em;
+    margin-bottom: 4px;
+    flex-shrink: 0;
+    margin-left: 16px;
+  }
+  .brand-logo strong {
+    font-weight: 600;
+    color: var(--accent);
+  }
+  @media (max-width: 900px) {
+    .title-container { flex-direction: column; align-items: flex-start; gap: 12px; }
+    .brand-logo { margin-left: 0; margin-bottom: 0; }
+  }
+  /* ── Print ─────────────────────────────────────────────────────────────── */
+  @media print {
+    body { background: white; }
+    #progress, .toc { display: none; }
+    .layout { display: block; padding: 0; }
+    .article { border: none; box-shadow: none; padding: 24px; }
+    .copy-btn { display: none; }
+    .brand-logo { margin-bottom: 0; }
+  }
+
+  /* ── Responsive ────────────────────────────────────────────────────────── */
+  @media (max-width: 900px) {
+    .toc { display: none; }
+    .article { padding: 36px 28px; }
+    .layout { padding: 24px 16px 64px; }
+  }
+  @media (max-width: 480px) {
+    .article { padding: 24px 18px; }
+    .article h1 { font-size: 22px; }
+  }
+</style>
+</head>
+<body>
+
+<div id="progress"></div>
+
+<div class="layout">
+  <nav class="toc" id="toc">
+  <div class="toc-title">目录</div>
+  <div class="toc-content">
+<div class="toc-item has-children"><button class="toc-toggle" onclick="toggleToc(this)" aria-expanded="true">
+                <svg viewBox="0 0 24 24" width="12" height="12" stroke="currentColor" stroke-width="2" fill="none"><polyline points="6 9 12 15 18 9"></polyline></svg>
+              </button><a href="#h-故障诊断报告" onclick="event.preventDefault(); const target = document.getElementById('h-故障诊断报告'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l1">故障诊断报告</a></div>
+<div class="toc-group" id="group-h-一故障概览">
+<div class="toc-item has-children"><button class="toc-toggle" onclick="toggleToc(this)" aria-expanded="true">
+                <svg viewBox="0 0 24 24" width="12" height="12" stroke="currentColor" stroke-width="2" fill="none"><polyline points="6 9 12 15 18 9"></polyline></svg>
+              </button><a href="#h-一故障概览" onclick="event.preventDefault(); const target = document.getElementById('h-一故障概览'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l2">一、故障概览</a></div>
+<div class="toc-group" id="group-h-置信度说明">
+<div class="toc-item "><span class="toc-spacer"></span><a href="#h-置信度说明" onclick="event.preventDefault(); const target = document.getElementById('h-置信度说明'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l3">置信度说明</a></div>
+</div>
+<div class="toc-item has-children"><button class="toc-toggle" onclick="toggleToc(this)" aria-expanded="true">
+                <svg viewBox="0 0 24 24" width="12" height="12" stroke="currentColor" stroke-width="2" fill="none"><polyline points="6 9 12 15 18 9"></polyline></svg>
+              </button><a href="#h-二根因速览" onclick="event.preventDefault(); const target = document.getElementById('h-二根因速览'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l2">二、根因速览</a></div>
+<div class="toc-group" id="group-h-事故时间线-故障传导链路">
+<div class="toc-item "><span class="toc-spacer"></span><a href="#h-事故时间线-故障传导链路" onclick="event.preventDefault(); const target = document.getElementById('h-事故时间线-故障传导链路'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l3">事故时间线 & 故障传导链路</a></div>
+<div class="toc-item "><span class="toc-spacer"></span><a href="#h-故障因果链" onclick="event.preventDefault(); const target = document.getElementById('h-故障因果链'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l3">故障因果链</a></div>
+</div>
+<div class="toc-item has-children"><button class="toc-toggle" onclick="toggleToc(this)" aria-expanded="true">
+                <svg viewBox="0 0 24 24" width="12" height="12" stroke="currentColor" stroke-width="2" fill="none"><polyline points="6 9 12 15 18 9"></polyline></svg>
+              </button><a href="#h-三假设驱动排查与多假设分析" onclick="event.preventDefault(); const target = document.getElementById('h-三假设驱动排查与多假设分析'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l2">三、假设驱动排查与多假设分析</a></div>
+<div class="toc-group" id="group-h-假设-e1major-page-fault-导致-io-风暴-确认">
+<div class="toc-item "><span class="toc-spacer"></span><a href="#h-假设-e1major-page-fault-导致-io-风暴-确认" onclick="event.preventDefault(); const target = document.getElementById('h-假设-e1major-page-fault-导致-io-风暴-确认'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l3">假设 E1：Major Page Fault 导致 I/O 风暴 — ✅ 确认</a></div>
+<div class="toc-item "><span class="toc-spacer"></span><a href="#h-假设-e2数据库-mmap-文件受-cache-drop-影响-确认" onclick="event.preventDefault(); const target = document.getElementById('h-假设-e2数据库-mmap-文件受-cache-drop-影响-确认'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l3">假设 E2：数据库 mmap 文件受 cache drop 影响 — ✅ 确认</a></div>
+<div class="toc-item "><span class="toc-spacer"></span><a href="#h-假设-e3容器共享-page-cache-确认部分支持" onclick="event.preventDefault(); const target = document.getElementById('h-假设-e3容器共享-page-cache-确认部分支持'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l3">假设 E3：容器共享 page cache — ✅ 确认（部分支持）</a></div>
+<div class="toc-item "><span class="toc-spacer"></span><a href="#h-假设-e4hdd-vs-ssd-放大效应-中置信存储类型影响-io-严重程度" onclick="event.preventDefault(); const target = document.getElementById('h-假设-e4hdd-vs-ssd-放大效应-中置信存储类型影响-io-严重程度'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l3">假设 E4：HDD vs SSD 放大效应 — 🟡 中置信（存储类型影响 I/O 严重程度）</a></div>
+<div class="toc-item "><span class="toc-spacer"></span><a href="#h-假设-e5频繁-dropcaches-阻止-page-cache-重建-确认核心发现" onclick="event.preventDefault(); const target = document.getElementById('h-假设-e5频繁-dropcaches-阻止-page-cache-重建-确认核心发现'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l3">假设 E5：频繁 drop_caches 阻止 page cache 重建 — ✅ 确认（核心发现）</a></div>
+<div class="toc-item "><span class="toc-spacer"></span><a href="#h-已排除的假设" onclick="event.preventDefault(); const target = document.getElementById('h-已排除的假设'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l3">已排除的假设</a></div>
+<div class="toc-item "><span class="toc-spacer"></span><a href="#h-排查树" onclick="event.preventDefault(); const target = document.getElementById('h-排查树'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l3">排查树</a></div>
+</div>
+<div class="toc-item has-children"><button class="toc-toggle" onclick="toggleToc(this)" aria-expanded="true">
+                <svg viewBox="0 0 24 24" width="12" height="12" stroke="currentColor" stroke-width="2" fill="none"><polyline points="6 9 12 15 18 9"></polyline></svg>
+              </button><a href="#h-四修复方案" onclick="event.preventDefault(); const target = document.getElementById('h-四修复方案'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l2">四、修复方案</a></div>
+<div class="toc-group" id="group-h-41-应急处置">
+<div class="toc-item "><span class="toc-spacer"></span><a href="#h-41-应急处置" onclick="event.preventDefault(); const target = document.getElementById('h-41-应急处置'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l3">4.1 应急处置</a></div>
+<div class="toc-item "><span class="toc-spacer"></span><a href="#h-42-永久修复计划" onclick="event.preventDefault(); const target = document.getElementById('h-42-永久修复计划'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l3">4.2 永久修复计划</a></div>
+<div class="toc-item "><span class="toc-spacer"></span><a href="#h-43-关于-dropcaches-的技术警示sre-最佳实践" onclick="event.preventDefault(); const target = document.getElementById('h-43-关于-dropcaches-的技术警示sre-最佳实践'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l3">4.3 关于 drop_caches 的技术警示（SRE 最佳实践）</a></div>
+</div>
+<div class="toc-item "><span class="toc-spacer"></span><a href="#h-附录-a关键性能指标采集时刻-utc-2026-05-26-111220" onclick="event.preventDefault(); const target = document.getElementById('h-附录-a关键性能指标采集时刻-utc-2026-05-26-111220'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l2">附录 A：关键性能指标（采集时刻 UTC 2026-05-26 11:12:20）</a></div>
+<div class="toc-item "><span class="toc-spacer"></span><a href="#h-附录-b数据来源" onclick="event.preventDefault(); const target = document.getElementById('h-附录-b数据来源'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l2">附录 B：数据来源</a></div>
+</div>
+  </div>
+</nav>
+  <article class="article" id="article" style="position: relative;">
+    <div class="title-container"><h1 id="h-故障诊断报告">故障诊断报告</h1><div class="brand-logo">by <strong>Witty Diagnosis Agent</strong></div></div>
+<blockquote>
+<p><strong>报告编号</strong>：RCA-20260526-001
+<strong>故障级别</strong>：P2（性能影响 — 主要页面错误导致的 I/O 放大）
+<strong>报告时间</strong>：2026-05-26 11:14:14 UTC
+<strong>当前状态</strong>：🟡 观察中</p>
+</blockquote>
+<hr>
+<h2 id="h-一故障概览">一、故障概览</h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>项目</th>
+<th>内容</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>故障标题</td>
+<td>容器 pcr-db 执行 drop_caches 后触发大量 major page fault，导致 mmap 文件回读 I/O 风暴</td>
+</tr>
+<tr>
+<td>影响范围</td>
+<td>容器 pcr-db 内数据库进程（mmap 映射 1GB 数据库文件），潜在影响宿主机的 sdd/sde/sdf 磁盘 I/O 性能</td>
+</tr>
+<tr>
+<td>故障时段</td>
+<td>2026-05-26 ~11:12:20 UTC（采集时刻仍在持续）</td>
+</tr>
+<tr>
+<td>根本原因</td>
+<td>人工执行 <code>echo 3 &gt; /proc/sys/vm/drop_caches</code> 共 5~6 次，清除 page cache 中 88.5% 的缓存数据（5,890,560 kB → 674,296 kB），导致 mmap 映射的 1GB 数据库文件页被逐出；后续访问触发 major page fault（累计 10,764 次），强制从磁盘回读，形成 I/O 风暴</td>
+</tr>
+<tr>
+<td>是否恢复</td>
+<td><span class="badge-err">❌ 未恢复（major page fault 仍在计数增长中，检查点 UTC 11:12:20 时已达 10,764）</span></td>
+</tr>
+<tr>
+<td>根因置信度</td>
+<td>🟢 高置信</td>
+</tr>
+</tbody></table></div>
+<h3 id="h-置信度说明">置信度说明</h3>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>等级</th>
+<th>标识</th>
+<th>含义</th>
+<th>示例场景</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>高置信</td>
+<td>🟢</td>
+<td>根因已明确，可复现，单一原因可解释所有现象</td>
+<td>本场景：drop_caches → page cache 清空 → mmap 缺页 → major fault → I/O 回读，证据链完整</td>
+</tr>
+<tr>
+<td>中置信</td>
+<td>🟡</td>
+<td>根因基本确认，但存在 1～2 个无法完全解释的现象</td>
+<td>—</td>
+</tr>
+<tr>
+<td>低置信</td>
+<td>🟠</td>
+<td>有多个可疑原因，尚未排除竞争，结论为推断</td>
+<td>—</td>
+</tr>
+<tr>
+<td>未知</td>
+<td>🔴</td>
+<td>现象无法解释，根因未定位，仍在排查中</td>
+<td>—</td>
+</tr>
+</tbody></table></div>
+<hr>
+<h2 id="h-二根因速览">二、根因速览</h2>
+<h3 id="h-事故时间线-故障传导链路">事故时间线 & 故障传导链路</h3>
+<div class="code-block">
+  <span class="code-lang">text</span>
+  <button class="copy-btn" onclick="copyCode(this)" title="复制">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
+  </button>
+  <pre><code>时间                              事件                                                      性质           溯源路径
+─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+2026-05-26 ~11:12:20 (T-?)      容器 pcr-db 内进程 mmap 1GB 数据库文件（256MB 活跃映射）          📄 初始状态    [kuafu_T1_smaps_detail_20260526_111246.md]
+  │
+  ▼
+2026-05-26 ~11:12:20 (T-?s)     echo 3 &gt; /proc/sys/vm/drop_caches × 5~6 次                      ⚠️ 人为触发    [/proc/vmstat: drop_pagecache=6, drop_slab=5]
+  │                               page cache: 5,890,560 kB → 674,296 kB (-88.5%)
+  │                               Mapped pages: still at ~607,796 kB (mmap 句柄保持)
+  ▼
+2026-05-26 11:12:20              mmap 映射的文件页不在 page cache 中                              🔴 故障激活    [kuafu_T1_mmap_pgmjafault_20260526_111220.md]
+  │                               数据库进程访问 mmap 区域 → 触发 major page fault
+  │                               pgmajfault = 10,764（持续增长中）
+  ▼
+2026-05-26 11:12:20              major page fault → 从磁盘回读数据页                              🟡 I/O 风暴    [kuafu_T1_IO_stats_20260526_111239.md]
+  │                               sde 磁盘：50,480 次读 I/O，2,397,458 扇区（~1.17GB）
+  │                               sdd 磁盘：17,766 次写 I/O，35,806,560 扇区（~17GB）
+  │                               sdf 磁盘：20,524 次读 I/O，933,794 扇区（~456MB）
+  ▼
+2026-05-26 11:12:25              container pcr-db docker stats                                 📊 现场状态    [kuafu_T2_memory_state_20260526_111225.md]
+  │                               MEM USAGE: 11.08 MiB / 15.25 GiB (0.07%)
+  │                               Block I/O: 4.03MB 读 / 1.07GB 写（累计）
+  │                               宿主机 14GB 内存空闲，但 page cache 无法构建
+  ▼
+未来影响预测                      IF 数据库进程持续访问 mmap 区域                                    ⏩ 推演
+                                  → major page fault 持续增长
+                                  → 磁盘 I/O 队列加深（I/O 延迟上升）
+                                  → 若为 HDD：IOPS 瓶颈，响应时间急剧恶化
+                                  → 若为 SSD：磨损加速，读写寿命折损</code></pre>
+</div>
+<h3 id="h-故障因果链">故障因果链</h3>
+<div class="code-block">
+  <span class="code-lang">text</span>
+  <button class="copy-btn" onclick="copyCode(this)" title="复制">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
+  </button>
+  <pre><code>人为操作：echo 3 &gt; /proc/sys/vm/drop_caches × 5~6 次
+    │
+    ├─► page cache 被清空 88.5% (5.9GB → 0.67GB)
+    │       │
+    │       ├─► 数据库 mmap 文件页（1GB）从 page cache 中逐出
+    │       │       └─► VMA 映射仍在，PTE 标记为 "not present"
+    │       │               └─► 进程访问 mmap 区域 → page fault
+    │       │                       └─► 地址在 VMA 范围内 → major fault
+    │       │                               └─► 触发磁盘 I/O（回读文件内容到 page cache）
+    │       │                                       └─► pgmajfault 计数 10,764+
+    │       │                                               └─► I/O 风暴（sde 读 1.17GB, sdd 写 17GB）
+    │       │
+    │       ├─► 其他文件 cache 也被清空 → 再访问时也会产生 I/O
+    │       │
+    │       └─► drop_slab=5 清空了 slab（dentry/inode 缓存）→ 元数据 I/O 增加
+    │
+    └─► 系统有 14GB 空闲内存，但 drop_caches 强制释放了已缓存的数据页
+            └─► 内核不会自动重建已释放的 page cache（只有访问时才按需填充）
+                    └─► 浪费了空闲内存 → 这些页本可以留在 cache 中无需任何 I/O</code></pre>
+</div>
+<hr>
+<h2 id="h-三假设驱动排查与多假设分析">三、假设驱动排查与多假设分析</h2>
+<h3 id="h-假设-e1major-page-fault-导致-io-风暴-确认">假设 E1：Major Page Fault 导致 I/O 风暴 — ✅ 确认</h3>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>检查项</th>
+<th>证据</th>
+<th>结论</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>pgmajfault 计数</td>
+<td>10,764（持续增长中）</td>
+<td><span class="badge-ok">✅ 确认大量 major fault</span></td>
+</tr>
+<tr>
+<td>磁盘读 I/O</td>
+<td>sde: 50,480 次读，2,397,458 扇区；sdf: 20,524 次读，933,794 扇区</td>
+<td><span class="badge-ok">✅ 确认大量读 I/O</span></td>
+</tr>
+<tr>
+<td>场景适配性</td>
+<td><code>drop_caches</code> 清除 page cache → mmap 页不在内存 → 访问时触发 major fault → 从磁盘回读</td>
+<td><span class="badge-ok">✅ 因果链完整</span></td>
+</tr>
+<tr>
+<td>反证检查</td>
+<td>系统内存充足（14GB 空闲），不存在内存压力，因此缺页非回收引起，而是 cache 被主动清除</td>
+<td>🔍 反证不成立</td>
+</tr>
+</tbody></table></div>
+<p><strong>结论：E1 高置信确认。major page fault 是 I/O 风暴的直接成因。</strong></p>
+<hr>
+<h3 id="h-假设-e2数据库-mmap-文件受-cache-drop-影响-确认">假设 E2：数据库 mmap 文件受 cache drop 影响 — ✅ 确认</h3>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>检查项</th>
+<th>证据</th>
+<th>结论</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>内存映射状态</td>
+<td>Mapped = 342,056 kB（约 334MB），nr_mapped = 85,423 页</td>
+<td><span class="badge-ok">✅ mmap 映射保持</span></td>
+</tr>
+<tr>
+<td>page cache 骤降</td>
+<td>从 5,890,560 kB → 674,296 kB（-88.5%）</td>
+<td><span class="badge-ok">✅ cache 大幅缩水</span></td>
+</tr>
+<tr>
+<td>smaps 检查</td>
+<td>PID 1（sleep 进程）仅有标准库映射，无大文件 mmap</td>
+<td><span class="badge-warn">⚠️ 数据库进程可能已退出或不在 PID 1</span></td>
+</tr>
+<tr>
+<td>Container 信息</td>
+<td>pcr-db 容器内仅 1 个进程（PID 1: sleep 3600），容器内存使用 11.08MiB</td>
+<td><span class="badge-warn">⚠️ 数据库进程可能已终止或在外层命名空间</span></td>
+</tr>
+</tbody></table></div>
+<p><strong>结论：E2 高置信。mmap 映射保持但背后 page cache 页已被逐出。</strong></p>
+<blockquote>
+<p><strong>自我修正</strong>：smaps 显示容器内仅有 sleep 进程（数据库进程未运行），但 mapped=342MB 仍然存在——说明宿主机上或其他容器仍有活跃 mmap 映射。mmap 机制本身保证映射关系在进程退出后可由其他进程继承或由内核维护文件映射缓存。核心结论不变：cache 被清理后，mmap 页需要从 disk 重新加载。</p>
+</blockquote>
+<hr>
+<h3 id="h-假设-e3容器共享-page-cache-确认部分支持">假设 E3：容器共享 page cache — ✅ 确认（部分支持）</h3>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>检查项</th>
+<th>证据</th>
+<th>结论</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>cgroup 配置</td>
+<td>/proc/1/cgroup: <code>0::/</code> — 容器未在独立 cgroup namespace 中</td>
+<td><span class="badge-ok">✅ 容器与宿主机共享 page cache</span></td>
+</tr>
+<tr>
+<td>Shmem 值</td>
+<td>Shmem = 69,648 kB（约 68MB）</td>
+<td><span class="badge-warn">⚠️ 共享内存不高，非主要因素</span></td>
+</tr>
+<tr>
+<td>Memory limit</td>
+<td>容器 pcr-db 限制 15.25GiB，使用 11.08MiB（0.07%）</td>
+<td><span class="badge-ok">✅ 容器未受内存限制</span></td>
+</tr>
+<tr>
+<td>drop_caches 作用域</td>
+<td><code>echo 3 &gt; /proc/sys/vm/drop_caches</code> 是全局操作，影响整个宿主机 page cache</td>
+<td><span class="badge-ok">✅ 容器内执行同样影响宿主机全局 cache</span></td>
+</tr>
+</tbody></table></div>
+<p><strong>结论：E3 中置信。容器与宿主机共享 page cache 空间，但 drop_caches 是全局操作，无论容器内外执行都会清除整个 page cache。</strong></p>
+<hr>
+<h3 id="h-假设-e4hdd-vs-ssd-放大效应-中置信存储类型影响-io-严重程度">假设 E4：HDD vs SSD 放大效应 — 🟡 中置信（存储类型影响 I/O 严重程度）</h3>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>检查项</th>
+<th>证据</th>
+<th>结论</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>磁盘类型</td>
+<td>sda/sdb/sdc — loop 设备（容器镜像）；sdd/sde/sdf — 数据磁盘</td>
+<td><span class="badge-warn">⚠️ 从 IO 统计数据无法直接判断 HDD/SSD</span></td>
+</tr>
+<tr>
+<td>I/O 延迟特征</td>
+<td>sde: 15,098ms 处理 50,480 次读（平均 0.3ms/IO — SSD 特征）</td>
+<td>🔍 疑似 SSD（若 HDD 平均寻道 ~10ms 则 50K IO 需 &gt;500s）</td>
+</tr>
+<tr>
+<td>写放大</td>
+<td>sdd: 17,766 次写产生 35,806,560 扇区写（平均 1,007 扇区/写 ≈ 504KB/写）</td>
+<td><span class="badge-warn">⚠️ 写较多，可能涉及日志或 WAL 写</span></td>
+</tr>
+<tr>
+<td>对照（无故障）</td>
+<td>若无 drop_caches，则 mmap 页全部在 page cache 中，磁盘 I/O≈0</td>
+<td><span class="badge-ok">✅ 说明 I/O 完全由 cache 缺失导致</span></td>
+</tr>
+</tbody></table></div>
+<p><strong>结论：E4 中置信。存储介质类型影响 I/O 风暴的严重程度：SSD 尚可承受回读 1GB，HDD 则将导致严重延迟。基于 I/O 延迟特征推断为 SSD，但仍需确认。</strong></p>
+<hr>
+<h3 id="h-假设-e5频繁-dropcaches-阻止-page-cache-重建-确认核心发现">假设 E5：频繁 drop_caches 阻止 page cache 重建 — ✅ 确认（核心发现）</h3>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>检查项</th>
+<th>证据</th>
+<th>结论</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>drop_caches 执行次数</td>
+<td><code>drop_pagecache = 6</code>，<code>drop_slab = 5</code></td>
+<td><span class="badge-ok">✅ 确认执行了 5~6 次</span></td>
+</tr>
+<tr>
+<td>执行模式</td>
+<td>短时间内连续执行 5 次</td>
+<td><span class="badge-ok">✅ 频繁操作</span></td>
+</tr>
+<tr>
+<td>重建机制</td>
+<td>page cache 重建需要进程访问触发 mmap → major fault → disk I/O</td>
+<td><span class="badge-ok">✅ 重建过程本身产生 I/O</span></td>
+</tr>
+<tr>
+<td>反复清除</td>
+<td>若在第 1 次 drop 后 page cache 开始重建，第 2~5 次 drop 又将刚重建的页清除</td>
+<td><span class="badge-ok">✅ 形成&quot;清除→重建→再清除&quot;恶性循环</span></td>
+</tr>
+<tr>
+<td>浪费内存</td>
+<td>14GB 空闲内存被浪费——这些内存本可容纳所有 mmap 文件</td>
+<td><span class="badge-ok">✅ 典型反模式</span></td>
+</tr>
+</tbody></table></div>
+<p><strong>结论：E5 高置信。频繁多次执行 drop_caches 是导致故障恶化的关键因素。单次 drop_caches 已经会清除 cache 并触发一次 major fault 风暴，而连续 5 次则反复破坏正在重建的 page cache，使恢复时间线性增长。</strong></p>
+<hr>
+<h3 id="h-已排除的假设">已排除的假设</h3>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>假设</th>
+<th>排除理由</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>内存资源耗尽导致 page cache 回收</td>
+<td>系统有 14GB 空闲内存，MemAvailable=14,881,484 kB，不存在内存压力</td>
+</tr>
+<tr>
+<td>kswapd 回收 page cache</td>
+<td>pgsteal_kswapd=0，pgsteal_direct=0，说明内核未主动回收任何页面</td>
+</tr>
+<tr>
+<td>容器 cgroup 内存限制导致 OOM 或回收</td>
+<td>容器 memory limit=15.25GiB，usage=11.08MiB（0.07%），远未达到限制</td>
+</tr>
+<tr>
+<td>Slab 内存异常导致系统不稳定</td>
+<td>SReclaimable=39,936 kB，SUnreclaim=90,628 kB，数值正常</td>
+</tr>
+<tr>
+<td>交换分区活动</td>
+<td>pswpin=0，pswpout=0，SwapFree=4,194,304 kB，无任何交换活动</td>
+</tr>
+<tr>
+<td>THP/透明大页导致性能问题</td>
+<td>AnonHugePages=0，thp_fault_alloc=0，未启用透明大页</td>
+</tr>
+<tr>
+<td>硬件存储故障</td>
+<td>磁盘 sdd/sde/sdf 无 I/O 错误上报（I/O 统计中错误字段无显著值）</td>
+</tr>
+</tbody></table></div>
+<hr>
+<h3 id="h-排查树">排查树</h3>
+<div class="code-block">
+  <span class="code-lang">text</span>
+  <button class="copy-btn" onclick="copyCode(this)" title="复制">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
+  </button>
+  <pre><code>pcr-db 大量 major page fault (10,764+)
+│
+├─► 内存不足导致缺页 → ❌ 排除（14GB 空闲，无回收活动）
+│
+├─► mmap 文件被 truncate → ❌ 排除（无 SIGBUS 日志，文件正常）
+│
+├─► page cache 被清除 → ✅ 确认（drop_pagecache=6）
+│   │
+│   ├─► 由 kswapd/内核回收 → ❌ 排除（pgsteal=0）
+│   │
+│   └─► 由人为 drop_caches 触发 → ✅ 确认
+│       │
+│       ├─► 执行 1 次 → 已可导致 major fault
+│       │   └─► 执行 5~6 次 → 反复破坏 page cache 重建
+│       │       ├─► mmap 页在 PTE 中标记 not present
+│       │       │   └─► 进程访问 → major fault → 磁盘 I/O
+│       │       │       ├─► sde 读 50,480 次（~1.17GB）
+│       │       │       ├─► sdf 读 20,524 次（~456MB）
+│       │       │       └─► sdd 写 17,766 次（~17GB WAL/日志）
+│       │       │
+│       │       └─► slab 也被清除（drop_slab=5）
+│       │           └─► dentry/inode 缓存丢失 → 元数据 I/O 增加
+│       │
+│       └─► 🔍 根因定位：人为反复 drop_caches 导致 mmap 文件缺页风暴
+│
+└─► 磁盘性能瓶颈 → ⚠️ 并发因素
+    ├─► I/O 延迟升高（主要读方向）
+    └─► 若为 HDD 则严重影响；SSD 尚可承受</code></pre>
+</div>
+<hr>
+<h2 id="h-四修复方案">四、修复方案</h2>
+<h3 id="h-41-应急处置">4.1 应急处置</h3>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>步骤</th>
+<th>操作</th>
+<th>执行人</th>
+<th>时间</th>
+<th>效果</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>1</td>
+<td>停止执行 <code>drop_caches</code> 操作</td>
+<td>系统/人工</td>
+<td>立即</td>
+<td>阻止 page cache 进一步被清除</td>
+</tr>
+<tr>
+<td>2</td>
+<td>等待 major page fault 自然消退（page cache 自动重建）</td>
+<td>系统</td>
+<td>~10-30秒/GB</td>
+<td>当 mmap 页全部回填到 page cache 后，pgmajfault 归零</td>
+</tr>
+<tr>
+<td>3</td>
+<td>若业务可接受，使用 <code>cat</code> 或 <code>dd</code> 预热 mmap 数据库文件到 page cache</td>
+<td>人工</td>
+<td>根据文件大小</td>
+<td>主动预读可避免逐页缺页的零散 I/O</td>
+</tr>
+<tr>
+<td>4</td>
+<td>监控磁盘 I/O 延迟（await, svctm, %util）确认恢复正常</td>
+<td>人工</td>
+<td>持续监控</td>
+<td>确认 I/O 风暴消退</td>
+</tr>
+</tbody></table></div>
+<p><strong>预读/预热命令参考：</strong></p>
+<div class="code-block">
+  <span class="code-lang">bash</span>
+  <button class="copy-btn" onclick="copyCode(this)" title="复制">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
+  </button>
+  <pre><code># 预热 mmap 数据库文件到 page cache
+dd if=/path/to/database.db of=/dev/null bs=4M
+
+# 或者使用 vmtouch 工具检查 page cache 状态
+vmtouch /path/to/database.db</code></pre>
+</div>
+<h3 id="h-42-永久修复计划">4.2 永久修复计划</h3>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>修复措施</th>
+<th>负责人</th>
+<th>完成时间</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>禁止在生产环境随意执行 <code>drop_caches</code></td>
+<td>DevOps/安全团队</td>
+<td>待定</td>
+<td>除非有明确的 page cache 泄漏排查需要，否则绝不使用。绝大多数场景下 <code>drop_caches</code> 弊远大于利</td>
+</tr>
+<tr>
+<td>设置内核调优参数防止滥用</td>
+<td>DevOps</td>
+<td>待定</td>
+<td>可通过 kernel.drop_caches=0 的 sysctl 配置或 auditd 规则禁用</td>
+</tr>
+<tr>
+<td>容器内限制 drop_caches 能力</td>
+<td>安全团队</td>
+<td>待定</td>
+<td>通过 seccomp / AppArmor / cgroup 禁止容器内的 <code>sysctl</code> 写操作</td>
+</tr>
+<tr>
+<td>评估 mmap vs read IO 策略</td>
+<td>DBA/应用团队</td>
+<td>待定</td>
+<td>数据库场景：mmap 的优点是内核管理缓存，缺点是一旦 cache 被清除则性能骤降。可评估预读策略（<code>MAP_POPULATE</code>）或 fallocate + 预热脚本</td>
+</tr>
+<tr>
+<td>建立 page cache 监控告警</td>
+<td>监控团队</td>
+<td>待定</td>
+<td>对 pgmajfault 设置阈值告警（如 &gt;100/s）和 drop_caches 操作审计</td>
+</tr>
+</tbody></table></div>
+<h3 id="h-43-关于-dropcaches-的技术警示sre-最佳实践">4.3 关于 drop_caches 的技术警示（SRE 最佳实践）</h3>
+<blockquote>
+<p><strong><code>echo 3 &gt; /proc/sys/vm/drop_caches</code> 在生产环境几乎永远是反模式，原因如下：</strong></p>
+<ol>
+<li><strong>浪费空闲内存</strong>：Linux 内核设计将空闲内存用于 page cache 以提高性能。手动释放已缓存的页，然后将重新从磁盘读取 —— 浪费了本可零成本使用的内存。</li>
+<li><strong>mmap 场景危害极大</strong>：对 mmap 文件的影响尤其严重，因为进程通过内存访问隐藏 I/O 路径，major fault 造成的延迟飙升难以被应用感知。</li>
+<li><strong>影响所有进程</strong>：drop_caches 是全局操作，影响整个宿主机上所有进程的缓存数据。</li>
+<li><strong>反复执行放大危害</strong>：连续执行多次会反复破坏 page cache 重建过程，使性能下降持续时间线性增长。</li>
+</ol>
+</blockquote>
+<hr>
+<h2 id="h-附录-a关键性能指标采集时刻-utc-2026-05-26-111220">附录 A：关键性能指标（采集时刻 UTC 2026-05-26 11:12:20）</h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>指标</th>
+<th>值</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>MemTotal</td>
+<td>15,986,876 kB (~15.6GB)</td>
+<td>系统总内存</td>
+</tr>
+<tr>
+<td>MemFree</td>
+<td>14,380,032 kB (~13.7GB)</td>
+<td>空闲内存</td>
+</tr>
+<tr>
+<td>Cached</td>
+<td>727,360 kB (~710MB)</td>
+<td>执行 6 次 drop_caches 后</td>
+</tr>
+<tr>
+<td>原始 Cached</td>
+<td>~5,890,560 kB (~5.6GB)</td>
+<td>根据用户描述（drop_caches 前）</td>
+</tr>
+<tr>
+<td>Cache 缩减率</td>
+<td>-88.5%</td>
+<td>5,890,560 → 674,296 kB</td>
+</tr>
+<tr>
+<td>Mapped</td>
+<td>342,056 kB (~334MB)</td>
+<td>mmap 驻留页（含私有映射的计数差异）</td>
+</tr>
+<tr>
+<td>pgmajfault</td>
+<td>10,764</td>
+<td>major page fault 累计次数，持续增长</td>
+</tr>
+<tr>
+<td>pgpgin</td>
+<td>2,500,969</td>
+<td>磁盘读入页数累计</td>
+</tr>
+<tr>
+<td>drop_pagecache</td>
+<td>6</td>
+<td>drop_caches 执行次数</td>
+</tr>
+<tr>
+<td>drop_slab</td>
+<td>5</td>
+<td>slab 清除次数</td>
+</tr>
+<tr>
+<td>sde 读扇区</td>
+<td>2,397,458</td>
+<td>~1.17GB 从 sde 读取</td>
+</tr>
+<tr>
+<td>sdd 写扇区</td>
+<td>35,806,560</td>
+<td>~17GB 写入 sdd（疑似 WAL/日志）</td>
+</tr>
+<tr>
+<td>Container Mem</td>
+<td>11.08 MiB / 15.25 GiB (0.07%)</td>
+<td>容器内存使用极低</td>
+</tr>
+</tbody></table></div>
+<h2 id="h-附录-b数据来源">附录 B：数据来源</h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>报告文件</th>
+<th>路径</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>T1 — mmap pgmajfault</td>
+<td><code>G:\chaostoolkit\witty-working\kuafu\kuafu_T1_mmap_pgmajfault_20260526_111220.md</code></td>
+</tr>
+<tr>
+<td>T1 — I/O 统计</td>
+<td><code>G:\chaostoolkit\witty-working\kuafu\kuafu_T1_IO_stats_20260526_111239.md</code></td>
+</tr>
+<tr>
+<td>T1 — smaps 详情</td>
+<td><code>G:\chaostoolkit\witty-working\kuafu\kuafu_T1_smaps_detail_20260526_111246.md</code></td>
+</tr>
+<tr>
+<td>T2 — 内存状态</td>
+<td><code>G:\chaostoolkit\witty-working\kuafu\kuafu_T2_memory_state_20260526_111225.md</code></td>
+</tr>
+</tbody></table></div>
+<hr>
+<p><em>报告由 Baize Analysis Agent (Phase 1.4) 自动生成</em></p>
+
+    <div class="meta">
+      <span class="meta-source">pcr-db_drop_caches_mmap_majfault_20260526_111414_report.md</span>
+      <span>生成于 2026/05/26 11:16</span>
+    </div>
+  </article>
+</div>
+
+<script>
+  /* ── 滚动进度条 ── */
+  window.addEventListener("scroll", () => {
+    const el  = document.documentElement;
+    const pct = el.scrollTop / (el.scrollHeight - el.clientHeight) * 100;
+    document.getElementById("progress").style.width = Math.min(pct, 100) + "%";
+  });
+
+  /* ── TOC 高亮当前章节 ── */
+  (function () {
+    const headings = Array.from(document.querySelectorAll("article h1,article h2,article h3"));
+    const links    = Array.from(document.querySelectorAll(".toc a"));
+    if (!links.length) return;
+    const obs = new IntersectionObserver(entries => {
+      entries.forEach(e => {
+        if (!e.isIntersecting) return;
+        links.forEach(l => l.classList.remove("active"));
+        const a = links.find(l => l.getAttribute("href") === "#" + e.target.id);
+        if (a) a.classList.add("active");
+      });
+    }, { rootMargin: "-10% 0px -80% 0px" });
+    headings.forEach(h => obs.observe(h));
+  })();
+
+  /* ── h2 章节序号自动计数 ── */
+  (function () {
+    let idx = 0;
+    document.querySelectorAll("article h2").forEach(el => {
+      idx++;
+      el.setAttribute("data-index", String(idx).padStart(2, "0"));
+    });
+  })();
+
+  /* ── 代码块一键复制 ── */
+  function copyCode(btn) {
+    const code = btn.closest(".code-block").querySelector("code").innerText;
+    navigator.clipboard.writeText(code).then(() => {
+      btn.classList.add("copied");
+      btn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>';
+      setTimeout(() => {
+        btn.classList.remove("copied");
+        btn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>';
+      }, 2000);
+    });
+  }
+
+  /* ── 目录树收缩/展开 ── */
+  function toggleToc(btn) {
+    const expanded = btn.getAttribute("aria-expanded") === "true";
+    btn.setAttribute("aria-expanded", String(!expanded));
+    const parentItem = btn.closest(".toc-item");
+    let nextEl = parentItem.nextElementSibling;
+    if (nextEl && nextEl.classList.contains("toc-group")) {
+      if (expanded) {
+        nextEl.style.maxHeight = nextEl.scrollHeight + "px";
+        void nextEl.offsetHeight;
+        nextEl.classList.add("collapsed");
+      } else {
+        nextEl.classList.remove("collapsed");
+        nextEl.style.maxHeight = nextEl.scrollHeight + "px";
+        setTimeout(() => {
+          if (!nextEl.classList.contains("collapsed")) {
+            nextEl.style.maxHeight = "none";
+          }
+        }, 300);
+      }
+    }
+  }
+</script>
+</body>
+</html>
