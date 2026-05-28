@@ -1,0 +1,1323 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>故障诊断报告 — 容器内进程多维度系统调用异常综合分析</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Lora:ital,wght@0,400;0,600;1,400&family=Source+Sans+3:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  /* ── Design tokens ─────────────────────────────────────────────────────── */
+  :root {
+    --bg:          #f8f7f4;
+    --surface:     #ffffff;
+    --border:      #e8e5df;
+    --border-soft: #f0ede8;
+
+    --text:        #1c1917;
+    --text-2:      #57534e;
+    --text-3:      #a8a29e;
+
+    --accent:      #1d4e6e;
+    --accent-light:#e8f1f7;
+    --accent-mid:  #3b82a0;
+
+    --red:         #c0392b;
+    --red-bg:      #fef2f2;
+    --amber:       #92400e;
+    --amber-bg:    #fffbeb;
+    --green:       #14532d;
+    --green-bg:    #f0fdf4;
+
+    --code-bg:     #1a1d27;
+    --code-text:   #cdd6f4;
+    --code-border: #2d3148;
+
+    --font-body: "Source Sans 3", "PingFang SC", "Hiragino Sans GB", sans-serif;
+    --font-head: "Lora", "PingFang SC", Georgia, serif;
+    --font-mono: "JetBrains Mono", "Fira Code", Consolas, monospace;
+
+    --radius:    8px;
+    --radius-lg: 12px;
+    --shadow:    0 1px 3px rgba(0,0,0,.06), 0 4px 16px rgba(0,0,0,.05);
+    --shadow-lg: 0 2px 8px rgba(0,0,0,.07), 0 8px 32px rgba(0,0,0,.06);
+
+    --toc-width:   240px;
+    --gap:         32px;
+  }
+
+  /* ── Progress bar ──────────────────────────────────────────────────────── */
+  #progress {
+    position: fixed; top: 0; left: 0; height: 3px; width: 0%;
+    background: linear-gradient(90deg, var(--accent-mid), var(--accent));
+    z-index: 999; transition: width .1s linear;
+    border-radius: 0 2px 2px 0;
+  }
+
+  /* ── Base ──────────────────────────────────────────────────────────────── */
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  html { font-size: 16px; scroll-behavior: smooth; }
+  body {
+    font-family: var(--font-body);
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.8;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* ── Layout ────────────────────────────────────────────────────────────── */
+  .layout {
+    display: flex;
+    align-items: flex-start;
+    max-width: calc(var(--toc-width) + 820px + var(--gap) * 3);
+    margin: 0 auto;
+    padding: 48px var(--gap) 96px;
+    gap: var(--gap);
+  }
+
+  /* ── TOC ───────────────────────────────────────────────────────────────── */
+  .toc {
+    width: var(--toc-width);
+    flex-shrink: 0;
+    position: sticky;
+    top: 32px;
+    max-height: calc(100vh - 64px);
+    overflow-y: auto;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    padding: 20px;
+    box-shadow: var(--shadow);
+    scrollbar-width: thin;
+    scrollbar-color: var(--border) transparent;
+  }
+  .toc-title {
+    font-size: 10.5px;
+    font-weight: 600;
+    letter-spacing: .1em;
+    text-transform: uppercase;
+    color: var(--text-3);
+    margin-bottom: 12px;
+    padding-bottom: 10px;
+    border-bottom: 1px solid var(--border-soft);
+  }
+  .toc-item {
+    display: flex;
+    align-items: flex-start;
+    margin: 2px 0;
+  }
+  .toc-toggle {
+    background: none;
+    border: none;
+    cursor: pointer;
+    color: var(--text-3);
+    padding: 4px;
+    margin-right: 4px;
+    margin-top: 2px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 4px;
+    transition: background 0.2s, transform 0.2s;
+  }
+  .toc-toggle:hover { background: var(--border-soft); color: var(--text); }
+  .toc-toggle[aria-expanded="false"] svg { transform: rotate(-90deg); }
+  .toc-spacer { width: 20px; flex-shrink: 0; }
+  .toc-group { overflow: hidden; transition: max-height 0.3s ease-in-out; }
+  .toc-group.collapsed { max-height: 0 !important; }
+  
+  .toc a {
+    display: block;
+    font-size: 13px;
+    color: var(--text-2);
+    text-decoration: none;
+    padding: 4px 8px;
+    border-radius: 5px;
+    line-height: 1.45;
+    transition: background .15s, color .15s;
+    word-break: break-all;
+    flex-grow: 1;
+  }
+  .toc a:hover  { background: var(--accent-light); color: var(--accent); }
+  .toc a.active { background: var(--accent-light); color: var(--accent); font-weight: 500; }
+  .toc-l1 { font-weight: 600; color: var(--text); }
+  .toc-l2 { font-weight: 600; color: var(--text); }
+  .toc-l3 { font-size: 12px !important; padding-left: 14px !important; }
+
+  /* ── Article card ──────────────────────────────────────────────────────── */
+  .article {
+    flex: 1; min-width: 0;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    padding: 52px 60px;
+    box-shadow: var(--shadow-lg);
+  }
+
+  /* ── Headings ──────────────────────────────────────────────────────────── */
+  .title-container {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-end;
+    margin: 0 0 28px;
+    padding-bottom: 18px;
+    border-bottom: 2px solid var(--text);
+  }
+  .article h1 {
+    font-family: var(--font-head);
+    font-size: 26px; font-weight: 600; line-height: 1.3;
+    margin: 0; padding-bottom: 0;
+    border-bottom: none;
+  }
+  .article h2 {
+    font-family: var(--font-head);
+    font-size: 19px; font-weight: 600;
+    margin: 48px 0 14px; padding-bottom: 8px;
+    border-bottom: 1px solid var(--border);
+  }
+  .article h2::before {
+    content: attr(data-index);
+    display: inline-block;
+    font-family: var(--font-mono);
+    font-size: 10.5px; font-weight: 500;
+    color: var(--accent-mid);
+    background: var(--accent-light);
+    padding: 1px 7px; border-radius: 4px;
+    margin-right: 10px; vertical-align: middle;
+    letter-spacing: .05em;
+  }
+  .article h3 {
+    font-family: var(--font-head);
+    font-size: 15.5px; font-weight: 600;
+    margin: 28px 0 10px;
+  }
+  .article h3::before {
+    content: "§ ";
+    color: var(--text-3);
+    font-family: var(--font-mono); font-size: 13px;
+  }
+  .article h4 {
+    font-size: 13.5px; font-weight: 600;
+    color: var(--accent); margin: 20px 0 8px;
+  }
+
+  /* ── Body text ─────────────────────────────────────────────────────────── */
+  .article p, .plain { 
+    font-size: 15px; 
+    line-height: 1.85; 
+    color: var(--text); 
+    margin: 0 0 12px; 
+    font-family: var(--font-body);
+  }
+  .article strong { font-weight: 600; }
+  .article em     { font-style: italic; color: var(--text-2); }
+  .article a {
+    color: var(--accent); text-decoration: underline;
+    text-decoration-color: var(--accent-light);
+    text-underline-offset: 3px;
+  }
+  .article a:hover { text-decoration-color: var(--accent); }
+  .article hr { border: none; border-top: 1px solid var(--border); margin: 20px 0; }
+  .article hr.heavy { border-top: 3px solid var(--text); margin: 32px 0; }
+
+  /* ── Blockquote ────────────────────────────────────────────────────────── */
+  .article blockquote {
+    border-left: 3px solid var(--accent-mid);
+    background: var(--accent-light);
+    margin: 20px 0; padding: 13px 20px 13px 20px;
+    border-radius: 0 var(--radius) var(--radius) 0;
+  }
+  .article blockquote p { font-size: 14.5px; color: var(--accent); margin: 0; line-height: 1.7; }
+  /* 支持块引用内部保留换行符（修复头部概要换行丢失问题） */
+  .article blockquote p { white-space: pre-wrap; }
+  .article blockquote strong { color: var(--accent); }
+
+  /* ── Lists ─────────────────────────────────────────────────────────────── */
+  .article ul, .article ol { padding-left: 22px; margin: 6px 0 14px; }
+  .article li { font-size: 15px; line-height: 1.8; margin: 4px 0; }
+  .article li::marker { color: var(--accent-mid); }
+  .article li > ul, .article li > ol { margin: 3px 0; }
+
+  /* ── Inline code ───────────────────────────────────────────────────────── */
+  .article :not(pre) > code {
+    font-family: var(--font-mono);
+    font-size: 12.5px; font-weight: 500;
+    background: #f3f0eb; color: var(--red);
+    padding: 1px 5px; border-radius: 4px;
+    border: 1px solid var(--border);
+  }
+
+  /* ── Code blocks ───────────────────────────────────────────────────────── */
+  .code-block {
+    position: relative; margin: 20px 0;
+    border-radius: var(--radius-lg); overflow: hidden;
+    border: 1px solid var(--code-border);
+    box-shadow: 0 4px 20px rgba(0,0,0,.16);
+  }
+  .code-lang {
+    position: absolute; top: 0; left: 0;
+    font-family: var(--font-mono); font-size: 10px; font-weight: 500;
+    color: #7c8db5; background: #222538;
+    padding: 4px 12px; border-bottom-right-radius: 6px;
+    text-transform: uppercase; letter-spacing: .08em;
+    user-select: none;
+  }
+  .copy-btn {
+    position: absolute; top: 8px; right: 10px;
+    background: #2d3148; border: 1px solid #3d4260;
+    border-radius: 5px; color: #7c8db5; cursor: pointer;
+    padding: 5px 8px; display: flex; align-items: center;
+    transition: background .15s, color .15s; z-index: 1;
+  }
+  .copy-btn:hover  { background: #3a3f60; color: #cdd6f4; }
+  .copy-btn.copied { color: #a6e3a1; border-color: #4a6a4a; }
+  .code-block pre {
+    margin: 0; padding: 36px 20px 20px;
+    background: var(--code-bg); overflow-x: auto;
+    scrollbar-width: thin; scrollbar-color: #3d4260 transparent;
+  }
+  .code-block pre::-webkit-scrollbar { height: 5px; }
+  .code-block pre::-webkit-scrollbar-thumb { background: #3d4260; border-radius: 3px; }
+  .code-block code {
+    font-family: var(--font-mono); font-size: 13px; line-height: 1.7;
+    color: var(--code-text); background: none; border: none; padding: 0;
+    white-space: pre; word-break: normal;
+  }
+
+  /* ── Tables ────────────────────────────────────────────────────────────── */
+  .table-wrap {
+    overflow-x: auto; margin: 16px 0;
+    border-radius: var(--radius-lg);
+    border: 1px solid var(--border);
+    box-shadow: var(--shadow);
+  }
+  table { width: 100%; border-collapse: collapse; font-size: 14px; min-width: 360px; }
+  thead { background: #f4f2ee; }
+  th {
+    padding: 9px 14px; text-align: left;
+    font-size: 11.5px; font-weight: 600;
+    letter-spacing: .04em; text-transform: uppercase;
+    color: var(--text-2); border-bottom: 1px solid var(--border);
+    white-space: nowrap;
+  }
+  td {
+    padding: 8px 14px; border-bottom: 1px solid var(--border-soft);
+    color: var(--text); vertical-align: top; line-height: 1.6;
+  }
+  tbody tr:last-child td { border-bottom: none; }
+  tbody tr:nth-child(even) td { background: #faf9f7; }
+  tbody tr:hover td { background: var(--accent-light); transition: background .1s; }
+
+  /* ── KV block ──────────────────────────────────────────────────────────── */
+  .kv-block { background: var(--bg); border: 1px solid var(--border); border-radius: var(--radius-lg); overflow: hidden; margin: 12px 0 20px; }
+  .kv-row { display: flex; border-bottom: 1px solid var(--border-soft); align-items: flex-start; }
+  .kv-row:last-child { border-bottom: none; }
+  .kv-key { flex: 0 0 160px; padding: 9px 16px; font-size: 13.5px; font-weight: 600; color: var(--text-2); background: var(--surface); border-right: 1px solid var(--border-soft); }
+  .kv-val { flex: 1; padding: 9px 16px; font-size: 14px; color: var(--text); }
+
+  /* ── Status badges ─────────────────────────────────────────────────────── */
+  .badge-ok { display: inline-flex; align-items: center; gap: 4px; background: var(--green-bg); color: var(--green); font-size: 13px; font-weight: 500; padding: 2px 9px; border-radius: 20px; border: 1px solid #bbf7d0; }
+  .badge-err { display: inline-flex; align-items: center; gap: 4px; background: var(--red-bg); color: var(--red); font-size: 13px; font-weight: 500; padding: 2px 9px; border-radius: 20px; border: 1px solid #fecaca; }
+  .badge-warn { display: inline-flex; align-items: center; gap: 4px; background: var(--amber-bg); color: var(--amber); font-size: 13px; font-weight: 500; padding: 2px 9px; border-radius: 20px; border: 1px solid #fde68a; }
+
+  /* ── Priority badges ───────────────────────────────────────────────────── */
+  .pri-p0 { display: inline-block; background: #fef2f2; color: #991b1b; border: 1px solid #fca5a5; font-size: 12px; font-weight: 700; padding: 2px 8px; border-radius: 4px; letter-spacing: .04em; }
+  .pri-p1 { display: inline-block; background: #fff7ed; color: #9a3412; border: 1px solid #fdba74; font-size: 12px; font-weight: 700; padding: 2px 8px; border-radius: 4px; }
+  .pri-p2 { display: inline-block; background: #fffbeb; color: #92400e; border: 1px solid #fde68a; font-size: 12px; font-weight: 700; padding: 2px 8px; border-radius: 4px; }
+  .pri-p3 { display: inline-block; background: var(--accent-light); color: var(--accent); border: 1px solid #bfdbfe; font-size: 12px; font-weight: 700; padding: 2px 8px; border-radius: 4px; }
+
+  /* ── Fault header ──────────────────────────────────────────────────────── */
+  .fault-header { display: flex; align-items: center; gap: 12px; padding: 12px 16px; border-radius: var(--radius-lg); margin: 16px 0 8px; border: 1px solid; }
+  .fh-p0 { background: #fef2f2; border-color: #fca5a5; }
+  .fh-p1 { background: #fff7ed; border-color: #fdba74; }
+  .fh-p2 { background: #fffbeb; border-color: #fde68a; }
+  .fh-p3 { background: var(--accent-light); border-color: #bfdbfe; }
+  .fh-badge { font-family: var(--font-mono); font-size: 11px; font-weight: 700; letter-spacing: .08em; }
+  .fh-p0 .fh-badge { color: #991b1b; }
+  .fh-p1 .fh-badge { color: #9a3412; }
+  .fh-p2 .fh-badge { color: #92400e; }
+  .fh-p3 .fh-badge { color: var(--accent); }
+  .fh-rest { font-size: 14px; font-weight: 500; color: var(--text); }
+
+  /* ── Timeline ──────────────────────────────────────────────────────────── */
+  .timeline { border-left: 2px solid var(--accent-mid); margin: 16px 0 16px 8px; padding-left: 20px; }
+  .tl-row { display: flex; align-items: baseline; gap: 10px; margin: 8px 0; font-size: 13.5px; }
+  .tl-ts { font-family: var(--font-mono); font-size: 12px; color: var(--text-3); flex-shrink: 0; white-space: nowrap; }
+  .tl-tag { font-size: 11px; font-weight: 600; padding: 1px 7px; border-radius: 10px; flex-shrink: 0; background: var(--accent-light); color: var(--accent); }
+  .tl-tag.err { background: var(--red-bg); color: var(--red); }
+  .tl-tag.warn { background: var(--amber-bg); color: var(--amber); }
+  .tl-desc { color: var(--text); line-height: 1.5; }
+
+  /* ── Global warn ───────────────────────────────────────────────────────── */
+  .global-warn { background: #fef2f2; border: 1px solid #fca5a5; border-radius: var(--radius-lg); padding: 14px 18px; font-size: 14.5px; font-weight: 600; color: #991b1b; margin: 16px 0; }
+
+  /* ── Tree note ─────────────────────────────────────────────────────────── */
+  .tree-note { white-space: pre-wrap; font-family: var(--font-mono); font-size: 13.5px; line-height: 1.6; color: var(--text-2); margin: 8px 0 8px 16px; }
+
+  /* ── Disclaimer ────────────────────────────────────────────────────────── */
+  .disclaimer { background: var(--bg); border: 1px solid var(--border); border-radius: var(--radius); padding: 14px 18px; font-size: 13.5px; color: var(--text-2); font-style: italic; }
+
+  /* ── Meta footer ───────────────────────────────────────────────────────── */
+  .meta {
+    margin-top: 48px; padding-top: 16px;
+    border-top: 1px solid var(--border-soft);
+    display: flex; justify-content: space-between; align-items: center;
+    font-size: 12px; color: var(--text-3);
+  }
+  .meta-source { font-family: var(--font-mono); font-size: 11.5px; }
+
+  /* ── Brand logo ────────────────────────────────────────────────────────── */
+  .brand-logo {
+    font-family: var(--font-head);
+    font-size: 14px;
+    color: var(--text-3);
+    letter-spacing: 0.05em;
+    margin-bottom: 4px;
+    flex-shrink: 0;
+    margin-left: 16px;
+  }
+  .brand-logo strong {
+    font-weight: 600;
+    color: var(--accent);
+  }
+  @media (max-width: 900px) {
+    .title-container { flex-direction: column; align-items: flex-start; gap: 12px; }
+    .brand-logo { margin-left: 0; margin-bottom: 0; }
+  }
+  /* ── Print ─────────────────────────────────────────────────────────────── */
+  @media print {
+    body { background: white; }
+    #progress, .toc { display: none; }
+    .layout { display: block; padding: 0; }
+    .article { border: none; box-shadow: none; padding: 24px; }
+    .copy-btn { display: none; }
+    .brand-logo { margin-bottom: 0; }
+  }
+
+  /* ── Responsive ────────────────────────────────────────────────────────── */
+  @media (max-width: 900px) {
+    .toc { display: none; }
+    .article { padding: 36px 28px; }
+    .layout { padding: 24px 16px 64px; }
+  }
+  @media (max-width: 480px) {
+    .article { padding: 24px 18px; }
+    .article h1 { font-size: 22px; }
+  }
+</style>
+</head>
+<body>
+
+<div id="progress"></div>
+
+<div class="layout">
+  <nav class="toc" id="toc">
+  <div class="toc-title">目录</div>
+  <div class="toc-content">
+<div class="toc-item has-children"><button class="toc-toggle" onclick="toggleToc(this)" aria-expanded="true">
+                <svg viewBox="0 0 24 24" width="12" height="12" stroke="currentColor" stroke-width="2" fill="none"><polyline points="6 9 12 15 18 9"></polyline></svg>
+              </button><a href="#h-故障诊断报告-容器内进程多维度系统调用异常综合分析" onclick="event.preventDefault(); const target = document.getElementById('h-故障诊断报告-容器内进程多维度系统调用异常综合分析'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l1">🔴 故障诊断报告 — 容器内进程多维度系统调用异常综合分析</a></div>
+<div class="toc-group" id="group-h-一故障概览">
+<div class="toc-item has-children"><button class="toc-toggle" onclick="toggleToc(this)" aria-expanded="true">
+                <svg viewBox="0 0 24 24" width="12" height="12" stroke="currentColor" stroke-width="2" fill="none"><polyline points="6 9 12 15 18 9"></polyline></svg>
+              </button><a href="#h-一故障概览" onclick="event.preventDefault(); const target = document.getElementById('h-一故障概览'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l2">一、故障概览</a></div>
+<div class="toc-group" id="group-h-置信度说明">
+<div class="toc-item "><span class="toc-spacer"></span><a href="#h-置信度说明" onclick="event.preventDefault(); const target = document.getElementById('h-置信度说明'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l3">置信度说明</a></div>
+</div>
+<div class="toc-item has-children"><button class="toc-toggle" onclick="toggleToc(this)" aria-expanded="true">
+                <svg viewBox="0 0 24 24" width="12" height="12" stroke="currentColor" stroke-width="2" fill="none"><polyline points="6 9 12 15 18 9"></polyline></svg>
+              </button><a href="#h-二根因速览" onclick="event.preventDefault(); const target = document.getElementById('h-二根因速览'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l2">二、根因速览</a></div>
+<div class="toc-group" id="group-h-事故时间线-故障传导链路">
+<div class="toc-item "><span class="toc-spacer"></span><a href="#h-事故时间线-故障传导链路" onclick="event.preventDefault(); const target = document.getElementById('h-事故时间线-故障传导链路'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l3">事故时间线 & 故障传导链路</a></div>
+<div class="toc-item "><span class="toc-spacer"></span><a href="#h-故障因果链" onclick="event.preventDefault(); const target = document.getElementById('h-故障因果链'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l3">故障因果链</a></div>
+</div>
+<div class="toc-item has-children"><button class="toc-toggle" onclick="toggleToc(this)" aria-expanded="true">
+                <svg viewBox="0 0 24 24" width="12" height="12" stroke="currentColor" stroke-width="2" fill="none"><polyline points="6 9 12 15 18 9"></polyline></svg>
+              </button><a href="#h-三排查过程" onclick="event.preventDefault(); const target = document.getElementById('h-三排查过程'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l2">三、排查过程</a></div>
+<div class="toc-group" id="group-h-31-初始现象">
+<div class="toc-item "><span class="toc-spacer"></span><a href="#h-31-初始现象" onclick="event.preventDefault(); const target = document.getElementById('h-31-初始现象'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l3">3.1 初始现象</a></div>
+<div class="toc-item "><span class="toc-spacer"></span><a href="#h-32-假设驱动排查" onclick="event.preventDefault(); const target = document.getElementById('h-32-假设驱动排查'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l3">3.2 假设驱动排查</a></div>
+<div class="toc-item "><span class="toc-spacer"></span><a href="#h-33-排查结论" onclick="event.preventDefault(); const target = document.getElementById('h-33-排查结论'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l3">3.3 排查结论</a></div>
+</div>
+<div class="toc-item has-children"><button class="toc-toggle" onclick="toggleToc(this)" aria-expanded="true">
+                <svg viewBox="0 0 24 24" width="12" height="12" stroke="currentColor" stroke-width="2" fill="none"><polyline points="6 9 12 15 18 9"></polyline></svg>
+              </button><a href="#h-四异常分类总结" onclick="event.preventDefault(); const target = document.getElementById('h-四异常分类总结'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l2">四、异常分类总结</a></div>
+<div class="toc-group" id="group-h-综合严重度评估">
+<div class="toc-item "><span class="toc-spacer"></span><a href="#h-综合严重度评估" onclick="event.preventDefault(); const target = document.getElementById('h-综合严重度评估'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l3">综合严重度评估</a></div>
+</div>
+<div class="toc-item has-children"><button class="toc-toggle" onclick="toggleToc(this)" aria-expanded="true">
+                <svg viewBox="0 0 24 24" width="12" height="12" stroke="currentColor" stroke-width="2" fill="none"><polyline points="6 9 12 15 18 9"></polyline></svg>
+              </button><a href="#h-五修复方案" onclick="event.preventDefault(); const target = document.getElementById('h-五修复方案'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l2">五、修复方案</a></div>
+<div class="toc-group" id="group-h-51-各异常类型的处置建议">
+<div class="toc-item "><span class="toc-spacer"></span><a href="#h-51-各异常类型的处置建议" onclick="event.preventDefault(); const target = document.getElementById('h-51-各异常类型的处置建议'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l3">5.1 各异常类型的处置建议</a></div>
+<div class="toc-item "><span class="toc-spacer"></span><a href="#h-52-永久修复计划" onclick="event.preventDefault(); const target = document.getElementById('h-52-永久修复计划'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l3">5.2 永久修复计划</a></div>
+</div>
+<div class="toc-item has-children"><button class="toc-toggle" onclick="toggleToc(this)" aria-expanded="true">
+                <svg viewBox="0 0 24 24" width="12" height="12" stroke="currentColor" stroke-width="2" fill="none"><polyline points="6 9 12 15 18 9"></polyline></svg>
+              </button><a href="#h-六附录" onclick="event.preventDefault(); const target = document.getElementById('h-六附录'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l2">六、附录</a></div>
+<div class="toc-group" id="group-h-61-证据索引">
+<div class="toc-item "><span class="toc-spacer"></span><a href="#h-61-证据索引" onclick="event.preventDefault(); const target = document.getElementById('h-61-证据索引'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l3">6.1 证据索引</a></div>
+<div class="toc-item "><span class="toc-spacer"></span><a href="#h-62-关键原始数据快照" onclick="event.preventDefault(); const target = document.getElementById('h-62-关键原始数据快照'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l3">6.2 关键原始数据快照</a></div>
+</div>
+</div>
+  </div>
+</nav>
+  <article class="article" id="article" style="position: relative;">
+    <div class="title-container"><h1 id="h-故障诊断报告-容器内进程多维度系统调用异常综合分析">🔴 故障诊断报告 — 容器内进程多维度系统调用异常综合分析</h1><div class="brand-logo">by <strong>Witty Diagnosis Agent</strong></div></div>
+<blockquote>
+<p><strong>报告编号</strong>：RCA-20260528-BAIZE-001
+<strong>故障级别</strong>：P2（中等严重度）
+<strong>报告时间</strong>：2026-05-28 22:30:00
+<strong>当前状态</strong>：🟡 观察中（该进程为诊断测试程序 <code>branch_a_errors --loop all</code>，部分异常属于预期行为）</p>
+</blockquote>
+<hr>
+<h2 id="h-一故障概览">一、故障概览</h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>项目</th>
+<th>内容</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>故障标题</td>
+<td>容器内进程（PID 1, branch_a_errors）产生四类系统调用异常：EPERM / ENOMEM / ENOENT / EAGAIN</td>
+</tr>
+<tr>
+<td>影响范围</td>
+<td>容器 <code>strace-fi-loop-a-all-1779968160</code> 内 PID 1 进程（branch_a_errors --loop all）</td>
+</tr>
+<tr>
+<td>故障时段</td>
+<td>2026-05-28 持续运行（无限循环模式）</td>
+</tr>
+<tr>
+<td>根本原因</td>
+<td>1）容器 Capabilities 缺少 CAP_SYS_NICE → sched_setscheduler EPERM；<br>2）RLIMIT_AS 软限制 32MB（自设）→ mmap 16MB ENOMEM；<br>3）固定不存在的路径遍历 → 预期 ENOENT；<br>4）O_NONBLOCK pipe 无事件驱动忙等轮询 → EAGAIN</td>
+</tr>
+<tr>
+<td>是否恢复</td>
+<td><span class="badge-err">❌ 未恢复（进程仍在循环）</span></td>
+</tr>
+<tr>
+<td>根因置信度</td>
+<td>🟢 高置信 — 客观证据充分，各异常路径均有明确根因</td>
+</tr>
+</tbody></table></div>
+<h3 id="h-置信度说明">置信度说明</h3>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>等级</th>
+<th>标识</th>
+<th>含义</th>
+<th>示例场景</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>高置信</td>
+<td>🟢</td>
+<td>根因已明确，可复现，单一原因可解释所有现象</td>
+<td>本报告中各异常类型均有决定性证据</td>
+</tr>
+<tr>
+<td>中置信</td>
+<td>🟡</td>
+<td>根因基本确认，但存在 1～2 个无法完全解释的现象</td>
+<td>—</td>
+</tr>
+<tr>
+<td>低置信</td>
+<td>🟠</td>
+<td>有多个可疑原因，尚未排除竞争，结论为推断</td>
+<td>—</td>
+</tr>
+<tr>
+<td>未知</td>
+<td>🔴</td>
+<td>现象无法解释，根因未定位，仍在排查中</td>
+<td>—</td>
+</tr>
+</tbody></table></div>
+<hr>
+<h2 id="h-二根因速览">二、根因速览</h2>
+<h3 id="h-事故时间线-故障传导链路">事故时间线 & 故障传导链路</h3>
+<div class="code-block">
+  <span class="code-lang">text</span>
+  <button class="copy-btn" onclick="copyCode(this)" title="复制">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
+  </button>
+  <pre><code>时间                       事件                                                      性质            溯源路径
+──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+2026-05-28 (持续)         容器启动：strace-fi-loop-a-all-1779968160                     📦 容器启动      [docker/container]
+                          进程启动：branch_a_errors --loop all (PID 1)
+                            程序自行设定 RLIMIT_AS = 32MB/64MB
+                            容器的 CapEff 不包含 CAP_SYS_NICE
+  │
+  ├─► 分支1: 实时调度请求
+  │       sched_setscheduler(0, SCHED_FIFO, [99]) → -1 EPERM (35次/10s, 100%失败)
+  │       │
+  │       ▼
+  │       🎯 根因: 容器 CapEff 缺失 CAP_SYS_NICE                    ⚠️ 容器配置缺陷   [kuafu_T1.md:21-26]
+  │
+  ├─► 分支2: 内存映射
+  │       当前 VmSize ~31MB (已达 RLIMIT_AS 32MB 的 96%)
+  │       mmap(16MB, ANONYMOUS) → -1 ENOMEM (7次/10s)
+  │       │
+  │       ▼
+  │       🎯 根因: RLIMIT_AS 软限制 32MB (自设) 被触发               🔴 资源限制       [kuafu_T2.md:27-28]
+  │
+  ├─► 分支3: 不存在的路径遍历
+  │       openat(/tmp/nonexistent_dir_1/*.conf) → ENOENT (37次/10s)
+  │       newfstatat(/tmp/definitely_not_a_file*) → ENOENT
+  │       access(/nonexistent_path/*) → ENOENT
+  │       │
+  │       ▼
+  │       🎯 根因: 路径名显式含 "nonexistent"，属于预期 ENOENT 测试           📋 测试代码行为   [kuafu_T3.md:11-27]
+  │
+  └─► 分支4: Pipe 忙等轮询
+          pipe(fd 3/4) + read(3, O_NONBLOCK) → EAGAIN (28次/10s, 80%失败率)
+          轮询间隔 20ms，连续4次 EAGAIN 后暂停 1.33s
+          无 poll/epoll/select 使用
+          │
+          ▼
+          🎯 根因: 自旋轮询无事件通知机制，纯 CPU 空转                      📋 低效设计       [kuafu_T3.md:29-36]</code></pre>
+</div>
+<h3 id="h-故障因果链">故障因果链</h3>
+<div class="code-block">
+  <span class="code-lang">text</span>
+  <button class="copy-btn" onclick="copyCode(this)" title="复制">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
+  </button>
+  <pre><code>branch_a_errors --loop all  (诊断/压力测试程序)
+    │
+    ├─► sched_setscheduler(SCHED_FIFO)
+    │       └─► 容器 CapEff 缺失 CAP_SYS_NICE
+    │               └─► EPERM 权限拒绝 (×35次/10s) ← 🎯 容器能力配置缺陷
+    │
+    ├─► mmap(16MB, ANON)
+    │       └─► RLIMIT_AS 软限制 32MB (进程自设)
+    │               ├─► 已使用 ~31MB (程序+栈+堆+libc)
+    │               └─► 16MB 请求将推到 ~47MB &gt; 32MB
+    │                       └─► ENOMEM 内存分配失败 (×7次/10s) ← 🎯 进程级资源限制 (自设)
+    │
+    ├─► openat/stat/access (不存在的路径)
+    │       └─► 路径名含 "nonexistent"、"definitely_not_a_file"  
+    │               └─► ENOENT 文件/路径不存在 (×37次/10s) ← 📋 预期测试行为
+    │
+    └─► read(O_NONBLOCK pipe)
+            └─► 无事件驱动机制 (无 poll/epoll/select)
+                    └─► 20ms 固定间隔 busy polling
+                            └─► EAGAIN 忙等轮询 (×28次/10s) ← 📋 低效的忙等设计</code></pre>
+</div>
+<hr>
+<h2 id="h-三排查过程">三、排查过程</h2>
+<blockquote>
+<p><strong>排查逻辑</strong>：分别对四种异常类型提出假设 → 收集证据 → 验证或排除 → 逐一定位根因</p>
+</blockquote>
+<h3 id="h-31-初始现象">3.1 初始现象</h3>
+<ul>
+<li>容器 <code>strace-fi-loop-a-all-1779968160</code> 内 PID 1 进程 <code>branch_a_errors --loop all</code> 在运行期间持续产生四类系统调用异常</li>
+<li>异常类型与频率：</li>
+</ul>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>异常类型</th>
+<th>系统调用</th>
+<th>频率 (次/10s)</th>
+<th>失败率</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>EPERM</td>
+<td>sched_setscheduler</td>
+<td>35</td>
+<td>100%</td>
+</tr>
+<tr>
+<td>ENOMEM</td>
+<td>mmap</td>
+<td>7</td>
+<td>—</td>
+</tr>
+<tr>
+<td>ENOENT</td>
+<td>openat / newfstatat / access</td>
+<td>37</td>
+<td>100%</td>
+</tr>
+<tr>
+<td>EAGAIN</td>
+<td>read(O_NONBLOCK pipe)</td>
+<td>28</td>
+<td>80%</td>
+</tr>
+</tbody></table></div>
+<hr>
+<h3 id="h-32-假设驱动排查">3.2 假设驱动排查</h3>
+<h4 id="h-异常-aeperm-schedsetscheduler-实时调度权限拒绝">异常 A：EPERM — sched_setscheduler 实时调度权限拒绝</h4>
+<blockquote>
+<p>🧪 假设：进程尝试设置实时调度策略（SCHED_FIFO，优先级 99）但被内核拒绝</p>
+</blockquote>
+<p><strong>Step 1 — 检查容器 Capabilities</strong></p>
+<div class="code-block">
+  
+  <button class="copy-btn" onclick="copyCode(this)" title="复制">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
+  </button>
+  <pre><code>CapEff: 00000000a82c35fb
+包含: cap_chown, cap_dac_override, cap_fowner, cap_fsetid, cap_kill,
+      cap_setgid, cap_setuid, cap_setpcap, cap_net_bind_service,
+      cap_net_admin, cap_net_raw, cap_sys_chroot, cap_sys_ptrace,
+      cap_sys_admin, cap_mknod, cap_audit_write, cap_setfcap
+不包含: CAP_SYS_NICE (cap_sys_nice)</code></pre>
+</div>
+<p><strong>Step 2 — 关联内核权限检查规则</strong></p>
+<p><code>sched_setscheduler()</code> 需要调用者具有 <code>CAP_SYS_NICE</code> 才能设置 SCHED_FIFO/SCHED_RR 实时调度策略。容器 CapEff 中缺失此权限。</p>
+<p><strong>✅ 结论：容器 Capabilities 配置缺少 CAP_SYS_NICE 导致 EPERM。</strong></p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>检查项</th>
+<th>操作</th>
+<th>结论</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>容器 CapEff 是否含 CAP_SYS_NICE</td>
+<td>解析 CapEff 位图</td>
+<td><span class="badge-err">❌ 缺失</span></td>
+</tr>
+<tr>
+<td>进程是否以 root 运行</td>
+<td>进程检查</td>
+<td><span class="badge-ok">✅ 是 (uid=0)</span></td>
+</tr>
+<tr>
+<td>CAP_SYS_NICE 是否是 sched_setscheduler 的必需 cap</td>
+<td>内核文档</td>
+<td><span class="badge-ok">✅ 是必要条件</span></td>
+</tr>
+</tbody></table></div>
+<hr>
+<h4 id="h-异常-benomem-mmap-内存分配失败">异常 B：ENOMEM — mmap 内存分配失败</h4>
+<blockquote>
+<p>🧪 假设：系统内存不足或进程级地址空间受限导致 mmap 失败</p>
+</blockquote>
+<p><strong>Step 1 — 检查系统内存状态（容器内）</strong></p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>检查项</th>
+<th>值</th>
+<th>结论</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>总内存</td>
+<td>~7.4GB</td>
+<td><span class="badge-ok">✅ 充足</span></td>
+</tr>
+<tr>
+<td>overcommit_memory</td>
+<td>1 (always)</td>
+<td><span class="badge-ok">✅ 允许过量申请</span></td>
+</tr>
+<tr>
+<td>max_map_count</td>
+<td>262144</td>
+<td><span class="badge-ok">✅ 充足</span></td>
+</tr>
+<tr>
+<td>cgroup memory limit</td>
+<td>无限制</td>
+<td><span class="badge-ok">✅ 不限</span></td>
+</tr>
+</tbody></table></div>
+<p><strong>Step 2 — 检查进程级资源限制</strong></p>
+<div class="code-block">
+  
+  <button class="copy-btn" onclick="copyCode(this)" title="复制">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
+  </button>
+  <pre><code>RLIMIT_AS (地址空间软限制): SOFT = 33,554,432 (32MB)  HARD = 67,108,864 (64MB)
+RLIMIT_DATA: unlimited
+RLIMIT_MEMLOCK: unlimited</code></pre>
+</div>
+<p><strong>Step 3 — 检查当前内存使用</strong></p>
+<div class="code-block">
+  
+  <button class="copy-btn" onclick="copyCode(this)" title="复制">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
+  </button>
+  <pre><code>VmSize: 31448 kB (~31MB，已达 RLIMIT_AS 软限制的 96%)
+VmRSS: 1536 kB</code></pre>
+</div>
+<p><strong>Step 4 — mmap 失败现场</strong></p>
+<div class="code-block">
+  
+  <button class="copy-btn" onclick="copyCode(this)" title="复制">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
+  </button>
+  <pre><code>mmap(NULL, 16777216 (16MB), PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_ANONYMOUS, -1, 0) = -1 ENOMEM</code></pre>
+</div>
+<p>mmap 16MB 尝试将总虚拟地址空间从 ~31MB 推到 ~47MB，超出 32MB 软限制。</p>
+<p><strong>✅ 结论：进程自设 RLIMIT_AS 软限制为 32MB，mmap 16MB 尝试突破该限制导致 ENOMEM。</strong></p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>检查项</th>
+<th>操作</th>
+<th>结论</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>系统内存是否充足</td>
+<td>容器内 /proc/meminfo</td>
+<td><span class="badge-ok">✅ 7.4GB</span></td>
+</tr>
+<tr>
+<td>RLIMIT_AS 软限制</td>
+<td>prlimit 检查</td>
+<td><span class="badge-err">❌ 32MB (过小)</span></td>
+</tr>
+<tr>
+<td>进程当前使用量</td>
+<td>/proc/self/status VmSize</td>
+<td><span class="badge-ok">✅ ~31MB (已接近极限)</span></td>
+</tr>
+<tr>
+<td>cgroup 内存限制</td>
+<td>/sys/fs/cgroup/memory</td>
+<td><span class="badge-ok">✅ 无限制</span></td>
+</tr>
+</tbody></table></div>
+<hr>
+<h4 id="h-异常-cenoent-固定路径不存在">异常 C：ENOENT — 固定路径不存在</h4>
+<blockquote>
+<p>🧪 假设：访问的路径确实不存在，可能是配置错误或测试路径</p>
+</blockquote>
+<p><strong>Step 1 — 分析路径模式</strong></p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>路径模式</th>
+<th>系统调用</th>
+<th>特征</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>/tmp/nonexistent_dir_1/nonexistent_file_{0-4}.conf</td>
+<td>openat(O_RDONLY)</td>
+<td>目录名含&quot;nonexistent&quot;</td>
+</tr>
+<tr>
+<td>/tmp/definitely_not_a_file_that_exists.xzy</td>
+<td>newfstatat</td>
+<td>文件名显式表示不存在</td>
+</tr>
+<tr>
+<td>/nonexistent_path/test_file.txt</td>
+<td>access(F_OK)</td>
+<td>路径含&quot;nonexistent&quot;</td>
+</tr>
+</tbody></table></div>
+<p><strong>Step 2 — 判断路径性质</strong></p>
+<p>所有路径名称皆为刻意标注为不存在的路径（&quot;nonexistent&quot;、&quot;definitely_not_a_file_that_exists&quot;），且程序循环遍历这些固定模式路径。这属于测试/演示代码的预期行为。</p>
+<p><strong>✅ 结论：ENOENT 是程序预期行为，路径名称设计即为不存在，非配置错误。</strong></p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>检查项</th>
+<th>操作</th>
+<th>结论</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>路径是否存在</td>
+<td>路径分析</td>
+<td><span class="badge-err">❌ 路径名显式指示不存在</span></td>
+</tr>
+<tr>
+<td>是否为容器挂载问题</td>
+<td>路径均在 /tmp 和 / 下</td>
+<td><span class="badge-ok">✅ 非挂载问题</span></td>
+</tr>
+<tr>
+<td>是否为配置错误</td>
+<td>路径名语义分析</td>
+<td><span class="badge-ok">✅ 属测试代码设计</span></td>
+</tr>
+</tbody></table></div>
+<hr>
+<h4 id="h-异常-deagain-pipe-忙等轮询">异常 D：EAGAIN — pipe 忙等轮询</h4>
+<blockquote>
+<p>🧪 假设：pipe 读端被设置为非阻塞模式，且无事件通知机制，导致 CPU 空转</p>
+</blockquote>
+<p><strong>Step 1 — 分析 pipe 读写模式</strong></p>
+<div class="code-block">
+  
+  <button class="copy-btn" onclick="copyCode(this)" title="复制">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
+  </button>
+  <pre><code>pipe(fd 3(read, O_NONBLOCK) / fd 4(write, blocking))
+
+轮询周期:
+  ├─ read(3) = EAGAIN  (间隔 20ms)
+  ├─ read(3) = EAGAIN  (间隔 20ms)
+  ├─ read(3) = EAGAIN  (间隔 20ms)
+  ├─ read(3) = EAGAIN  (间隔 20ms)
+  └─ 暂停 ~1.33s
+     └─ 重复以上模式</code></pre>
+</div>
+<p><strong>Step 2 — 检查是否使用事件驱动机制</strong></p>
+<div class="code-block">
+  
+  <button class="copy-btn" onclick="copyCode(this)" title="复制">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
+  </button>
+  <pre><code>检查结果: 无 poll/epoll/select/ppoll 调用</code></pre>
+</div>
+<p><strong>Step 3 — 评估 CPU 效率</strong></p>
+<p>20ms 轮询间隔意味着每秒将产生约 50 次无意义的系统调用，全部返回 EAGAIN。这种忙等模式导致：</p>
+<ul>
+<li>CPU 时间浪费在无意义的系统调用上</li>
+<li>上下文切换开销增大</li>
+<li>无数据时仍持续轮询</li>
+</ul>
+<p><strong>✅ 结论：纯忙等（Busy Polling）模式，无 poll/epoll/select 事件通知，属于低效设计。</strong></p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>检查项</th>
+<th>操作</th>
+<th>结论</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>pipe 是否非阻塞</td>
+<td>fd flags</td>
+<td><span class="badge-ok">✅ O_NONBLOCK</span></td>
+</tr>
+<tr>
+<td>是否存在事件驱动</td>
+<td>strace 检查 poll/epoll/select</td>
+<td><span class="badge-err">❌ 无</span></td>
+</tr>
+<tr>
+<td>轮询间隔</td>
+<td>时间间隔计算</td>
+<td>20ms (过高频率)</td>
+</tr>
+</tbody></table></div>
+<hr>
+<h3 id="h-33-排查结论">3.3 排查结论</h3>
+<div class="code-block">
+  <span class="code-lang">text</span>
+  <button class="copy-btn" onclick="copyCode(this)" title="复制">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
+  </button>
+  <pre><code>容器内进程 PID 1 (branch_a_errors --loop all) 四类系统调用异常
+│
+├─► EPERM (sched_setscheduler)     ← 容器 CapEff 缺失 CAP_SYS_NICE
+│       └─► 🎯 根因确认：容器能力配置缺陷
+│
+├─► ENOMEM (mmap 16MB)            ← RLIMIT_AS 软限制 32MB 被突破
+│       └─► 🎯 根因确认：进程自设资源限制过小
+│
+├─► ENOENT (openat/stat/access)   ← 固定不存在的测试路径
+│       └─► 📋 预期行为：测试代码设计如此
+│
+└─► EAGAIN (pipe read)            ← 无事件驱动的忙等轮询
+        └─► 📋 低效设计：缺少 poll/epoll 事件通知机制</code></pre>
+</div>
+<hr>
+<h2 id="h-四异常分类总结">四、异常分类总结</h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>异常类型</th>
+<th>syscall</th>
+<th align="center">是否为真正故障</th>
+<th align="center">严重度</th>
+<th>归因类别</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>EPERM</td>
+<td>sched_setscheduler</td>
+<td align="center">⚠️ 是（容器配置缺陷）</td>
+<td align="center"><strong>中等</strong></td>
+<td>容器运行时配置</td>
+</tr>
+<tr>
+<td>ENOMEM</td>
+<td>mmap</td>
+<td align="center">⚠️ 是（进程级限制）</td>
+<td align="center"><strong>中等</strong></td>
+<td>进程资源限制（自设）</td>
+</tr>
+<tr>
+<td>ENOENT</td>
+<td>openat/stat/access</td>
+<td align="center">❌ 否（预期测试行为）</td>
+<td align="center"><strong>低（信息性）</strong></td>
+<td>测试代码逻辑</td>
+</tr>
+<tr>
+<td>EAGAIN</td>
+<td>pipe read(O_NONBLOCK)</td>
+<td align="center">❌ 否（但设计低效）</td>
+<td align="center"><strong>低（建议改进）</strong></td>
+<td>编程模式/设计</td>
+</tr>
+</tbody></table></div>
+<h3 id="h-综合严重度评估">综合严重度评估</h3>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>维度</th>
+<th align="center">评级</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>影响范围</td>
+<td align="center">🟢 单容器</td>
+<td>仅影响容器 <code>strace-fi-loop-a-all-1779968160</code> 内 PID 1</td>
+</tr>
+<tr>
+<td>业务中断</td>
+<td align="center">🟢 无</td>
+<td>进程为诊断/演示程序 <code>branch_a_errors</code>，非生产业务</td>
+</tr>
+<tr>
+<td>资源消耗</td>
+<td align="center">🟡 轻度</td>
+<td>EAGAIN 忙等模式产生约 50 次/秒无用 syscall，存在轻微 CPU 浪费</td>
+</tr>
+<tr>
+<td>潜在风险</td>
+<td align="center">🟡 中等</td>
+<td>若将 RLIMIT_AS 32MB 模式误用于生产进程会导致内存分配故障</td>
+</tr>
+<tr>
+<td><strong>综合</strong></td>
+<td align="center"><strong>P2 (中等)</strong></td>
+<td>非生产应用，但揭示了容器能力配置和进程资源限制的典型问题模式</td>
+</tr>
+</tbody></table></div>
+<hr>
+<h2 id="h-五修复方案">五、修复方案</h2>
+<h3 id="h-51-各异常类型的处置建议">5.1 各异常类型的处置建议</h3>
+<h4 id="h-异常-aeperm-schedsetscheduler-容器-capabilities-配置">异常 A：EPERM (sched_setscheduler) — 容器 Capabilities 配置</h4>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>措施</th>
+<th>操作</th>
+<th align="center">优先级</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>方案一：添加 CAP_SYS_NICE</td>
+<td>启动容器时增加 <code>--cap-add=SYS_NICE</code></td>
+<td align="center">高</td>
+</tr>
+<tr>
+<td>方案二：使用宽松策略</td>
+<td>使用 <code>--privileged</code>（不推荐，过度授权）</td>
+<td align="center">低</td>
+</tr>
+<tr>
+<td>方案三：降级调度策略</td>
+<td>在应用层面降级为 SCHED_OTHER（不需要 CAP_SYS_NICE）</td>
+<td align="center">中</td>
+</tr>
+</tbody></table></div>
+<div class="code-block">
+  <span class="code-lang">bash</span>
+  <button class="copy-btn" onclick="copyCode(this)" title="复制">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
+  </button>
+  <pre><code># 推荐方案：给容器增加 CAP_SYS_NICE
+docker run --cap-add=SYS_NICE strace-fi-loop-a-all-1779968160
+
+# 或 docker-compose 中:
+# cap_add:
+#   - SYS_NICE</code></pre>
+</div>
+<h4 id="h-异常-benomem-mmap-rlimitas-地址空间限制">异常 B：ENOMEM (mmap) — RLIMIT_AS 地址空间限制</h4>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>措施</th>
+<th>操作</th>
+<th align="center">优先级</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>方案一：增大 RLIMIT_AS</td>
+<td>将 <code>RLIMIT_AS</code> 软限制提升至 64MB 以上</td>
+<td align="center">高</td>
+</tr>
+<tr>
+<td>方案二：预检查可用空间</td>
+<td>在 mmap 前检查 VmSize + 请求大小是否超出限制</td>
+<td align="center">中</td>
+</tr>
+<tr>
+<td>方案三：动态 fallback</td>
+<td>mmap 失败时减小分配大小或释放现有映射</td>
+<td align="center">中</td>
+</tr>
+</tbody></table></div>
+<div class="code-block">
+  <span class="code-lang">bash</span>
+  <button class="copy-btn" onclick="copyCode(this)" title="复制">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
+  </button>
+  <pre><code># 诊断命令：检查当前资源限制
+prlimit --pid 8862 --as
+
+# 增大 RLIMIT_AS (示例 ulimit)
+ulimit -v 65536   # 64MB</code></pre>
+</div>
+<h4 id="h-异常-cenoent-路径不存在预期行为">异常 C：ENOENT — 路径不存在（预期行为）</h4>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>措施</th>
+<th>操作</th>
+<th align="center">优先级</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>方案一：确认是否为测试意图</td>
+<td>如属测试代码，保持现状即可</td>
+<td align="center">低</td>
+</tr>
+<tr>
+<td>方案二：添加路径不存在时的日志</td>
+<td>增加错误日志便于调试</td>
+<td align="center">低</td>
+</tr>
+</tbody></table></div>
+<h4 id="h-异常-deagain-pipe-忙等轮询">异常 D：EAGAIN — Pipe 忙等轮询</h4>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>措施</th>
+<th>操作</th>
+<th align="center">优先级</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>方案一：使用 epoll 事件驱动</td>
+<td>替换为 <code>epoll_create + epoll_wait</code> 阻塞等待</td>
+<td align="center">高</td>
+</tr>
+<tr>
+<td>方案二：使用 poll/select</td>
+<td>替换忙等为 <code>poll(pipe_fd, POLLIN)</code> 阻塞式 I/O 多路复用</td>
+<td align="center">高</td>
+</tr>
+<tr>
+<td>方案三：降低轮询频率</td>
+<td>若必须轮询，增大间隔（如 200ms）并添加退避策略</td>
+<td align="center">中</td>
+</tr>
+<tr>
+<td>方案四：使用 blocking read</td>
+<td>直接使用阻塞式 read，由内核调度等待</td>
+<td align="center">中</td>
+</tr>
+</tbody></table></div>
+<div class="code-block">
+  <span class="code-lang">c</span>
+  <button class="copy-btn" onclick="copyCode(this)" title="复制">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
+  </button>
+  <pre><code>// 推荐方案：使用 epoll 替代忙等
+int epfd = epoll_create1(0);
+struct epoll_event ev = {.events = EPOLLIN, .data.fd = pipe_fd};
+epoll_ctl(epfd, EPOLL_CTL_ADD, pipe_fd, &amp;ev);
+
+// 阻塞等待数据，零 CPU 空转
+struct epoll_event events[1];
+epoll_wait(epfd, events, 1, -1);
+read(pipe_fd, buf, sizeof(buf));</code></pre>
+</div>
+<h3 id="h-52-永久修复计划">5.2 永久修复计划</h3>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>修复措施</th>
+<th align="center">优先级</th>
+<th>负责人</th>
+<th>完成时间</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>容器 Capabilities 配置审查并补充 CAP_SYS_NICE</td>
+<td align="center">P1 高</td>
+<td>容器平台团队</td>
+<td>待定</td>
+</tr>
+<tr>
+<td>进程 RLIMIT_AS 评估并设置合理值（建议 ≥128MB）</td>
+<td align="center">P1 高</td>
+<td>应用开发团队</td>
+<td>待定</td>
+</tr>
+<tr>
+<td>重构 pipe 通信逻辑，使用 epoll 替代忙等轮询</td>
+<td align="center">P2 中</td>
+<td>应用开发团队</td>
+<td>待定</td>
+</tr>
+<tr>
+<td>ENOENT 路径访问添加容错逻辑或确认测试意图</td>
+<td align="center">P3 低</td>
+<td>应用开发团队</td>
+<td>待定</td>
+</tr>
+</tbody></table></div>
+<hr>
+<h2 id="h-六附录">六、附录</h2>
+<h3 id="h-61-证据索引">6.1 证据索引</h3>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th align="center">序号</th>
+<th>证据文件</th>
+<th>关键内容</th>
+</tr>
+</thead>
+<tbody><tr>
+<td align="center">T1</td>
+<td><code>/home/win11/.witty-diagnosis-agent/dayu/report/kuafu_T1_20260528_permission_denied.md</code></td>
+<td>EPERM 根因：CapEff 缺失 CAP_SYS_NICE</td>
+</tr>
+<tr>
+<td align="center">T2</td>
+<td><code>/home/win11/.witty-diagnosis-agent/dayu/report/kuafu_T2_20260528_enomem.md</code></td>
+<td>ENOMEM 根因：RLIMIT_AS 32MB 软限制</td>
+</tr>
+<tr>
+<td align="center">T3</td>
+<td><code>/home/win11/.witty-diagnosis-agent/dayu/report/kuafu_T3_20260528_enoent_eagain.md</code></td>
+<td>ENOENT 预期路径 + EAGAIN 忙等轮询</td>
+</tr>
+</tbody></table></div>
+<h3 id="h-62-关键原始数据快照">6.2 关键原始数据快照</h3>
+<p><strong>容器 CapEff 位图：</strong></p>
+<div class="code-block">
+  
+  <button class="copy-btn" onclick="copyCode(this)" title="复制">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
+  </button>
+  <pre><code>CapEff: 00000000a82c35fb
+二进制: 1010 1000 0010 1100 0011 0101 1111 1011
+CAP_SYS_NICE 位(bit 23): 0 → 缺失</code></pre>
+</div>
+<p><strong>RLIMIT_AS 状态：</strong></p>
+<div class="code-block">
+  
+  <button class="copy-btn" onclick="copyCode(this)" title="复制">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
+  </button>
+  <pre><code>Soft limit: 33,554,432 bytes (32MB)
+Hard limit: 67,108,864 bytes (64MB)
+Current VmSize: 31,448 kB (~31MB, 96%)</code></pre>
+</div>
+<p><strong>Pipe 轮询时序：</strong></p>
+<div class="code-block">
+  
+  <button class="copy-btn" onclick="copyCode(this)" title="复制">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
+  </button>
+  <pre><code>20ms → EAGAIN → 20ms → EAGAIN → 20ms → EAGAIN → 20ms → EAGAIN → 1.33s pause → repeat
+CPU 利用率：每 1.33s 内有 ~80ms 连续 syscall 密集期</code></pre>
+</div>
+
+    <div class="meta">
+      <span class="meta-source">容器内进程四类系统调用异常综合分析_branch_a_errors_20260528_baize_report.md</span>
+      <span>生成于 2026/05/28 20:02</span>
+    </div>
+  </article>
+</div>
+
+<script>
+  /* ── 滚动进度条 ── */
+  window.addEventListener("scroll", () => {
+    const el  = document.documentElement;
+    const pct = el.scrollTop / (el.scrollHeight - el.clientHeight) * 100;
+    document.getElementById("progress").style.width = Math.min(pct, 100) + "%";
+  });
+
+  /* ── TOC 高亮当前章节 ── */
+  (function () {
+    const headings = Array.from(document.querySelectorAll("article h1,article h2,article h3"));
+    const links    = Array.from(document.querySelectorAll(".toc a"));
+    if (!links.length) return;
+    const obs = new IntersectionObserver(entries => {
+      entries.forEach(e => {
+        if (!e.isIntersecting) return;
+        links.forEach(l => l.classList.remove("active"));
+        const a = links.find(l => l.getAttribute("href") === "#" + e.target.id);
+        if (a) a.classList.add("active");
+      });
+    }, { rootMargin: "-10% 0px -80% 0px" });
+    headings.forEach(h => obs.observe(h));
+  })();
+
+  /* ── h2 章节序号自动计数 ── */
+  (function () {
+    let idx = 0;
+    document.querySelectorAll("article h2").forEach(el => {
+      idx++;
+      el.setAttribute("data-index", String(idx).padStart(2, "0"));
+    });
+  })();
+
+  /* ── 代码块一键复制 ── */
+  function copyCode(btn) {
+    const code = btn.closest(".code-block").querySelector("code").innerText;
+    navigator.clipboard.writeText(code).then(() => {
+      btn.classList.add("copied");
+      btn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>';
+      setTimeout(() => {
+        btn.classList.remove("copied");
+        btn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>';
+      }, 2000);
+    });
+  }
+
+  /* ── 目录树收缩/展开 ── */
+  function toggleToc(btn) {
+    const expanded = btn.getAttribute("aria-expanded") === "true";
+    btn.setAttribute("aria-expanded", String(!expanded));
+    const parentItem = btn.closest(".toc-item");
+    let nextEl = parentItem.nextElementSibling;
+    if (nextEl && nextEl.classList.contains("toc-group")) {
+      if (expanded) {
+        nextEl.style.maxHeight = nextEl.scrollHeight + "px";
+        void nextEl.offsetHeight;
+        nextEl.classList.add("collapsed");
+      } else {
+        nextEl.classList.remove("collapsed");
+        nextEl.style.maxHeight = nextEl.scrollHeight + "px";
+        setTimeout(() => {
+          if (!nextEl.classList.contains("collapsed")) {
+            nextEl.style.maxHeight = "none";
+          }
+        }, 300);
+      }
+    }
+  }
+</script>
+</body>
+</html>

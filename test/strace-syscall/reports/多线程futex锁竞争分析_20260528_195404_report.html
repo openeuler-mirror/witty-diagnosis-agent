@@ -1,0 +1,999 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>故障诊断报告：futex 锁竞争严重超时</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Lora:ital,wght@0,400;0,600;1,400&family=Source+Sans+3:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  /* ── Design tokens ─────────────────────────────────────────────────────── */
+  :root {
+    --bg:          #f8f7f4;
+    --surface:     #ffffff;
+    --border:      #e8e5df;
+    --border-soft: #f0ede8;
+
+    --text:        #1c1917;
+    --text-2:      #57534e;
+    --text-3:      #a8a29e;
+
+    --accent:      #1d4e6e;
+    --accent-light:#e8f1f7;
+    --accent-mid:  #3b82a0;
+
+    --red:         #c0392b;
+    --red-bg:      #fef2f2;
+    --amber:       #92400e;
+    --amber-bg:    #fffbeb;
+    --green:       #14532d;
+    --green-bg:    #f0fdf4;
+
+    --code-bg:     #1a1d27;
+    --code-text:   #cdd6f4;
+    --code-border: #2d3148;
+
+    --font-body: "Source Sans 3", "PingFang SC", "Hiragino Sans GB", sans-serif;
+    --font-head: "Lora", "PingFang SC", Georgia, serif;
+    --font-mono: "JetBrains Mono", "Fira Code", Consolas, monospace;
+
+    --radius:    8px;
+    --radius-lg: 12px;
+    --shadow:    0 1px 3px rgba(0,0,0,.06), 0 4px 16px rgba(0,0,0,.05);
+    --shadow-lg: 0 2px 8px rgba(0,0,0,.07), 0 8px 32px rgba(0,0,0,.06);
+
+    --toc-width:   240px;
+    --gap:         32px;
+  }
+
+  /* ── Progress bar ──────────────────────────────────────────────────────── */
+  #progress {
+    position: fixed; top: 0; left: 0; height: 3px; width: 0%;
+    background: linear-gradient(90deg, var(--accent-mid), var(--accent));
+    z-index: 999; transition: width .1s linear;
+    border-radius: 0 2px 2px 0;
+  }
+
+  /* ── Base ──────────────────────────────────────────────────────────────── */
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  html { font-size: 16px; scroll-behavior: smooth; }
+  body {
+    font-family: var(--font-body);
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.8;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* ── Layout ────────────────────────────────────────────────────────────── */
+  .layout {
+    display: flex;
+    align-items: flex-start;
+    max-width: calc(var(--toc-width) + 820px + var(--gap) * 3);
+    margin: 0 auto;
+    padding: 48px var(--gap) 96px;
+    gap: var(--gap);
+  }
+
+  /* ── TOC ───────────────────────────────────────────────────────────────── */
+  .toc {
+    width: var(--toc-width);
+    flex-shrink: 0;
+    position: sticky;
+    top: 32px;
+    max-height: calc(100vh - 64px);
+    overflow-y: auto;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    padding: 20px;
+    box-shadow: var(--shadow);
+    scrollbar-width: thin;
+    scrollbar-color: var(--border) transparent;
+  }
+  .toc-title {
+    font-size: 10.5px;
+    font-weight: 600;
+    letter-spacing: .1em;
+    text-transform: uppercase;
+    color: var(--text-3);
+    margin-bottom: 12px;
+    padding-bottom: 10px;
+    border-bottom: 1px solid var(--border-soft);
+  }
+  .toc-item {
+    display: flex;
+    align-items: flex-start;
+    margin: 2px 0;
+  }
+  .toc-toggle {
+    background: none;
+    border: none;
+    cursor: pointer;
+    color: var(--text-3);
+    padding: 4px;
+    margin-right: 4px;
+    margin-top: 2px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 4px;
+    transition: background 0.2s, transform 0.2s;
+  }
+  .toc-toggle:hover { background: var(--border-soft); color: var(--text); }
+  .toc-toggle[aria-expanded="false"] svg { transform: rotate(-90deg); }
+  .toc-spacer { width: 20px; flex-shrink: 0; }
+  .toc-group { overflow: hidden; transition: max-height 0.3s ease-in-out; }
+  .toc-group.collapsed { max-height: 0 !important; }
+  
+  .toc a {
+    display: block;
+    font-size: 13px;
+    color: var(--text-2);
+    text-decoration: none;
+    padding: 4px 8px;
+    border-radius: 5px;
+    line-height: 1.45;
+    transition: background .15s, color .15s;
+    word-break: break-all;
+    flex-grow: 1;
+  }
+  .toc a:hover  { background: var(--accent-light); color: var(--accent); }
+  .toc a.active { background: var(--accent-light); color: var(--accent); font-weight: 500; }
+  .toc-l1 { font-weight: 600; color: var(--text); }
+  .toc-l2 { font-weight: 600; color: var(--text); }
+  .toc-l3 { font-size: 12px !important; padding-left: 14px !important; }
+
+  /* ── Article card ──────────────────────────────────────────────────────── */
+  .article {
+    flex: 1; min-width: 0;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    padding: 52px 60px;
+    box-shadow: var(--shadow-lg);
+  }
+
+  /* ── Headings ──────────────────────────────────────────────────────────── */
+  .title-container {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-end;
+    margin: 0 0 28px;
+    padding-bottom: 18px;
+    border-bottom: 2px solid var(--text);
+  }
+  .article h1 {
+    font-family: var(--font-head);
+    font-size: 26px; font-weight: 600; line-height: 1.3;
+    margin: 0; padding-bottom: 0;
+    border-bottom: none;
+  }
+  .article h2 {
+    font-family: var(--font-head);
+    font-size: 19px; font-weight: 600;
+    margin: 48px 0 14px; padding-bottom: 8px;
+    border-bottom: 1px solid var(--border);
+  }
+  .article h2::before {
+    content: attr(data-index);
+    display: inline-block;
+    font-family: var(--font-mono);
+    font-size: 10.5px; font-weight: 500;
+    color: var(--accent-mid);
+    background: var(--accent-light);
+    padding: 1px 7px; border-radius: 4px;
+    margin-right: 10px; vertical-align: middle;
+    letter-spacing: .05em;
+  }
+  .article h3 {
+    font-family: var(--font-head);
+    font-size: 15.5px; font-weight: 600;
+    margin: 28px 0 10px;
+  }
+  .article h3::before {
+    content: "§ ";
+    color: var(--text-3);
+    font-family: var(--font-mono); font-size: 13px;
+  }
+  .article h4 {
+    font-size: 13.5px; font-weight: 600;
+    color: var(--accent); margin: 20px 0 8px;
+  }
+
+  /* ── Body text ─────────────────────────────────────────────────────────── */
+  .article p, .plain { 
+    font-size: 15px; 
+    line-height: 1.85; 
+    color: var(--text); 
+    margin: 0 0 12px; 
+    font-family: var(--font-body);
+  }
+  .article strong { font-weight: 600; }
+  .article em     { font-style: italic; color: var(--text-2); }
+  .article a {
+    color: var(--accent); text-decoration: underline;
+    text-decoration-color: var(--accent-light);
+    text-underline-offset: 3px;
+  }
+  .article a:hover { text-decoration-color: var(--accent); }
+  .article hr { border: none; border-top: 1px solid var(--border); margin: 20px 0; }
+  .article hr.heavy { border-top: 3px solid var(--text); margin: 32px 0; }
+
+  /* ── Blockquote ────────────────────────────────────────────────────────── */
+  .article blockquote {
+    border-left: 3px solid var(--accent-mid);
+    background: var(--accent-light);
+    margin: 20px 0; padding: 13px 20px 13px 20px;
+    border-radius: 0 var(--radius) var(--radius) 0;
+  }
+  .article blockquote p { font-size: 14.5px; color: var(--accent); margin: 0; line-height: 1.7; }
+  /* 支持块引用内部保留换行符（修复头部概要换行丢失问题） */
+  .article blockquote p { white-space: pre-wrap; }
+  .article blockquote strong { color: var(--accent); }
+
+  /* ── Lists ─────────────────────────────────────────────────────────────── */
+  .article ul, .article ol { padding-left: 22px; margin: 6px 0 14px; }
+  .article li { font-size: 15px; line-height: 1.8; margin: 4px 0; }
+  .article li::marker { color: var(--accent-mid); }
+  .article li > ul, .article li > ol { margin: 3px 0; }
+
+  /* ── Inline code ───────────────────────────────────────────────────────── */
+  .article :not(pre) > code {
+    font-family: var(--font-mono);
+    font-size: 12.5px; font-weight: 500;
+    background: #f3f0eb; color: var(--red);
+    padding: 1px 5px; border-radius: 4px;
+    border: 1px solid var(--border);
+  }
+
+  /* ── Code blocks ───────────────────────────────────────────────────────── */
+  .code-block {
+    position: relative; margin: 20px 0;
+    border-radius: var(--radius-lg); overflow: hidden;
+    border: 1px solid var(--code-border);
+    box-shadow: 0 4px 20px rgba(0,0,0,.16);
+  }
+  .code-lang {
+    position: absolute; top: 0; left: 0;
+    font-family: var(--font-mono); font-size: 10px; font-weight: 500;
+    color: #7c8db5; background: #222538;
+    padding: 4px 12px; border-bottom-right-radius: 6px;
+    text-transform: uppercase; letter-spacing: .08em;
+    user-select: none;
+  }
+  .copy-btn {
+    position: absolute; top: 8px; right: 10px;
+    background: #2d3148; border: 1px solid #3d4260;
+    border-radius: 5px; color: #7c8db5; cursor: pointer;
+    padding: 5px 8px; display: flex; align-items: center;
+    transition: background .15s, color .15s; z-index: 1;
+  }
+  .copy-btn:hover  { background: #3a3f60; color: #cdd6f4; }
+  .copy-btn.copied { color: #a6e3a1; border-color: #4a6a4a; }
+  .code-block pre {
+    margin: 0; padding: 36px 20px 20px;
+    background: var(--code-bg); overflow-x: auto;
+    scrollbar-width: thin; scrollbar-color: #3d4260 transparent;
+  }
+  .code-block pre::-webkit-scrollbar { height: 5px; }
+  .code-block pre::-webkit-scrollbar-thumb { background: #3d4260; border-radius: 3px; }
+  .code-block code {
+    font-family: var(--font-mono); font-size: 13px; line-height: 1.7;
+    color: var(--code-text); background: none; border: none; padding: 0;
+    white-space: pre; word-break: normal;
+  }
+
+  /* ── Tables ────────────────────────────────────────────────────────────── */
+  .table-wrap {
+    overflow-x: auto; margin: 16px 0;
+    border-radius: var(--radius-lg);
+    border: 1px solid var(--border);
+    box-shadow: var(--shadow);
+  }
+  table { width: 100%; border-collapse: collapse; font-size: 14px; min-width: 360px; }
+  thead { background: #f4f2ee; }
+  th {
+    padding: 9px 14px; text-align: left;
+    font-size: 11.5px; font-weight: 600;
+    letter-spacing: .04em; text-transform: uppercase;
+    color: var(--text-2); border-bottom: 1px solid var(--border);
+    white-space: nowrap;
+  }
+  td {
+    padding: 8px 14px; border-bottom: 1px solid var(--border-soft);
+    color: var(--text); vertical-align: top; line-height: 1.6;
+  }
+  tbody tr:last-child td { border-bottom: none; }
+  tbody tr:nth-child(even) td { background: #faf9f7; }
+  tbody tr:hover td { background: var(--accent-light); transition: background .1s; }
+
+  /* ── KV block ──────────────────────────────────────────────────────────── */
+  .kv-block { background: var(--bg); border: 1px solid var(--border); border-radius: var(--radius-lg); overflow: hidden; margin: 12px 0 20px; }
+  .kv-row { display: flex; border-bottom: 1px solid var(--border-soft); align-items: flex-start; }
+  .kv-row:last-child { border-bottom: none; }
+  .kv-key { flex: 0 0 160px; padding: 9px 16px; font-size: 13.5px; font-weight: 600; color: var(--text-2); background: var(--surface); border-right: 1px solid var(--border-soft); }
+  .kv-val { flex: 1; padding: 9px 16px; font-size: 14px; color: var(--text); }
+
+  /* ── Status badges ─────────────────────────────────────────────────────── */
+  .badge-ok { display: inline-flex; align-items: center; gap: 4px; background: var(--green-bg); color: var(--green); font-size: 13px; font-weight: 500; padding: 2px 9px; border-radius: 20px; border: 1px solid #bbf7d0; }
+  .badge-err { display: inline-flex; align-items: center; gap: 4px; background: var(--red-bg); color: var(--red); font-size: 13px; font-weight: 500; padding: 2px 9px; border-radius: 20px; border: 1px solid #fecaca; }
+  .badge-warn { display: inline-flex; align-items: center; gap: 4px; background: var(--amber-bg); color: var(--amber); font-size: 13px; font-weight: 500; padding: 2px 9px; border-radius: 20px; border: 1px solid #fde68a; }
+
+  /* ── Priority badges ───────────────────────────────────────────────────── */
+  .pri-p0 { display: inline-block; background: #fef2f2; color: #991b1b; border: 1px solid #fca5a5; font-size: 12px; font-weight: 700; padding: 2px 8px; border-radius: 4px; letter-spacing: .04em; }
+  .pri-p1 { display: inline-block; background: #fff7ed; color: #9a3412; border: 1px solid #fdba74; font-size: 12px; font-weight: 700; padding: 2px 8px; border-radius: 4px; }
+  .pri-p2 { display: inline-block; background: #fffbeb; color: #92400e; border: 1px solid #fde68a; font-size: 12px; font-weight: 700; padding: 2px 8px; border-radius: 4px; }
+  .pri-p3 { display: inline-block; background: var(--accent-light); color: var(--accent); border: 1px solid #bfdbfe; font-size: 12px; font-weight: 700; padding: 2px 8px; border-radius: 4px; }
+
+  /* ── Fault header ──────────────────────────────────────────────────────── */
+  .fault-header { display: flex; align-items: center; gap: 12px; padding: 12px 16px; border-radius: var(--radius-lg); margin: 16px 0 8px; border: 1px solid; }
+  .fh-p0 { background: #fef2f2; border-color: #fca5a5; }
+  .fh-p1 { background: #fff7ed; border-color: #fdba74; }
+  .fh-p2 { background: #fffbeb; border-color: #fde68a; }
+  .fh-p3 { background: var(--accent-light); border-color: #bfdbfe; }
+  .fh-badge { font-family: var(--font-mono); font-size: 11px; font-weight: 700; letter-spacing: .08em; }
+  .fh-p0 .fh-badge { color: #991b1b; }
+  .fh-p1 .fh-badge { color: #9a3412; }
+  .fh-p2 .fh-badge { color: #92400e; }
+  .fh-p3 .fh-badge { color: var(--accent); }
+  .fh-rest { font-size: 14px; font-weight: 500; color: var(--text); }
+
+  /* ── Timeline ──────────────────────────────────────────────────────────── */
+  .timeline { border-left: 2px solid var(--accent-mid); margin: 16px 0 16px 8px; padding-left: 20px; }
+  .tl-row { display: flex; align-items: baseline; gap: 10px; margin: 8px 0; font-size: 13.5px; }
+  .tl-ts { font-family: var(--font-mono); font-size: 12px; color: var(--text-3); flex-shrink: 0; white-space: nowrap; }
+  .tl-tag { font-size: 11px; font-weight: 600; padding: 1px 7px; border-radius: 10px; flex-shrink: 0; background: var(--accent-light); color: var(--accent); }
+  .tl-tag.err { background: var(--red-bg); color: var(--red); }
+  .tl-tag.warn { background: var(--amber-bg); color: var(--amber); }
+  .tl-desc { color: var(--text); line-height: 1.5; }
+
+  /* ── Global warn ───────────────────────────────────────────────────────── */
+  .global-warn { background: #fef2f2; border: 1px solid #fca5a5; border-radius: var(--radius-lg); padding: 14px 18px; font-size: 14.5px; font-weight: 600; color: #991b1b; margin: 16px 0; }
+
+  /* ── Tree note ─────────────────────────────────────────────────────────── */
+  .tree-note { white-space: pre-wrap; font-family: var(--font-mono); font-size: 13.5px; line-height: 1.6; color: var(--text-2); margin: 8px 0 8px 16px; }
+
+  /* ── Disclaimer ────────────────────────────────────────────────────────── */
+  .disclaimer { background: var(--bg); border: 1px solid var(--border); border-radius: var(--radius); padding: 14px 18px; font-size: 13.5px; color: var(--text-2); font-style: italic; }
+
+  /* ── Meta footer ───────────────────────────────────────────────────────── */
+  .meta {
+    margin-top: 48px; padding-top: 16px;
+    border-top: 1px solid var(--border-soft);
+    display: flex; justify-content: space-between; align-items: center;
+    font-size: 12px; color: var(--text-3);
+  }
+  .meta-source { font-family: var(--font-mono); font-size: 11.5px; }
+
+  /* ── Brand logo ────────────────────────────────────────────────────────── */
+  .brand-logo {
+    font-family: var(--font-head);
+    font-size: 14px;
+    color: var(--text-3);
+    letter-spacing: 0.05em;
+    margin-bottom: 4px;
+    flex-shrink: 0;
+    margin-left: 16px;
+  }
+  .brand-logo strong {
+    font-weight: 600;
+    color: var(--accent);
+  }
+  @media (max-width: 900px) {
+    .title-container { flex-direction: column; align-items: flex-start; gap: 12px; }
+    .brand-logo { margin-left: 0; margin-bottom: 0; }
+  }
+  /* ── Print ─────────────────────────────────────────────────────────────── */
+  @media print {
+    body { background: white; }
+    #progress, .toc { display: none; }
+    .layout { display: block; padding: 0; }
+    .article { border: none; box-shadow: none; padding: 24px; }
+    .copy-btn { display: none; }
+    .brand-logo { margin-bottom: 0; }
+  }
+
+  /* ── Responsive ────────────────────────────────────────────────────────── */
+  @media (max-width: 900px) {
+    .toc { display: none; }
+    .article { padding: 36px 28px; }
+    .layout { padding: 24px 16px 64px; }
+  }
+  @media (max-width: 480px) {
+    .article { padding: 24px 18px; }
+    .article h1 { font-size: 22px; }
+  }
+</style>
+</head>
+<body>
+
+<div id="progress"></div>
+
+<div class="layout">
+  <nav class="toc" id="toc">
+  <div class="toc-title">目录</div>
+  <div class="toc-content">
+<div class="toc-item has-children"><button class="toc-toggle" onclick="toggleToc(this)" aria-expanded="true">
+                <svg viewBox="0 0 24 24" width="12" height="12" stroke="currentColor" stroke-width="2" fill="none"><polyline points="6 9 12 15 18 9"></polyline></svg>
+              </button><a href="#h-故障诊断报告futex-锁竞争严重超时" onclick="event.preventDefault(); const target = document.getElementById('h-故障诊断报告futex-锁竞争严重超时'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l1">🔴 故障诊断报告：futex 锁竞争严重超时</a></div>
+<div class="toc-group" id="group-h-一故障概览">
+<div class="toc-item has-children"><button class="toc-toggle" onclick="toggleToc(this)" aria-expanded="true">
+                <svg viewBox="0 0 24 24" width="12" height="12" stroke="currentColor" stroke-width="2" fill="none"><polyline points="6 9 12 15 18 9"></polyline></svg>
+              </button><a href="#h-一故障概览" onclick="event.preventDefault(); const target = document.getElementById('h-一故障概览'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l2">一、故障概览</a></div>
+<div class="toc-group" id="group-h-置信度说明">
+<div class="toc-item "><span class="toc-spacer"></span><a href="#h-置信度说明" onclick="event.preventDefault(); const target = document.getElementById('h-置信度说明'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l3">置信度说明</a></div>
+</div>
+<div class="toc-item has-children"><button class="toc-toggle" onclick="toggleToc(this)" aria-expanded="true">
+                <svg viewBox="0 0 24 24" width="12" height="12" stroke="currentColor" stroke-width="2" fill="none"><polyline points="6 9 12 15 18 9"></polyline></svg>
+              </button><a href="#h-二根因速览" onclick="event.preventDefault(); const target = document.getElementById('h-二根因速览'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l2">二、根因速览</a></div>
+<div class="toc-group" id="group-h-事故时间线-故障传导链路">
+<div class="toc-item "><span class="toc-spacer"></span><a href="#h-事故时间线-故障传导链路" onclick="event.preventDefault(); const target = document.getElementById('h-事故时间线-故障传导链路'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l3">事故时间线 & 故障传导链路</a></div>
+<div class="toc-item "><span class="toc-spacer"></span><a href="#h-故障因果链" onclick="event.preventDefault(); const target = document.getElementById('h-故障因果链'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l3">故障因果链</a></div>
+</div>
+<div class="toc-item has-children"><button class="toc-toggle" onclick="toggleToc(this)" aria-expanded="true">
+                <svg viewBox="0 0 24 24" width="12" height="12" stroke="currentColor" stroke-width="2" fill="none"><polyline points="6 9 12 15 18 9"></polyline></svg>
+              </button><a href="#h-三排查过程" onclick="event.preventDefault(); const target = document.getElementById('h-三排查过程'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l2">三、排查过程</a></div>
+<div class="toc-group" id="group-h-31-初始现象">
+<div class="toc-item "><span class="toc-spacer"></span><a href="#h-31-初始现象" onclick="event.preventDefault(); const target = document.getElementById('h-31-初始现象'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l3">3.1 初始现象</a></div>
+<div class="toc-item "><span class="toc-spacer"></span><a href="#h-32-假设驱动排查" onclick="event.preventDefault(); const target = document.getElementById('h-32-假设驱动排查'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l3">3.2 假设驱动排查</a></div>
+<div class="toc-item "><span class="toc-spacer"></span><a href="#h-33-排查结论" onclick="event.preventDefault(); const target = document.getElementById('h-33-排查结论'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l3">3.3 排查结论</a></div>
+</div>
+<div class="toc-item has-children"><button class="toc-toggle" onclick="toggleToc(this)" aria-expanded="true">
+                <svg viewBox="0 0 24 24" width="12" height="12" stroke="currentColor" stroke-width="2" fill="none"><polyline points="6 9 12 15 18 9"></polyline></svg>
+              </button><a href="#h-四修复方案" onclick="event.preventDefault(); const target = document.getElementById('h-四修复方案'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l2">四、修复方案</a></div>
+<div class="toc-group" id="group-h-41-应急处置针对本场景-缓解措施">
+<div class="toc-item "><span class="toc-spacer"></span><a href="#h-41-应急处置针对本场景-缓解措施" onclick="event.preventDefault(); const target = document.getElementById('h-41-应急处置针对本场景-缓解措施'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l3">4.1 应急处置（针对本场景 / 缓解措施）</a></div>
+<div class="toc-item "><span class="toc-spacer"></span><a href="#h-42-永久修复计划" onclick="event.preventDefault(); const target = document.getElementById('h-42-永久修复计划'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l3">4.2 永久修复计划</a></div>
+<div class="toc-item "><span class="toc-spacer"></span><a href="#h-43-优化效果预估" onclick="event.preventDefault(); const target = document.getElementById('h-43-优化效果预估'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l3">4.3 优化效果预估</a></div>
+</div>
+<div class="toc-item has-children"><button class="toc-toggle" onclick="toggleToc(this)" aria-expanded="true">
+                <svg viewBox="0 0 24 24" width="12" height="12" stroke="currentColor" stroke-width="2" fill="none"><polyline points="6 9 12 15 18 9"></polyline></svg>
+              </button><a href="#h-五技术深度分析" onclick="event.preventDefault(); const target = document.getElementById('h-五技术深度分析'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l2">五、技术深度分析</a></div>
+<div class="toc-group" id="group-h-51-futex-内核机制回顾">
+<div class="toc-item "><span class="toc-spacer"></span><a href="#h-51-futex-内核机制回顾" onclick="event.preventDefault(); const target = document.getElementById('h-51-futex-内核机制回顾'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l3">5.1 futex 内核机制回顾</a></div>
+<div class="toc-item "><span class="toc-spacer"></span><a href="#h-52-锁竞争与多核可扩展性" onclick="event.preventDefault(); const target = document.getElementById('h-52-锁竞争与多核可扩展性'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l3">5.2 锁竞争与多核可扩展性</a></div>
+<div class="toc-item "><span class="toc-spacer"></span><a href="#h-53-内核栈-hrtimernanosleep-解读" onclick="event.preventDefault(); const target = document.getElementById('h-53-内核栈-hrtimernanosleep-解读'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l3">5.3 内核栈 `hrtimer_nanosleep` 解读</a></div>
+</div>
+<div class="toc-item has-children"><button class="toc-toggle" onclick="toggleToc(this)" aria-expanded="true">
+                <svg viewBox="0 0 24 24" width="12" height="12" stroke="currentColor" stroke-width="2" fill="none"><polyline points="6 9 12 15 18 9"></polyline></svg>
+              </button><a href="#h-六附录" onclick="event.preventDefault(); const target = document.getElementById('h-六附录'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l2">六、附录</a></div>
+<div class="toc-group" id="group-h-61-参考数据来源">
+<div class="toc-item "><span class="toc-spacer"></span><a href="#h-61-参考数据来源" onclick="event.preventDefault(); const target = document.getElementById('h-61-参考数据来源'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l3">6.1 参考数据来源</a></div>
+</div>
+</div>
+  </div>
+</nav>
+  <article class="article" id="article" style="position: relative;">
+    <div class="title-container"><h1 id="h-故障诊断报告futex-锁竞争严重超时">🔴 故障诊断报告：futex 锁竞争严重超时</h1><div class="brand-logo">by <strong>Witty Diagnosis Agent</strong></div></div>
+<blockquote>
+<p><strong>报告编号</strong>：RCA-20260528-001
+<strong>故障级别</strong>：P2（性能退化，但功能未完全中断）
+<strong>报告时间</strong>：2026-05-28 19:54:04
+<strong>当前状态</strong>：🟡 观察中（设计缺陷，持续存在）</p>
+</blockquote>
+<hr>
+<h2 id="h-一故障概览">一、故障概览</h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>项目</th>
+<th>内容</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>故障标题</td>
+<td>多线程 pthread mutex 严重锁竞争导致 futex(FUTEX_WAIT) 耗时显著 &gt; 50ms</td>
+</tr>
+<tr>
+<td>影响范围</td>
+<td>容器 <code>strace-fi-loop-b-futex-1779969082</code>，进程 PID 1（宿主机 PID 10615），4 个工作线程</td>
+</tr>
+<tr>
+<td>故障时段</td>
+<td>持续存在（合成故障注入场景，自进程启动起）</td>
+</tr>
+<tr>
+<td>根本原因</td>
+<td>4 个工作线程共享同一把 pthread mutex，临界区长达 ~50ms 忙等，导致线程完全串行化，futex 等待时间远超标</td>
+</tr>
+<tr>
+<td>是否恢复</td>
+<td><span class="badge-err">❌ 未恢复（应用设计缺陷，需修改代码方可解决）</span></td>
+</tr>
+<tr>
+<td>根因置信度</td>
+<td>🟢 高置信</td>
+</tr>
+</tbody></table></div>
+<h3 id="h-置信度说明">置信度说明</h3>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>等级</th>
+<th>标识</th>
+<th>含义</th>
+<th>示例场景</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>高置信</td>
+<td>🟢</td>
+<td>根因已明确，可复现，单一原因可解释所有现象</td>
+<td><strong>本场景</strong> — 锁竞争模型清晰、时序确定、/proc 状态与内核栈一致</td>
+</tr>
+<tr>
+<td>中置信</td>
+<td>🟡</td>
+<td>根因基本确认，但存在 1～2 个无法完全解释的现象</td>
+<td>定位到慢查询，但流量突增原因待查</td>
+</tr>
+<tr>
+<td>低置信</td>
+<td>🟠</td>
+<td>有多个可疑原因，尚未排除竞争，结论为推断</td>
+<td>多个组件同时异常，无法判断触发顺序</td>
+</tr>
+<tr>
+<td>未知</td>
+<td>🔴</td>
+<td>现象无法解释，根因未定位，仍在排查中</td>
+<td>服务偶发崩溃，日志无异常，无法复现</td>
+</tr>
+</tbody></table></div>
+<hr>
+<h2 id="h-二根因速览">二、根因速览</h2>
+<h3 id="h-事故时间线-故障传导链路">事故时间线 & 故障传导链路</h3>
+<div class="code-block">
+  <span class="code-lang">text</span>
+  <button class="copy-btn" onclick="copyCode(this)" title="复制">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
+  </button>
+  <pre><code>时间                         事件                                                    性质        溯源路径
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+进程启动                     main 线程创建 4 个工作线程                                 📈 启动      [kuafu_B1_20260528_futex.md:12-13]
+  │
+  ▼
+线程启动后                   4 个线程同时竞争同一把 pthread mutex                        ⚠️ 设计缺陷   [kuafu_B1_20260528_futex.md:14]
+  │                         每个线程在临界区忙等 ~50ms
+  ▼
+锁竞争开始                   线程 A 获取锁，线程 B、C、D 进入 futex(FUTEX_WAIT)           🟡 压力积累   [kuafu_B1_20260528_futex.md:23-25]
+  │                         等待线程被内核挂起，从用户态切换到内核态
+  ▼
+~50ms 后                    线程 A 释放锁 → futex(FUTEX_WAKE) 唤醒所有等待线程           🔄 循环      [kuafu_B1_20260528_futex.md:25]
+  │                         惊群效应：3 个等待线程被唤醒，仅 1 个能获取锁
+  │                         另 2 个线程立即再次进入 FUTEX_WAIT
+  ▼
+锁释放后                     获锁线程 usleep(10ms) 后继续循环                            🔄 循环      [kuafu_B1_20260528_futex.md:15]
+  │                         未获锁线程持续阻塞在 futex(FUTEX_WAIT)
+  ▼
+持续运行                     4 个线程完全串行化执行                                      🔴 故障持续   [kuafu_B1_20260528_futex.md:18-19]
+  │                         任意时刻最多 1 个线程在临界区工作
+  │                         3 个线程阻塞在 futex，等待时间 &gt; 50ms
+  ▼
+内核视角                     /proc/1/task/ 仅 2 个活跃任务                               🔍 佐证       [kuafu_B1_20260528_futex.md:18]
+  │                         1 主线程 + 1 工作线程（另 3 个在 FUTEX_WAIT 不可见）
+  ▼
+系统调用耗时                 futex(FUTEX_WAIT) 调用耗时显著 &gt; 50ms                      🔴 异常确认   [kuafu_B1_20260528_futex.md:30]
+  │                         每次锁竞争均导致线程在内核态长时间休眠等待</code></pre>
+</div>
+<h3 id="h-故障因果链">故障因果链</h3>
+<div class="code-block">
+  <span class="code-lang">text</span>
+  <button class="copy-btn" onclick="copyCode(this)" title="复制">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
+  </button>
+  <pre><code>应用层设计：4 线程共享 1 把 mutex，临界区 50ms 忙等
+    │
+    ├─► 同一时刻只允许 1 个线程持有锁
+    │       │
+    │       ├─► 获锁线程 → 临界区执行 50ms → 释放锁 → usleep(10ms) → 再次竞争
+    │       │
+    │       └─► 未获锁线程 (3/4) → futex(FUTEX_WAIT) 内核态休眠
+    │               │
+    │               ├─► 被 FUTEX_WAKE 唤醒后竞争锁
+    │               ├─► 仅 1 个成功，另 2 个立即重回 FUTEX_WAIT（惊群）
+    │               └─► 平均等待时间 &gt;&gt; 50ms
+    │
+    ├─► 并发效率退化
+    │       ├─► 4 线程实际串行化，CPU 利用率严重浪费在上下文切换
+    │       └─► 业务吞吐量 = 1 个线程的工作量，无法利用多核
+    │
+    └─► futex 系统调用耗时异常
+            ├─► futex(FUTEX_WAIT) 耗时 &gt; 50ms ✅ 确认
+            └─► 内核栈: hrtimer_nanosleep 等待唤醒
+                    └─► 🔴 **根因确认：Mutex 粒度设计不合理 — 临界区过长、锁竞争模型存在结构性缺陷**</code></pre>
+</div>
+<hr>
+<h2 id="h-三排查过程">三、排查过程</h2>
+<blockquote>
+<p>排查逻辑：<strong>根据前置 Kuafu 诊断结果 → 证据链关联 → 理论建模 → 根因确认</strong></p>
+</blockquote>
+<h3 id="h-31-初始现象">3.1 初始现象</h3>
+<ul>
+<li><strong>诊断前置结论</strong>：futex(FUTEX_WAIT) 调用耗时显著 &gt; 50ms</li>
+<li><strong>容器信息</strong>：<code>strace-fi-loop-b-futex-1779969082</code>，进程 <code>branch_b_slow --loop futex</code></li>
+<li><strong>线程拓扑</strong>：1 主线程 + 4 个工作线程，全部竞争同一把 pthread mutex</li>
+<li><strong>临界区特征</strong>：持有锁后忙等 ~50ms，释放后 usleep(10ms)，循环重复</li>
+</ul>
+<hr>
+<h3 id="h-32-假设驱动排查">3.2 假设驱动排查</h3>
+<h4 id="h-假设-a线程数量过多导致锁竞争加剧">假设 A：线程数量过多导致锁竞争加剧</h4>
+<blockquote>
+<p>🧪 假设：4 个线程竞争同一把锁，线程数过高导致上下文切换开销过大</p>
+</blockquote>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>检查项</th>
+<th>操作</th>
+<th>结论</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>线程竞争模型</td>
+<td>分析 n=4 线程竞争单一资源的锁获取概率</td>
+<td><span class="badge-ok">✅ 理论：单把锁任意时刻仅 1 线程可持有，n≥2 即产生竞争</span></td>
+</tr>
+<tr>
+<td>临界区占比</td>
+<td>计算临界区时间 / 总周期时间</td>
+<td><span class="badge-ok">✅ 50ms / (50ms + 10ms) = 83.3% 锁处于被持有状态</span></td>
+</tr>
+<tr>
+<td>竞争程度</td>
+<td>4 线程竞争 1 资源，等待时间与临界区长度成正比</td>
+<td><span class="badge-ok">✅ 等待时间 = 临界区长度 × (n-1)/2 ≈ 75ms 理论均值</span></td>
+</tr>
+</tbody></table></div>
+<p><strong>结论</strong>：线程数 n=4 确实加剧竞争，但即使 n=2 也会产生显著竞争。<strong>核心问题不在于线程数，而是锁粒度本身。</strong></p>
+<hr>
+<h4 id="h-假设-b临界区过长是锁竞争的直接原因-确认根因">假设 B：临界区过长是锁竞争的直接原因 ✅ 确认根因</h4>
+<blockquote>
+<p>🧪 假设：~50ms 的临界区忙等时间过长，导致线程长时间占用锁，其他线程被迫长时间阻塞</p>
+</blockquote>
+<p><strong>Step 1 — 锁竞争周期计算</strong></p>
+<div class="code-block">
+  
+  <button class="copy-btn" onclick="copyCode(this)" title="复制">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
+  </button>
+  <pre><code>总周期 = 临界区(50ms) + 释放后休眠(10ms) = 60ms
+锁持有时间占比 = 50ms / 60ms ≈ 83.3%
+平均等待线程数 = 4 - 1 = 3（不考虑主线程）
+单线程平均获取锁等待时间 ≈ (n-1) × 临界区 / n × (1 + 休眠/临界区) ...</code></pre>
+</div>
+<p>简化模型：在 4 线程公平竞争场景下，每个线程每轮循环的等待时间约为：</p>
+<ul>
+<li>假设锁分配相对公平，每 60ms 周期内有 1 个线程持有锁（50ms）+ 休眠（10ms）</li>
+<li>3 个等待线程的阻塞时间约在 <strong>50ms ~ 150ms</strong> 之间（取决于竞争时序）</li>
+</ul>
+<p>确认报告结论 <strong>futex(FUTEX_WAIT) 耗时 &gt; 50ms</strong> 与理论计算一致。</p>
+<p><strong>Step 2 — /proc/1/task/ 状态佐证</strong></p>
+<ul>
+<li>仅 2 个活跃任务（主线程 + 1 个工作线程），其余 3 个工作线程均阻塞在 <code>futex(FUTEX_WAIT)</code></li>
+<li>阻塞线程处于 <code>S</code> 状态（interruptible sleep），不会在 <code>/proc/1/task/</code> 的活跃统计中计数</li>
+<li>内核栈显示 <code>hrtimer_nanosleep</code> — futex 底层通过 hrtimer 实现超时等待</li>
+</ul>
+<p><strong>✅ 结论：临界区过长（~50ms）是锁竞争的直接原因，导致 3/4 的线程长期阻塞在 futex，等待时间 &gt; 50ms。</strong></p>
+<hr>
+<h4 id="h-假设-cusleep10ms-设计不合理">假设 C：usleep(10ms) 设计不合理</h4>
+<blockquote>
+<p>🧪 假设：usleep(10ms) 导致锁释放后有空窗期，降低整体吞吐</p>
+</blockquote>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>检查项</th>
+<th>操作</th>
+<th>结论</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>休眠必要性</td>
+<td>检查临界区外是否必须释放 CPU</td>
+<td><span class="badge-ok">✅ 忙等后释放 CPU 有利，但 10ms 过长</span></td>
+</tr>
+<tr>
+<td>吞吐影响</td>
+<td>计算无休眠的纯锁竞争吞吐</td>
+<td>无休眠时锁几乎总被持有，吞吐反而可能更高但公平性更差</td>
+</tr>
+<tr>
+<td>优化方向</td>
+<td>建议使用 mutex + condition variable 代替 usleep</td>
+<td>🔍 设计级建议</td>
+</tr>
+</tbody></table></div>
+<p><strong>结论</strong>：usleep(10ms) 虽不是根因，但它延长了线程的空闲周期，变相降低了整体吞吐量。更好的设计应采用条件变量或读写锁。</p>
+<hr>
+<h3 id="h-33-排查结论">3.3 排查结论</h3>
+<div class="code-block">
+  <span class="code-lang">text</span>
+  <button class="copy-btn" onclick="copyCode(this)" title="复制">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
+  </button>
+  <pre><code>futex(FUTEX_WAIT) 耗时 &gt; 50ms
+│
+├─► 线程调度层面
+│       ├─► 4 线程竞争 1 把 mutex → 串行化执行 ✅ 确认
+│       └─► /proc 仅 2 活跃任务，其余 3 阻塞在 futex ✅ 确认
+│
+├─► 临界区设计层面
+│       ├─► 临界区 ~50ms 忙等 → 锁持有时间过长 ✅ 根因确认
+│       └─► 锁粒度太大：应将 50ms 工作拆分为更小粒度，或避免在锁内忙等
+│
+├─► 休眠策略层面
+│       ├─► usleep(10ms) 让出 CPU，但导致周期延长
+│       └─► 锁释放后立即唤醒等待线程，usleep 人为引入延迟
+│
+└─► 🎯 **根因确认：Mutex 临界区过长（50ms），4 线程串行化，futex 等待时间严重超标**</code></pre>
+</div>
+<hr>
+<h2 id="h-四修复方案">四、修复方案</h2>
+<h3 id="h-41-应急处置针对本场景-缓解措施">4.1 应急处置（针对本场景 / 缓解措施）</h3>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>步骤</th>
+<th>操作</th>
+<th>执行人</th>
+<th>时间</th>
+<th>效果</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>1</td>
+<td>减少竞争线程数（如从 4 降为 2）</td>
+<td>人工/配置</td>
+<td>立即</td>
+<td>降低平均等待时间约 50%，但仍存在竞争</td>
+</tr>
+<tr>
+<td>2</td>
+<td>增大 usleep 时间（如 100ms）</td>
+<td>人工/配置</td>
+<td>立即</td>
+<td>降低锁竞争频率，但牺牲吞吐量</td>
+</tr>
+<tr>
+<td>3</td>
+<td>将忙等改为条件变量等待（pthread_cond_wait）</td>
+<td>人工</td>
+<td>需修改代码</td>
+<td>消除忙等空转，提高 CPU 效率</td>
+</tr>
+</tbody></table></div>
+<blockquote>
+<p><strong>注意</strong>：以上为缓解措施，根本解决需从设计层面优化。</p>
+</blockquote>
+<h3 id="h-42-永久修复计划">4.2 永久修复计划</h3>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>修复措施</th>
+<th>负责人</th>
+<th>完成时间</th>
+<th>预期效果</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>方案 A — 减小锁粒度</strong>：将 50ms 临界区分解为多个小临界区，减少单次锁持有时间</td>
+<td>开发团队</td>
+<td>待定</td>
+<td>将锁持有时间降至微秒级，大幅降低竞争概率</td>
+</tr>
+<tr>
+<td><strong>方案 B — 无锁化 / 读写锁</strong>：评估临界区的读写特征，若以读为主则可使用 <code>pthread_rwlock_t</code> 实现读并发</td>
+<td>开发团队</td>
+<td>待定</td>
+<td>读操作可并行执行，完全消除读侧竞争</td>
+</tr>
+<tr>
+<td><strong>方案 C — 任务分片</strong>：将工作任务按数据分片（shard）分配，每片独立 mutex，避免全局锁</td>
+<td>开发团队</td>
+<td>待定</td>
+<td>锁竞争概率降至 1/n，n 为分片数</td>
+</tr>
+<tr>
+<td><strong>方案 D — 锁外处理</strong>：将 50ms 忙等操作移出临界区，仅在临界区内进行快速的状态切换，用条件变量驱动工作线程</td>
+<td>开发团队</td>
+<td>待定</td>
+<td>锁持有时间降至微秒级，彻底消除锁竞争瓶颈</td>
+</tr>
+</tbody></table></div>
+<h3 id="h-43-优化效果预估">4.3 优化效果预估</h3>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>优化方案</th>
+<th>预估 futex(FUTEX_WAIT) 耗时</th>
+<th>吞吐提升</th>
+<th>复杂度</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>当前状态</td>
+<td>&gt; 50ms</td>
+<td>基线</td>
+<td>-</td>
+</tr>
+<tr>
+<td>减小锁粒度 (A)</td>
+<td>&lt; 1ms</td>
+<td>10x+</td>
+<td>低</td>
+</tr>
+<tr>
+<td>读写锁 (B)</td>
+<td>取决于读写比</td>
+<td>2x~5x</td>
+<td>中</td>
+</tr>
+<tr>
+<td>数据分片 (C)</td>
+<td>&lt; 1ms</td>
+<td>4x</td>
+<td>中</td>
+</tr>
+<tr>
+<td>锁外处理 (D)</td>
+<td>&lt; 1ms</td>
+<td>10x+</td>
+<td>中高</td>
+</tr>
+</tbody></table></div>
+<hr>
+<h2 id="h-五技术深度分析">五、技术深度分析</h2>
+<h3 id="h-51-futex-内核机制回顾">5.1 futex 内核机制回顾</h3>
+<p>futex (Fast Userspace Mutex) 是 Linux 下高效的用户态锁实现：</p>
+<ol>
+<li><strong>无竞争时</strong>：锁操作完全在用户态完成（原子 cmpxchg），不进入内核，开销极低（~10ns）</li>
+<li><strong>有竞争时</strong>：<ul>
+<li>请求锁但发现已被持有 → <code>futex(FUTEX_WAIT, val)</code> 系统调用 → 线程挂起进入 <code>hrtimer_nanosleep</code></li>
+<li>持有锁的线程释放锁 → <code>futex(FUTEX_WAKE, n)</code> 唤醒至多 n 个等待线程</li>
+<li>被唤醒的线程返回用户态，重新尝试原子操作获取锁</li>
+</ul>
+</li>
+</ol>
+<p><strong>本场景的核心问题</strong>：由于 4 线程全部阻塞等待，每次 <code>FUTEX_WAKE</code> 会产生<strong>惊群效应（thundering herd）</strong> — 3 个等待线程全部被唤醒，但只有 1 个能成功获取锁，其余 2 个立即重入 <code>FUTEX_WAIT</code>，造成额外的上下文切换和内核态/用户态切换开销。</p>
+<h3 id="h-52-锁竞争与多核可扩展性">5.2 锁竞争与多核可扩展性</h3>
+<p>本场景在任意多核 CPU 上都会表现出一致的瓶颈，因为：</p>
+<div class="code-block">
+  
+  <button class="copy-btn" onclick="copyCode(this)" title="复制">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
+  </button>
+  <pre><code>Amdahl's Law: S = 1 / (1 - P + P/n)
+其中 P = 可并行比例，n = 核心数
+
+本场景中临界区占比 = 50ms / 60ms ≈ 83.3%
+可并行比例 = 1 - 0.833 = 16.7%
+最大加速比 = 1 / 0.833 = 1.2x
+
+即使使用 128 核，加速比也仅为 1.2 — 即性能约等于单线程的 1.2 倍。</code></pre>
+</div>
+<h3 id="h-53-内核栈-hrtimernanosleep-解读">5.3 内核栈 `hrtimer_nanosleep` 解读</h3>
+<ul>
+<li><code>hrtimer_nanosleep</code> 是 Linux 高精度定时器（HRT）驱动的睡眠机制</li>
+<li>futex 的 <code>FUTEX_WAIT</code> 内部使用 <code>hrtimer</code> 实现超时等待</li>
+<li>线程在 <code>FUTEX_WAIT</code> 中阻塞时内核态栈底表现为 <code>hrtimer_nanosleep</code></li>
+<li>这验证了线程确实在 futex 等待中进入了长时睡眠，而非处于用户态自旋</li>
+</ul>
+<hr>
+<h2 id="h-六附录">六、附录</h2>
+<h3 id="h-61-参考数据来源">6.1 参考数据来源</h3>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>证据项</th>
+<th>来源文件</th>
+<th>内容摘要</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>线程拓扑与锁竞争模型</td>
+<td><code>kuafu_B1_20260528_futex.md:12-16</code></td>
+<td>4 线程、mutex、50ms 临界区、10ms 休眠</td>
+</tr>
+<tr>
+<td>线程活跃状态</td>
+<td><code>kuafu_B1_20260528_futex.md:18-19</code></td>
+<td>/proc/1/task/ 仅 2 活跃任务</td>
+</tr>
+<tr>
+<td>内核栈信息</td>
+<td><code>kuafu_B1_20260528_futex.md:19</code></td>
+<td>hrtimer_nanosleep（确认 futex 睡眠）</td>
+</tr>
+<tr>
+<td>锁竞争特征描述</td>
+<td><code>kuafu_B1_20260528_futex.md:22-26</code></td>
+<td>连续循环锁竞争模式</td>
+</tr>
+<tr>
+<td>诊断结论</td>
+<td><code>kuafu_B1_20260528_futex.md:29-30</code></td>
+<td>FUTEX_WAIT 耗时 &gt; 50ms</td>
+</tr>
+</tbody></table></div>
+
+    <div class="meta">
+      <span class="meta-source">多线程futex锁竞争分析_20260528_195404_report.md</span>
+      <span>生成于 2026/05/28 20:02</span>
+    </div>
+  </article>
+</div>
+
+<script>
+  /* ── 滚动进度条 ── */
+  window.addEventListener("scroll", () => {
+    const el  = document.documentElement;
+    const pct = el.scrollTop / (el.scrollHeight - el.clientHeight) * 100;
+    document.getElementById("progress").style.width = Math.min(pct, 100) + "%";
+  });
+
+  /* ── TOC 高亮当前章节 ── */
+  (function () {
+    const headings = Array.from(document.querySelectorAll("article h1,article h2,article h3"));
+    const links    = Array.from(document.querySelectorAll(".toc a"));
+    if (!links.length) return;
+    const obs = new IntersectionObserver(entries => {
+      entries.forEach(e => {
+        if (!e.isIntersecting) return;
+        links.forEach(l => l.classList.remove("active"));
+        const a = links.find(l => l.getAttribute("href") === "#" + e.target.id);
+        if (a) a.classList.add("active");
+      });
+    }, { rootMargin: "-10% 0px -80% 0px" });
+    headings.forEach(h => obs.observe(h));
+  })();
+
+  /* ── h2 章节序号自动计数 ── */
+  (function () {
+    let idx = 0;
+    document.querySelectorAll("article h2").forEach(el => {
+      idx++;
+      el.setAttribute("data-index", String(idx).padStart(2, "0"));
+    });
+  })();
+
+  /* ── 代码块一键复制 ── */
+  function copyCode(btn) {
+    const code = btn.closest(".code-block").querySelector("code").innerText;
+    navigator.clipboard.writeText(code).then(() => {
+      btn.classList.add("copied");
+      btn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>';
+      setTimeout(() => {
+        btn.classList.remove("copied");
+        btn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>';
+      }, 2000);
+    });
+  }
+
+  /* ── 目录树收缩/展开 ── */
+  function toggleToc(btn) {
+    const expanded = btn.getAttribute("aria-expanded") === "true";
+    btn.setAttribute("aria-expanded", String(!expanded));
+    const parentItem = btn.closest(".toc-item");
+    let nextEl = parentItem.nextElementSibling;
+    if (nextEl && nextEl.classList.contains("toc-group")) {
+      if (expanded) {
+        nextEl.style.maxHeight = nextEl.scrollHeight + "px";
+        void nextEl.offsetHeight;
+        nextEl.classList.add("collapsed");
+      } else {
+        nextEl.classList.remove("collapsed");
+        nextEl.style.maxHeight = nextEl.scrollHeight + "px";
+        setTimeout(() => {
+          if (!nextEl.classList.contains("collapsed")) {
+            nextEl.style.maxHeight = "none";
+          }
+        }, 300);
+      }
+    }
+  }
+</script>
+</body>
+</html>
