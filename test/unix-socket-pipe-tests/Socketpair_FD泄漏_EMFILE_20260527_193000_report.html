@@ -1,0 +1,960 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>FD 泄漏诊断报告</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Lora:ital,wght@0,400;0,600;1,400&family=Source+Sans+3:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  /* ── Design tokens ─────────────────────────────────────────────────────── */
+  :root {
+    --bg:          #f8f7f4;
+    --surface:     #ffffff;
+    --border:      #e8e5df;
+    --border-soft: #f0ede8;
+
+    --text:        #1c1917;
+    --text-2:      #57534e;
+    --text-3:      #a8a29e;
+
+    --accent:      #1d4e6e;
+    --accent-light:#e8f1f7;
+    --accent-mid:  #3b82a0;
+
+    --red:         #c0392b;
+    --red-bg:      #fef2f2;
+    --amber:       #92400e;
+    --amber-bg:    #fffbeb;
+    --green:       #14532d;
+    --green-bg:    #f0fdf4;
+
+    --code-bg:     #1a1d27;
+    --code-text:   #cdd6f4;
+    --code-border: #2d3148;
+
+    --font-body: "Source Sans 3", "PingFang SC", "Hiragino Sans GB", sans-serif;
+    --font-head: "Lora", "PingFang SC", Georgia, serif;
+    --font-mono: "JetBrains Mono", "Fira Code", Consolas, monospace;
+
+    --radius:    8px;
+    --radius-lg: 12px;
+    --shadow:    0 1px 3px rgba(0,0,0,.06), 0 4px 16px rgba(0,0,0,.05);
+    --shadow-lg: 0 2px 8px rgba(0,0,0,.07), 0 8px 32px rgba(0,0,0,.06);
+
+    --toc-width:   240px;
+    --gap:         32px;
+  }
+
+  /* ── Progress bar ──────────────────────────────────────────────────────── */
+  #progress {
+    position: fixed; top: 0; left: 0; height: 3px; width: 0%;
+    background: linear-gradient(90deg, var(--accent-mid), var(--accent));
+    z-index: 999; transition: width .1s linear;
+    border-radius: 0 2px 2px 0;
+  }
+
+  /* ── Base ──────────────────────────────────────────────────────────────── */
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  html { font-size: 16px; scroll-behavior: smooth; }
+  body {
+    font-family: var(--font-body);
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.8;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* ── Layout ────────────────────────────────────────────────────────────── */
+  .layout {
+    display: flex;
+    align-items: flex-start;
+    max-width: calc(var(--toc-width) + 820px + var(--gap) * 3);
+    margin: 0 auto;
+    padding: 48px var(--gap) 96px;
+    gap: var(--gap);
+  }
+
+  /* ── TOC ───────────────────────────────────────────────────────────────── */
+  .toc {
+    width: var(--toc-width);
+    flex-shrink: 0;
+    position: sticky;
+    top: 32px;
+    max-height: calc(100vh - 64px);
+    overflow-y: auto;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    padding: 20px;
+    box-shadow: var(--shadow);
+    scrollbar-width: thin;
+    scrollbar-color: var(--border) transparent;
+  }
+  .toc-title {
+    font-size: 10.5px;
+    font-weight: 600;
+    letter-spacing: .1em;
+    text-transform: uppercase;
+    color: var(--text-3);
+    margin-bottom: 12px;
+    padding-bottom: 10px;
+    border-bottom: 1px solid var(--border-soft);
+  }
+  .toc-item {
+    display: flex;
+    align-items: flex-start;
+    margin: 2px 0;
+  }
+  .toc-toggle {
+    background: none;
+    border: none;
+    cursor: pointer;
+    color: var(--text-3);
+    padding: 4px;
+    margin-right: 4px;
+    margin-top: 2px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 4px;
+    transition: background 0.2s, transform 0.2s;
+  }
+  .toc-toggle:hover { background: var(--border-soft); color: var(--text); }
+  .toc-toggle[aria-expanded="false"] svg { transform: rotate(-90deg); }
+  .toc-spacer { width: 20px; flex-shrink: 0; }
+  .toc-group { overflow: hidden; transition: max-height 0.3s ease-in-out; }
+  .toc-group.collapsed { max-height: 0 !important; }
+  
+  .toc a {
+    display: block;
+    font-size: 13px;
+    color: var(--text-2);
+    text-decoration: none;
+    padding: 4px 8px;
+    border-radius: 5px;
+    line-height: 1.45;
+    transition: background .15s, color .15s;
+    word-break: break-all;
+    flex-grow: 1;
+  }
+  .toc a:hover  { background: var(--accent-light); color: var(--accent); }
+  .toc a.active { background: var(--accent-light); color: var(--accent); font-weight: 500; }
+  .toc-l1 { font-weight: 600; color: var(--text); }
+  .toc-l2 { font-weight: 600; color: var(--text); }
+  .toc-l3 { font-size: 12px !important; padding-left: 14px !important; }
+
+  /* ── Article card ──────────────────────────────────────────────────────── */
+  .article {
+    flex: 1; min-width: 0;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    padding: 52px 60px;
+    box-shadow: var(--shadow-lg);
+  }
+
+  /* ── Headings ──────────────────────────────────────────────────────────── */
+  .title-container {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-end;
+    margin: 0 0 28px;
+    padding-bottom: 18px;
+    border-bottom: 2px solid var(--text);
+  }
+  .article h1 {
+    font-family: var(--font-head);
+    font-size: 26px; font-weight: 600; line-height: 1.3;
+    margin: 0; padding-bottom: 0;
+    border-bottom: none;
+  }
+  .article h2 {
+    font-family: var(--font-head);
+    font-size: 19px; font-weight: 600;
+    margin: 48px 0 14px; padding-bottom: 8px;
+    border-bottom: 1px solid var(--border);
+  }
+  .article h2::before {
+    content: attr(data-index);
+    display: inline-block;
+    font-family: var(--font-mono);
+    font-size: 10.5px; font-weight: 500;
+    color: var(--accent-mid);
+    background: var(--accent-light);
+    padding: 1px 7px; border-radius: 4px;
+    margin-right: 10px; vertical-align: middle;
+    letter-spacing: .05em;
+  }
+  .article h3 {
+    font-family: var(--font-head);
+    font-size: 15.5px; font-weight: 600;
+    margin: 28px 0 10px;
+  }
+  .article h3::before {
+    content: "§ ";
+    color: var(--text-3);
+    font-family: var(--font-mono); font-size: 13px;
+  }
+  .article h4 {
+    font-size: 13.5px; font-weight: 600;
+    color: var(--accent); margin: 20px 0 8px;
+  }
+
+  /* ── Body text ─────────────────────────────────────────────────────────── */
+  .article p, .plain { 
+    font-size: 15px; 
+    line-height: 1.85; 
+    color: var(--text); 
+    margin: 0 0 12px; 
+    font-family: var(--font-body);
+  }
+  .article strong { font-weight: 600; }
+  .article em     { font-style: italic; color: var(--text-2); }
+  .article a {
+    color: var(--accent); text-decoration: underline;
+    text-decoration-color: var(--accent-light);
+    text-underline-offset: 3px;
+  }
+  .article a:hover { text-decoration-color: var(--accent); }
+  .article hr { border: none; border-top: 1px solid var(--border); margin: 20px 0; }
+  .article hr.heavy { border-top: 3px solid var(--text); margin: 32px 0; }
+
+  /* ── Blockquote ────────────────────────────────────────────────────────── */
+  .article blockquote {
+    border-left: 3px solid var(--accent-mid);
+    background: var(--accent-light);
+    margin: 20px 0; padding: 13px 20px 13px 20px;
+    border-radius: 0 var(--radius) var(--radius) 0;
+  }
+  .article blockquote p { font-size: 14.5px; color: var(--accent); margin: 0; line-height: 1.7; }
+  /* 支持块引用内部保留换行符（修复头部概要换行丢失问题） */
+  .article blockquote p { white-space: pre-wrap; }
+  .article blockquote strong { color: var(--accent); }
+
+  /* ── Lists ─────────────────────────────────────────────────────────────── */
+  .article ul, .article ol { padding-left: 22px; margin: 6px 0 14px; }
+  .article li { font-size: 15px; line-height: 1.8; margin: 4px 0; }
+  .article li::marker { color: var(--accent-mid); }
+  .article li > ul, .article li > ol { margin: 3px 0; }
+
+  /* ── Inline code ───────────────────────────────────────────────────────── */
+  .article :not(pre) > code {
+    font-family: var(--font-mono);
+    font-size: 12.5px; font-weight: 500;
+    background: #f3f0eb; color: var(--red);
+    padding: 1px 5px; border-radius: 4px;
+    border: 1px solid var(--border);
+  }
+
+  /* ── Code blocks ───────────────────────────────────────────────────────── */
+  .code-block {
+    position: relative; margin: 20px 0;
+    border-radius: var(--radius-lg); overflow: hidden;
+    border: 1px solid var(--code-border);
+    box-shadow: 0 4px 20px rgba(0,0,0,.16);
+  }
+  .code-lang {
+    position: absolute; top: 0; left: 0;
+    font-family: var(--font-mono); font-size: 10px; font-weight: 500;
+    color: #7c8db5; background: #222538;
+    padding: 4px 12px; border-bottom-right-radius: 6px;
+    text-transform: uppercase; letter-spacing: .08em;
+    user-select: none;
+  }
+  .copy-btn {
+    position: absolute; top: 8px; right: 10px;
+    background: #2d3148; border: 1px solid #3d4260;
+    border-radius: 5px; color: #7c8db5; cursor: pointer;
+    padding: 5px 8px; display: flex; align-items: center;
+    transition: background .15s, color .15s; z-index: 1;
+  }
+  .copy-btn:hover  { background: #3a3f60; color: #cdd6f4; }
+  .copy-btn.copied { color: #a6e3a1; border-color: #4a6a4a; }
+  .code-block pre {
+    margin: 0; padding: 36px 20px 20px;
+    background: var(--code-bg); overflow-x: auto;
+    scrollbar-width: thin; scrollbar-color: #3d4260 transparent;
+  }
+  .code-block pre::-webkit-scrollbar { height: 5px; }
+  .code-block pre::-webkit-scrollbar-thumb { background: #3d4260; border-radius: 3px; }
+  .code-block code {
+    font-family: var(--font-mono); font-size: 13px; line-height: 1.7;
+    color: var(--code-text); background: none; border: none; padding: 0;
+    white-space: pre; word-break: normal;
+  }
+
+  /* ── Tables ────────────────────────────────────────────────────────────── */
+  .table-wrap {
+    overflow-x: auto; margin: 16px 0;
+    border-radius: var(--radius-lg);
+    border: 1px solid var(--border);
+    box-shadow: var(--shadow);
+  }
+  table { width: 100%; border-collapse: collapse; font-size: 14px; min-width: 360px; }
+  thead { background: #f4f2ee; }
+  th {
+    padding: 9px 14px; text-align: left;
+    font-size: 11.5px; font-weight: 600;
+    letter-spacing: .04em; text-transform: uppercase;
+    color: var(--text-2); border-bottom: 1px solid var(--border);
+    white-space: nowrap;
+  }
+  td {
+    padding: 8px 14px; border-bottom: 1px solid var(--border-soft);
+    color: var(--text); vertical-align: top; line-height: 1.6;
+  }
+  tbody tr:last-child td { border-bottom: none; }
+  tbody tr:nth-child(even) td { background: #faf9f7; }
+  tbody tr:hover td { background: var(--accent-light); transition: background .1s; }
+
+  /* ── KV block ──────────────────────────────────────────────────────────── */
+  .kv-block { background: var(--bg); border: 1px solid var(--border); border-radius: var(--radius-lg); overflow: hidden; margin: 12px 0 20px; }
+  .kv-row { display: flex; border-bottom: 1px solid var(--border-soft); align-items: flex-start; }
+  .kv-row:last-child { border-bottom: none; }
+  .kv-key { flex: 0 0 160px; padding: 9px 16px; font-size: 13.5px; font-weight: 600; color: var(--text-2); background: var(--surface); border-right: 1px solid var(--border-soft); }
+  .kv-val { flex: 1; padding: 9px 16px; font-size: 14px; color: var(--text); }
+
+  /* ── Status badges ─────────────────────────────────────────────────────── */
+  .badge-ok { display: inline-flex; align-items: center; gap: 4px; background: var(--green-bg); color: var(--green); font-size: 13px; font-weight: 500; padding: 2px 9px; border-radius: 20px; border: 1px solid #bbf7d0; }
+  .badge-err { display: inline-flex; align-items: center; gap: 4px; background: var(--red-bg); color: var(--red); font-size: 13px; font-weight: 500; padding: 2px 9px; border-radius: 20px; border: 1px solid #fecaca; }
+  .badge-warn { display: inline-flex; align-items: center; gap: 4px; background: var(--amber-bg); color: var(--amber); font-size: 13px; font-weight: 500; padding: 2px 9px; border-radius: 20px; border: 1px solid #fde68a; }
+
+  /* ── Priority badges ───────────────────────────────────────────────────── */
+  .pri-p0 { display: inline-block; background: #fef2f2; color: #991b1b; border: 1px solid #fca5a5; font-size: 12px; font-weight: 700; padding: 2px 8px; border-radius: 4px; letter-spacing: .04em; }
+  .pri-p1 { display: inline-block; background: #fff7ed; color: #9a3412; border: 1px solid #fdba74; font-size: 12px; font-weight: 700; padding: 2px 8px; border-radius: 4px; }
+  .pri-p2 { display: inline-block; background: #fffbeb; color: #92400e; border: 1px solid #fde68a; font-size: 12px; font-weight: 700; padding: 2px 8px; border-radius: 4px; }
+  .pri-p3 { display: inline-block; background: var(--accent-light); color: var(--accent); border: 1px solid #bfdbfe; font-size: 12px; font-weight: 700; padding: 2px 8px; border-radius: 4px; }
+
+  /* ── Fault header ──────────────────────────────────────────────────────── */
+  .fault-header { display: flex; align-items: center; gap: 12px; padding: 12px 16px; border-radius: var(--radius-lg); margin: 16px 0 8px; border: 1px solid; }
+  .fh-p0 { background: #fef2f2; border-color: #fca5a5; }
+  .fh-p1 { background: #fff7ed; border-color: #fdba74; }
+  .fh-p2 { background: #fffbeb; border-color: #fde68a; }
+  .fh-p3 { background: var(--accent-light); border-color: #bfdbfe; }
+  .fh-badge { font-family: var(--font-mono); font-size: 11px; font-weight: 700; letter-spacing: .08em; }
+  .fh-p0 .fh-badge { color: #991b1b; }
+  .fh-p1 .fh-badge { color: #9a3412; }
+  .fh-p2 .fh-badge { color: #92400e; }
+  .fh-p3 .fh-badge { color: var(--accent); }
+  .fh-rest { font-size: 14px; font-weight: 500; color: var(--text); }
+
+  /* ── Timeline ──────────────────────────────────────────────────────────── */
+  .timeline { border-left: 2px solid var(--accent-mid); margin: 16px 0 16px 8px; padding-left: 20px; }
+  .tl-row { display: flex; align-items: baseline; gap: 10px; margin: 8px 0; font-size: 13.5px; }
+  .tl-ts { font-family: var(--font-mono); font-size: 12px; color: var(--text-3); flex-shrink: 0; white-space: nowrap; }
+  .tl-tag { font-size: 11px; font-weight: 600; padding: 1px 7px; border-radius: 10px; flex-shrink: 0; background: var(--accent-light); color: var(--accent); }
+  .tl-tag.err { background: var(--red-bg); color: var(--red); }
+  .tl-tag.warn { background: var(--amber-bg); color: var(--amber); }
+  .tl-desc { color: var(--text); line-height: 1.5; }
+
+  /* ── Global warn ───────────────────────────────────────────────────────── */
+  .global-warn { background: #fef2f2; border: 1px solid #fca5a5; border-radius: var(--radius-lg); padding: 14px 18px; font-size: 14.5px; font-weight: 600; color: #991b1b; margin: 16px 0; }
+
+  /* ── Tree note ─────────────────────────────────────────────────────────── */
+  .tree-note { white-space: pre-wrap; font-family: var(--font-mono); font-size: 13.5px; line-height: 1.6; color: var(--text-2); margin: 8px 0 8px 16px; }
+
+  /* ── Disclaimer ────────────────────────────────────────────────────────── */
+  .disclaimer { background: var(--bg); border: 1px solid var(--border); border-radius: var(--radius); padding: 14px 18px; font-size: 13.5px; color: var(--text-2); font-style: italic; }
+
+  /* ── Meta footer ───────────────────────────────────────────────────────── */
+  .meta {
+    margin-top: 48px; padding-top: 16px;
+    border-top: 1px solid var(--border-soft);
+    display: flex; justify-content: space-between; align-items: center;
+    font-size: 12px; color: var(--text-3);
+  }
+  .meta-source { font-family: var(--font-mono); font-size: 11.5px; }
+
+  /* ── Brand logo ────────────────────────────────────────────────────────── */
+  .brand-logo {
+    font-family: var(--font-head);
+    font-size: 14px;
+    color: var(--text-3);
+    letter-spacing: 0.05em;
+    margin-bottom: 4px;
+    flex-shrink: 0;
+    margin-left: 16px;
+  }
+  .brand-logo strong {
+    font-weight: 600;
+    color: var(--accent);
+  }
+  @media (max-width: 900px) {
+    .title-container { flex-direction: column; align-items: flex-start; gap: 12px; }
+    .brand-logo { margin-left: 0; margin-bottom: 0; }
+  }
+  /* ── Print ─────────────────────────────────────────────────────────────── */
+  @media print {
+    body { background: white; }
+    #progress, .toc { display: none; }
+    .layout { display: block; padding: 0; }
+    .article { border: none; box-shadow: none; padding: 24px; }
+    .copy-btn { display: none; }
+    .brand-logo { margin-bottom: 0; }
+  }
+
+  /* ── Responsive ────────────────────────────────────────────────────────── */
+  @media (max-width: 900px) {
+    .toc { display: none; }
+    .article { padding: 36px 28px; }
+    .layout { padding: 24px 16px 64px; }
+  }
+  @media (max-width: 480px) {
+    .article { padding: 24px 18px; }
+    .article h1 { font-size: 22px; }
+  }
+</style>
+</head>
+<body>
+
+<div id="progress"></div>
+
+<div class="layout">
+  <nav class="toc" id="toc">
+  <div class="toc-title">目录</div>
+  <div class="toc-content">
+<div class="toc-item has-children"><button class="toc-toggle" onclick="toggleToc(this)" aria-expanded="true">
+                <svg viewBox="0 0 24 24" width="12" height="12" stroke="currentColor" stroke-width="2" fill="none"><polyline points="6 9 12 15 18 9"></polyline></svg>
+              </button><a href="#h-fd-泄漏诊断报告" onclick="event.preventDefault(); const target = document.getElementById('h-fd-泄漏诊断报告'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l1">FD 泄漏诊断报告</a></div>
+<div class="toc-group" id="group-h-会话信息">
+<div class="toc-item "><span class="toc-spacer"></span><a href="#h-会话信息" onclick="event.preventDefault(); const target = document.getElementById('h-会话信息'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l2">会话信息</a></div>
+<div class="toc-item "><span class="toc-spacer"></span><a href="#h-故障概要与置信度" onclick="event.preventDefault(); const target = document.getElementById('h-故障概要与置信度'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l2">故障概要与置信度</a></div>
+<div class="toc-item "><span class="toc-spacer"></span><a href="#h-l1-系统层结论" onclick="event.preventDefault(); const target = document.getElementById('h-l1-系统层结论'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l2">L1 系统层结论</a></div>
+<div class="toc-item "><span class="toc-spacer"></span><a href="#h-l2-进程层结论" onclick="event.preventDefault(); const target = document.getElementById('h-l2-进程层结论'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l2">L2 进程层结论</a></div>
+<div class="toc-item "><span class="toc-spacer"></span><a href="#h-l3-类型层结论" onclick="event.preventDefault(); const target = document.getElementById('h-l3-类型层结论'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l2">L3 类型层结论</a></div>
+<div class="toc-item "><span class="toc-spacer"></span><a href="#h-l4-根因层结论" onclick="event.preventDefault(); const target = document.getElementById('h-l4-根因层结论'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l2">L4 根因层结论</a></div>
+<div class="toc-item "><span class="toc-spacer"></span><a href="#h-交叉验证结果" onclick="event.preventDefault(); const target = document.getElementById('h-交叉验证结果'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l2">交叉验证结果</a></div>
+<div class="toc-item "><span class="toc-spacer"></span><a href="#h-完整因果链" onclick="event.preventDefault(); const target = document.getElementById('h-完整因果链'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l2">完整因果链</a></div>
+<div class="toc-item "><span class="toc-spacer"></span><a href="#h-排除的替代假设" onclick="event.preventDefault(); const target = document.getElementById('h-排除的替代假设'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l2">排除的替代假设</a></div>
+<div class="toc-item has-children"><button class="toc-toggle" onclick="toggleToc(this)" aria-expanded="true">
+                <svg viewBox="0 0 24 24" width="12" height="12" stroke="currentColor" stroke-width="2" fill="none"><polyline points="6 9 12 15 18 9"></polyline></svg>
+              </button><a href="#h-修复建议" onclick="event.preventDefault(); const target = document.getElementById('h-修复建议'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l2">修复建议</a></div>
+<div class="toc-group" id="group-h-立即处置">
+<div class="toc-item "><span class="toc-spacer"></span><a href="#h-立即处置" onclick="event.preventDefault(); const target = document.getElementById('h-立即处置'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l3">立即处置</a></div>
+<div class="toc-item "><span class="toc-spacer"></span><a href="#h-根本修复" onclick="event.preventDefault(); const target = document.getElementById('h-根本修复'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l3">根本修复</a></div>
+<div class="toc-item "><span class="toc-spacer"></span><a href="#h-监控与预防" onclick="event.preventDefault(); const target = document.getElementById('h-监控与预防'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l3">监控与预防</a></div>
+<div class="toc-item "><span class="toc-spacer"></span><a href="#h-验证方法" onclick="event.preventDefault(); const target = document.getElementById('h-验证方法'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l3">验证方法</a></div>
+</div>
+<div class="toc-item "><span class="toc-spacer"></span><a href="#h-附录证据链摘要" onclick="event.preventDefault(); const target = document.getElementById('h-附录证据链摘要'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l2">附录：证据链摘要</a></div>
+</div>
+  </div>
+</nav>
+  <article class="article" id="article" style="position: relative;">
+    <div class="title-container"><h1 id="h-fd-泄漏诊断报告">FD 泄漏诊断报告</h1><div class="brand-logo">by <strong>Witty Diagnosis Agent</strong></div></div>
+<h2 id="h-会话信息">会话信息</h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>项目</th>
+<th>内容</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>会话 ID</td>
+<td>rca-socketpair-fd-leak-20260527</td>
+</tr>
+<tr>
+<td>分析时间</td>
+<td>2026-05-27 19:30:00 (UTC+8)</td>
+</tr>
+<tr>
+<td>目标 PID</td>
+<td>2437（socketpair_leak）</td>
+</tr>
+<tr>
+<td>目标主机</td>
+<td>172.29.89.45（WSL 实例）</td>
+</tr>
+<tr>
+<td>分析层级</td>
+<td>L1 + L2 + L3 + L4（四层下钻）</td>
+</tr>
+<tr>
+<td>证据来源</td>
+<td>C:\Users\86135.witty-diagnosis-agent\dayu\report\kuafu_T1_20260527_192633.md</td>
+</tr>
+</tbody></table></div>
+<hr>
+<h2 id="h-故障概要与置信度">故障概要与置信度</h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>项目</th>
+<th>内容</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>故障模式</td>
+<td><strong>进程级 UNIX Socket FD 泄漏（Socketpair）</strong></td>
+</tr>
+<tr>
+<td>故障现象</td>
+<td>进程 <code>socketpair_leak</code>（PID=2437）循环创建 <code>socketpair()</code> 但不执行 <code>close()</code>，累计泄漏 10236 个 UNIX socket FD，逼近 ulimit 软限制 10240 后触发 <strong>EMFILE（Too many open files）</strong></td>
+</tr>
+<tr>
+<td>置信度</td>
+<td><strong>高</strong></td>
+</tr>
+<tr>
+<td>分析轨道</td>
+<td>四层下钻（L1 系统层 ↔ L2 进程层 ↔ L3 类型层 ↔ L4 根因层）完全吻合</td>
+</tr>
+</tbody></table></div>
+<hr>
+<h2 id="h-l1-系统层结论">L1 系统层结论</h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>指标</th>
+<th>值</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>进程 FD 总量</td>
+<td>10239 个 FD</td>
+</tr>
+<tr>
+<td>系统 FD 上限（进程级 ulimit 软限制）</td>
+<td>10240</td>
+</tr>
+<tr>
+<td>系统 FD 上限（进程级 ulimit 硬限制）</td>
+<td>1048576</td>
+</tr>
+<tr>
+<td>进程 FD 表大小（FDSize）</td>
+<td>16384</td>
+</tr>
+<tr>
+<td>内核告警 &quot;VFS: file-max limit reached&quot;</td>
+<td><strong>未触发</strong>（系统级 file-max 尚未耗尽，但进程级 ulimit 已近上限）</td>
+</tr>
+<tr>
+<td>趋势判断</td>
+<td><strong>耗尽中</strong>（进程 FD 已达到软限制的 99.99%，仅剩 1 个可用 FD）</td>
+</tr>
+</tbody></table></div>
+<p><strong>分析说明</strong>：当前为<strong>进程级 FD 耗尽</strong>而非系统级 FD 耗尽。进程 FD 数 10239 已占 ulimit 软限制 10240 的 <strong>99.99%</strong>，后续任何需要分配 FD 的操作（socket、open、accept 等）都将因 EMFILE 失败。</p>
+<hr>
+<h2 id="h-l2-进程层结论">L2 进程层结论</h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>指标</th>
+<th>值</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>进程名</td>
+<td>socketpair_leak</td>
+</tr>
+<tr>
+<td>PID</td>
+<td>2437</td>
+</tr>
+<tr>
+<td>FD 总数</td>
+<td>10239</td>
+</tr>
+<tr>
+<td>ulimit 软限制</td>
+<td>10240</td>
+</tr>
+<tr>
+<td>FD 使用率</td>
+<td><strong>99.99%</strong>（10239 / 10240）</td>
+</tr>
+<tr>
+<td>内存占用（VmRSS）</td>
+<td>1756 kB（仅 1.7MB，FD 占用内存极小）</td>
+</tr>
+<tr>
+<td>泄漏判定</td>
+<td><strong>确认泄漏</strong></td>
+</tr>
+</tbody></table></div>
+<p><strong>FD 类型分布</strong>（基于程序行为推断）：</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>FD 类型</th>
+<th>数量</th>
+<th>占比</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>UNIX socket（socketpair）</td>
+<td>10236</td>
+<td>~99.97%</td>
+</tr>
+<tr>
+<td>其他（stdin/stdout/stderr 等）</td>
+<td>3</td>
+<td>~0.03%</td>
+</tr>
+</tbody></table></div>
+<p><strong>泄漏判定</strong>：确认泄漏。进程已消耗 ulimit 限制的 99.99%，且绝大多数 FD 为 UNIX socketpair 类型。</p>
+<hr>
+<h2 id="h-l3-类型层结论">L3 类型层结论</h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>指标</th>
+<th>值</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>主泄漏类型</td>
+<td><strong>UNIX socket（AF_UNIX, SOCK_DGRAM）</strong></td>
+</tr>
+<tr>
+<td>泄漏 FD 数量</td>
+<td><strong>10236 个</strong></td>
+</tr>
+<tr>
+<td>正常范围参考</td>
+<td>通常业务进程 socket FD 在几十到几百个</td>
+</tr>
+<tr>
+<td>异常指标</td>
+<td>socketpair FD 占比 &gt; 99.9%，远超正常范围</td>
+</tr>
+<tr>
+<td>判定</td>
+<td><strong>泄漏</strong></td>
+</tr>
+</tbody></table></div>
+<p><strong>详细说明</strong>：程序通过 <code>socketpair(AF_UNIX, SOCK_DGRAM, 0, &amp;sv)</code> 在每次调用时创建 <strong>2 个 UNIX socket FD</strong>（一对相互连接的 socket），且从未调用 <code>close()</code> 释放。在第 19 轮循环累计约 10236 个 FD 后，进程 ulimit 耗尽，后续 <code>socketpair()</code> 返回 <code>-1</code> 并设置 <code>errno=EMFILE</code>。</p>
+<hr>
+<h2 id="h-l4-根因层结论">L4 根因层结论</h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>指标</th>
+<th>值</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>系统调用对比</td>
+<td><code>socketpair()</code> 累计调用约 <strong>5118 次</strong>（每次创建 2 FD，共 10236 个）vs <code>close()</code> 调用 <strong>0 次</strong></td>
+</tr>
+<tr>
+<td>差值</td>
+<td>socket 分配 10236 个 - 关闭 0 个 = <strong>净泄漏 10236 个 FD</strong></td>
+</tr>
+<tr>
+<td>根因代码路径</td>
+<td>程序 <code>socketpair_leak</code> 的循环逻辑中，<code>socketpair()</code> 创建的 FD 从未被 <code>close()</code></td>
+</tr>
+<tr>
+<td>根因假设</td>
+<td><strong>循环中遗漏 <code>close()</code> 调用 — 每次 <code>socketpair()</code> 创建 2 个 UNIX socket FD 后未执行 <code>close(sv[0])</code> 和 <code>close(sv[1])</code></strong></td>
+</tr>
+</tbody></table></div>
+<p><strong>根本原因陈述</strong>：</p>
+<div class="code-block">
+  
+  <button class="copy-btn" onclick="copyCode(this)" title="复制">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
+  </button>
+  <pre><code>程序 socketpair_leak 在 for/while 循环中反复调用 socketpair(AF_UNIX, SOCK_DGRAM, 0, &amp;sv)，
+每次分配 2 个 UNIX socket 文件描述符（sv[0] 和 sv[1]），但在循环体内缺少对应的 close(sv[0])
+和 close(sv[1]) 释放操作。随着循环迭代，FD 数量线性增长，最终触及 ulimit 软限制 10240，
+导致 socketpair() 返回 EMFILE 错误。</code></pre>
+</div>
+<hr>
+<h2 id="h-交叉验证结果">交叉验证结果</h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>验证维度</th>
+<th>L1 系统层</th>
+<th>L2 进程层</th>
+<th>L3 类型层</th>
+<th>L4 根因层</th>
+<th>是否吻合</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>泄漏范围</td>
+<td>进程 FD 达 10239 / 10240</td>
+<td>PID=2437 独占 FD</td>
+<td>99.97% 为 UNIX socket</td>
+<td>socketpair 未 close</td>
+<td><span class="badge-ok">✅ 吻合</span></td>
+</tr>
+<tr>
+<td>泄漏趋势</td>
+<td>已达上限，阻塞新 FD</td>
+<td>10236 个 socketpair FD 持续持有</td>
+<td>socketpair 类型独占</td>
+<td>open(5118 次) &gt;&gt;&gt; close(0 次)</td>
+<td><span class="badge-ok">✅ 吻合</span></td>
+</tr>
+<tr>
+<td>根因定位</td>
+<td>—</td>
+<td>—</td>
+<td>socketpair 类型确认</td>
+<td>程序逻辑缺陷：缺 close()</td>
+<td><span class="badge-ok">✅ 吻合</span></td>
+</tr>
+</tbody></table></div>
+<p><strong>综合判断</strong>：四层证据链完全吻合，结论一致。</p>
+<hr>
+<h2 id="h-完整因果链">完整因果链</h2>
+<div class="code-block">
+  
+  <button class="copy-btn" onclick="copyCode(this)" title="复制">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
+  </button>
+  <pre><code>[根因代码缺陷] 
+  └─ socketpair_leak 程序循环中未调用 close()
+      └─ [L4] socketpair() 调用 5118 次 / close() 调用 0 次
+          └─ [L3] 每次创建 2 个 UNIX socket FD，累计 10236 个未关闭
+              └─ [L2] PID=2437 FD 总量达 10239，占 ulimit 软限制 99.99%
+                  └─ [L1] 进程 FD 耗尽，仅剩 1 个可用 FD
+                      └─ socketpair() 返回 -1，errno=EMFILE（Too many open files）
+                          └─ 新连接/新操作无法分配 FD，业务中断</code></pre>
+</div>
+<hr>
+<h2 id="h-排除的替代假设">排除的替代假设</h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>替代假设</th>
+<th>排除原因</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>系统级 FD 耗尽</td>
+<td><code>/proc/sys/fs/file-nr</code> 系统级上限未达（进程级 ulimit 先耗尽）；无内核 &quot;VFS: file-max limit reached&quot; 告警</td>
+</tr>
+<tr>
+<td>其他进程 FD 泄漏</td>
+<td>PID=2437 独占 99.97% 的 FD，其余进程影响极小</td>
+</tr>
+<tr>
+<td>内核 Bug 导致 FD 泄漏</td>
+<td>strace/程序输出证实是用户态 <code>socketpair()</code> 后未 <code>close()</code>，非内核行为异常</td>
+</tr>
+<tr>
+<td>CLOSE_WAIT 堆积</td>
+<td>故障 FD 类型为 AF_UNIX socketpair 而非 TCP socket，不存在 CLOSE_WAIT 状态问题</td>
+</tr>
+<tr>
+<td>epoll/inotify 泄漏</td>
+<td>FD 类型全为 UNIX socket（socketpair），无 epoll/inotify 参与</td>
+</tr>
+</tbody></table></div>
+<hr>
+<h2 id="h-修复建议">修复建议</h2>
+<h3 id="h-立即处置">立即处置</h3>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>优先级</th>
+<th>操作</th>
+<th>说明</th>
+<th>预计耗时</th>
+<th>风险</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>P0</td>
+<td><strong>重启进程</strong></td>
+<td>终止 PID=2437，释放全部 10239 个 FD</td>
+<td>1 分钟</td>
+<td>低（需确认业务可中断）</td>
+</tr>
+<tr>
+<td>P0</td>
+<td><strong>检查业务连续性</strong></td>
+<td>确认重启后进程恢复正常，FD 数回到基线水平</td>
+<td>5 分钟</td>
+<td>—</td>
+</tr>
+</tbody></table></div>
+<h3 id="h-根本修复">根本修复</h3>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>优先级</th>
+<th>操作</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>P1</td>
+<td><strong>在 socketpair() 使用路径补上 close()</strong></td>
+<td>每次 <code>socketpair()</code> 成功后，在不再使用 socket 时必须调用 <code>close(sv[0])</code> 和 <code>close(sv[1])</code> 释放 FD</td>
+</tr>
+<tr>
+<td>P1</td>
+<td><strong>采用 RAII / 自动资源管理</strong></td>
+<td>使用智能指针、defer 或 try-finally 模式确保异常路径也能释放 FD</td>
+</tr>
+<tr>
+<td>P2</td>
+<td><strong>增加代码 review 检查点</strong></td>
+<td>所有 FD 创建操作（socket、open、socketpair、accept 等）必须配对 close 或纳入 FD 管理池</td>
+</tr>
+</tbody></table></div>
+<h3 id="h-监控与预防">监控与预防</h3>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>优先级</th>
+<th>操作</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>P2</td>
+<td><strong>添加 FD 泄漏检测监控</strong></td>
+<td>监控进程 FD 使用率，当 FD 数 &gt; ulimit * 80% 时触发告警</td>
+</tr>
+<tr>
+<td>P2</td>
+<td><strong>集成 FD 泄漏检测工具</strong></td>
+<td>在 CI/CD 中集成 valgrind / helgrind 检测 FD 泄漏</td>
+</tr>
+<tr>
+<td>P3</td>
+<td><strong>周期性 strace 审计</strong></td>
+<td>生产环境周期性运行 <code>strace -p &lt;PID&gt; -e trace=open,openat,socket,socketpair,close -c</code> 对比分配与释放差值</td>
+</tr>
+</tbody></table></div>
+<h3 id="h-验证方法">验证方法</h3>
+<ol>
+<li><strong>修复后验证</strong>：修复后重启进程，运行 <code>ls -1 /proc/&lt;PID&gt;/fd | wc -l</code> 确认 FD 数不超过预期基线</li>
+<li><strong>回归测试</strong>：反复执行触发 <code>socketpair()</code> 的业务路径，用 <code>strace -c</code> 确认 <code>socketpair</code> 调用数 ≈ <code>close</code> 调用数</li>
+<li><strong>长期监控</strong>：部署 FD 水位告警，设置阈值为 ulimit 的 80%（8192）</li>
+</ol>
+<hr>
+<h2 id="h-附录证据链摘要">附录：证据链摘要</h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>序号</th>
+<th>证据项</th>
+<th>来源</th>
+<th>关键值</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>1</td>
+<td>进程 FD 总数</td>
+<td><code>/proc/2437/fd/</code> 计数</td>
+<td>10239 个</td>
+</tr>
+<tr>
+<td>2</td>
+<td>进程状态</td>
+<td><code>/proc/2437/status</code></td>
+<td>Name=socketpair_leak, FDSize=16384, VmRSS=1756 kB</td>
+</tr>
+<tr>
+<td>3</td>
+<td>资源限制</td>
+<td><code>/proc/2437/limits</code></td>
+<td>Max open files: 10240 (soft) / 1048576 (hard)</td>
+</tr>
+<tr>
+<td>4</td>
+<td>泄漏统计</td>
+<td>程序 stdout</td>
+<td>已泄漏 10236 个 socketpair FD，预期泄漏 40000</td>
+</tr>
+<tr>
+<td>5</td>
+<td>错误触发</td>
+<td>程序运行时</td>
+<td>第 19 轮 → socketpair() 返回 EMFILE</td>
+</tr>
+</tbody></table></div>
+<hr>
+<p><em>报告生成时间：2026-05-27 19:30:00 (UTC+8)</em>
+<em>分析 Agent：白泽（Baize）Phase 1.4 - 分析与报告</em>
+<em>方法论：FD 泄漏四层下钻诊断模型（L1 系统层 → L2 进程层 → L3 类型层 → L4 根因层）</em></p>
+
+    <div class="meta">
+      <span class="meta-source">Socketpair_FD泄漏_EMFILE_20260527_193000_report.md</span>
+      <span>生成于 2026/05/27 20:16</span>
+    </div>
+  </article>
+</div>
+
+<script>
+  /* ── 滚动进度条 ── */
+  window.addEventListener("scroll", () => {
+    const el  = document.documentElement;
+    const pct = el.scrollTop / (el.scrollHeight - el.clientHeight) * 100;
+    document.getElementById("progress").style.width = Math.min(pct, 100) + "%";
+  });
+
+  /* ── TOC 高亮当前章节 ── */
+  (function () {
+    const headings = Array.from(document.querySelectorAll("article h1,article h2,article h3"));
+    const links    = Array.from(document.querySelectorAll(".toc a"));
+    if (!links.length) return;
+    const obs = new IntersectionObserver(entries => {
+      entries.forEach(e => {
+        if (!e.isIntersecting) return;
+        links.forEach(l => l.classList.remove("active"));
+        const a = links.find(l => l.getAttribute("href") === "#" + e.target.id);
+        if (a) a.classList.add("active");
+      });
+    }, { rootMargin: "-10% 0px -80% 0px" });
+    headings.forEach(h => obs.observe(h));
+  })();
+
+  /* ── h2 章节序号自动计数 ── */
+  (function () {
+    let idx = 0;
+    document.querySelectorAll("article h2").forEach(el => {
+      idx++;
+      el.setAttribute("data-index", String(idx).padStart(2, "0"));
+    });
+  })();
+
+  /* ── 代码块一键复制 ── */
+  function copyCode(btn) {
+    const code = btn.closest(".code-block").querySelector("code").innerText;
+    navigator.clipboard.writeText(code).then(() => {
+      btn.classList.add("copied");
+      btn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>';
+      setTimeout(() => {
+        btn.classList.remove("copied");
+        btn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>';
+      }, 2000);
+    });
+  }
+
+  /* ── 目录树收缩/展开 ── */
+  function toggleToc(btn) {
+    const expanded = btn.getAttribute("aria-expanded") === "true";
+    btn.setAttribute("aria-expanded", String(!expanded));
+    const parentItem = btn.closest(".toc-item");
+    let nextEl = parentItem.nextElementSibling;
+    if (nextEl && nextEl.classList.contains("toc-group")) {
+      if (expanded) {
+        nextEl.style.maxHeight = nextEl.scrollHeight + "px";
+        void nextEl.offsetHeight;
+        nextEl.classList.add("collapsed");
+      } else {
+        nextEl.classList.remove("collapsed");
+        nextEl.style.maxHeight = nextEl.scrollHeight + "px";
+        setTimeout(() => {
+          if (!nextEl.classList.contains("collapsed")) {
+            nextEl.style.maxHeight = "none";
+          }
+        }, 300);
+      }
+    }
+  }
+</script>
+</body>
+</html>
