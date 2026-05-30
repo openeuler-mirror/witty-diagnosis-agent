@@ -143,7 +143,7 @@ cat /proc/sys/kernel/core_pattern
 
 #### 2. 开发会产生 Core Dump 的示例 C 代码
 
-创建 `crash_demo.c` 文件：
+1）创建 `crash_demo.c` 文件：
 
 ```c
 #include <stdio.h>
@@ -161,32 +161,32 @@ int main() {
 }
 ```
 
-**安装编译工具和 GDB**：
+2）安装编译工具和 GDB：
 
 ```bash
 sudo apt update && sudo apt install -y gcc gdb
 ```
 
-**编译（禁用优化，开启调试符号）**：
+3）编译（禁用优化，开启调试符号）：
 
 ```bash
 gcc -g -O0 -o crash_demo crash_demo.c
 ```
 
-**运行**：
+4）运行：
 
 ```bash
 ./crash_demo
 ```
 
-执行后将触发段错误并产生 core dump 文件：
+5）执行后将触发段错误并产生 core dump 文件：
 
 ```
 Starting crash demo...
 Segmentation fault (core dumped)
 ```
 
-**查看生成的 core 文件**：
+6）查看生成的 core 文件：
 
 ```bash
 ls -la ./core.*
@@ -194,15 +194,15 @@ ls -la ./core.*
 
 #### 3. 在 WSL 中启动 OpenCode 并使用智能诊断 Agent 分析
 
-**启动 OpenCode**：
+1）启动 OpenCode：
 
 ```bash
 opencode
 ```
 
-**加载 Xuanyuan Agent**：执行 `/agents` 命令，选择 `Xuanyuan` Agent。
+2）加载 Xuanyuan Agent：执行 `/agents` 命令，选择 `Xuanyuan` Agent。
 
-**输入问题描述**：
+3）输入问题描述：
 
 ```
 分析/tmp/test目录下的core文件根因。
@@ -210,10 +210,36 @@ opencode
 
 > **提示**：将 `/tmp/test` 替换为示例 C 代码所在的实际目录路径。
 
-系统将自动执行智能诊断流程，分析进程崩溃原因并输出诊断报告。
+4）系统将自动执行智能诊断流程，分析进程崩溃原因并输出诊断报告。
 
 ---
 
+### 硬盘故障诊断示例
+
+#### 1. 环境准备
+
+1. 下载测试用例日志logs.zip（链接: https://pan.baidu.com/s/1-VlfKy5sx7LR-_tXkJ1G1A?pwd=bykf 提取码: bykf）；
+2. 将logs.zip拷贝到/tmp目录下并解压；
+
+#### 2. 使用智能诊断 Agent 分析
+
+1）启动 OpenCode：
+
+```bash
+opencode
+```
+
+2）加载 Xuanyuan Agent：执行 `/agents` 命令，选择 `Xuanyuan` Agent。
+
+3）输入问题描述：
+
+```
+请诊断2026-03-05 14:31前最近一次硬盘故障，日志路径：/tmp/logs
+```
+
+4）系统将自动执行智能诊断流程，分析硬盘故障原因并输出诊断报告。
+
+---
 
 ### 如何贡献
 
