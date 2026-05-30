@@ -1,0 +1,1201 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>故障诊断报告</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Lora:ital,wght@0,400;0,600;1,400&family=Source+Sans+3:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  /* ── Design tokens ─────────────────────────────────────────────────────── */
+  :root {
+    --bg:          #f8f7f4;
+    --surface:     #ffffff;
+    --border:      #e8e5df;
+    --border-soft: #f0ede8;
+
+    --text:        #1c1917;
+    --text-2:      #57534e;
+    --text-3:      #a8a29e;
+
+    --accent:      #1d4e6e;
+    --accent-light:#e8f1f7;
+    --accent-mid:  #3b82a0;
+
+    --red:         #c0392b;
+    --red-bg:      #fef2f2;
+    --amber:       #92400e;
+    --amber-bg:    #fffbeb;
+    --green:       #14532d;
+    --green-bg:    #f0fdf4;
+
+    --code-bg:     #1a1d27;
+    --code-text:   #cdd6f4;
+    --code-border: #2d3148;
+
+    --font-body: "Source Sans 3", "PingFang SC", "Hiragino Sans GB", sans-serif;
+    --font-head: "Lora", "PingFang SC", Georgia, serif;
+    --font-mono: "JetBrains Mono", "Fira Code", Consolas, monospace;
+
+    --radius:    8px;
+    --radius-lg: 12px;
+    --shadow:    0 1px 3px rgba(0,0,0,.06), 0 4px 16px rgba(0,0,0,.05);
+    --shadow-lg: 0 2px 8px rgba(0,0,0,.07), 0 8px 32px rgba(0,0,0,.06);
+
+    --toc-width:   240px;
+    --gap:         32px;
+  }
+
+  /* ── Progress bar ──────────────────────────────────────────────────────── */
+  #progress {
+    position: fixed; top: 0; left: 0; height: 3px; width: 0%;
+    background: linear-gradient(90deg, var(--accent-mid), var(--accent));
+    z-index: 999; transition: width .1s linear;
+    border-radius: 0 2px 2px 0;
+  }
+
+  /* ── Base ──────────────────────────────────────────────────────────────── */
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  html { font-size: 16px; scroll-behavior: smooth; }
+  body {
+    font-family: var(--font-body);
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.8;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* ── Layout ────────────────────────────────────────────────────────────── */
+  .layout {
+    display: flex;
+    align-items: flex-start;
+    max-width: calc(var(--toc-width) + 820px + var(--gap) * 3);
+    margin: 0 auto;
+    padding: 48px var(--gap) 96px;
+    gap: var(--gap);
+  }
+
+  /* ── TOC ───────────────────────────────────────────────────────────────── */
+  .toc {
+    width: var(--toc-width);
+    flex-shrink: 0;
+    position: sticky;
+    top: 32px;
+    max-height: calc(100vh - 64px);
+    overflow-y: auto;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    padding: 20px;
+    box-shadow: var(--shadow);
+    scrollbar-width: thin;
+    scrollbar-color: var(--border) transparent;
+  }
+  .toc-title {
+    font-size: 10.5px;
+    font-weight: 600;
+    letter-spacing: .1em;
+    text-transform: uppercase;
+    color: var(--text-3);
+    margin-bottom: 12px;
+    padding-bottom: 10px;
+    border-bottom: 1px solid var(--border-soft);
+  }
+  .toc-item {
+    display: flex;
+    align-items: flex-start;
+    margin: 2px 0;
+  }
+  .toc-toggle {
+    background: none;
+    border: none;
+    cursor: pointer;
+    color: var(--text-3);
+    padding: 4px;
+    margin-right: 4px;
+    margin-top: 2px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 4px;
+    transition: background 0.2s, transform 0.2s;
+  }
+  .toc-toggle:hover { background: var(--border-soft); color: var(--text); }
+  .toc-toggle[aria-expanded="false"] svg { transform: rotate(-90deg); }
+  .toc-spacer { width: 20px; flex-shrink: 0; }
+  .toc-group { overflow: hidden; transition: max-height 0.3s ease-in-out; }
+  .toc-group.collapsed { max-height: 0 !important; }
+  
+  .toc a {
+    display: block;
+    font-size: 13px;
+    color: var(--text-2);
+    text-decoration: none;
+    padding: 4px 8px;
+    border-radius: 5px;
+    line-height: 1.45;
+    transition: background .15s, color .15s;
+    word-break: break-all;
+    flex-grow: 1;
+  }
+  .toc a:hover  { background: var(--accent-light); color: var(--accent); }
+  .toc a.active { background: var(--accent-light); color: var(--accent); font-weight: 500; }
+  .toc-l1 { font-weight: 600; color: var(--text); }
+  .toc-l2 { font-weight: 600; color: var(--text); }
+  .toc-l3 { font-size: 12px !important; padding-left: 14px !important; }
+
+  /* ── Article card ──────────────────────────────────────────────────────── */
+  .article {
+    flex: 1; min-width: 0;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    padding: 52px 60px;
+    box-shadow: var(--shadow-lg);
+  }
+
+  /* ── Headings ──────────────────────────────────────────────────────────── */
+  .title-container {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-end;
+    margin: 0 0 28px;
+    padding-bottom: 18px;
+    border-bottom: 2px solid var(--text);
+  }
+  .article h1 {
+    font-family: var(--font-head);
+    font-size: 26px; font-weight: 600; line-height: 1.3;
+    margin: 0; padding-bottom: 0;
+    border-bottom: none;
+  }
+  .article h2 {
+    font-family: var(--font-head);
+    font-size: 19px; font-weight: 600;
+    margin: 48px 0 14px; padding-bottom: 8px;
+    border-bottom: 1px solid var(--border);
+  }
+  .article h2::before {
+    content: attr(data-index);
+    display: inline-block;
+    font-family: var(--font-mono);
+    font-size: 10.5px; font-weight: 500;
+    color: var(--accent-mid);
+    background: var(--accent-light);
+    padding: 1px 7px; border-radius: 4px;
+    margin-right: 10px; vertical-align: middle;
+    letter-spacing: .05em;
+  }
+  .article h3 {
+    font-family: var(--font-head);
+    font-size: 15.5px; font-weight: 600;
+    margin: 28px 0 10px;
+  }
+  .article h3::before {
+    content: "§ ";
+    color: var(--text-3);
+    font-family: var(--font-mono); font-size: 13px;
+  }
+  .article h4 {
+    font-size: 13.5px; font-weight: 600;
+    color: var(--accent); margin: 20px 0 8px;
+  }
+
+  /* ── Body text ─────────────────────────────────────────────────────────── */
+  .article p, .plain { 
+    font-size: 15px; 
+    line-height: 1.85; 
+    color: var(--text); 
+    margin: 0 0 12px; 
+    font-family: var(--font-body);
+  }
+  .article strong { font-weight: 600; }
+  .article em     { font-style: italic; color: var(--text-2); }
+  .article a {
+    color: var(--accent); text-decoration: underline;
+    text-decoration-color: var(--accent-light);
+    text-underline-offset: 3px;
+  }
+  .article a:hover { text-decoration-color: var(--accent); }
+  .article hr { border: none; border-top: 1px solid var(--border); margin: 20px 0; }
+  .article hr.heavy { border-top: 3px solid var(--text); margin: 32px 0; }
+
+  /* ── Blockquote ────────────────────────────────────────────────────────── */
+  .article blockquote {
+    border-left: 3px solid var(--accent-mid);
+    background: var(--accent-light);
+    margin: 20px 0; padding: 13px 20px 13px 20px;
+    border-radius: 0 var(--radius) var(--radius) 0;
+  }
+  .article blockquote p { font-size: 14.5px; color: var(--accent); margin: 0; line-height: 1.7; }
+  /* 支持块引用内部保留换行符（修复头部概要换行丢失问题） */
+  .article blockquote p { white-space: pre-wrap; }
+  .article blockquote strong { color: var(--accent); }
+
+  /* ── Lists ─────────────────────────────────────────────────────────────── */
+  .article ul, .article ol { padding-left: 22px; margin: 6px 0 14px; }
+  .article li { font-size: 15px; line-height: 1.8; margin: 4px 0; }
+  .article li::marker { color: var(--accent-mid); }
+  .article li > ul, .article li > ol { margin: 3px 0; }
+
+  /* ── Inline code ───────────────────────────────────────────────────────── */
+  .article :not(pre) > code {
+    font-family: var(--font-mono);
+    font-size: 12.5px; font-weight: 500;
+    background: #f3f0eb; color: var(--red);
+    padding: 1px 5px; border-radius: 4px;
+    border: 1px solid var(--border);
+  }
+
+  /* ── Code blocks ───────────────────────────────────────────────────────── */
+  .code-block {
+    position: relative; margin: 20px 0;
+    border-radius: var(--radius-lg); overflow: hidden;
+    border: 1px solid var(--code-border);
+    box-shadow: 0 4px 20px rgba(0,0,0,.16);
+  }
+  .code-lang {
+    position: absolute; top: 0; left: 0;
+    font-family: var(--font-mono); font-size: 10px; font-weight: 500;
+    color: #7c8db5; background: #222538;
+    padding: 4px 12px; border-bottom-right-radius: 6px;
+    text-transform: uppercase; letter-spacing: .08em;
+    user-select: none;
+  }
+  .copy-btn {
+    position: absolute; top: 8px; right: 10px;
+    background: #2d3148; border: 1px solid #3d4260;
+    border-radius: 5px; color: #7c8db5; cursor: pointer;
+    padding: 5px 8px; display: flex; align-items: center;
+    transition: background .15s, color .15s; z-index: 1;
+  }
+  .copy-btn:hover  { background: #3a3f60; color: #cdd6f4; }
+  .copy-btn.copied { color: #a6e3a1; border-color: #4a6a4a; }
+  .code-block pre {
+    margin: 0; padding: 36px 20px 20px;
+    background: var(--code-bg); overflow-x: auto;
+    scrollbar-width: thin; scrollbar-color: #3d4260 transparent;
+  }
+  .code-block pre::-webkit-scrollbar { height: 5px; }
+  .code-block pre::-webkit-scrollbar-thumb { background: #3d4260; border-radius: 3px; }
+  .code-block code {
+    font-family: var(--font-mono); font-size: 13px; line-height: 1.7;
+    color: var(--code-text); background: none; border: none; padding: 0;
+    white-space: pre; word-break: normal;
+  }
+
+  /* ── Tables ────────────────────────────────────────────────────────────── */
+  .table-wrap {
+    overflow-x: auto; margin: 16px 0;
+    border-radius: var(--radius-lg);
+    border: 1px solid var(--border);
+    box-shadow: var(--shadow);
+  }
+  table { width: 100%; border-collapse: collapse; font-size: 14px; min-width: 360px; }
+  thead { background: #f4f2ee; }
+  th {
+    padding: 9px 14px; text-align: left;
+    font-size: 11.5px; font-weight: 600;
+    letter-spacing: .04em; text-transform: uppercase;
+    color: var(--text-2); border-bottom: 1px solid var(--border);
+    white-space: nowrap;
+  }
+  td {
+    padding: 8px 14px; border-bottom: 1px solid var(--border-soft);
+    color: var(--text); vertical-align: top; line-height: 1.6;
+  }
+  tbody tr:last-child td { border-bottom: none; }
+  tbody tr:nth-child(even) td { background: #faf9f7; }
+  tbody tr:hover td { background: var(--accent-light); transition: background .1s; }
+
+  /* ── KV block ──────────────────────────────────────────────────────────── */
+  .kv-block { background: var(--bg); border: 1px solid var(--border); border-radius: var(--radius-lg); overflow: hidden; margin: 12px 0 20px; }
+  .kv-row { display: flex; border-bottom: 1px solid var(--border-soft); align-items: flex-start; }
+  .kv-row:last-child { border-bottom: none; }
+  .kv-key { flex: 0 0 160px; padding: 9px 16px; font-size: 13.5px; font-weight: 600; color: var(--text-2); background: var(--surface); border-right: 1px solid var(--border-soft); }
+  .kv-val { flex: 1; padding: 9px 16px; font-size: 14px; color: var(--text); }
+
+  /* ── Status badges ─────────────────────────────────────────────────────── */
+  .badge-ok { display: inline-flex; align-items: center; gap: 4px; background: var(--green-bg); color: var(--green); font-size: 13px; font-weight: 500; padding: 2px 9px; border-radius: 20px; border: 1px solid #bbf7d0; }
+  .badge-err { display: inline-flex; align-items: center; gap: 4px; background: var(--red-bg); color: var(--red); font-size: 13px; font-weight: 500; padding: 2px 9px; border-radius: 20px; border: 1px solid #fecaca; }
+  .badge-warn { display: inline-flex; align-items: center; gap: 4px; background: var(--amber-bg); color: var(--amber); font-size: 13px; font-weight: 500; padding: 2px 9px; border-radius: 20px; border: 1px solid #fde68a; }
+
+  /* ── Priority badges ───────────────────────────────────────────────────── */
+  .pri-p0 { display: inline-block; background: #fef2f2; color: #991b1b; border: 1px solid #fca5a5; font-size: 12px; font-weight: 700; padding: 2px 8px; border-radius: 4px; letter-spacing: .04em; }
+  .pri-p1 { display: inline-block; background: #fff7ed; color: #9a3412; border: 1px solid #fdba74; font-size: 12px; font-weight: 700; padding: 2px 8px; border-radius: 4px; }
+  .pri-p2 { display: inline-block; background: #fffbeb; color: #92400e; border: 1px solid #fde68a; font-size: 12px; font-weight: 700; padding: 2px 8px; border-radius: 4px; }
+  .pri-p3 { display: inline-block; background: var(--accent-light); color: var(--accent); border: 1px solid #bfdbfe; font-size: 12px; font-weight: 700; padding: 2px 8px; border-radius: 4px; }
+
+  /* ── Fault header ──────────────────────────────────────────────────────── */
+  .fault-header { display: flex; align-items: center; gap: 12px; padding: 12px 16px; border-radius: var(--radius-lg); margin: 16px 0 8px; border: 1px solid; }
+  .fh-p0 { background: #fef2f2; border-color: #fca5a5; }
+  .fh-p1 { background: #fff7ed; border-color: #fdba74; }
+  .fh-p2 { background: #fffbeb; border-color: #fde68a; }
+  .fh-p3 { background: var(--accent-light); border-color: #bfdbfe; }
+  .fh-badge { font-family: var(--font-mono); font-size: 11px; font-weight: 700; letter-spacing: .08em; }
+  .fh-p0 .fh-badge { color: #991b1b; }
+  .fh-p1 .fh-badge { color: #9a3412; }
+  .fh-p2 .fh-badge { color: #92400e; }
+  .fh-p3 .fh-badge { color: var(--accent); }
+  .fh-rest { font-size: 14px; font-weight: 500; color: var(--text); }
+
+  /* ── Timeline ──────────────────────────────────────────────────────────── */
+  .timeline { border-left: 2px solid var(--accent-mid); margin: 16px 0 16px 8px; padding-left: 20px; }
+  .tl-row { display: flex; align-items: baseline; gap: 10px; margin: 8px 0; font-size: 13.5px; }
+  .tl-ts { font-family: var(--font-mono); font-size: 12px; color: var(--text-3); flex-shrink: 0; white-space: nowrap; }
+  .tl-tag { font-size: 11px; font-weight: 600; padding: 1px 7px; border-radius: 10px; flex-shrink: 0; background: var(--accent-light); color: var(--accent); }
+  .tl-tag.err { background: var(--red-bg); color: var(--red); }
+  .tl-tag.warn { background: var(--amber-bg); color: var(--amber); }
+  .tl-desc { color: var(--text); line-height: 1.5; }
+
+  /* ── Global warn ───────────────────────────────────────────────────────── */
+  .global-warn { background: #fef2f2; border: 1px solid #fca5a5; border-radius: var(--radius-lg); padding: 14px 18px; font-size: 14.5px; font-weight: 600; color: #991b1b; margin: 16px 0; }
+
+  /* ── Tree note ─────────────────────────────────────────────────────────── */
+  .tree-note { white-space: pre-wrap; font-family: var(--font-mono); font-size: 13.5px; line-height: 1.6; color: var(--text-2); margin: 8px 0 8px 16px; }
+
+  /* ── Disclaimer ────────────────────────────────────────────────────────── */
+  .disclaimer { background: var(--bg); border: 1px solid var(--border); border-radius: var(--radius); padding: 14px 18px; font-size: 13.5px; color: var(--text-2); font-style: italic; }
+
+  /* ── Meta footer ───────────────────────────────────────────────────────── */
+  .meta {
+    margin-top: 48px; padding-top: 16px;
+    border-top: 1px solid var(--border-soft);
+    display: flex; justify-content: space-between; align-items: center;
+    font-size: 12px; color: var(--text-3);
+  }
+  .meta-source { font-family: var(--font-mono); font-size: 11.5px; }
+
+  /* ── Brand logo ────────────────────────────────────────────────────────── */
+  .brand-logo {
+    font-family: var(--font-head);
+    font-size: 14px;
+    color: var(--text-3);
+    letter-spacing: 0.05em;
+    margin-bottom: 4px;
+    flex-shrink: 0;
+    margin-left: 16px;
+  }
+  .brand-logo strong {
+    font-weight: 600;
+    color: var(--accent);
+  }
+  @media (max-width: 900px) {
+    .title-container { flex-direction: column; align-items: flex-start; gap: 12px; }
+    .brand-logo { margin-left: 0; margin-bottom: 0; }
+  }
+  /* ── Print ─────────────────────────────────────────────────────────────── */
+  @media print {
+    body { background: white; }
+    #progress, .toc { display: none; }
+    .layout { display: block; padding: 0; }
+    .article { border: none; box-shadow: none; padding: 24px; }
+    .copy-btn { display: none; }
+    .brand-logo { margin-bottom: 0; }
+  }
+
+  /* ── Responsive ────────────────────────────────────────────────────────── */
+  @media (max-width: 900px) {
+    .toc { display: none; }
+    .article { padding: 36px 28px; }
+    .layout { padding: 24px 16px 64px; }
+  }
+  @media (max-width: 480px) {
+    .article { padding: 24px 18px; }
+    .article h1 { font-size: 22px; }
+  }
+</style>
+</head>
+<body>
+
+<div id="progress"></div>
+
+<div class="layout">
+  <nav class="toc" id="toc">
+  <div class="toc-title">目录</div>
+  <div class="toc-content">
+<div class="toc-item has-children"><button class="toc-toggle" onclick="toggleToc(this)" aria-expanded="true">
+                <svg viewBox="0 0 24 24" width="12" height="12" stroke="currentColor" stroke-width="2" fill="none"><polyline points="6 9 12 15 18 9"></polyline></svg>
+              </button><a href="#h-故障诊断报告" onclick="event.preventDefault(); const target = document.getElementById('h-故障诊断报告'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l1">🔴 故障诊断报告</a></div>
+<div class="toc-group" id="group-h-一故障概览">
+<div class="toc-item has-children"><button class="toc-toggle" onclick="toggleToc(this)" aria-expanded="true">
+                <svg viewBox="0 0 24 24" width="12" height="12" stroke="currentColor" stroke-width="2" fill="none"><polyline points="6 9 12 15 18 9"></polyline></svg>
+              </button><a href="#h-一故障概览" onclick="event.preventDefault(); const target = document.getElementById('h-一故障概览'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l2">一、故障概览</a></div>
+<div class="toc-group" id="group-h-置信度说明">
+<div class="toc-item "><span class="toc-spacer"></span><a href="#h-置信度说明" onclick="event.preventDefault(); const target = document.getElementById('h-置信度说明'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l3">置信度说明</a></div>
+</div>
+<div class="toc-item has-children"><button class="toc-toggle" onclick="toggleToc(this)" aria-expanded="true">
+                <svg viewBox="0 0 24 24" width="12" height="12" stroke="currentColor" stroke-width="2" fill="none"><polyline points="6 9 12 15 18 9"></polyline></svg>
+              </button><a href="#h-二根因速览" onclick="event.preventDefault(); const target = document.getElementById('h-二根因速览'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l2">二、根因速览</a></div>
+<div class="toc-group" id="group-h-事故时间线-故障传导链路">
+<div class="toc-item "><span class="toc-spacer"></span><a href="#h-事故时间线-故障传导链路" onclick="event.preventDefault(); const target = document.getElementById('h-事故时间线-故障传导链路'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l3">事故时间线 & 故障传导链路</a></div>
+<div class="toc-item "><span class="toc-spacer"></span><a href="#h-故障因果链" onclick="event.preventDefault(); const target = document.getElementById('h-故障因果链'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l3">故障因果链</a></div>
+</div>
+<div class="toc-item has-children"><button class="toc-toggle" onclick="toggleToc(this)" aria-expanded="true">
+                <svg viewBox="0 0 24 24" width="12" height="12" stroke="currentColor" stroke-width="2" fill="none"><polyline points="6 9 12 15 18 9"></polyline></svg>
+              </button><a href="#h-三排查过程" onclick="event.preventDefault(); const target = document.getElementById('h-三排查过程'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l2">三、排查过程</a></div>
+<div class="toc-group" id="group-h-31-初始现象">
+<div class="toc-item "><span class="toc-spacer"></span><a href="#h-31-初始现象" onclick="event.preventDefault(); const target = document.getElementById('h-31-初始现象'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l3">3.1 初始现象</a></div>
+<div class="toc-item "><span class="toc-spacer"></span><a href="#h-32-假设驱动排查" onclick="event.preventDefault(); const target = document.getElementById('h-32-假设驱动排查'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l3">3.2 假设驱动排查</a></div>
+<div class="toc-item "><span class="toc-spacer"></span><a href="#h-33-排查结论" onclick="event.preventDefault(); const target = document.getElementById('h-33-排查结论'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l3">3.3 排查结论</a></div>
+</div>
+<div class="toc-item has-children"><button class="toc-toggle" onclick="toggleToc(this)" aria-expanded="true">
+                <svg viewBox="0 0 24 24" width="12" height="12" stroke="currentColor" stroke-width="2" fill="none"><polyline points="6 9 12 15 18 9"></polyline></svg>
+              </button><a href="#h-四修复方案" onclick="event.preventDefault(); const target = document.getElementById('h-四修复方案'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l2">四、修复方案</a></div>
+<div class="toc-group" id="group-h-41-应急处置如有">
+<div class="toc-item "><span class="toc-spacer"></span><a href="#h-41-应急处置如有" onclick="event.preventDefault(); const target = document.getElementById('h-41-应急处置如有'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l3">4.1 应急处置（如有）</a></div>
+<div class="toc-item "><span class="toc-spacer"></span><a href="#h-42-永久修复计划" onclick="event.preventDefault(); const target = document.getElementById('h-42-永久修复计划'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l3">4.2 永久修复计划</a></div>
+</div>
+<div class="toc-item has-children"><button class="toc-toggle" onclick="toggleToc(this)" aria-expanded="true">
+                <svg viewBox="0 0 24 24" width="12" height="12" stroke="currentColor" stroke-width="2" fill="none"><polyline points="6 9 12 15 18 9"></polyline></svg>
+              </button><a href="#h-五补充分析overlayfs-系统态诊断" onclick="event.preventDefault(); const target = document.getElementById('h-五补充分析overlayfs-系统态诊断'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l2">五、补充分析：OverlayFS 系统态诊断</a></div>
+<div class="toc-group" id="group-h-51-挂载拓扑">
+<div class="toc-item "><span class="toc-spacer"></span><a href="#h-51-挂载拓扑" onclick="event.preventDefault(); const target = document.getElementById('h-51-挂载拓扑'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l3">5.1 挂载拓扑</a></div>
+<div class="toc-item "><span class="toc-spacer"></span><a href="#h-52-文件分布" onclick="event.preventDefault(); const target = document.getElementById('h-52-文件分布'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l3">5.2 文件分布</a></div>
+<div class="toc-item "><span class="toc-spacer"></span><a href="#h-53-inode-使用分析" onclick="event.preventDefault(); const target = document.getElementById('h-53-inode-使用分析'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l3">5.3 inode 使用分析</a></div>
+<div class="toc-item "><span class="toc-spacer"></span><a href="#h-54-异常现象总结" onclick="event.preventDefault(); const target = document.getElementById('h-54-异常现象总结'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l3">5.4 异常现象总结</a></div>
+</div>
+<div class="toc-item has-children"><button class="toc-toggle" onclick="toggleToc(this)" aria-expanded="true">
+                <svg viewBox="0 0 24 24" width="12" height="12" stroke="currentColor" stroke-width="2" fill="none"><polyline points="6 9 12 15 18 9"></polyline></svg>
+              </button><a href="#h-六内核态分析" onclick="event.preventDefault(); const target = document.getElementById('h-六内核态分析'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l2">六、内核态分析</a></div>
+<div class="toc-group" id="group-h-相关内核代码路径">
+<div class="toc-item "><span class="toc-spacer"></span><a href="#h-相关内核代码路径" onclick="event.preventDefault(); const target = document.getElementById('h-相关内核代码路径'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l3">相关内核代码路径</a></div>
+<div class="toc-item "><span class="toc-spacer"></span><a href="#h-因果链" onclick="event.preventDefault(); const target = document.getElementById('h-因果链'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l3">因果链</a></div>
+</div>
+<div class="toc-item "><span class="toc-spacer"></span><a href="#h-七交叉验证结果" onclick="event.preventDefault(); const target = document.getElementById('h-七交叉验证结果'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l2">七、交叉验证结果</a></div>
+<div class="toc-item "><span class="toc-spacer"></span><a href="#h-八排除的替代假设" onclick="event.preventDefault(); const target = document.getElementById('h-八排除的替代假设'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l2">八、排除的替代假设</a></div>
+<div class="toc-item has-children"><button class="toc-toggle" onclick="toggleToc(this)" aria-expanded="true">
+                <svg viewBox="0 0 24 24" width="12" height="12" stroke="currentColor" stroke-width="2" fill="none"><polyline points="6 9 12 15 18 9"></polyline></svg>
+              </button><a href="#h-九验证建议" onclick="event.preventDefault(); const target = document.getElementById('h-九验证建议'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l2">九、验证建议</a></div>
+<div class="toc-group" id="group-h-91-根因验证">
+<div class="toc-item "><span class="toc-spacer"></span><a href="#h-91-根因验证" onclick="event.preventDefault(); const target = document.getElementById('h-91-根因验证'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l3">9.1 根因验证</a></div>
+<div class="toc-item "><span class="toc-spacer"></span><a href="#h-92-修复验证" onclick="event.preventDefault(); const target = document.getElementById('h-92-修复验证'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l3">9.2 修复验证</a></div>
+<div class="toc-item "><span class="toc-spacer"></span><a href="#h-93-监控建议" onclick="event.preventDefault(); const target = document.getElementById('h-93-监控建议'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l3">9.3 监控建议</a></div>
+</div>
+</div>
+  </div>
+</nav>
+  <article class="article" id="article" style="position: relative;">
+    <div class="title-container"><h1 id="h-故障诊断报告">🔴 故障诊断报告</h1><div class="brand-logo">by <strong>Witty Diagnosis Agent</strong></div></div>
+<blockquote>
+<p><strong>报告编号</strong>：RCA-20260528-001
+<strong>故障级别</strong>：P3 / 风险预警
+<strong>报告时间</strong>：2026-05-28 23:58:00
+<strong>当前状态</strong>：🟡 观察中（已有 47% inode 占用，尚未触发实际故障）</p>
+</blockquote>
+<hr>
+<h2 id="h-一故障概览">一、故障概览</h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>项目</th>
+<th>内容</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>故障标题</td>
+<td>Docker 容器 overlayfs-fault-G OverlayFS inode 压力 — 3000 文件批量 copy-up 导致 inode 使用率 47%</td>
+</tr>
+<tr>
+<td>影响范围</td>
+<td>容器 overlayfs-fault-G（Docker overlay2 存储场景），底层 ext4 文件系统 inode 池共 12800</td>
+</tr>
+<tr>
+<td>故障时段</td>
+<td>2026-05-28 23:58:00（测试执行时间点），持续累积中</td>
+</tr>
+<tr>
+<td>根本原因</td>
+<td>大量小文件（3000个）从 overlay lower 层逐批 copy-up 到 upper 层，每个文件消耗一个 inode，累计 inode 使用 6016/12800 (47%)；ext4 文件系统 inode 数量在 mkfs 时固定，无法动态扩容，持续增长将导致 inode 耗尽</td>
+</tr>
+<tr>
+<td>是否恢复</td>
+<td><span class="badge-ok">✅ 当前测试状态正常（文件全量可见，容器运行正常）</span></td>
+</tr>
+<tr>
+<td>根因置信度</td>
+<td>🟢 高置信</td>
+</tr>
+</tbody></table></div>
+<h3 id="h-置信度说明">置信度说明</h3>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>等级</th>
+<th>标识</th>
+<th>含义</th>
+<th>示例场景</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>高置信</td>
+<td>🟢</td>
+<td>根因已明确，可复现，单一原因可解释所有现象</td>
+<td>定量测试：3000 文件 copy-up 后 inode 用量与预期一致</td>
+</tr>
+<tr>
+<td>中置信</td>
+<td>🟡</td>
+<td>根因基本确认，但存在 1～2 个无法完全解释的现象</td>
+<td>定位到慢查询，但流量突增原因待查</td>
+</tr>
+<tr>
+<td>低置信</td>
+<td>🟠</td>
+<td>有多个可疑原因，尚未排除竞争，结论为推断</td>
+<td>多个组件同时异常，无法判断触发顺序</td>
+</tr>
+<tr>
+<td>未知</td>
+<td>🔴</td>
+<td>现象无法解释，根因未定位，仍在排查中</td>
+<td>服务偶发崩溃，日志无异常，无法复现</td>
+</tr>
+</tbody></table></div>
+<hr>
+<h2 id="h-二根因速览">二、根因速览</h2>
+<h3 id="h-事故时间线-故障传导链路">事故时间线 & 故障传导链路</h3>
+<div class="code-block">
+  <span class="code-lang">text</span>
+  <button class="copy-btn" onclick="copyCode(this)" title="复制">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
+  </button>
+  <pre><code>时间                         事件                                                  性质         证据来源
+───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+2026-05-28 23:58:00          容器 overlayfs-fault-G overlay 挂载完成                       ✅ 正常     [kuafu_T1_20260528_235800.md:4-8]
+  │                           挂载拓扑：lower=/mnt/ovl_g/lower, upper=/mnt/ovl_g/upper
+  │                                   work=/mnt/ovl_g/work, merged=/mnt/ovl_g/merged
+  │                           各层文件系统均为 ext4
+  │
+  ▼
+2026-05-28 23:58:00          向 overlay merged 写入 3000 个小文件                           📈 操作触发  [kuafu_T1_20260528_235800.md:17-22]
+  │                           overlay 内核触发 copy-up 机制：
+  │                           写入 merged → overlay 拦截 → 将 lower 文件复制到 upper
+  │                           每个文件在 upper 层创建一个独立 inode
+  │
+  ▼
+2026-05-28 23:58:00          upper 层 3000 文件 copy-up 完成                              🔵 完成     [kuafu_T1_20260528_235800.md:17-22]
+  │                           lower(3000 文件) + upper(3000 文件) = 6000 个文件
+  │                           加上目录元数据等开销
+  │
+  ▼
+2026-05-28 23:58:00          inode 使用量：6016 / 12800 (47%)                           🟡 风险累积   [kuafu_T1_20260528_235800.md:24-30]
+  │                           可用 inode：6784（约 53%）
+  │                           每批 3000 文件消耗约 3000 inode →
+  │                           预计约 6700 文件后 inode 将耗尽
+  │
+  ▼
+2026-05-28 23:58:00          当前状态：容器运行正常，merged 全量可见 3000 文件              🟢 正常     [kuafu_T1_20260528_235800.md:32]
+  │                           尚未触发 ENOSPC 故障
+  │
+  ▼
+[预测] 若持续写入 → inode 耗尽 → 触发 ENOSPC                          🔴 风险预警
+        即使 df -h 显示磁盘 block 有余量（block 与 inode 相互独立）
+        容器内将无法创建新文件/目录，报 "no space left on device"</code></pre>
+</div>
+<h3 id="h-故障因果链">故障因果链</h3>
+<div class="code-block">
+  <span class="code-lang">text</span>
+  <button class="copy-btn" onclick="copyCode(this)" title="复制">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
+  </button>
+  <pre><code>容器应用写入 merged 目录（3000 小文件）
+    │
+    ▼ OverlayFS copy-up 机制（写时复制）
+    └─► 内核 overlay 驱动自动将 lower 文件复制到 upper 层
+         │
+         ▼ 每次 copy-up 在 upper 层 ext4 创建一个新 inode
+         └─► upper 层 each 文件 inode + 1
+              │
+              ▼ 每批 3000 文件 → 约 3000 inode 消耗
+              └─► inode 使用量持续增长（当前 6016/12800 = 47%）
+                   │
+                   ▼ ext4 文件系统 inode 总量在 mkfs.ext4 时固定
+                   └─► 无法动态扩容 inode 池
+                        │
+                        ▼ 可用 inode 持续减少（当前剩余 6784）
+                        └─► 预计再写入约 6700 文件后 inode 耗尽
+                             │
+                             ▼ 🔴 触发 "no space left on device" 故障
+                             即使磁盘 block 空间仍有大量余量</code></pre>
+</div>
+<hr>
+<h2 id="h-三排查过程">三、排查过程</h2>
+<blockquote>
+<p>排查逻辑：<strong>提出假设 → 收集证据 → 验证或排除 → 逐步收敛到根因</strong></p>
+</blockquote>
+<h3 id="h-31-初始现象">3.1 初始现象</h3>
+<ul>
+<li><strong>环境</strong>：Docker 容器 overlayfs-fault-G，使用 overlay2 存储驱动</li>
+<li><strong>操作</strong>：向 merged 目录批量写入 3000 个小文件，触发 overlay copy-up</li>
+<li><strong>观测结果</strong>：<ul>
+<li>各层文件分布：lower 3000 / upper 3000（全部 copy-up）/ merged 3000（全量可见）</li>
+<li>inode 用量：6016 / 12800（47%）</li>
+<li>容器运行正常，读写无异常</li>
+</ul>
+</li>
+</ul>
+<h3 id="h-32-假设驱动排查">3.2 假设驱动排查</h3>
+<h4 id="h-假设-a磁盘空间block不足导致故障">假设 A：磁盘空间（block）不足导致故障</h4>
+<blockquote>
+<p>🧪 假设：下层 ext4 磁盘空间满，引发写入失败</p>
+</blockquote>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>检查项</th>
+<th>操作</th>
+<th>结论</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>磁盘容量</td>
+<td><code>df -h</code>（ext4 文件系统）</td>
+<td><span class="badge-ok">✅ 未报告容量不足</span></td>
+</tr>
+<tr>
+<td>写入测试</td>
+<td>容器内正常完成 3000 文件写入</td>
+<td><span class="badge-ok">✅ 写入无异常</span></td>
+</tr>
+</tbody></table></div>
+<p><strong>❌ 排除</strong>：磁盘 block 空间未满，写入正常。</p>
+<hr>
+<h4 id="h-假设-binode-耗尽导致容器异常-确认根因-风险明确">假设 B：inode 耗尽导致容器异常 ✅ 确认根因 / 风险明确</h4>
+<blockquote>
+<p>🧪 假设：overlay upper 层 ext4 文件系统 inode 池有限，文件持续累积将耗尽 inode</p>
+</blockquote>
+<p><strong>Step 1 — 确认 inode 使用现状</strong></p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>指标</th>
+<th>当前值</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>总 inode</td>
+<td>12800</td>
+<td>ext4 mkfs 时固定值</td>
+</tr>
+<tr>
+<td>已用 inode</td>
+<td>6016 (47%)</td>
+<td>含 lower 层 3000 + upper 层 3000 + 目录元数据</td>
+</tr>
+<tr>
+<td>可用 inode</td>
+<td>6784 (53%)</td>
+<td>可支撑约 2 批同类操作</td>
+</tr>
+</tbody></table></div>
+<p><strong>Step 2 — 理解 copy-up 机理</strong></p>
+<p>OverlayFS 的内核 copy-up 机制（<code>fs/overlayfs/copy_up.c</code>）：</p>
+<ul>
+<li>当进程对 merged 视图中的 lower 层文件进行修改操作时，overlay 内核模块先将文件<strong>完整复制</strong>到 upper 层</li>
+<li>每次 copy-up 在 upper 层创建一个<strong>新文件</strong>，消耗一个 inode</li>
+<li>即使只修改文件的一个字节，也需要完整的文件复制和 inode 分配</li>
+<li>小文件场景下（如日志文件、缓存文件、配置文件等），大量 copy-up 会迅速消耗 inode</li>
+</ul>
+<p><strong>Step 3 — 趋势预测</strong></p>
+<div class="code-block">
+  <span class="code-lang">text</span>
+  <button class="copy-btn" onclick="copyCode(this)" title="复制">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
+  </button>
+  <pre><code>当前：3000 文件 copy-up → inode 47% (6016/12800)
+第二批 3000 文件 → inode 约 67%  (约 8600/12800)
+第三批 3000 文件 → inode 约 90%  (约 11600/12800)
+第四批 约 2000 文件 → inode 100% → inode 耗尽 ❌</code></pre>
+</div>
+<p><strong>✅ 结论：OverlayFS copy-up 导致 upper 层 inode 持续消耗；ext4 inode 池固定（12800），不可动态扩容；当前占用 47%，以每 3000 文件消耗约 3000 inode 的速率推算，约 6700 文件后将触发 inode 耗尽。</strong></p>
+<hr>
+<h4 id="h-假设-c文件系统跨设备问题">假设 C：文件系统跨设备问题</h4>
+<blockquote>
+<p>🧪 假设：upperdir/lowerdir/workdir 属于不同文件系统导致 overlay 异常</p>
+</blockquote>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>检查项</th>
+<th>操作</th>
+<th>结论</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>各层文件系统类型</td>
+<td>lower=ext4, upper=ext4, work=ext4</td>
+<td><span class="badge-ok">✅ 同一类型</span></td>
+</tr>
+<tr>
+<td>挂载设备</td>
+<td>均为同一 ext4 loop 设备</td>
+<td><span class="badge-ok">✅ 同设备</span></td>
+</tr>
+</tbody></table></div>
+<p><strong>❌ 排除</strong>：各层位于相同 ext4 文件系统上，非跨设备问题。</p>
+<hr>
+<h4 id="h-假设-dwhiteout-opaque-标记异常">假设 D：whiteout / opaque 标记异常</h4>
+<blockquote>
+<p>🧪 假设：overlay 的 whiteout 或 opaque xattr 导致文件不可见</p>
+</blockquote>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>检查项</th>
+<th>操作</th>
+<th>结论</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>merged 文件可见性</td>
+<td>3000 文件在 merged 全量可见</td>
+<td><span class="badge-ok">✅ 正常</span></td>
+</tr>
+<tr>
+<td>文件访问</td>
+<td>无 readdir 异常</td>
+<td><span class="badge-ok">✅ 正常</span></td>
+</tr>
+</tbody></table></div>
+<p><strong>❌ 排除</strong>：whiteout/opaque 无异常，所有文件可见可访问。</p>
+<hr>
+<h3 id="h-33-排查结论">3.3 排查结论</h3>
+<div class="code-block">
+  <span class="code-lang">text</span>
+  <button class="copy-btn" onclick="copyCode(this)" title="复制">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
+  </button>
+  <pre><code>容器 overlayfs-fault-G inode 使用率 47%
+├─► 磁盘 block 空间       → ✅ 充足，排除
+├─► 跨设备问题            → ✅ 同文件系统，排除
+├─► whiteout/opaque 异常  → ✅ 文件全量可见，排除
+└─► overlay copy-up inode 消耗 → ❌ 确认风险
+        ├─► 机理：内核 copy_up.c 机制 → 每次写入触发文件复制到 upper 层
+        ├─► 当前：3000 文件 → 6016 inode (47%)
+        └─► 风险：inode 12800 固定，约 6700 文件后将耗尽
+                └─► 🎯 根因确认：ext4 固定 inode 池 + overlay copy-up 逐文件消耗 inode</code></pre>
+</div>
+<hr>
+<h2 id="h-四修复方案">四、修复方案</h2>
+<h3 id="h-41-应急处置如有">4.1 应急处置（如有）</h3>
+<p>当前 inode 占用 47%，尚未触发实际故障，无需紧急处置。但应启动监控与容量规划。</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>步骤</th>
+<th>操作</th>
+<th>执行人</th>
+<th>时间</th>
+<th>效果</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>1</td>
+<td>对容器 overlay 层添加 inode 使用率监控告警（阈值 &gt; 80%）</td>
+<td>运维团队</td>
+<td>立即</td>
+<td>提前感知 inode 压力</td>
+</tr>
+<tr>
+<td>2</td>
+<td>若 inode 使用率 &gt; 90%，清理容器中不再需要的 upper 层文件</td>
+<td>运维团队</td>
+<td>按需</td>
+<td>释放 inode，延缓耗尽</td>
+</tr>
+</tbody></table></div>
+<h3 id="h-42-永久修复计划">4.2 永久修复计划</h3>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>修复措施</th>
+<th>负责人</th>
+<th>完成时间</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>方案一：增大 inode 密度</strong> — 对存储层重新 mkfs.ext4，使用 <code>-i 4096</code> 或 <code>-N</code> 参数指定更大的 inode 数量（如 <code>mkfs.ext4 -i 4096 /dev/sdX</code>）</td>
+<td>存储/运维团队</td>
+<td>下次维护窗口</td>
+</tr>
+<tr>
+<td><strong>方案二：日志/小文件轮转清理</strong> — 在容器内配置 logrotate 等策略，定期清理或归档 upper 层累积的小文件</td>
+<td>应用团队</td>
+<td>持续</td>
+</tr>
+<tr>
+<td><strong>方案三：使用支持动态 inode 的文件系统</strong> — 考虑 XFS（支持动态 inode 分配）替代 ext4 作为 overlay upper/lower 层文件系统</td>
+<td>架构团队</td>
+<td>长期规划</td>
+</tr>
+<tr>
+<td><strong>方案四：调整容器配置</strong> — 将高频写入的小文件目录通过 volume 挂载独立文件系统，避免与 overlay upper 层共享 inode 池</td>
+<td>应用/运维团队</td>
+<td>短期可实施</td>
+</tr>
+<tr>
+<td><strong>方案五：容器镜像优化</strong> — 减少基础镜像中的小文件数量，降低 lower 层 inode 基线的消耗（当前 lower 已占 3000+ inode）</td>
+<td>开发团队</td>
+<td>迭代周期内</td>
+</tr>
+</tbody></table></div>
+<h4 id="h-推荐实施顺序">推荐实施顺序</h4>
+<div class="code-block">
+  
+  <button class="copy-btn" onclick="copyCode(this)" title="复制">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
+  </button>
+  <pre><code>短期（1周内）：方案二（logrotate）+ 方案四（volume 分离）
+中期（1月内）：方案一（增大 inode 密度）
+长期（持续）：方案三（XFS 迁移）+ 方案五（镜像优化）</code></pre>
+</div>
+<hr>
+<h2 id="h-五补充分析overlayfs-系统态诊断">五、补充分析：OverlayFS 系统态诊断</h2>
+<h3 id="h-51-挂载拓扑">5.1 挂载拓扑</h3>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>层</th>
+<th>路径</th>
+<th>文件系统</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>lowerdir</td>
+<td>/mnt/ovl_g/lower</td>
+<td>ext4</td>
+</tr>
+<tr>
+<td>upperdir</td>
+<td>/mnt/ovl_g/upper</td>
+<td>ext4</td>
+</tr>
+<tr>
+<td>workdir</td>
+<td>/mnt/ovl_g/work</td>
+<td>ext4</td>
+</tr>
+<tr>
+<td>merged</td>
+<td>/mnt/ovl_g/merged</td>
+<td>overlay</td>
+</tr>
+</tbody></table></div>
+<h3 id="h-52-文件分布">5.2 文件分布</h3>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>位置</th>
+<th>文件数</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>lower</td>
+<td>3000</td>
+<td>基础层文件（只读）</td>
+</tr>
+<tr>
+<td>upper</td>
+<td>3000</td>
+<td>全部由 lower copy-up 产生</td>
+</tr>
+<tr>
+<td>merged</td>
+<td>3000</td>
+<td>全量可见（overlay 合并视图）</td>
+</tr>
+</tbody></table></div>
+<h3 id="h-53-inode-使用分析">5.3 inode 使用分析</h3>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>指标</th>
+<th>值</th>
+<th>计算说明</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>总 inode</td>
+<td>12800</td>
+<td>mkfs.ext4 默认根据分区大小自动计算</td>
+</tr>
+<tr>
+<td>已用 inode</td>
+<td>6016</td>
+<td>≈ 3000(lower 文件) + 3000(upper 文件) + 16(目录等元数据开销)</td>
+</tr>
+<tr>
+<td>可用 inode</td>
+<td>6784</td>
+<td>12800 - 6016</td>
+</tr>
+<tr>
+<td>inode 使用率</td>
+<td>47%</td>
+<td>6016 / 12800</td>
+</tr>
+</tbody></table></div>
+<h3 id="h-54-异常现象总结">5.4 异常现象总结</h3>
+<ul>
+<li><strong>当前状态</strong>：无功能性异常，容器正常运行</li>
+<li><strong>风险模式</strong>：overlay2 inode 耗尽风险</li>
+<li><strong>对应 OverlayFS 诊断分支</strong>：<strong>分支 G</strong> — Docker overlay2 inode 耗尽</li>
+<li><strong>触发条件</strong>：容器内持续产生小文件写入 → overlay copy-up → upper 层 inode 逐文件消耗 → ext4 inode 池耗尽 → ENOSPC</li>
+</ul>
+<hr>
+<h2 id="h-六内核态分析">六、内核态分析</h2>
+<h3 id="h-相关内核代码路径">相关内核代码路径</h3>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>项目</th>
+<th>内容</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>内核文件</td>
+<td><code>fs/overlayfs/copy_up.c</code></td>
+</tr>
+<tr>
+<td>核心机制</td>
+<td>OverlayFS copy-up（写时复制）</td>
+</tr>
+<tr>
+<td>行为描述</td>
+<td>当进程对 overlay merged 视图中的 lower 层文件执行修改操作时，overlay 内核模块在 upper 层创建一个新文件，将 lower 文件完整复制到 upper 层，然后对 upper 层副本执行修改。后续所有 I/O 重定向到 upper 层副本。</td>
+</tr>
+<tr>
+<td>inode 消耗机制</td>
+<td>每次 copy-up 调用 <code>ovl_copy_up_one()</code> → 在 upper 层文件系统上 <code>vfs_create()</code> → 分配一个新的 inode</td>
+</tr>
+<tr>
+<td>底层限制</td>
+<td>ext4 文件系统在 mkfs 阶段已固定 inode 表大小（<code>sbi-&gt;s_inodes_count</code>），运行时不可扩容</td>
+</tr>
+</tbody></table></div>
+<h3 id="h-因果链">因果链</h3>
+<div class="code-block">
+  
+  <button class="copy-btn" onclick="copyCode(this)" title="复制">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
+  </button>
+  <pre><code>[触发条件] 容器应用写入 merged 中源自 lower 层的文件
+    → [内核路径] fs/overlayfs/copy_up.c: ovl_copy_up_one() 
+        → vfs_create() in upper dir
+            → ext4 分配新 inode（ext4_new_inode()）
+                → inode 计数 +1
+    → [累积效应] 大批小文件反复触发 copy-up
+        → [异常状态] upper 层文件系统 inode 快速消耗
+            → [用户可见] inode 使用率 47%（6016/12800）
+                → [风险] inode 耗尽后触发 ENOSPC</code></pre>
+</div>
+<hr>
+<h2 id="h-七交叉验证结果">七、交叉验证结果</h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>验证维度</th>
+<th>系统态结论</th>
+<th>内核态结论</th>
+<th>是否吻合？</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>异常现象</td>
+<td>inode 使用率 47%，无功能性异常</td>
+<td>copy_up_one() 每次消耗一个 inode</td>
+<td><span class="badge-ok">✅ 吻合</span></td>
+</tr>
+<tr>
+<td>配置条件</td>
+<td>ext4 文件系统，total_inodes=12800</td>
+<td>ext4 超级块固定 inode 数量</td>
+<td><span class="badge-ok">✅ 吻合</span></td>
+</tr>
+<tr>
+<td>触发路径</td>
+<td>3000 文件写入 merged → copy-up → inode 6000+</td>
+<td>copy_up.c 逐文件复制到 upper</td>
+<td><span class="badge-ok">✅ 吻合</span></td>
+</tr>
+<tr>
+<td>根因位置</td>
+<td>inode 池固定 + copy-up 逐文件消耗</td>
+<td>ext4_inode_info 结构体预分配</td>
+<td><span class="badge-ok">✅ 吻合</span></td>
+</tr>
+<tr>
+<td>触发条件</td>
+<td>小文件批量写入 overlay 场景</td>
+<td>vfs_create 每次调用分配 inode</td>
+<td><span class="badge-ok">✅ 吻合</span></td>
+</tr>
+</tbody></table></div>
+<p><strong>综合判断</strong>：两轨完全吻合。系统态观察到 inode 占用的定量数据，内核态确认了 copy-up 的逐文件 inode 消耗机制和 ext4 的固定 inode 限制。结论为<strong>高置信度</strong>。</p>
+<hr>
+<h2 id="h-八排除的替代假设">八、排除的替代假设</h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>假设</th>
+<th>排除原因</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>磁盘 block 空间不足</td>
+<td>df -h 未显示容量问题，且 inode 与 block 相互独立</td>
+</tr>
+<tr>
+<td>跨设备 overlay 限制</td>
+<td>upper/lower/work 均位于同一 ext4 文件系统</td>
+</tr>
+<tr>
+<td>whiteout/opaque 元数据异常</td>
+<td>merged 目录 3000 文件全量可见，无异常</td>
+</tr>
+<tr>
+<td>文件系统权限问题</td>
+<td>写入操作全部成功完成，无 Permission denied</td>
+</tr>
+<tr>
+<td>内核版本不兼容</td>
+<td>overlay 挂载成功，copy-up 执行正常，无 dmesg 报错</td>
+</tr>
+<tr>
+<td>SELinux/AppArmor 限制</td>
+<td>无相关拒绝日志，操作正常完成</td>
+</tr>
+</tbody></table></div>
+<hr>
+<h2 id="h-九验证建议">九、验证建议</h2>
+<h3 id="h-91-根因验证">9.1 根因验证</h3>
+<ul>
+<li><strong>正向验证</strong>：在同等 ext4 + overlay 配置下，持续写入小文件，观察 inode 使用量随文件数的线性增长关系，验证单位文件消耗单位 inode 的推理</li>
+<li><strong>反向验证</strong>：使用 XFS 文件系统（动态 inode）代替 ext4 重复测试，验证 inode 耗尽现象是否消失</li>
+</ul>
+<h3 id="h-92-修复验证">9.2 修复验证</h3>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>修复措施</th>
+<th>验证方法</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>增大 inode 密度</td>
+<td>使用 <code>mkfs.ext4 -i 4096</code> 重建后，确认 `dumpe2fs -h</td>
+</tr>
+<tr>
+<td>logrotate 清理</td>
+<td>模拟文件累积后触发 logrotate，确认 <code>df -i</code> 显示的已用 inode 下降</td>
+</tr>
+<tr>
+<td>XFS 迁移</td>
+<td><code>xfs_info</code> 确认支持动态 inode，压力测试中不会出现 inode 耗尽</td>
+</tr>
+<tr>
+<td>volume 分离</td>
+<td>确认 volume 挂载点使用独立的文件系统，inode 统计不占用 overlay upper 层</td>
+</tr>
+</tbody></table></div>
+<h3 id="h-93-监控建议">9.3 监控建议</h3>
+<div class="code-block">
+  <span class="code-lang">text</span>
+  <button class="copy-btn" onclick="copyCode(this)" title="复制">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
+  </button>
+  <pre><code>推荐告警阈值：
+  🟢 安全：inode 使用率 &lt; 60%  → 无需处理
+  🟡 注意：inode 使用率 60%-80%  → 评估清理或扩容计划
+  🟠 预警：inode 使用率 80%-90%  → 启动文件清理流程
+  🔴 紧急：inode 使用率 &gt; 90%  → 立即介入，准备应急扩容或迁移</code></pre>
+</div>
+<hr>
+<blockquote>
+<p><strong>报告结束</strong></p>
+<p>分析节点：白泽（Baize）- Phase 1.4 分析与报告 Agent
+日期：2026-05-28 23:58:00</p>
+</blockquote>
+
+    <div class="meta">
+      <span class="meta-source">Docker容器overlayfs-inode压力测试_20260528_235800_report.md</span>
+      <span>生成于 2026/05/28 23:52</span>
+    </div>
+  </article>
+</div>
+
+<script>
+  /* ── 滚动进度条 ── */
+  window.addEventListener("scroll", () => {
+    const el  = document.documentElement;
+    const pct = el.scrollTop / (el.scrollHeight - el.clientHeight) * 100;
+    document.getElementById("progress").style.width = Math.min(pct, 100) + "%";
+  });
+
+  /* ── TOC 高亮当前章节 ── */
+  (function () {
+    const headings = Array.from(document.querySelectorAll("article h1,article h2,article h3"));
+    const links    = Array.from(document.querySelectorAll(".toc a"));
+    if (!links.length) return;
+    const obs = new IntersectionObserver(entries => {
+      entries.forEach(e => {
+        if (!e.isIntersecting) return;
+        links.forEach(l => l.classList.remove("active"));
+        const a = links.find(l => l.getAttribute("href") === "#" + e.target.id);
+        if (a) a.classList.add("active");
+      });
+    }, { rootMargin: "-10% 0px -80% 0px" });
+    headings.forEach(h => obs.observe(h));
+  })();
+
+  /* ── h2 章节序号自动计数 ── */
+  (function () {
+    let idx = 0;
+    document.querySelectorAll("article h2").forEach(el => {
+      idx++;
+      el.setAttribute("data-index", String(idx).padStart(2, "0"));
+    });
+  })();
+
+  /* ── 代码块一键复制 ── */
+  function copyCode(btn) {
+    const code = btn.closest(".code-block").querySelector("code").innerText;
+    navigator.clipboard.writeText(code).then(() => {
+      btn.classList.add("copied");
+      btn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>';
+      setTimeout(() => {
+        btn.classList.remove("copied");
+        btn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>';
+      }, 2000);
+    });
+  }
+
+  /* ── 目录树收缩/展开 ── */
+  function toggleToc(btn) {
+    const expanded = btn.getAttribute("aria-expanded") === "true";
+    btn.setAttribute("aria-expanded", String(!expanded));
+    const parentItem = btn.closest(".toc-item");
+    let nextEl = parentItem.nextElementSibling;
+    if (nextEl && nextEl.classList.contains("toc-group")) {
+      if (expanded) {
+        nextEl.style.maxHeight = nextEl.scrollHeight + "px";
+        void nextEl.offsetHeight;
+        nextEl.classList.add("collapsed");
+      } else {
+        nextEl.classList.remove("collapsed");
+        nextEl.style.maxHeight = nextEl.scrollHeight + "px";
+        setTimeout(() => {
+          if (!nextEl.classList.contains("collapsed")) {
+            nextEl.style.maxHeight = "none";
+          }
+        }, 300);
+      }
+    }
+  }
+</script>
+</body>
+</html>

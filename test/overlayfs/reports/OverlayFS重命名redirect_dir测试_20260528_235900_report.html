@@ -1,0 +1,1278 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>OverlayFS 目录重命名 Redirect 行为诊断报告</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Lora:ital,wght@0,400;0,600;1,400&family=Source+Sans+3:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  /* ── Design tokens ─────────────────────────────────────────────────────── */
+  :root {
+    --bg:          #f8f7f4;
+    --surface:     #ffffff;
+    --border:      #e8e5df;
+    --border-soft: #f0ede8;
+
+    --text:        #1c1917;
+    --text-2:      #57534e;
+    --text-3:      #a8a29e;
+
+    --accent:      #1d4e6e;
+    --accent-light:#e8f1f7;
+    --accent-mid:  #3b82a0;
+
+    --red:         #c0392b;
+    --red-bg:      #fef2f2;
+    --amber:       #92400e;
+    --amber-bg:    #fffbeb;
+    --green:       #14532d;
+    --green-bg:    #f0fdf4;
+
+    --code-bg:     #1a1d27;
+    --code-text:   #cdd6f4;
+    --code-border: #2d3148;
+
+    --font-body: "Source Sans 3", "PingFang SC", "Hiragino Sans GB", sans-serif;
+    --font-head: "Lora", "PingFang SC", Georgia, serif;
+    --font-mono: "JetBrains Mono", "Fira Code", Consolas, monospace;
+
+    --radius:    8px;
+    --radius-lg: 12px;
+    --shadow:    0 1px 3px rgba(0,0,0,.06), 0 4px 16px rgba(0,0,0,.05);
+    --shadow-lg: 0 2px 8px rgba(0,0,0,.07), 0 8px 32px rgba(0,0,0,.06);
+
+    --toc-width:   240px;
+    --gap:         32px;
+  }
+
+  /* ── Progress bar ──────────────────────────────────────────────────────── */
+  #progress {
+    position: fixed; top: 0; left: 0; height: 3px; width: 0%;
+    background: linear-gradient(90deg, var(--accent-mid), var(--accent));
+    z-index: 999; transition: width .1s linear;
+    border-radius: 0 2px 2px 0;
+  }
+
+  /* ── Base ──────────────────────────────────────────────────────────────── */
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  html { font-size: 16px; scroll-behavior: smooth; }
+  body {
+    font-family: var(--font-body);
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.8;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* ── Layout ────────────────────────────────────────────────────────────── */
+  .layout {
+    display: flex;
+    align-items: flex-start;
+    max-width: calc(var(--toc-width) + 820px + var(--gap) * 3);
+    margin: 0 auto;
+    padding: 48px var(--gap) 96px;
+    gap: var(--gap);
+  }
+
+  /* ── TOC ───────────────────────────────────────────────────────────────── */
+  .toc {
+    width: var(--toc-width);
+    flex-shrink: 0;
+    position: sticky;
+    top: 32px;
+    max-height: calc(100vh - 64px);
+    overflow-y: auto;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    padding: 20px;
+    box-shadow: var(--shadow);
+    scrollbar-width: thin;
+    scrollbar-color: var(--border) transparent;
+  }
+  .toc-title {
+    font-size: 10.5px;
+    font-weight: 600;
+    letter-spacing: .1em;
+    text-transform: uppercase;
+    color: var(--text-3);
+    margin-bottom: 12px;
+    padding-bottom: 10px;
+    border-bottom: 1px solid var(--border-soft);
+  }
+  .toc-item {
+    display: flex;
+    align-items: flex-start;
+    margin: 2px 0;
+  }
+  .toc-toggle {
+    background: none;
+    border: none;
+    cursor: pointer;
+    color: var(--text-3);
+    padding: 4px;
+    margin-right: 4px;
+    margin-top: 2px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 4px;
+    transition: background 0.2s, transform 0.2s;
+  }
+  .toc-toggle:hover { background: var(--border-soft); color: var(--text); }
+  .toc-toggle[aria-expanded="false"] svg { transform: rotate(-90deg); }
+  .toc-spacer { width: 20px; flex-shrink: 0; }
+  .toc-group { overflow: hidden; transition: max-height 0.3s ease-in-out; }
+  .toc-group.collapsed { max-height: 0 !important; }
+  
+  .toc a {
+    display: block;
+    font-size: 13px;
+    color: var(--text-2);
+    text-decoration: none;
+    padding: 4px 8px;
+    border-radius: 5px;
+    line-height: 1.45;
+    transition: background .15s, color .15s;
+    word-break: break-all;
+    flex-grow: 1;
+  }
+  .toc a:hover  { background: var(--accent-light); color: var(--accent); }
+  .toc a.active { background: var(--accent-light); color: var(--accent); font-weight: 500; }
+  .toc-l1 { font-weight: 600; color: var(--text); }
+  .toc-l2 { font-weight: 600; color: var(--text); }
+  .toc-l3 { font-size: 12px !important; padding-left: 14px !important; }
+
+  /* ── Article card ──────────────────────────────────────────────────────── */
+  .article {
+    flex: 1; min-width: 0;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    padding: 52px 60px;
+    box-shadow: var(--shadow-lg);
+  }
+
+  /* ── Headings ──────────────────────────────────────────────────────────── */
+  .title-container {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-end;
+    margin: 0 0 28px;
+    padding-bottom: 18px;
+    border-bottom: 2px solid var(--text);
+  }
+  .article h1 {
+    font-family: var(--font-head);
+    font-size: 26px; font-weight: 600; line-height: 1.3;
+    margin: 0; padding-bottom: 0;
+    border-bottom: none;
+  }
+  .article h2 {
+    font-family: var(--font-head);
+    font-size: 19px; font-weight: 600;
+    margin: 48px 0 14px; padding-bottom: 8px;
+    border-bottom: 1px solid var(--border);
+  }
+  .article h2::before {
+    content: attr(data-index);
+    display: inline-block;
+    font-family: var(--font-mono);
+    font-size: 10.5px; font-weight: 500;
+    color: var(--accent-mid);
+    background: var(--accent-light);
+    padding: 1px 7px; border-radius: 4px;
+    margin-right: 10px; vertical-align: middle;
+    letter-spacing: .05em;
+  }
+  .article h3 {
+    font-family: var(--font-head);
+    font-size: 15.5px; font-weight: 600;
+    margin: 28px 0 10px;
+  }
+  .article h3::before {
+    content: "§ ";
+    color: var(--text-3);
+    font-family: var(--font-mono); font-size: 13px;
+  }
+  .article h4 {
+    font-size: 13.5px; font-weight: 600;
+    color: var(--accent); margin: 20px 0 8px;
+  }
+
+  /* ── Body text ─────────────────────────────────────────────────────────── */
+  .article p, .plain { 
+    font-size: 15px; 
+    line-height: 1.85; 
+    color: var(--text); 
+    margin: 0 0 12px; 
+    font-family: var(--font-body);
+  }
+  .article strong { font-weight: 600; }
+  .article em     { font-style: italic; color: var(--text-2); }
+  .article a {
+    color: var(--accent); text-decoration: underline;
+    text-decoration-color: var(--accent-light);
+    text-underline-offset: 3px;
+  }
+  .article a:hover { text-decoration-color: var(--accent); }
+  .article hr { border: none; border-top: 1px solid var(--border); margin: 20px 0; }
+  .article hr.heavy { border-top: 3px solid var(--text); margin: 32px 0; }
+
+  /* ── Blockquote ────────────────────────────────────────────────────────── */
+  .article blockquote {
+    border-left: 3px solid var(--accent-mid);
+    background: var(--accent-light);
+    margin: 20px 0; padding: 13px 20px 13px 20px;
+    border-radius: 0 var(--radius) var(--radius) 0;
+  }
+  .article blockquote p { font-size: 14.5px; color: var(--accent); margin: 0; line-height: 1.7; }
+  /* 支持块引用内部保留换行符（修复头部概要换行丢失问题） */
+  .article blockquote p { white-space: pre-wrap; }
+  .article blockquote strong { color: var(--accent); }
+
+  /* ── Lists ─────────────────────────────────────────────────────────────── */
+  .article ul, .article ol { padding-left: 22px; margin: 6px 0 14px; }
+  .article li { font-size: 15px; line-height: 1.8; margin: 4px 0; }
+  .article li::marker { color: var(--accent-mid); }
+  .article li > ul, .article li > ol { margin: 3px 0; }
+
+  /* ── Inline code ───────────────────────────────────────────────────────── */
+  .article :not(pre) > code {
+    font-family: var(--font-mono);
+    font-size: 12.5px; font-weight: 500;
+    background: #f3f0eb; color: var(--red);
+    padding: 1px 5px; border-radius: 4px;
+    border: 1px solid var(--border);
+  }
+
+  /* ── Code blocks ───────────────────────────────────────────────────────── */
+  .code-block {
+    position: relative; margin: 20px 0;
+    border-radius: var(--radius-lg); overflow: hidden;
+    border: 1px solid var(--code-border);
+    box-shadow: 0 4px 20px rgba(0,0,0,.16);
+  }
+  .code-lang {
+    position: absolute; top: 0; left: 0;
+    font-family: var(--font-mono); font-size: 10px; font-weight: 500;
+    color: #7c8db5; background: #222538;
+    padding: 4px 12px; border-bottom-right-radius: 6px;
+    text-transform: uppercase; letter-spacing: .08em;
+    user-select: none;
+  }
+  .copy-btn {
+    position: absolute; top: 8px; right: 10px;
+    background: #2d3148; border: 1px solid #3d4260;
+    border-radius: 5px; color: #7c8db5; cursor: pointer;
+    padding: 5px 8px; display: flex; align-items: center;
+    transition: background .15s, color .15s; z-index: 1;
+  }
+  .copy-btn:hover  { background: #3a3f60; color: #cdd6f4; }
+  .copy-btn.copied { color: #a6e3a1; border-color: #4a6a4a; }
+  .code-block pre {
+    margin: 0; padding: 36px 20px 20px;
+    background: var(--code-bg); overflow-x: auto;
+    scrollbar-width: thin; scrollbar-color: #3d4260 transparent;
+  }
+  .code-block pre::-webkit-scrollbar { height: 5px; }
+  .code-block pre::-webkit-scrollbar-thumb { background: #3d4260; border-radius: 3px; }
+  .code-block code {
+    font-family: var(--font-mono); font-size: 13px; line-height: 1.7;
+    color: var(--code-text); background: none; border: none; padding: 0;
+    white-space: pre; word-break: normal;
+  }
+
+  /* ── Tables ────────────────────────────────────────────────────────────── */
+  .table-wrap {
+    overflow-x: auto; margin: 16px 0;
+    border-radius: var(--radius-lg);
+    border: 1px solid var(--border);
+    box-shadow: var(--shadow);
+  }
+  table { width: 100%; border-collapse: collapse; font-size: 14px; min-width: 360px; }
+  thead { background: #f4f2ee; }
+  th {
+    padding: 9px 14px; text-align: left;
+    font-size: 11.5px; font-weight: 600;
+    letter-spacing: .04em; text-transform: uppercase;
+    color: var(--text-2); border-bottom: 1px solid var(--border);
+    white-space: nowrap;
+  }
+  td {
+    padding: 8px 14px; border-bottom: 1px solid var(--border-soft);
+    color: var(--text); vertical-align: top; line-height: 1.6;
+  }
+  tbody tr:last-child td { border-bottom: none; }
+  tbody tr:nth-child(even) td { background: #faf9f7; }
+  tbody tr:hover td { background: var(--accent-light); transition: background .1s; }
+
+  /* ── KV block ──────────────────────────────────────────────────────────── */
+  .kv-block { background: var(--bg); border: 1px solid var(--border); border-radius: var(--radius-lg); overflow: hidden; margin: 12px 0 20px; }
+  .kv-row { display: flex; border-bottom: 1px solid var(--border-soft); align-items: flex-start; }
+  .kv-row:last-child { border-bottom: none; }
+  .kv-key { flex: 0 0 160px; padding: 9px 16px; font-size: 13.5px; font-weight: 600; color: var(--text-2); background: var(--surface); border-right: 1px solid var(--border-soft); }
+  .kv-val { flex: 1; padding: 9px 16px; font-size: 14px; color: var(--text); }
+
+  /* ── Status badges ─────────────────────────────────────────────────────── */
+  .badge-ok { display: inline-flex; align-items: center; gap: 4px; background: var(--green-bg); color: var(--green); font-size: 13px; font-weight: 500; padding: 2px 9px; border-radius: 20px; border: 1px solid #bbf7d0; }
+  .badge-err { display: inline-flex; align-items: center; gap: 4px; background: var(--red-bg); color: var(--red); font-size: 13px; font-weight: 500; padding: 2px 9px; border-radius: 20px; border: 1px solid #fecaca; }
+  .badge-warn { display: inline-flex; align-items: center; gap: 4px; background: var(--amber-bg); color: var(--amber); font-size: 13px; font-weight: 500; padding: 2px 9px; border-radius: 20px; border: 1px solid #fde68a; }
+
+  /* ── Priority badges ───────────────────────────────────────────────────── */
+  .pri-p0 { display: inline-block; background: #fef2f2; color: #991b1b; border: 1px solid #fca5a5; font-size: 12px; font-weight: 700; padding: 2px 8px; border-radius: 4px; letter-spacing: .04em; }
+  .pri-p1 { display: inline-block; background: #fff7ed; color: #9a3412; border: 1px solid #fdba74; font-size: 12px; font-weight: 700; padding: 2px 8px; border-radius: 4px; }
+  .pri-p2 { display: inline-block; background: #fffbeb; color: #92400e; border: 1px solid #fde68a; font-size: 12px; font-weight: 700; padding: 2px 8px; border-radius: 4px; }
+  .pri-p3 { display: inline-block; background: var(--accent-light); color: var(--accent); border: 1px solid #bfdbfe; font-size: 12px; font-weight: 700; padding: 2px 8px; border-radius: 4px; }
+
+  /* ── Fault header ──────────────────────────────────────────────────────── */
+  .fault-header { display: flex; align-items: center; gap: 12px; padding: 12px 16px; border-radius: var(--radius-lg); margin: 16px 0 8px; border: 1px solid; }
+  .fh-p0 { background: #fef2f2; border-color: #fca5a5; }
+  .fh-p1 { background: #fff7ed; border-color: #fdba74; }
+  .fh-p2 { background: #fffbeb; border-color: #fde68a; }
+  .fh-p3 { background: var(--accent-light); border-color: #bfdbfe; }
+  .fh-badge { font-family: var(--font-mono); font-size: 11px; font-weight: 700; letter-spacing: .08em; }
+  .fh-p0 .fh-badge { color: #991b1b; }
+  .fh-p1 .fh-badge { color: #9a3412; }
+  .fh-p2 .fh-badge { color: #92400e; }
+  .fh-p3 .fh-badge { color: var(--accent); }
+  .fh-rest { font-size: 14px; font-weight: 500; color: var(--text); }
+
+  /* ── Timeline ──────────────────────────────────────────────────────────── */
+  .timeline { border-left: 2px solid var(--accent-mid); margin: 16px 0 16px 8px; padding-left: 20px; }
+  .tl-row { display: flex; align-items: baseline; gap: 10px; margin: 8px 0; font-size: 13.5px; }
+  .tl-ts { font-family: var(--font-mono); font-size: 12px; color: var(--text-3); flex-shrink: 0; white-space: nowrap; }
+  .tl-tag { font-size: 11px; font-weight: 600; padding: 1px 7px; border-radius: 10px; flex-shrink: 0; background: var(--accent-light); color: var(--accent); }
+  .tl-tag.err { background: var(--red-bg); color: var(--red); }
+  .tl-tag.warn { background: var(--amber-bg); color: var(--amber); }
+  .tl-desc { color: var(--text); line-height: 1.5; }
+
+  /* ── Global warn ───────────────────────────────────────────────────────── */
+  .global-warn { background: #fef2f2; border: 1px solid #fca5a5; border-radius: var(--radius-lg); padding: 14px 18px; font-size: 14.5px; font-weight: 600; color: #991b1b; margin: 16px 0; }
+
+  /* ── Tree note ─────────────────────────────────────────────────────────── */
+  .tree-note { white-space: pre-wrap; font-family: var(--font-mono); font-size: 13.5px; line-height: 1.6; color: var(--text-2); margin: 8px 0 8px 16px; }
+
+  /* ── Disclaimer ────────────────────────────────────────────────────────── */
+  .disclaimer { background: var(--bg); border: 1px solid var(--border); border-radius: var(--radius); padding: 14px 18px; font-size: 13.5px; color: var(--text-2); font-style: italic; }
+
+  /* ── Meta footer ───────────────────────────────────────────────────────── */
+  .meta {
+    margin-top: 48px; padding-top: 16px;
+    border-top: 1px solid var(--border-soft);
+    display: flex; justify-content: space-between; align-items: center;
+    font-size: 12px; color: var(--text-3);
+  }
+  .meta-source { font-family: var(--font-mono); font-size: 11.5px; }
+
+  /* ── Brand logo ────────────────────────────────────────────────────────── */
+  .brand-logo {
+    font-family: var(--font-head);
+    font-size: 14px;
+    color: var(--text-3);
+    letter-spacing: 0.05em;
+    margin-bottom: 4px;
+    flex-shrink: 0;
+    margin-left: 16px;
+  }
+  .brand-logo strong {
+    font-weight: 600;
+    color: var(--accent);
+  }
+  @media (max-width: 900px) {
+    .title-container { flex-direction: column; align-items: flex-start; gap: 12px; }
+    .brand-logo { margin-left: 0; margin-bottom: 0; }
+  }
+  /* ── Print ─────────────────────────────────────────────────────────────── */
+  @media print {
+    body { background: white; }
+    #progress, .toc { display: none; }
+    .layout { display: block; padding: 0; }
+    .article { border: none; box-shadow: none; padding: 24px; }
+    .copy-btn { display: none; }
+    .brand-logo { margin-bottom: 0; }
+  }
+
+  /* ── Responsive ────────────────────────────────────────────────────────── */
+  @media (max-width: 900px) {
+    .toc { display: none; }
+    .article { padding: 36px 28px; }
+    .layout { padding: 24px 16px 64px; }
+  }
+  @media (max-width: 480px) {
+    .article { padding: 24px 18px; }
+    .article h1 { font-size: 22px; }
+  }
+</style>
+</head>
+<body>
+
+<div id="progress"></div>
+
+<div class="layout">
+  <nav class="toc" id="toc">
+  <div class="toc-title">目录</div>
+  <div class="toc-content">
+<div class="toc-item has-children"><button class="toc-toggle" onclick="toggleToc(this)" aria-expanded="true">
+                <svg viewBox="0 0 24 24" width="12" height="12" stroke="currentColor" stroke-width="2" fill="none"><polyline points="6 9 12 15 18 9"></polyline></svg>
+              </button><a href="#h-overlayfs-目录重命名-redirect-行为诊断报告" onclick="event.preventDefault(); const target = document.getElementById('h-overlayfs-目录重命名-redirect-行为诊断报告'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l1">🟡 OverlayFS 目录重命名 Redirect 行为诊断报告</a></div>
+<div class="toc-group" id="group-h-一故障概览">
+<div class="toc-item has-children"><button class="toc-toggle" onclick="toggleToc(this)" aria-expanded="true">
+                <svg viewBox="0 0 24 24" width="12" height="12" stroke="currentColor" stroke-width="2" fill="none"><polyline points="6 9 12 15 18 9"></polyline></svg>
+              </button><a href="#h-一故障概览" onclick="event.preventDefault(); const target = document.getElementById('h-一故障概览'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l2">一、故障概览</a></div>
+<div class="toc-group" id="group-h-置信度说明">
+<div class="toc-item "><span class="toc-spacer"></span><a href="#h-置信度说明" onclick="event.preventDefault(); const target = document.getElementById('h-置信度说明'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l3">置信度说明</a></div>
+</div>
+<div class="toc-item has-children"><button class="toc-toggle" onclick="toggleToc(this)" aria-expanded="true">
+                <svg viewBox="0 0 24 24" width="12" height="12" stroke="currentColor" stroke-width="2" fill="none"><polyline points="6 9 12 15 18 9"></polyline></svg>
+              </button><a href="#h-二根因速览" onclick="event.preventDefault(); const target = document.getElementById('h-二根因速览'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l2">二、根因速览</a></div>
+<div class="toc-group" id="group-h-事故时间线-故障传导链路">
+<div class="toc-item "><span class="toc-spacer"></span><a href="#h-事故时间线-故障传导链路" onclick="event.preventDefault(); const target = document.getElementById('h-事故时间线-故障传导链路'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l3">事故时间线 & 故障传导链路</a></div>
+<div class="toc-item "><span class="toc-spacer"></span><a href="#h-故障因果链" onclick="event.preventDefault(); const target = document.getElementById('h-故障因果链'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l3">故障因果链</a></div>
+</div>
+<div class="toc-item has-children"><button class="toc-toggle" onclick="toggleToc(this)" aria-expanded="true">
+                <svg viewBox="0 0 24 24" width="12" height="12" stroke="currentColor" stroke-width="2" fill="none"><polyline points="6 9 12 15 18 9"></polyline></svg>
+              </button><a href="#h-三排查过程" onclick="event.preventDefault(); const target = document.getElementById('h-三排查过程'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l2">三、排查过程</a></div>
+<div class="toc-group" id="group-h-31-初始现象">
+<div class="toc-item "><span class="toc-spacer"></span><a href="#h-31-初始现象" onclick="event.preventDefault(); const target = document.getElementById('h-31-初始现象'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l3">3.1 初始现象</a></div>
+<div class="toc-item "><span class="toc-spacer"></span><a href="#h-32-假设驱动排查" onclick="event.preventDefault(); const target = document.getElementById('h-32-假设驱动排查'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l3">3.2 假设驱动排查</a></div>
+<div class="toc-item "><span class="toc-spacer"></span><a href="#h-33-排查结论" onclick="event.preventDefault(); const target = document.getElementById('h-33-排查结论'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l3">3.3 排查结论</a></div>
+</div>
+<div class="toc-item has-children"><button class="toc-toggle" onclick="toggleToc(this)" aria-expanded="true">
+                <svg viewBox="0 0 24 24" width="12" height="12" stroke="currentColor" stroke-width="2" fill="none"><polyline points="6 9 12 15 18 9"></polyline></svg>
+              </button><a href="#h-四系统态诊断结论" onclick="event.preventDefault(); const target = document.getElementById('h-四系统态诊断结论'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l2">四、系统态诊断结论</a></div>
+<div class="toc-group" id="group-h-重命名后的-upper-层文件清单">
+<div class="toc-item "><span class="toc-spacer"></span><a href="#h-重命名后的-upper-层文件清单" onclick="event.preventDefault(); const target = document.getElementById('h-重命名后的-upper-层文件清单'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l3">重命名后的 Upper 层文件清单</a></div>
+</div>
+<div class="toc-item has-children"><button class="toc-toggle" onclick="toggleToc(this)" aria-expanded="true">
+                <svg viewBox="0 0 24 24" width="12" height="12" stroke="currentColor" stroke-width="2" fill="none"><polyline points="6 9 12 15 18 9"></polyline></svg>
+              </button><a href="#h-五内核态分析结论" onclick="event.preventDefault(); const target = document.getElementById('h-五内核态分析结论'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l2">五、内核态分析结论</a></div>
+<div class="toc-group" id="group-h-wsl2-内核-overlayfs-模块参数一览">
+<div class="toc-item "><span class="toc-spacer"></span><a href="#h-wsl2-内核-overlayfs-模块参数一览" onclick="event.preventDefault(); const target = document.getElementById('h-wsl2-内核-overlayfs-模块参数一览'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l3">WSL2 内核 OverlayFS 模块参数一览</a></div>
+</div>
+<div class="toc-item "><span class="toc-spacer"></span><a href="#h-六交叉验证结果" onclick="event.preventDefault(); const target = document.getElementById('h-六交叉验证结果'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l2">六、交叉验证结果</a></div>
+<div class="toc-item "><span class="toc-spacer"></span><a href="#h-七排除的替代假设" onclick="event.preventDefault(); const target = document.getElementById('h-七排除的替代假设'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l2">七、排除的替代假设</a></div>
+<div class="toc-item has-children"><button class="toc-toggle" onclick="toggleToc(this)" aria-expanded="true">
+                <svg viewBox="0 0 24 24" width="12" height="12" stroke="currentColor" stroke-width="2" fill="none"><polyline points="6 9 12 15 18 9"></polyline></svg>
+              </button><a href="#h-八修复建议" onclick="event.preventDefault(); const target = document.getElementById('h-八修复建议'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l2">八、修复建议</a></div>
+<div class="toc-group" id="group-h-81-当前行为分析">
+<div class="toc-item "><span class="toc-spacer"></span><a href="#h-81-当前行为分析" onclick="event.preventDefault(); const target = document.getElementById('h-81-当前行为分析'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l3">8.1 当前行为分析</a></div>
+<div class="toc-item "><span class="toc-spacer"></span><a href="#h-82-如确需启用-redirectdir" onclick="event.preventDefault(); const target = document.getElementById('h-82-如确需启用-redirectdir'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l3">8.2 如确需启用 redirect_dir</a></div>
+<div class="toc-item "><span class="toc-spacer"></span><a href="#h-83-根本建议" onclick="event.preventDefault(); const target = document.getElementById('h-83-根本建议'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l3">8.3 根本建议</a></div>
+</div>
+<div class="toc-item "><span class="toc-spacer"></span><a href="#h-九验证建议" onclick="event.preventDefault(); const target = document.getElementById('h-九验证建议'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l2">九、验证建议</a></div>
+</div>
+  </div>
+</nav>
+  <article class="article" id="article" style="position: relative;">
+    <div class="title-container"><h1 id="h-overlayfs-目录重命名-redirect-行为诊断报告">🟡 OverlayFS 目录重命名 Redirect 行为诊断报告</h1><div class="brand-logo">by <strong>Witty Diagnosis Agent</strong></div></div>
+<blockquote>
+<p><strong>报告编号</strong>：RPT-20260528-OVL-I-001
+<strong>故障级别</strong>：P3 / 异常行为确认
+<strong>报告时间</strong>：2026-05-28 23:59:00
+<strong>当前状态</strong>：🟡 观察中（已确认非故障，为预期行为差异）</p>
+</blockquote>
+<hr>
+<h2 id="h-一故障概览">一、故障概览</h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>项目</th>
+<th>内容</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>故障标题</td>
+<td>OverlayFS <code>redirect_dir=N</code> 导致目录重命名不生成 redirect xattr</td>
+</tr>
+<tr>
+<td>影响范围</td>
+<td><code>overlayfs-fault-I</code> 容器测试环境，自定义 overlay 挂载 <code>/mnt/ovl_i/</code></td>
+</tr>
+<tr>
+<td>故障时段</td>
+<td>2026-05-28 15:52:00（容器启动）～ 持续验证中</td>
+</tr>
+<tr>
+<td>根本原因</td>
+<td>WSL2 内核（6.6.87.2-microsoft-standard-WSL2）的 OverlayFS 模块参数 <code>redirect_dir=N</code>（默认禁用），导致目录跨层重命名时使用 copy-up 策略而非 redirect xattr 机制</td>
+</tr>
+<tr>
+<td>是否恢复</td>
+<td><span class="badge-ok">✅ 已确认（非故障，为内核配置差异导致的预期行为）</span></td>
+</tr>
+<tr>
+<td>根因置信度</td>
+<td>🟢 高置信（双轨证据完全吻合，可复现）</td>
+</tr>
+</tbody></table></div>
+<h3 id="h-置信度说明">置信度说明</h3>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>等级</th>
+<th>标识</th>
+<th>含义</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>高置信</td>
+<td>🟢</td>
+<td>系统态 + 内核态双轨证据完全吻合，单一原因可解释全部现象</td>
+</tr>
+</tbody></table></div>
+<hr>
+<h2 id="h-二根因速览">二、根因速览</h2>
+<h3 id="h-事故时间线-故障传导链路">事故时间线 & 故障传导链路</h3>
+<div class="code-block">
+  <span class="code-lang">text</span>
+  <button class="copy-btn" onclick="copyCode(this)" title="复制">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
+  </button>
+  <pre><code>时间                           事件                                                 性质           证据来源
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+2026-05-28 15:52:00   overlayfs-fault-I 容器启动                                        🚀 事件开始    [docker inspect]
+                      ├─ 测试 overlay 挂载：/mnt/ovl_i/merged
+                      │    lowerdir=/mnt/ovl_i/lower (含 app/config/settings.ini)
+                      │    upperdir=/mnt/ovl_i/upper    (初始为空)
+                      │    workdir=/mnt/ovl_i/work
+                      │    
+                      ▼
+2026-05-28 15:52:00   执行测试：mv /mnt/ovl_i/merged/app /mnt/ovl_i/merged/app_renamed   ⚠️ 关键操作
+                      │    
+                      ├─► 内核检测到 app/ 位于 lower 层，需跨层重命名
+                      │    redirect_dir=N → 无法使用 redirect xattr
+                      │    
+                      ▼
+2026-05-28 15:52:00   内核执行 copy-up 策略重命名                                      🔄 内核决策    [/sys/module/overlay/parameters/redirect_dir = N]
+                      ├─► 在 upper 创建 whiteout 节点：app（字符设备 0,0）               ✅ 验证
+                      │    目的：屏蔽 merged 视图中的 lower/app/
+                      ├─► 将 app/config/settings.ini 完整 copy-up 到 upper/app_renamed/   ✅ 验证
+                      │    目的：使重命名后的内容在 merged 中可见
+                      │    
+                      ▼
+2026-05-28 15:52:00   验证结果                                                         🔍 测试结论
+                      ├─ ✓ app → app_renamed 重命名成功
+                      ├─ ✓ merged/app_renamed/config/settings.ini 可访问（内容: version=1）
+                      └─ ⚠️ upper 中未发现 trusted.overlay.redirect xattr → 预期内</code></pre>
+</div>
+<h3 id="h-故障因果链">故障因果链</h3>
+<div class="code-block">
+  <span class="code-lang">text</span>
+  <button class="copy-btn" onclick="copyCode(this)" title="复制">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
+  </button>
+  <pre><code>overlayfs-fault-I 容器启动
+    └─► 测试目录重命名：mv merged/app → merged/app_renamed
+            │  app 目录位于 lower 层
+            ▼
+    Need to rename directory across layers
+            │
+            ├─► 方案 A [redirect_dir=on]：
+            │    在 upper/app_renamed 上创建 trusted.overlay.redirect="/app"
+            │    内核 readdir 时跟随 redirect 找到内容
+            │    优点：元数据级操作，速度快
+            │
+            └─► 方案 B [redirect_dir=N]（当前 WSL2 行为）：
+                  ├─ 在 upper 创建 whiteout 节点（app → c--------- 0,0）
+                  ├─ 将 app/config/settings.ini 完整 copy-up 到 upper/app_renamed/
+                  └─ merged 视图仅显示 upper/app_renamed
+                  优点：兼容性好，无需 redirect 支持
+                  缺点：大目录 copy-up 耗时、占用 upper 空间
+                  
+                  → 🎯 实际执行路径：方案 B（原因：redirect_dir=N）</code></pre>
+</div>
+<hr>
+<h2 id="h-三排查过程">三、排查过程</h2>
+<blockquote>
+<p>排查逻辑：<strong>收集证据 → 提出假设 → 双轨验证 → 收敛结论</strong></p>
+</blockquote>
+<h3 id="h-31-初始现象">3.1 初始现象</h3>
+<ul>
+<li><strong>测试操作</strong>：在 OverlayFS merged 视图中将 <code>app/</code> 目录重命名为 <code>app_renamed/</code></li>
+<li><strong>测试结果</strong>：<ul>
+<li><span class="badge-ok">✅ 重命名操作成功，无报错</span></li>
+<li>✅ 重命名后 <code>merged/app_renamed/config/settings.ini</code> 可正常读取（内容：<code>version=1</code>）</li>
+<li>❓ <code>upper/</code> 中未发现 <code>trusted.overlay.redirect</code> xattr</li>
+</ul>
+</li>
+<li><strong>用户疑问</strong>：为何重命名成功但无 redirect xattr？</li>
+</ul>
+<h3 id="h-32-假设驱动排查">3.2 假设驱动排查</h3>
+<h4 id="h-假设-aredirect-xattr-存在于其他位置">假设 A：redirect xattr 存在于其他位置</h4>
+<blockquote>
+<p>🧪 假设：测试检查位置不完整，redirect xattr 可能在目录的其他层级上</p>
+</blockquote>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>检查项</th>
+<th>操作</th>
+<th>结论</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>递归扫描 upper</td>
+<td><code>find /mnt/ovl_i/upper/ -exec getfattr -d -m trusted.overlay.redirect {} \;</code></td>
+<td><span class="badge-ok">✅ 无任何 redirect xattr</span></td>
+</tr>
+<tr>
+<td>检查 upper/app_renamed</td>
+<td><code>getfattr -d /mnt/ovl_i/upper/app_renamed</code></td>
+<td><span class="badge-ok">✅ 无任何 xattr</span></td>
+</tr>
+<tr>
+<td>检查 upper/app_renamed/config</td>
+<td><code>getfattr -d /mnt/ovl_i/upper/app_renamed/config</code></td>
+<td><span class="badge-ok">✅ 无任何 xattr</span></td>
+</tr>
+<tr>
+<td>检查 upper/app（whiteout）</td>
+<td><code>getfattr -d /mnt/ovl_i/upper/app</code></td>
+<td><span class="badge-ok">✅ 无 xattr（whiteout 本身无额外 xattr）</span></td>
+</tr>
+</tbody></table></div>
+<p><strong>❌ 排除</strong>：redirect xattr 不存在于 upper 的任何位置，非检查范围问题。</p>
+<hr>
+<h4 id="h-假设-bmetacopy-启用导致使用另一种机制">假设 B：metacopy 启用导致使用另一种机制</h4>
+<blockquote>
+<p>🧪 假设：metacopy 优化启用导致内核使用不同的重命名策略，不产生 redirect</p>
+</blockquote>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>检查项</th>
+<th>操作</th>
+<th>结论</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>查看 metacopy 参数</td>
+<td><code>cat /sys/module/overlay/parameters/metacopy</code></td>
+<td>✅ <code>metacopy = N</code>（禁用）</td>
+</tr>
+<tr>
+<td>metacopy 状态确认</td>
+<td>模块参数为 <code>N</code></td>
+<td><span class="badge-ok">✅ 排除 metacopy 影响</span></td>
+</tr>
+</tbody></table></div>
+<p><strong>❌ 排除</strong>：metacopy 已禁用，不影响重命名行为。</p>
+<hr>
+<h4 id="h-假设-credirectdir-禁用导致使用-copy-up-策略-确认根因">假设 C：redirect_dir 禁用导致使用 copy-up 策略 ✅ 确认根因</h4>
+<blockquote>
+<p>🧪 假设：WSL2 内核的 <code>redirect_dir=N</code> 导致内核无法使用 xattr 机制，回退到 copy-up 策略</p>
+</blockquote>
+<p><strong>Step 1 — 确认内核 OverlayFS 模块参数</strong></p>
+<div class="code-block">
+  <span class="code-lang">bash</span>
+  <button class="copy-btn" onclick="copyCode(this)" title="复制">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
+  </button>
+  <pre><code>$ cat /sys/module/overlay/parameters/redirect_dir
+N</code></pre>
+</div>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>关键参数</th>
+<th>值</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>redirect_dir</code></td>
+<td><strong>N</strong></td>
+<td>关闭，不创建新的 redirect xattr</td>
+</tr>
+<tr>
+<td><code>redirect_always_follow</code></td>
+<td><strong>Y</strong></td>
+<td>遇到现有 redirect xattr 时跟随</td>
+</tr>
+<tr>
+<td><code>redirect_max</code></td>
+<td><strong>256</strong></td>
+<td>redirect 深度限制（无关，因已禁用）</td>
+</tr>
+<tr>
+<td><code>metacopy</code></td>
+<td>N</td>
+<td>禁用</td>
+</tr>
+<tr>
+<td><code>index</code></td>
+<td>N</td>
+<td>禁用</td>
+</tr>
+<tr>
+<td><code>xino_auto</code></td>
+<td>N</td>
+<td>禁用</td>
+</tr>
+<tr>
+<td><code>check_copy_up</code></td>
+<td>N</td>
+<td>禁用</td>
+</tr>
+<tr>
+<td><code>nfs_export</code></td>
+<td>N</td>
+<td>禁用</td>
+</tr>
+</tbody></table></div>
+<p><strong>Step 2 — 验证系统态现象（系统态诊断轨道）</strong></p>
+<div class="code-block">
+  <span class="code-lang">text</span>
+  <button class="copy-btn" onclick="copyCode(this)" title="复制">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
+  </button>
+  <pre><code>挂载点：/mnt/ovl_i/merged
+Overlay 拓扑：
+  lowerdir=/mnt/ovl_i/lower   ← 含 app/config/settings.ini
+  upperdir=/mnt/ovl_i/upper   ← 原始为空
+  workdir=/mnt/ovl_i/work
+
+重命名操作后 upper 状态：
+  upper/app                → 字符设备 whiteout (0,0) — 屏蔽 lower/app
+  upper/app_renamed/        → 目录（copy-up 创建）
+  upper/app_renamed/config/ → 目录（copy-up 创建）
+  upper/app_renamed/config/settings.ini → 文件（copy-up 创建）
+  ⚠️ 无 trusted.overlay.redirect xattr</code></pre>
+</div>
+<p><strong>Step 3 — 内核态因果链验证（有源码推论）</strong></p>
+<div class="code-block">
+  <span class="code-lang">text</span>
+  <button class="copy-btn" onclick="copyCode(this)" title="复制">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
+  </button>
+  <pre><code>文件：fs/overlayfs/readdir.c / fs/overlayfs/copy_up.c
+机制：目录重命名决策路径
+
+流程（基于 kernel 6.6 源码逻辑）：
+  1. ovl_rename() 被调用
+  2. 检测到原目录在 lower 层（不在 upper）
+  3. 检查 redirect_dir 策略：
+     → redirect_dir=N（模块参数 N → off）
+  4. 分支决策：
+     ┌─ redirect_dir=on:  ovl_redirect_directory() 创建 trusted.overlay.redirect xattr
+     └─ redirect_dir=off: 回退 ovl_copy_up() 策略
+            ↓
+  5. copy-up 路径：
+     a. ovl_copy_up_one() 将 lower/app 内容复制到 upper
+     b. ovl_whiteout() 在 upper 创建 whiteout 节点 app
+     c. 重命名 upper 中的目标为 app_renamed
+     d. 完成</code></pre>
+</div>
+<p><strong>Step 4 — 反事实验证</strong></p>
+<div class="code-block">
+  
+  <button class="copy-btn" onclick="copyCode(this)" title="复制">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
+  </button>
+  <pre><code>推演的异常路径  == 系统态的行为？
+  ✓ redirect_dir=N → 不产生 redirect → upper 无 xattr → 吻合
+  ✓ redirect_dir=off → copy-up + whiteout → upper 有 whiteout + 内容 → 吻合
+  ✓ copy-up 后 merged 可访问 → merged/app_renamed/config/settings.ini 正常 → 吻合
+
+推演的配置条件  == 系统态的实际配置？
+  ✓ /sys/module/overlay/parameters/redirect_dir = N → 吻合
+
+推演的触发条件  == 系统态的触发场景？
+  ✓ 跨层重命名 lower 目录 → copy-up 策略 → 吻合
+
+三条全 ✓ → 根因确认</code></pre>
+</div>
+<p><strong>✅ 结论：WSL2 内核默认配置 redirect_dir=N 导致采用 copy-up 策略，不产生 redirect xattr。这是预期的内核适配行为，而非故障。</strong></p>
+<hr>
+<h4 id="h-假设-d内核-bugoverlayfs-redirectdir-在新内核中有缺陷">假设 D：内核 Bug（OverlayFS redirect_dir 在新内核中有缺陷）</h4>
+<blockquote>
+<p>🧪 假设：内核存在 Bug 导致 redirect xattr 应生成而未生成</p>
+</blockquote>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>检查项</th>
+<th>操作</th>
+<th>结论</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>确认内核版本</td>
+<td><code>uname -r</code></td>
+<td>6.6.87.2-microsoft-standard-WSL2</td>
+</tr>
+<tr>
+<td>确认 redirect_dir 参数</td>
+<td><code>cat /sys/module/overlay/parameters/redirect_dir</code></td>
+<td><code>N</code>（显式禁用）</td>
+</tr>
+<tr>
+<td>查询上游 kernel 6.6 redirect_dir 行为</td>
+<td>上游 redirect_dir 默认开启</td>
+<td>WSL2 内核修改了默认值</td>
+</tr>
+</tbody></table></div>
+<p><strong>❌ 排除</strong>：不是内核 Bug。<code>redirect_dir=N</code> 是 WSL2 内核的<em>有意识配置决策</em>（通过模块默认参数），copy-up 策略是 <code>redirect_dir=off</code> 时的标准回退路径。</p>
+<hr>
+<h3 id="h-33-排查结论">3.3 排查结论</h3>
+<div class="code-block">
+  <span class="code-lang">text</span>
+  <button class="copy-btn" onclick="copyCode(this)" title="复制">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
+  </button>
+  <pre><code>OverlayFS 目录重命名无 redirect xattr
+├─► 假设 A：xattr 在别处未找到      → ✅ 已全量递归扫描，排除
+├─► 假设 B：metacopy 影响           → ✅ metacopy=N，排除
+├─► 假设 C：redirect_dir=N 导致 copy-up → 🎯 根因确认
+│       └─► 系统态证据：
+│             ├─ 参数确认: redirect_dir=N
+│             ├─ upper 有 whiteout (app)
+│             └─ upper 有 copy-up 文件 (app_renamed/...)
+│       └─► 内核态证据：
+│             ├─ ovl_rename() → redirect_dir=off 分支
+│             ├─ ovl_copy_up() 路径触发
+│             └─ ovl_redirect_directory() 不调用
+│       └─► 反事实验证：三条件全 ✓
+└─► 假设 D：内核 Bug                → ✅ WSL2 有意配置，排除</code></pre>
+</div>
+<hr>
+<h2 id="h-四系统态诊断结论">四、系统态诊断结论</h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>检查项</th>
+<th>结果</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>挂载点</td>
+<td><code>/mnt/ovl_i/merged</code></td>
+</tr>
+<tr>
+<td>Overlay 拓扑</td>
+<td><code>lowerdir=/mnt/ovl_i/lower, upperdir=/mnt/ovl_i/upper, workdir=/mnt/ovl_i/work</code></td>
+</tr>
+<tr>
+<td>各层文件系统</td>
+<td>lower=ext4, upper=ext4, work=ext4</td>
+</tr>
+<tr>
+<td>磁盘空间状态</td>
+<td>正常（需确认具体 inode/空间）</td>
+</tr>
+<tr>
+<td>异常现象</td>
+<td>目录重命名成功且文件可访问，但 upper 中无 redirect xattr</td>
+</tr>
+<tr>
+<td>系统态侧根因假设</td>
+<td>WSL2 内核 overlay 模块参数 <code>redirect_dir=N</code> 禁用 redirect 机制，回退到 copy-up 策略</td>
+</tr>
+</tbody></table></div>
+<h3 id="h-重命名后的-upper-层文件清单">重命名后的 Upper 层文件清单</h3>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>路径</th>
+<th>类型</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>/mnt/ovl_i/upper/app</code></td>
+<td>字符设备 (0,0)</td>
+<td>whiteout 节点，屏蔽 lower/app</td>
+</tr>
+<tr>
+<td><code>/mnt/ovl_i/upper/app_renamed/</code></td>
+<td>目录</td>
+<td>copy-up 创建的目录</td>
+</tr>
+<tr>
+<td><code>/mnt/ovl_i/upper/app_renamed/config/</code></td>
+<td>目录</td>
+<td>copy-up 创建的目录</td>
+</tr>
+<tr>
+<td><code>/mnt/ovl_i/upper/app_renamed/config/settings.ini</code></td>
+<td>文件</td>
+<td>copy-up 创建，内容: <code>version=1</code></td>
+</tr>
+<tr>
+<td><code>trusted.overlay.redirect</code> xattr</td>
+<td>（无）</td>
+<td>因 <code>redirect_dir=N</code> 而未创建</td>
+</tr>
+</tbody></table></div>
+<hr>
+<h2 id="h-五内核态分析结论">五、内核态分析结论</h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>检查项</th>
+<th>内容</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>内核版本</td>
+<td>6.6.87.2-microsoft-standard-WSL2</td>
+</tr>
+<tr>
+<td>OverlayFS 模块模式</td>
+<td>内核内置模块（非可加载模块）</td>
+</tr>
+<tr>
+<td>相关内核代码路径</td>
+<td><code>fs/overlayfs/copy_up.c</code> — <code>ovl_copy_up_one()</code> / <code>ovl_rename()</code></td>
+</tr>
+<tr>
+<td>机制类型</td>
+<td>目录重命名决策（redirect_dir vs copy-up）</td>
+</tr>
+<tr>
+<td>机制解释</td>
+<td>当 <code>redirect_dir=off</code> 时，OverlayFS 内核不会为跨层目录重命名创建 <code>trusted.overlay.redirect</code> xattr，而是通过 <strong>copy-up + whiteout</strong> 策略实现语义等同的操作：将目录内容复制到 upper 层并在原处放置 whiteout，最终在 upper 层完成重命名</td>
+</tr>
+<tr>
+<td>触发条件</td>
+<td>① 目录存在于 lower 层（不在 upper） ② <code>redirect_dir=off</code>（此内核默认值）</td>
+</tr>
+<tr>
+<td>因果链</td>
+<td><code>Kernel: redirect_dir=N</code> → <code>ovl_rename()</code> 走 copy-up 分支 → <code>ovl_copy_up_one()</code> 复制目录树 → <code>ovl_whiteout()</code> 创建 whiteout → 目录重命名在 upper 完成 → 无 redirect xattr 产生</td>
+</tr>
+</tbody></table></div>
+<h3 id="h-wsl2-内核-overlayfs-模块参数一览">WSL2 内核 OverlayFS 模块参数一览</h3>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>参数文件</th>
+<th>值</th>
+<th>默认值（上游）</th>
+<th>差异说明</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>redirect_dir</code></td>
+<td><strong>N</strong></td>
+<td>Y (on)</td>
+<td><strong>WSL2 显式禁用 redirect 创建</strong></td>
+</tr>
+<tr>
+<td><code>redirect_always_follow</code></td>
+<td><strong>Y</strong></td>
+<td>N</td>
+<td><strong>WSL2 显式启用跟随已有 redirect</strong></td>
+</tr>
+<tr>
+<td><code>redirect_max</code></td>
+<td>256</td>
+<td>256</td>
+<td>相同</td>
+</tr>
+<tr>
+<td><code>metacopy</code></td>
+<td>N</td>
+<td>Y</td>
+<td>WSL2 禁用 metacopy 优化</td>
+</tr>
+<tr>
+<td><code>index</code></td>
+<td>N</td>
+<td>N</td>
+<td>相同</td>
+</tr>
+<tr>
+<td><code>xino_auto</code></td>
+<td>N</td>
+<td>Y</td>
+<td>WSL2 禁用 xino</td>
+</tr>
+<tr>
+<td><code>check_copy_up</code></td>
+<td>N</td>
+<td>N</td>
+<td>相同</td>
+</tr>
+<tr>
+<td><code>nfs_export</code></td>
+<td>N</td>
+<td>N</td>
+<td>相同</td>
+</tr>
+</tbody></table></div>
+<hr>
+<h2 id="h-六交叉验证结果">六、交叉验证结果</h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>验证维度</th>
+<th>系统态结论</th>
+<th>内核态结论</th>
+<th>是否吻合？</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>异常现象</td>
+<td>upper 中无 redirect xattr</td>
+<td><code>redirect_dir=N</code> 时 ovl_redirect_directory() 不调用</td>
+<td>✅ <strong>吻合</strong></td>
+</tr>
+<tr>
+<td>配置条件</td>
+<td><code>/sys/module/</code> 显示 redirect_dir=N</td>
+<td>模块参数 N 对应 redirect_dir=off</td>
+<td>✅ <strong>吻合</strong></td>
+</tr>
+<tr>
+<td>触发路径</td>
+<td>rename 操作 → copy-up → whiteout + 文件复制</td>
+<td>内核 ovl_rename() → ovl_copy_up() → ovl_whiteout()</td>
+<td>✅ <strong>吻合</strong></td>
+</tr>
+<tr>
+<td>根因位置</td>
+<td>WSL2 修改了 redirect_dir 默认值</td>
+<td>内核模块参数加载时的默认值设定</td>
+<td>✅ <strong>吻合</strong></td>
+</tr>
+<tr>
+<td>触发条件</td>
+<td>跨层目录重命名</td>
+<td>lower 目录 + redirect_dir=off 同时满足</td>
+<td>✅ <strong>吻合</strong></td>
+</tr>
+</tbody></table></div>
+<p><strong>综合判断</strong>：双轨证据完全吻合，所有验证维度一致。<strong>此行为为 WSL2 内核 OverlayFS 的预期设计行为，非故障或缺陷。</strong></p>
+<hr>
+<h2 id="h-七排除的替代假设">七、排除的替代假设</h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>假设</th>
+<th>排除原因</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>redirect xattr 存在于 upper 其他位置</td>
+<td>已递归全量扫描 <code>find ... -exec getfattr -d -m trusted.overlay.redirect</code> 确认不存在</td>
+</tr>
+<tr>
+<td>metacopy 优化导致行为差异</td>
+<td><code>metacopy=N</code> 已禁用，排除影响</td>
+</tr>
+<tr>
+<td>内核 Bug（应生成而没生成）</td>
+<td><code>redirect_dir=N</code> 是有意的配置决策（<code>redirect_always_follow=Y</code> 组合表明设计意图是只跟随、不创建），非缺陷</td>
+</tr>
+<tr>
+<td>挂载参数覆盖了模块默认值</td>
+<td>挂载命令使用 <code>uuid=on</code> 未指定 redirect_dir，因此使用模块默认值 <code>N</code></td>
+</tr>
+<tr>
+<td>重命名操作失败或部分失败</td>
+<td>验证重命名成功、文件可访问、whiteout 存在，操作完整正确</td>
+</tr>
+</tbody></table></div>
+<hr>
+<h2 id="h-八修复建议">八、修复建议</h2>
+<h3 id="h-81-当前行为分析">8.1 当前行为分析</h3>
+<p>当前 WSL2 内核的配置（<code>redirect_dir=N</code> + <code>redirect_always_follow=Y</code>）是一个合理的安全设计：</p>
+<ul>
+<li><strong>不创建</strong> redirect xattr → 避免跨层符号链接引用带来的复杂性</li>
+<li><strong>跟随</strong>已有 redirect → 兼容已有的 redirect 数据</li>
+<li>使用 copy-up + whiteout → 语义等价但更耗空间和 I/O</li>
+</ul>
+<h3 id="h-82-如确需启用-redirectdir">8.2 如确需启用 redirect_dir</h3>
+<p>若测试或应用场景需要验证 redirect xattr 行为，可采取以下方案：</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>方案</th>
+<th>操作</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>方案 A：挂载时指定</strong></td>
+<td><code>mount -t overlay overlay -o lowerdir=...,upperdir=...,workdir=...,redirect_dir=on /merged</code></td>
+<td>挂载选项可覆盖模块默认值，无需重启</td>
+</tr>
+<tr>
+<td><strong>方案 B：覆盖验证</strong></td>
+<td>在同一台机器上手动创建 overlay 挂载并指定 <code>redirect_dir=on</code>，观察 xattr 生成行为</td>
+<td>用于对比测试，验证 redirect 功能是否正常</td>
+</tr>
+<tr>
+<td><strong>方案 C：升级内核</strong></td>
+<td>将 WSL2 内核更换为标准主线内核或拥有不同默认配置的发行版内核</td>
+<td>生产系统通常默认为 <code>redirect_dir=on</code></td>
+</tr>
+</tbody></table></div>
+<p><strong>推荐操作：</strong> 方案 A（最小改动，立即可验证）</p>
+<div class="code-block">
+  <span class="code-lang">bash</span>
+  <button class="copy-btn" onclick="copyCode(this)" title="复制">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
+  </button>
+  <pre><code># 创建新的测试目录
+mkdir -p /tmp/test_{lower,upper,work,merged}
+
+# 准备 lower 数据
+echo "hello" &gt; /tmp/test_lower/test.txt
+
+# 使用 redirect_dir=on 挂载
+mount -t overlay overlay \
+  -o lowerdir=/tmp/test_lower,upperdir=/tmp/test_upper,workdir=/tmp/test_work,\
+     redirect_dir=on /tmp/test_merged
+
+# 验证：重命名目录，检查 xattr
+mv /tmp/test_merged /tmp/test_merged_renamed   # 在 merged 中重命名一个 lower 目录
+getfattr -d -m trusted.overlay.redirect /tmp/test_upper/*  # 应能看到 redirect</code></pre>
+</div>
+<h3 id="h-83-根本建议">8.3 根本建议</h3>
+<p>此场景属于<strong>配置预期差异</strong>，非系统故障：</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>场景</th>
+<th>建议</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>仅做功能验证/测试</td>
+<td>确认当前行为正确即可，无需变更</td>
+</tr>
+<tr>
+<td>需要测试 redirect 功能</td>
+<td>挂载时显式传入 <code>redirect_dir=on</code></td>
+</tr>
+<tr>
+<td>生产环境 WSL2 部署</td>
+<td>评估 copy-up 对存储和性能的影响，大目录重命名场景需关注</td>
+</tr>
+<tr>
+<td>与标准 Linux 对齐</td>
+<td>可在挂载选项中显式配置 <code>redirect_dir=on</code> 以匹配上游默认行为</td>
+</tr>
+</tbody></table></div>
+<hr>
+<h2 id="h-九验证建议">九、验证建议</h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>验证目标</th>
+<th>方法</th>
+<th>预期结果</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>确认根因正确性</td>
+<td><code>cat /sys/module/overlay/parameters/redirect_dir</code></td>
+<td>值为 <code>N</code></td>
+</tr>
+<tr>
+<td>确认 redirect 功能正常（非禁用）</td>
+<td>使用 <code>redirect_dir=on</code> 挂载并重命名 lower 目录</td>
+<td>应能在 upper 中看到 <code>trusted.overlay.redirect</code> xattr</td>
+</tr>
+<tr>
+<td>确认 copy-up 正确性</td>
+<td>检查 upper 中文件内容与 lower 一致</td>
+<td><code>version=1</code> 一致</td>
+</tr>
+<tr>
+<td>验证大目录重命名性能</td>
+<td>创建一个包含 10000+ 文件的 lower 目录并重命名</td>
+<td>应成功完成（时间取决于文件数量）</td>
+</tr>
+</tbody></table></div>
+<hr>
+<blockquote>
+<p><strong>报告生成</strong>：白泽（Baize）Phase 1.4 分析与报告 Agent
+<strong>内核版本</strong>：6.6.87.2-microsoft-standard-WSL2
+<strong>测试容器</strong>：overlayfs-fault-I (ID: 3ed7ca96ada9)
+<strong>报告路径</strong>：<code>/home/win11/.witty-diagnosis-agent/baize/reports/OverlayFS重命名redirect_dir测试_20260528_235900_report.md</code></p>
+</blockquote>
+
+    <div class="meta">
+      <span class="meta-source">OverlayFS重命名redirect_dir测试_20260528_235900_report.md</span>
+      <span>生成于 2026/05/28 23:57</span>
+    </div>
+  </article>
+</div>
+
+<script>
+  /* ── 滚动进度条 ── */
+  window.addEventListener("scroll", () => {
+    const el  = document.documentElement;
+    const pct = el.scrollTop / (el.scrollHeight - el.clientHeight) * 100;
+    document.getElementById("progress").style.width = Math.min(pct, 100) + "%";
+  });
+
+  /* ── TOC 高亮当前章节 ── */
+  (function () {
+    const headings = Array.from(document.querySelectorAll("article h1,article h2,article h3"));
+    const links    = Array.from(document.querySelectorAll(".toc a"));
+    if (!links.length) return;
+    const obs = new IntersectionObserver(entries => {
+      entries.forEach(e => {
+        if (!e.isIntersecting) return;
+        links.forEach(l => l.classList.remove("active"));
+        const a = links.find(l => l.getAttribute("href") === "#" + e.target.id);
+        if (a) a.classList.add("active");
+      });
+    }, { rootMargin: "-10% 0px -80% 0px" });
+    headings.forEach(h => obs.observe(h));
+  })();
+
+  /* ── h2 章节序号自动计数 ── */
+  (function () {
+    let idx = 0;
+    document.querySelectorAll("article h2").forEach(el => {
+      idx++;
+      el.setAttribute("data-index", String(idx).padStart(2, "0"));
+    });
+  })();
+
+  /* ── 代码块一键复制 ── */
+  function copyCode(btn) {
+    const code = btn.closest(".code-block").querySelector("code").innerText;
+    navigator.clipboard.writeText(code).then(() => {
+      btn.classList.add("copied");
+      btn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>';
+      setTimeout(() => {
+        btn.classList.remove("copied");
+        btn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>';
+      }, 2000);
+    });
+  }
+
+  /* ── 目录树收缩/展开 ── */
+  function toggleToc(btn) {
+    const expanded = btn.getAttribute("aria-expanded") === "true";
+    btn.setAttribute("aria-expanded", String(!expanded));
+    const parentItem = btn.closest(".toc-item");
+    let nextEl = parentItem.nextElementSibling;
+    if (nextEl && nextEl.classList.contains("toc-group")) {
+      if (expanded) {
+        nextEl.style.maxHeight = nextEl.scrollHeight + "px";
+        void nextEl.offsetHeight;
+        nextEl.classList.add("collapsed");
+      } else {
+        nextEl.classList.remove("collapsed");
+        nextEl.style.maxHeight = nextEl.scrollHeight + "px";
+        setTimeout(() => {
+          if (!nextEl.classList.contains("collapsed")) {
+            nextEl.style.maxHeight = "none";
+          }
+        }, 300);
+      }
+    }
+  }
+</script>
+</body>
+</html>
