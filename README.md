@@ -37,15 +37,15 @@ Witty 智能诊断 Agent 采用“Agent-Skill-工具-知识”四层解耦架构
 - **Skill 层**：将专家排查流程封装为可复用的诊断技能（如 OOM、死锁排查）。
 - **知识底座**：内置 openEuler 专属故障模式与因果规则，持续自我进化。
 
-#### 3. 核心诊断场景
+#### 3. 核心诊断能力
 
 深度结合 openEuler 操作系统特性，目前已支持：
 
-- **内核级诊断**：自动化采集解析 VMCore，精准回溯系统崩溃（Crash/Panic）调用栈。
-- **系统级诊断**：针对磁盘 I/O、网络丢包、内存碎片等资源瓶颈提供多维关联分析。
-- **进程级诊断**：深度诊断进程死锁、僵尸进程及服务超时等逻辑异常。
+- **用户态诊断**：诊断进程 coredump、文件描述符泄漏、系统调用异常、IPC/资源耗尽、Unix Socket/Pipe、容器（Docker）、时间同步与安全认证等进程/服务层逻辑异常。
+- **内核级诊断**：自动解析VMCore，精准回溯内核崩溃（Crash/Panic）调用栈；覆盖 OOM、CPU 调度、文件系统（EXT4/XFS/OverlayFS）、Swap 抖动，以及块设备 IO 与网络协议栈等内核子系统故障。
+- **硬件级诊断**：基于 iBMC 带外日志与 OS 信息采集，定位 CPU/内存/磁盘/GPU/NPU/网卡/电源等部件的物理故障（ECC/MCE、坏道、掉卡、链路不稳、供电异常等），并提供磁盘健康预测与 GRUB 启动链故障诊断。
 
-> 💡 **更多基于 OS 全栈（硬件层 -> 内核层 -> 系统服务层）的诊断能力持续演进中...**
+> 💡 诊断能力详情，请参见[功能列表](docs/reference/features.md)。
 
 ---
 
@@ -104,7 +104,7 @@ bash install.sh
    
    <img src="docs/assets/guide_auto_diag_report.png" alt="诊断报告" width="800" />
 
-如需了解更多操作细节，可查阅[用户手册](docs/guide/MANUAL.md)；支持的诊断能力与功能说明详见[功能列表](docs/reference/features.md)。
+如需了解更多操作细节，可查阅[用户手册](docs/guide/MANUAL.md)。
 
 ---
 
