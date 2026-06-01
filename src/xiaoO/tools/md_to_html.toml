@@ -28,6 +28,6 @@ description = "可选，禁用自动目录"
 
 [exec]
 command = "python3"
-args = [".xiaoo/tools/md_to_html.py"]
+args = ["~/.xiaoo/tools/md_to_html.py"]
 stdin = "json"
 stdout = "text"
