@@ -1,5 +1,5 @@
 import { describe, it, expect } from "bun:test"
-import packageJson from "../../package.json" with { type: "json" }
+import packageJson from "../../../package.json" with { type: "json" }
 
 describe("CLI version", () => {
   it("reads version from package.json as valid semver", () => {
