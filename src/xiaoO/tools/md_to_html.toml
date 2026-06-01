@@ -1,0 +1,33 @@
+name = "md_to_html"
+description = "将 Markdown 转成带目录、代码复制和报告样式增强的独立 HTML 页面"
+timeout_ms = 15000
+
+[input_schema]
+type = "object"
+required = ["input_path"]
+
+[input_schema.properties.input_path]
+type = "string"
+description = "待转换的 Markdown 文件路径，支持相对工作区或绝对路径"
+
+[input_schema.properties.output_path]
+type = "string"
+description = "可选，输出 HTML 文件路径；默认与输入文件同目录同名 .html"
+
+[input_schema.properties.title]
+type = "string"
+description = "可选，自定义 HTML 页面标题"
+
+[input_schema.properties.force_report_mode]
+type = "boolean"
+description = "可选，强制启用报告样式预处理与结构增强"
+
+[input_schema.properties.disable_toc]
+type = "boolean"
+description = "可选，禁用自动目录"
+
+[exec]
+command = "python3"
+args = [".xiaoo/tools/md_to_html.py"]
+stdin = "json"
+stdout = "text"
