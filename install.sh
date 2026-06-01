@@ -61,6 +61,10 @@ replace_xiaoo_witty_config() {
   local fragment_file="${config_file}.witty.tmp"
 
   awk '
+    function is_table_header(line) {
+      return line ~ /^\[[A-Za-z0-9_.-]+\]/
+    }
+
     function is_witty_section(name) {
       return name == "agent.fuxi" ||
         name == "agent.fuxi.tools" ||
@@ -80,26 +84,42 @@ replace_xiaoo_witty_config() {
         name == "subagent.kuafu.tools" ||
         name == "subagent.baize" ||
         name == "subagent.baize.tools"
+    }
+
+    function toggles_multiline(line) {
+      return line ~ /'\'''\'''\''/ || line ~ /"""/
     }
 
     /^# >>> witty-diagnosis-agent xiaoO config >>>$/ { marker_skip = 1; next }
     /^# <<< witty-diagnosis-agent xiaoO config <<<$/{ marker_skip = 0; next }
     marker_skip { next }
 
-    /^\[/ {
+    in_multiline {
+      if (!section_skip) print
+      if (toggles_multiline($0)) in_multiline = 0
+      next
+    }
+
+    is_table_header($0) {
       section = $0
       sub(/^\[/, "", section)
       sub(/\].*$/, "", section)
       section_skip = is_witty_section(section)
     }
 
+    /^\[/ && !is_table_header($0) { next }
     /WittyDiagnosisAgent/ && section_skip == 0 { next }
     /Predefined subagent roles for Xuanyuan delegation/ && section_skip == 0 { next }
 
     !section_skip { print }
+    toggles_multiline($0) { in_multiline = 1 }
   ' "$config_file" > "$tmp_file"
 
   awk '
+    function is_table_header(line) {
+      return line ~ /^\[[A-Za-z0-9_.-]+\]/
+    }
+
     function is_witty_section(name) {
       return name == "agent.fuxi" ||
         name == "agent.fuxi.tools" ||
@@ -121,7 +141,17 @@ replace_xiaoo_witty_config() {
         name == "subagent.baize.tools"
     }
 
-    /^\[/ {
+    function toggles_multiline(line) {
+      return line ~ /'\'''\'''\''/ || line ~ /"""/
+    }
+
+    in_multiline {
+      if (section_keep) print
+      if (toggles_multiline($0)) in_multiline = 0
+      next
+    }
+
+    is_table_header($0) {
       section = $0
       sub(/^\[/, "", section)
       sub(/\].*$/, "", section)
@@ -129,6 +159,7 @@ replace_xiaoo_witty_config() {
     }
 
     section_keep || /WittyDiagnosisAgent/ || /Predefined subagent roles for Xuanyuan delegation/ { print }
+    toggles_multiline($0) { in_multiline = 1 }
   ' "$source_config" > "$fragment_file"
 
   {
