@@ -1,11 +1,10 @@
-# kernel-io-uring-diagnosis Test Suite
+# kernel-io-uring-diagnosis 测试套件
 
-This directory contains reproducible test materials for the
-`kernel-io-uring-diagnosis` skill. The tests are intended for Linux/openEuler
-test hosts. Fault injection changes process limits, creates temporary files, and
-starts short-lived test programs only inside the selected test directory.
+本目录提供 `kernel-io-uring-diagnosis` skill 的可复现测试材料，用于在 Linux/openEuler
+测试主机上验证 io_uring 诊断分支。测试会调整子 shell 的进程资源限制、创建临时文件、
+启动短生命周期测试程序；所有产物默认位于本目录的 `out/` 下。
 
-## Layout
+## 目录结构
 
 ```text
 test/kernel-io-uring-diagnosis/
@@ -19,68 +18,63 @@ test/kernel-io-uring-diagnosis/
     └── sample_report.md
 ```
 
-## Prerequisites
+## 前置条件
 
-- Linux kernel with io_uring support.
-- `gcc`.
-- Standard Linux headers providing `linux/io_uring.h`.
-- Optional: `strace` for syscall evidence.
+- Linux 内核支持 io_uring。
+- 已安装 `gcc`。
+- 系统头文件包含 `linux/io_uring.h`。
+- 可选：安装 `strace`，用于补充 syscall 证据。
 
-No liburing dependency is required. The probe uses raw syscalls and standard
-Linux headers.
+测试程序直接使用 raw syscall，不依赖 liburing。
 
-## Supported Scenarios
+## 覆盖场景
 
-| Scenario | Command | Expected signal |
+| 场景 | 命令 | 预期信号 |
 | --- | --- | --- |
-| baseline probe | `./run.sh run baseline` | successful setup when kernel supports io_uring |
-| memlock/fixed buffer | `./run.sh run memlock` | low `ulimit -l` plus fixed-buffer registration evidence |
-| ring pressure | `./run.sh run ring` | queue depth and repeated submit/enter activity |
-| SQPOLL | `./run.sh run sqpoll` | setup success/failure and errno for SQPOLL mode |
-| O_DIRECT alignment | `./run.sh run odirect` | unaligned O_DIRECT write returns `EINVAL` on supporting filesystems |
-| feature compatibility | `./run.sh run compat` | kernel/header/probe evidence for compatibility classification |
+| 基线探测 | `./run.sh run baseline` | 内核支持 io_uring 时 setup 成功 |
+| memlock/fixed buffer | `./run.sh run memlock` | 低 `ulimit -l` 与 fixed buffer 注册失败证据 |
+| ring 压力 | `./run.sh run ring` | queue depth 和 enter/submit 相关证据 |
+| SQPOLL | `./run.sh run sqpoll` | SQPOLL setup 成功或返回 errno |
+| O_DIRECT 对齐 | `./run.sh run odirect` | 支持 Direct I/O 的文件系统上未对齐写入返回 `EINVAL` |
+| feature 兼容 | `./run.sh run compat` | 内核、header 和 probe 证据 |
 
-## Workflow
+## 使用流程
 
 ```bash
 cd test/kernel-io-uring-diagnosis
 
-# Build the raw-syscall probe.
+# 构建 raw syscall 测试程序
 ./run.sh build
 
-# Run one scenario and save logs.
+# 运行一个场景并保存日志
 ./run.sh run memlock
 
-# Inspect generated logs.
+# 查看生成的日志
 ./run.sh status
 
-# Run skill branch scripts against the collected log.
+# 使用 skill 分支脚本分析采集日志
 ../../skills/kernel-io-uring-diagnosis/scripts/diagnose_io_uring_limits.sh \
   -l ./out/memlock.log
 ../../skills/kernel-io-uring-diagnosis/scripts/diagnose_io_uring_compat.sh \
   -l ./out/memlock.log
 
-# Clean generated artifacts.
+# 清理测试产物
 ./run.sh clean
 ```
 
-## Safety
+## 安全边界
 
-- The probe creates temporary files under `test/kernel-io-uring-diagnosis/out/`.
-- The `memlock` scenario runs the probe under a low `ulimit -l` in a child shell.
-- The `odirect` scenario writes to a temporary file and removes it during clean.
-- No system configuration, sysctl, service, or cgroup setting is modified.
+- 测试程序只在 `test/kernel-io-uring-diagnosis/out/` 下生成产物。
+- `memlock` 场景只在子 shell 中降低 `ulimit -l`。
+- `odirect` 场景写入临时文件，清理流程会删除测试产物。
+- 测试不修改 sysctl、systemd、cgroup 或系统服务配置。
 
-## Expected Diagnosis Mapping
+## 预期诊断映射
 
-- `memlock`: the skill should classify the case as `resource-limit` when fixed
-  buffer registration fails and the log shows a finite locked-memory limit.
-- `ring`: the skill should identify ring capacity/completion-flow evidence and
-  request queue depth and consumer evidence if the probe does not reproduce
-  actual CQ overflow.
-- `sqpoll`: the skill should classify as `worker-or-sqpoll` or
-  `compat-or-permission` depending on the setup errno.
-- `odirect`: the skill should classify `EINVAL` with O_DIRECT as a direct-I/O
-  alignment candidate and request buffer address/length/offset evidence.
-- `compat`: the skill should avoid high-confidence compatibility conclusions
-  unless runtime syscall errno and feature arguments are present.
+- `memlock`：fixed buffer 注册失败且日志包含有限 locked-memory limit 时，skill 应分类为资源限制。
+- `ring`：skill 应识别 ring 容量和完成事件流相关证据；若 probe 未复现真实 CQ overflow，
+  应要求补充 queue depth 和消费线程证据。
+- `sqpoll`：根据 setup errno 和线程状态，分类为 worker/SQPOLL 或兼容性/权限问题。
+- `odirect`：`O_DIRECT` 场景出现 `EINVAL` 时，应分类为 Direct I/O 对齐候选，并要求补充
+  buffer 地址、长度和 offset 证据。
+- `compat`：只有 runtime syscall errno 和 feature 参数完整时，才能给出高置信度兼容性结论。

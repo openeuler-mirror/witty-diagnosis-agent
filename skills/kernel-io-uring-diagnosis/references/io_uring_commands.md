@@ -1,10 +1,9 @@
-# io_uring Diagnosis Command Reference
+# io_uring 诊断命令参考
 
-All commands in this reference are intended for diagnosis. Commands that trace a
-live process can affect performance; get approval before using them in
-production.
+本文件记录常用诊断命令。所有命令默认用于信息采集；对在线进程执行 strace、perf、
+ftrace 或 bpftrace 前，需要说明性能影响并取得确认。
 
-## Baseline
+## 基线信息
 
 ```bash
 uname -a
@@ -14,7 +13,7 @@ cat /proc/meminfo
 cat /proc/sys/kernel/osrelease
 ```
 
-## Process State
+## 进程状态
 
 ```bash
 cat /proc/<pid>/status
@@ -24,22 +23,22 @@ ls -la /proc/<pid>/fd | head -100
 ps -L -p <pid> -o pid,tid,psr,stat,pcpu,comm,wchan:32
 ```
 
-## io_uring Syscall Trace
+## io_uring syscall 轨迹
 
 ```bash
 strace -f -tt -T -e trace=io_uring_setup,io_uring_enter,io_uring_register -p <pid>
 strace -f -e trace=%desc,%file,io_uring_setup,io_uring_enter,io_uring_register <command>
 ```
 
-Fields to record:
+需要记录的字段：
 
-- syscall name and errno
-- setup entries and flags
-- register opcode
-- elapsed time (`-T`)
-- thread ID and timestamp
+- syscall 名称和 errno。
+- setup entries 和 flags。
+- register opcode。
+- 调用耗时（`-T`）。
+- 线程 ID 和时间戳。
 
-## Worker and SQPOLL Threads
+## Worker 与 SQPOLL 线程
 
 ```bash
 ps -eLf | grep -E 'iou-wrk|iou-sqp|io_uring|<process-name>'
@@ -50,13 +49,13 @@ for t in /proc/<pid>/task/*; do
 done
 ```
 
-If root permissions are available, kernel stacks may help:
+有 root 权限时，可补充内核栈：
 
 ```bash
 cat /proc/<pid>/task/<tid>/stack
 ```
 
-## Logs
+## 日志
 
 ```bash
 dmesg -T | grep -Ei 'io_uring|uring|iou-wrk|iou-sqp|direct I/O|O_DIRECT|EINVAL|ENOMEM|EAGAIN'
@@ -64,7 +63,7 @@ journalctl -k --since '2026-06-02 10:00:00' --until '2026-06-02 10:30:00' \
   | grep -Ei 'io_uring|uring|direct I/O|O_DIRECT|ENOMEM|EINVAL|EAGAIN'
 ```
 
-## O_DIRECT Alignment
+## O_DIRECT 对齐
 
 ```bash
 stat -fc 'fs_type=%T block_size=%s' <mount-point>
@@ -73,20 +72,20 @@ blockdev --getpbsz /dev/<device>
 findmnt -T <file>
 ```
 
-Application evidence to request:
+需要向应用侧补充确认：
 
-- buffer address
-- I/O length
-- file offset
-- file open flags
-- filesystem and backing block device
+- buffer 地址。
+- I/O 长度。
+- 文件 offset。
+- 文件打开 flags。
+- 文件系统和后端块设备。
 
-## Compatibility Probe
+## 兼容性探测
 
 ```bash
 grep -R "IORING_OP_" /usr/include/linux/io_uring.h 2>/dev/null | tail
 grep -R "IORING_FEAT_" /usr/include/linux/io_uring.h 2>/dev/null
 ```
 
-Header presence is not proof of runtime support. Prefer a small runtime probe
-or application strace evidence when possible.
+header 中存在符号不代表运行内核支持对应 feature。优先使用小型 runtime probe 或应用
+strace 证据确认。

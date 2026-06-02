@@ -1,65 +1,62 @@
-# io_uring Diagnosis Report Template
+# io_uring 诊断报告模板
 
-## Summary
+## 故障概要
 
-- Case ID:
-- Host:
-- Kernel:
-- Process/PID:
-- Failure window:
-- Classification:
-- Confidence:
+- 案例编号：
+- 主机：
+- 内核版本：
+- 目标进程/PID：
+- 故障时间窗口：
+- 故障分类：
+- 置信度：
 
-## User-visible Symptom
+## 用户可见现象
 
-Describe the application error, timeout, throughput drop, missing completion, or
-syscall errno observed by the user.
+描述应用侧错误、超时、吞吐下降、完成事件丢失、短 I/O 或 syscall errno。
 
-## Evidence
+## 证据链
 
-| Evidence | Source | Interpretation |
+| 证据 | 来源 | 解释 |
 | --- | --- | --- |
 |  |  |  |
 
-## Root Cause Analysis
+## 根因分析
 
-State the most likely root cause and explain which io_uring stage is involved:
-setup, submit, complete, register, worker execution, SQPOLL, direct I/O, or
-kernel compatibility.
+说明最可能的根因，并明确异常发生在 io_uring 的哪个阶段：
+setup、submit、complete、register、worker、SQPOLL、Direct I/O 或内核兼容性。
 
-## Excluded Causes
-
--
--
-
-## Risk and Impact
-
-- Affected workload:
-- Failure mode:
-- Data integrity risk:
-- Performance risk:
-
-## Recommendations
-
-Read-only recommendations:
+## 排除的替代假设
 
 -
+-
 
-Actions that require explicit approval:
+## 风险与影响
+
+- 受影响 workload：
+- 故障模式：
+- 数据一致性风险：
+- 性能风险：
+
+## 修复建议
+
+只读建议：
 
 -
 
-## Missing Evidence
+需要明确审批的操作：
 
 -
 
-## Commands Run
+## 缺失证据
+
+-
+
+## 已执行命令
 
 ```bash
 
 ```
 
-## Cleanup
+## 清理结果
 
-No cleanup is required for read-only diagnosis. If fault injection was used,
-record the exact cleanup command and result here.
+只读诊断不需要清理。若使用故障注入，应记录准确的清理命令和执行结果。

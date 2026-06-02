@@ -1,11 +1,11 @@
-# io_uring Kernel Feature Notes
+# io_uring 内核 Feature 参考
 
-io_uring support is kernel-version sensitive and often affected by distribution
-backports. Use these notes as a triage aid, not as the only proof of support.
+io_uring 能力与内核版本、发行版 backport 和运行时 probe 强相关。本文件只作为分诊辅助，
+不能替代运行证据。
 
-## Version and Runtime Checks
+## 版本与运行时检查
 
-Always collect:
+始终采集：
 
 ```bash
 uname -r
@@ -14,41 +14,38 @@ cat /etc/os-release
 grep -R "IORING_FEAT_" /usr/include/linux/io_uring.h 2>/dev/null
 ```
 
-Prefer runtime evidence:
+优先使用运行时证据：
 
-- `io_uring_setup` return value and `features` field when available.
-- `io_uring_register` opcode and errno.
-- application feature probe output.
-- strace around setup/register failures.
+- `io_uring_setup` 返回值和可用时的 `features` 字段。
+- `io_uring_register` opcode 和 errno。
+- 应用 feature probe 输出。
+- setup/register 失败附近的 strace 记录。
 
-## Common Compatibility Signals
+## 常见兼容性信号
 
-| Signal | Interpretation | Next check |
+| 信号 | 含义 | 下一步检查 |
 | --- | --- | --- |
-| `ENOSYS` on `io_uring_setup` | syscall is unavailable | confirm kernel config/version |
-| `EINVAL` on setup | invalid entries, flags, or unsupported flag combination | decode setup flags and entries |
-| `EINVAL` on register | unsupported register opcode or invalid argument | identify opcode and kernel support |
-| app built with newer headers | compile-time symbols may exceed runtime kernel | run feature probe on target host |
-| works on newer distro, fails on older openEuler kernel | feature/backport difference | compare runtime kernel and app required features |
+| `io_uring_setup` 返回 `ENOSYS` | syscall 不可用 | 确认内核配置和版本 |
+| setup 返回 `EINVAL` | entries、flags 或 flag 组合非法/不支持 | 解码 setup flags 和 entries |
+| register 返回 `EINVAL` | register opcode 不支持或参数非法 | 确认 opcode 和参数大小 |
+| 应用使用新 header 编译 | 编译期符号可能超出运行内核能力 | 在目标主机运行 feature probe |
+| 新发行版成功、旧 openEuler 内核失败 | feature 或 backport 差异 | 对比运行内核和应用依赖 feature |
 
-## Feature Categories to Identify
+## 需要识别的 feature 类型
 
-- Setup flags: `IORING_SETUP_SQPOLL`, `IORING_SETUP_IOPOLL`,
-  `IORING_SETUP_CLAMP`, `IORING_SETUP_ATTACH_WQ`, `IORING_SETUP_COOP_TASKRUN`,
-  `IORING_SETUP_SINGLE_ISSUER`.
-- Register operations: buffers, files, eventfd, restrictions, personality,
-  ring fd, provided buffers.
-- Operation codes: read/write, timeout, poll, fsync, accept/connect, send/recv,
-  splice, openat/statx, cancel, cmd passthrough.
-- Feature bits returned by setup: single mmap, nodrop, submit stable, rw cur pos,
-  fast poll, poll 32bits, sqpoll nonfixed, ext arg, native workers, rsrc tags.
+- Setup flags：`IORING_SETUP_SQPOLL`、`IORING_SETUP_IOPOLL`、
+  `IORING_SETUP_CLAMP`、`IORING_SETUP_ATTACH_WQ`、`IORING_SETUP_COOP_TASKRUN`、
+  `IORING_SETUP_SINGLE_ISSUER`。
+- Register 操作：buffers、files、eventfd、restrictions、personality、ring fd、
+  provided buffers。
+- Operation codes：read/write、timeout、poll、fsync、accept/connect、send/recv、
+  splice、openat/statx、cancel、cmd passthrough。
+- Setup 返回 feature bits：single mmap、nodrop、submit stable、rw cur pos、fast poll、
+  poll 32bits、sqpoll nonfixed、ext arg、native workers、rsrc tags。
 
-## Diagnosis Rules
+## 诊断规则
 
-- Do not assume a feature is supported because the header defines it.
-- Do not assume a failure is compatibility-related until invalid arguments and
-  resource limits are checked.
-- If evidence only shows `EINVAL`, classify as `compat-or-invalid-argument`
-  until setup/register arguments are decoded.
-- For community PR reports, state exact kernel version and the collected runtime
-  evidence instead of broad claims such as "old kernel does not support it".
+- 不要因为 header 定义了某个 feature 就判定运行内核支持。
+- 不要在未检查参数和资源限制前，把 `EINVAL` 直接归因到兼容性。
+- 只有泛化 `EINVAL` 证据时，先分类为“兼容性或参数错误”，等待 setup/register 参数补齐。
+- 社区 PR 报告中应写精确内核版本和已采集的运行证据，不写“旧内核不支持”这类泛化结论。
