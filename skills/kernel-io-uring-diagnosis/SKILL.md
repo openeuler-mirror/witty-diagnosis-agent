@@ -7,23 +7,6 @@ description: >
   O_DIRECT EINVAL、或高版本 io_uring feature 在旧内核不可用时，必须使用本技能。
   覆盖场景：资源限制、ring 容量、worker/SQPOLL、fixed buffer、O_DIRECT 对齐、
   内核兼容性和待补证据分支。
-version: 1.0.0
-category: analysis
-author: duanzhoutao
-created: 2026-06-02
-updated: 2026-06-03
-tags:
-  - linux-kernel
-  - io-uring
-  - async-io
-  - system-call
-  - openEuler
-scripts:
-  - scripts/collect_io_uring_context.sh
-  - scripts/diagnose_io_uring_limits.sh
-  - scripts/diagnose_io_uring_rings.sh
-  - scripts/diagnose_io_uring_workers.sh
-  - scripts/diagnose_io_uring_compat.sh
 ---
 
 # io_uring 异步 I/O 故障深度诊断（双轨：运行证据 + 内核语义）
