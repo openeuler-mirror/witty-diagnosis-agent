@@ -29,7 +29,8 @@
   "files": [
     "dist",
     "postinstall.mjs",
-    "skills"
+    "skills",
+    "src/xiaoO"
   ],
   "scripts": {
     "build": "tsup && npm run build:schema",

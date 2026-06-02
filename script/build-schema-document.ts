@@ -1,5 +1,5 @@
 import * as z from "zod"
-import { WittyDiagnosisAgentConfigSchema } from "../src/config/schema"
+import { WittyDiagnosisAgentConfigSchema } from "../src/opencode/config/schema"
 
 export function createWittyDiagnosisAgentJsonSchema(): Record<string, unknown> {
   const jsonSchema = z.toJSONSchema(WittyDiagnosisAgentConfigSchema, {
