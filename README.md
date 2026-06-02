@@ -54,7 +54,7 @@ Witty 智能诊断 Agent 采用“Agent-Skill-工具-知识”四层解耦架构
 #### 环境要求
 
 - 运行环境：Node.js (>=20.0.0)
-- 依赖工具：已安装[OpenCode](https://opencode.ai/)
+- 依赖工具：已安装[OpenCode](https://opencode.ai/)或[xiaoO](https://gitcode.com/openeuler/xiaoO/)
 - 依赖工具：已安装 [Ansible](https://docs.ansible.com/ansible/latest/installation_guide/)（`ansible` 命令须在系统 PATH 中可用，可通过 `ansible --version` 提前验证）
 
 > ⚠️ **注意**：执行 `witty-diagnosis-agent install` 前，请确保本地已完成 Ansible 的安装与环境配置，否则安装程序将直接终止。
@@ -83,6 +83,7 @@ bash install.sh
 ---
 
 ### 如何使用
+#### 基于opencode框架启动
 
 1. 启动 \*\*OpenCode \*\*。
 
@@ -105,6 +106,28 @@ bash install.sh
    <img src="docs/assets/guide_auto_diag_report.png" alt="诊断报告" width="800" />
 
 如需了解更多操作细节，可查阅[用户手册](docs/guide/MANUAL.md)。
+
+#### 基于xiaoO框架启动
+1. 启动 \*\*xiaoO \*\*。
+
+2. 使用`tab`键，切换`Xuanyuan`Agent。
+   
+   ![选择Xuanyuan Agent](docs/assets/xiaoO_select_xuanyuan.png)
+
+3. 输入故障问题描述，示例：
+   
+   ```shell
+   请诊断2026-03-05 14:31前最近一次硬盘故障，日志路径：/tmp/logs
+   ```
+   
+   <img src="docs/assets/xiaoO_guide_auto_diag_start.png" alt="wittywork命令" width="800" />
+
+4. 系统将自动执行**智能诊断**流程。
+
+5. 诊断完成后，系统将生成[HTML](docs/reference/reports/hard_disk_fault_diagnosis_report.html)和[Markdown](docs/reference/reports/hard_disk_fault_diagnosis_report.md)两种格式的诊断分析报告，同时在界面上展示完整报告内容：
+   
+   <img src="docs/assets/xiaoO_guide_auto_diag_report.png" alt="诊断报告" width="800" />
+
 
 ---
 
