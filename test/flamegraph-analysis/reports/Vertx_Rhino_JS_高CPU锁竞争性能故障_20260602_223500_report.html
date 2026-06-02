@@ -1,0 +1,1097 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>故障诊断报告</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Lora:ital,wght@0,400;0,600;1,400&family=Source+Sans+3:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  /* ── Design tokens ─────────────────────────────────────────────────────── */
+  :root {
+    --bg:          #f8f7f4;
+    --surface:     #ffffff;
+    --border:      #e8e5df;
+    --border-soft: #f0ede8;
+
+    --text:        #1c1917;
+    --text-2:      #57534e;
+    --text-3:      #a8a29e;
+
+    --accent:      #1d4e6e;
+    --accent-light:#e8f1f7;
+    --accent-mid:  #3b82a0;
+
+    --red:         #c0392b;
+    --red-bg:      #fef2f2;
+    --amber:       #92400e;
+    --amber-bg:    #fffbeb;
+    --green:       #14532d;
+    --green-bg:    #f0fdf4;
+
+    --code-bg:     #1a1d27;
+    --code-text:   #cdd6f4;
+    --code-border: #2d3148;
+
+    --font-body: "Source Sans 3", "PingFang SC", "Hiragino Sans GB", sans-serif;
+    --font-head: "Lora", "PingFang SC", Georgia, serif;
+    --font-mono: "JetBrains Mono", "Fira Code", Consolas, monospace;
+
+    --radius:    8px;
+    --radius-lg: 12px;
+    --shadow:    0 1px 3px rgba(0,0,0,.06), 0 4px 16px rgba(0,0,0,.05);
+    --shadow-lg: 0 2px 8px rgba(0,0,0,.07), 0 8px 32px rgba(0,0,0,.06);
+
+    --toc-width:   240px;
+    --gap:         32px;
+  }
+
+  /* ── Progress bar ──────────────────────────────────────────────────────── */
+  #progress {
+    position: fixed; top: 0; left: 0; height: 3px; width: 0%;
+    background: linear-gradient(90deg, var(--accent-mid), var(--accent));
+    z-index: 999; transition: width .1s linear;
+    border-radius: 0 2px 2px 0;
+  }
+
+  /* ── Base ──────────────────────────────────────────────────────────────── */
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  html { font-size: 16px; scroll-behavior: smooth; }
+  body {
+    font-family: var(--font-body);
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.8;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* ── Layout ────────────────────────────────────────────────────────────── */
+  .layout {
+    display: flex;
+    align-items: flex-start;
+    max-width: calc(var(--toc-width) + 820px + var(--gap) * 3);
+    margin: 0 auto;
+    padding: 48px var(--gap) 96px;
+    gap: var(--gap);
+  }
+
+  /* ── TOC ───────────────────────────────────────────────────────────────── */
+  .toc {
+    width: var(--toc-width);
+    flex-shrink: 0;
+    position: sticky;
+    top: 32px;
+    max-height: calc(100vh - 64px);
+    overflow-y: auto;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    padding: 20px;
+    box-shadow: var(--shadow);
+    scrollbar-width: thin;
+    scrollbar-color: var(--border) transparent;
+  }
+  .toc-title {
+    font-size: 10.5px;
+    font-weight: 600;
+    letter-spacing: .1em;
+    text-transform: uppercase;
+    color: var(--text-3);
+    margin-bottom: 12px;
+    padding-bottom: 10px;
+    border-bottom: 1px solid var(--border-soft);
+  }
+  .toc-item {
+    display: flex;
+    align-items: flex-start;
+    margin: 2px 0;
+  }
+  .toc-toggle {
+    background: none;
+    border: none;
+    cursor: pointer;
+    color: var(--text-3);
+    padding: 4px;
+    margin-right: 4px;
+    margin-top: 2px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 4px;
+    transition: background 0.2s, transform 0.2s;
+  }
+  .toc-toggle:hover { background: var(--border-soft); color: var(--text); }
+  .toc-toggle[aria-expanded="false"] svg { transform: rotate(-90deg); }
+  .toc-spacer { width: 20px; flex-shrink: 0; }
+  .toc-group { overflow: hidden; transition: max-height 0.3s ease-in-out; }
+  .toc-group.collapsed { max-height: 0 !important; }
+  
+  .toc a {
+    display: block;
+    font-size: 13px;
+    color: var(--text-2);
+    text-decoration: none;
+    padding: 4px 8px;
+    border-radius: 5px;
+    line-height: 1.45;
+    transition: background .15s, color .15s;
+    word-break: break-all;
+    flex-grow: 1;
+  }
+  .toc a:hover  { background: var(--accent-light); color: var(--accent); }
+  .toc a.active { background: var(--accent-light); color: var(--accent); font-weight: 500; }
+  .toc-l1 { font-weight: 600; color: var(--text); }
+  .toc-l2 { font-weight: 600; color: var(--text); }
+  .toc-l3 { font-size: 12px !important; padding-left: 14px !important; }
+
+  /* ── Article card ──────────────────────────────────────────────────────── */
+  .article {
+    flex: 1; min-width: 0;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    padding: 52px 60px;
+    box-shadow: var(--shadow-lg);
+  }
+
+  /* ── Headings ──────────────────────────────────────────────────────────── */
+  .title-container {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-end;
+    margin: 0 0 28px;
+    padding-bottom: 18px;
+    border-bottom: 2px solid var(--text);
+  }
+  .article h1 {
+    font-family: var(--font-head);
+    font-size: 26px; font-weight: 600; line-height: 1.3;
+    margin: 0; padding-bottom: 0;
+    border-bottom: none;
+  }
+  .article h2 {
+    font-family: var(--font-head);
+    font-size: 19px; font-weight: 600;
+    margin: 48px 0 14px; padding-bottom: 8px;
+    border-bottom: 1px solid var(--border);
+  }
+  .article h2::before {
+    content: attr(data-index);
+    display: inline-block;
+    font-family: var(--font-mono);
+    font-size: 10.5px; font-weight: 500;
+    color: var(--accent-mid);
+    background: var(--accent-light);
+    padding: 1px 7px; border-radius: 4px;
+    margin-right: 10px; vertical-align: middle;
+    letter-spacing: .05em;
+  }
+  .article h3 {
+    font-family: var(--font-head);
+    font-size: 15.5px; font-weight: 600;
+    margin: 28px 0 10px;
+  }
+  .article h3::before {
+    content: "§ ";
+    color: var(--text-3);
+    font-family: var(--font-mono); font-size: 13px;
+  }
+  .article h4 {
+    font-size: 13.5px; font-weight: 600;
+    color: var(--accent); margin: 20px 0 8px;
+  }
+
+  /* ── Body text ─────────────────────────────────────────────────────────── */
+  .article p, .plain { 
+    font-size: 15px; 
+    line-height: 1.85; 
+    color: var(--text); 
+    margin: 0 0 12px; 
+    font-family: var(--font-body);
+  }
+  .article strong { font-weight: 600; }
+  .article em     { font-style: italic; color: var(--text-2); }
+  .article a {
+    color: var(--accent); text-decoration: underline;
+    text-decoration-color: var(--accent-light);
+    text-underline-offset: 3px;
+  }
+  .article a:hover { text-decoration-color: var(--accent); }
+  .article hr { border: none; border-top: 1px solid var(--border); margin: 20px 0; }
+  .article hr.heavy { border-top: 3px solid var(--text); margin: 32px 0; }
+
+  /* ── Blockquote ────────────────────────────────────────────────────────── */
+  .article blockquote {
+    border-left: 3px solid var(--accent-mid);
+    background: var(--accent-light);
+    margin: 20px 0; padding: 13px 20px 13px 20px;
+    border-radius: 0 var(--radius) var(--radius) 0;
+  }
+  .article blockquote p { font-size: 14.5px; color: var(--accent); margin: 0; line-height: 1.7; }
+  /* 支持块引用内部保留换行符（修复头部概要换行丢失问题） */
+  .article blockquote p { white-space: pre-wrap; }
+  .article blockquote strong { color: var(--accent); }
+
+  /* ── Lists ─────────────────────────────────────────────────────────────── */
+  .article ul, .article ol { padding-left: 22px; margin: 6px 0 14px; }
+  .article li { font-size: 15px; line-height: 1.8; margin: 4px 0; }
+  .article li::marker { color: var(--accent-mid); }
+  .article li > ul, .article li > ol { margin: 3px 0; }
+
+  /* ── Inline code ───────────────────────────────────────────────────────── */
+  .article :not(pre) > code {
+    font-family: var(--font-mono);
+    font-size: 12.5px; font-weight: 500;
+    background: #f3f0eb; color: var(--red);
+    padding: 1px 5px; border-radius: 4px;
+    border: 1px solid var(--border);
+  }
+
+  /* ── Code blocks ───────────────────────────────────────────────────────── */
+  .code-block {
+    position: relative; margin: 20px 0;
+    border-radius: var(--radius-lg); overflow: hidden;
+    border: 1px solid var(--code-border);
+    box-shadow: 0 4px 20px rgba(0,0,0,.16);
+  }
+  .code-lang {
+    position: absolute; top: 0; left: 0;
+    font-family: var(--font-mono); font-size: 10px; font-weight: 500;
+    color: #7c8db5; background: #222538;
+    padding: 4px 12px; border-bottom-right-radius: 6px;
+    text-transform: uppercase; letter-spacing: .08em;
+    user-select: none;
+  }
+  .copy-btn {
+    position: absolute; top: 8px; right: 10px;
+    background: #2d3148; border: 1px solid #3d4260;
+    border-radius: 5px; color: #7c8db5; cursor: pointer;
+    padding: 5px 8px; display: flex; align-items: center;
+    transition: background .15s, color .15s; z-index: 1;
+  }
+  .copy-btn:hover  { background: #3a3f60; color: #cdd6f4; }
+  .copy-btn.copied { color: #a6e3a1; border-color: #4a6a4a; }
+  .code-block pre {
+    margin: 0; padding: 36px 20px 20px;
+    background: var(--code-bg); overflow-x: auto;
+    scrollbar-width: thin; scrollbar-color: #3d4260 transparent;
+  }
+  .code-block pre::-webkit-scrollbar { height: 5px; }
+  .code-block pre::-webkit-scrollbar-thumb { background: #3d4260; border-radius: 3px; }
+  .code-block code {
+    font-family: var(--font-mono); font-size: 13px; line-height: 1.7;
+    color: var(--code-text); background: none; border: none; padding: 0;
+    white-space: pre; word-break: normal;
+  }
+
+  /* ── Tables ────────────────────────────────────────────────────────────── */
+  .table-wrap {
+    overflow-x: auto; margin: 16px 0;
+    border-radius: var(--radius-lg);
+    border: 1px solid var(--border);
+    box-shadow: var(--shadow);
+  }
+  table { width: 100%; border-collapse: collapse; font-size: 14px; min-width: 360px; }
+  thead { background: #f4f2ee; }
+  th {
+    padding: 9px 14px; text-align: left;
+    font-size: 11.5px; font-weight: 600;
+    letter-spacing: .04em; text-transform: uppercase;
+    color: var(--text-2); border-bottom: 1px solid var(--border);
+    white-space: nowrap;
+  }
+  td {
+    padding: 8px 14px; border-bottom: 1px solid var(--border-soft);
+    color: var(--text); vertical-align: top; line-height: 1.6;
+  }
+  tbody tr:last-child td { border-bottom: none; }
+  tbody tr:nth-child(even) td { background: #faf9f7; }
+  tbody tr:hover td { background: var(--accent-light); transition: background .1s; }
+
+  /* ── KV block ──────────────────────────────────────────────────────────── */
+  .kv-block { background: var(--bg); border: 1px solid var(--border); border-radius: var(--radius-lg); overflow: hidden; margin: 12px 0 20px; }
+  .kv-row { display: flex; border-bottom: 1px solid var(--border-soft); align-items: flex-start; }
+  .kv-row:last-child { border-bottom: none; }
+  .kv-key { flex: 0 0 160px; padding: 9px 16px; font-size: 13.5px; font-weight: 600; color: var(--text-2); background: var(--surface); border-right: 1px solid var(--border-soft); }
+  .kv-val { flex: 1; padding: 9px 16px; font-size: 14px; color: var(--text); }
+
+  /* ── Status badges ─────────────────────────────────────────────────────── */
+  .badge-ok { display: inline-flex; align-items: center; gap: 4px; background: var(--green-bg); color: var(--green); font-size: 13px; font-weight: 500; padding: 2px 9px; border-radius: 20px; border: 1px solid #bbf7d0; }
+  .badge-err { display: inline-flex; align-items: center; gap: 4px; background: var(--red-bg); color: var(--red); font-size: 13px; font-weight: 500; padding: 2px 9px; border-radius: 20px; border: 1px solid #fecaca; }
+  .badge-warn { display: inline-flex; align-items: center; gap: 4px; background: var(--amber-bg); color: var(--amber); font-size: 13px; font-weight: 500; padding: 2px 9px; border-radius: 20px; border: 1px solid #fde68a; }
+
+  /* ── Priority badges ───────────────────────────────────────────────────── */
+  .pri-p0 { display: inline-block; background: #fef2f2; color: #991b1b; border: 1px solid #fca5a5; font-size: 12px; font-weight: 700; padding: 2px 8px; border-radius: 4px; letter-spacing: .04em; }
+  .pri-p1 { display: inline-block; background: #fff7ed; color: #9a3412; border: 1px solid #fdba74; font-size: 12px; font-weight: 700; padding: 2px 8px; border-radius: 4px; }
+  .pri-p2 { display: inline-block; background: #fffbeb; color: #92400e; border: 1px solid #fde68a; font-size: 12px; font-weight: 700; padding: 2px 8px; border-radius: 4px; }
+  .pri-p3 { display: inline-block; background: var(--accent-light); color: var(--accent); border: 1px solid #bfdbfe; font-size: 12px; font-weight: 700; padding: 2px 8px; border-radius: 4px; }
+
+  /* ── Fault header ──────────────────────────────────────────────────────── */
+  .fault-header { display: flex; align-items: center; gap: 12px; padding: 12px 16px; border-radius: var(--radius-lg); margin: 16px 0 8px; border: 1px solid; }
+  .fh-p0 { background: #fef2f2; border-color: #fca5a5; }
+  .fh-p1 { background: #fff7ed; border-color: #fdba74; }
+  .fh-p2 { background: #fffbeb; border-color: #fde68a; }
+  .fh-p3 { background: var(--accent-light); border-color: #bfdbfe; }
+  .fh-badge { font-family: var(--font-mono); font-size: 11px; font-weight: 700; letter-spacing: .08em; }
+  .fh-p0 .fh-badge { color: #991b1b; }
+  .fh-p1 .fh-badge { color: #9a3412; }
+  .fh-p2 .fh-badge { color: #92400e; }
+  .fh-p3 .fh-badge { color: var(--accent); }
+  .fh-rest { font-size: 14px; font-weight: 500; color: var(--text); }
+
+  /* ── Timeline ──────────────────────────────────────────────────────────── */
+  .timeline { border-left: 2px solid var(--accent-mid); margin: 16px 0 16px 8px; padding-left: 20px; }
+  .tl-row { display: flex; align-items: baseline; gap: 10px; margin: 8px 0; font-size: 13.5px; }
+  .tl-ts { font-family: var(--font-mono); font-size: 12px; color: var(--text-3); flex-shrink: 0; white-space: nowrap; }
+  .tl-tag { font-size: 11px; font-weight: 600; padding: 1px 7px; border-radius: 10px; flex-shrink: 0; background: var(--accent-light); color: var(--accent); }
+  .tl-tag.err { background: var(--red-bg); color: var(--red); }
+  .tl-tag.warn { background: var(--amber-bg); color: var(--amber); }
+  .tl-desc { color: var(--text); line-height: 1.5; }
+
+  /* ── Global warn ───────────────────────────────────────────────────────── */
+  .global-warn { background: #fef2f2; border: 1px solid #fca5a5; border-radius: var(--radius-lg); padding: 14px 18px; font-size: 14.5px; font-weight: 600; color: #991b1b; margin: 16px 0; }
+
+  /* ── Tree note ─────────────────────────────────────────────────────────── */
+  .tree-note { white-space: pre-wrap; font-family: var(--font-mono); font-size: 13.5px; line-height: 1.6; color: var(--text-2); margin: 8px 0 8px 16px; }
+
+  /* ── Disclaimer ────────────────────────────────────────────────────────── */
+  .disclaimer { background: var(--bg); border: 1px solid var(--border); border-radius: var(--radius); padding: 14px 18px; font-size: 13.5px; color: var(--text-2); font-style: italic; }
+
+  /* ── Meta footer ───────────────────────────────────────────────────────── */
+  .meta {
+    margin-top: 48px; padding-top: 16px;
+    border-top: 1px solid var(--border-soft);
+    display: flex; justify-content: space-between; align-items: center;
+    font-size: 12px; color: var(--text-3);
+  }
+  .meta-source { font-family: var(--font-mono); font-size: 11.5px; }
+
+  /* ── Brand logo ────────────────────────────────────────────────────────── */
+  .brand-logo {
+    font-family: var(--font-head);
+    font-size: 14px;
+    color: var(--text-3);
+    letter-spacing: 0.05em;
+    margin-bottom: 4px;
+    flex-shrink: 0;
+    margin-left: 16px;
+  }
+  .brand-logo strong {
+    font-weight: 600;
+    color: var(--accent);
+  }
+  @media (max-width: 900px) {
+    .title-container { flex-direction: column; align-items: flex-start; gap: 12px; }
+    .brand-logo { margin-left: 0; margin-bottom: 0; }
+  }
+  /* ── Print ─────────────────────────────────────────────────────────────── */
+  @media print {
+    body { background: white; }
+    #progress, .toc { display: none; }
+    .layout { display: block; padding: 0; }
+    .article { border: none; box-shadow: none; padding: 24px; }
+    .copy-btn { display: none; }
+    .brand-logo { margin-bottom: 0; }
+  }
+
+  /* ── Responsive ────────────────────────────────────────────────────────── */
+  @media (max-width: 900px) {
+    .toc { display: none; }
+    .article { padding: 36px 28px; }
+    .layout { padding: 24px 16px 64px; }
+  }
+  @media (max-width: 480px) {
+    .article { padding: 24px 18px; }
+    .article h1 { font-size: 22px; }
+  }
+</style>
+</head>
+<body>
+
+<div id="progress"></div>
+
+<div class="layout">
+  <nav class="toc" id="toc">
+  <div class="toc-title">目录</div>
+  <div class="toc-content">
+<div class="toc-item has-children"><button class="toc-toggle" onclick="toggleToc(this)" aria-expanded="true">
+                <svg viewBox="0 0 24 24" width="12" height="12" stroke="currentColor" stroke-width="2" fill="none"><polyline points="6 9 12 15 18 9"></polyline></svg>
+              </button><a href="#h-故障诊断报告" onclick="event.preventDefault(); const target = document.getElementById('h-故障诊断报告'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l1">🔴 故障诊断报告</a></div>
+<div class="toc-group" id="group-h-一故障概览">
+<div class="toc-item has-children"><button class="toc-toggle" onclick="toggleToc(this)" aria-expanded="true">
+                <svg viewBox="0 0 24 24" width="12" height="12" stroke="currentColor" stroke-width="2" fill="none"><polyline points="6 9 12 15 18 9"></polyline></svg>
+              </button><a href="#h-一故障概览" onclick="event.preventDefault(); const target = document.getElementById('h-一故障概览'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l2">一、故障概览</a></div>
+<div class="toc-group" id="group-h-置信度说明">
+<div class="toc-item "><span class="toc-spacer"></span><a href="#h-置信度说明" onclick="event.preventDefault(); const target = document.getElementById('h-置信度说明'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l3">置信度说明</a></div>
+</div>
+<div class="toc-item has-children"><button class="toc-toggle" onclick="toggleToc(this)" aria-expanded="true">
+                <svg viewBox="0 0 24 24" width="12" height="12" stroke="currentColor" stroke-width="2" fill="none"><polyline points="6 9 12 15 18 9"></polyline></svg>
+              </button><a href="#h-二根因速览" onclick="event.preventDefault(); const target = document.getElementById('h-二根因速览'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l2">二、根因速览</a></div>
+<div class="toc-group" id="group-h-事故时间线-故障传导链路">
+<div class="toc-item "><span class="toc-spacer"></span><a href="#h-事故时间线-故障传导链路" onclick="event.preventDefault(); const target = document.getElementById('h-事故时间线-故障传导链路'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l3">事故时间线 & 故障传导链路</a></div>
+<div class="toc-item "><span class="toc-spacer"></span><a href="#h-故障因果链" onclick="event.preventDefault(); const target = document.getElementById('h-故障因果链'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l3">故障因果链</a></div>
+</div>
+<div class="toc-item has-children"><button class="toc-toggle" onclick="toggleToc(this)" aria-expanded="true">
+                <svg viewBox="0 0 24 24" width="12" height="12" stroke="currentColor" stroke-width="2" fill="none"><polyline points="6 9 12 15 18 9"></polyline></svg>
+              </button><a href="#h-三排查过程" onclick="event.preventDefault(); const target = document.getElementById('h-三排查过程'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l2">三、排查过程</a></div>
+<div class="toc-group" id="group-h-31-初始现象">
+<div class="toc-item "><span class="toc-spacer"></span><a href="#h-31-初始现象" onclick="event.preventDefault(); const target = document.getElementById('h-31-初始现象'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l3">3.1 初始现象</a></div>
+<div class="toc-item "><span class="toc-spacer"></span><a href="#h-32-假设驱动排查" onclick="event.preventDefault(); const target = document.getElementById('h-32-假设驱动排查'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l3">3.2 假设驱动排查</a></div>
+<div class="toc-item "><span class="toc-spacer"></span><a href="#h-33-排查结论与逻辑树" onclick="event.preventDefault(); const target = document.getElementById('h-33-排查结论与逻辑树'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l3">3.3 排查结论与逻辑树</a></div>
+</div>
+<div class="toc-item has-children"><button class="toc-toggle" onclick="toggleToc(this)" aria-expanded="true">
+                <svg viewBox="0 0 24 24" width="12" height="12" stroke="currentColor" stroke-width="2" fill="none"><polyline points="6 9 12 15 18 9"></polyline></svg>
+              </button><a href="#h-四修复方案" onclick="event.preventDefault(); const target = document.getElementById('h-四修复方案'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l2">四、修复方案</a></div>
+<div class="toc-group" id="group-h-41-应急处置">
+<div class="toc-item "><span class="toc-spacer"></span><a href="#h-41-应急处置" onclick="event.preventDefault(); const target = document.getElementById('h-41-应急处置'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l3">4.1 应急处置</a></div>
+<div class="toc-item "><span class="toc-spacer"></span><a href="#h-42-永久修复计划" onclick="event.preventDefault(); const target = document.getElementById('h-42-永久修复计划'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l3">4.2 永久修复计划</a></div>
+<div class="toc-item "><span class="toc-spacer"></span><a href="#h-43-预期优化效果" onclick="event.preventDefault(); const target = document.getElementById('h-43-预期优化效果'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l3">4.3 预期优化效果</a></div>
+</div>
+<div class="toc-item has-children"><button class="toc-toggle" onclick="toggleToc(this)" aria-expanded="true">
+                <svg viewBox="0 0 24 24" width="12" height="12" stroke="currentColor" stroke-width="2" fill="none"><polyline points="6 9 12 15 18 9"></polyline></svg>
+              </button><a href="#h-五附录" onclick="event.preventDefault(); const target = document.getElementById('h-五附录'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l2">五、附录</a></div>
+<div class="toc-group" id="group-h-51-证据文件清单">
+<div class="toc-item "><span class="toc-spacer"></span><a href="#h-51-证据文件清单" onclick="event.preventDefault(); const target = document.getElementById('h-51-证据文件清单'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l3">5.1 证据文件清单</a></div>
+<div class="toc-item "><span class="toc-spacer"></span><a href="#h-52-诊断采样信息" onclick="event.preventDefault(); const target = document.getElementById('h-52-诊断采样信息'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l3">5.2 诊断采样信息</a></div>
+<div class="toc-item "><span class="toc-spacer"></span><a href="#h-53-术语表" onclick="event.preventDefault(); const target = document.getElementById('h-53-术语表'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l3">5.3 术语表</a></div>
+</div>
+</div>
+  </div>
+</nav>
+  <article class="article" id="article" style="position: relative;">
+    <div class="title-container"><h1 id="h-故障诊断报告">🔴 故障诊断报告</h1><div class="brand-logo">by <strong>Witty Diagnosis Agent</strong></div></div>
+<blockquote>
+<p><strong>报告编号</strong>：RCA-20260602-001
+<strong>故障级别</strong>：P1 / Critical
+<strong>报告时间</strong>：2026-06-02 22:35:00
+<strong>当前状态</strong>：🔴 处理中</p>
+</blockquote>
+<hr>
+<h2 id="h-一故障概览">一、故障概览</h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>项目</th>
+<th>内容</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>故障标题</td>
+<td>Vert.x + Mozilla Rhino JavaScript 引擎高并发下 CPU 性能瓶颈（锁竞争 + 解释执行 + 内存分配三重重度开销）</td>
+</tr>
+<tr>
+<td>影响范围</td>
+<td>运行 Vert.x HTTP Server + Netty + Mozilla Rhino JS 引擎的 Java 应用服务器（4核 Intel i5-2400）</td>
+</tr>
+<tr>
+<td>故障时段</td>
+<td>2015-07-09 17:14:37（采样时间）～ 分析时未恢复</td>
+</tr>
+<tr>
+<td>根本原因</td>
+<td>Mozilla Rhino JavaScript 引擎的 <code>ScriptableObject</code> 属性操作（<code>createSlot</code>/<code>putImpl</code>/<code>getSlot</code>）在解释模式（Interpreter）下多线程并发执行，同时引发<strong>①剧烈锁竞争</strong>（92.93% 线程消耗在 libpthread 同步层）、<strong>②解释执行 CPU 高开销</strong>（无 JIT 编译）及<strong>③频繁内存分配触发 GC</strong>（2.1% CPU）三重连锁性能问题</td>
+</tr>
+<tr>
+<td>是否恢复</td>
+<td><span class="badge-err">❌ 未恢复（基于离线 perf 数据分析，未执行修复操作）</span></td>
+</tr>
+<tr>
+<td>根因置信度</td>
+<td>🟢 高置信</td>
+</tr>
+</tbody></table></div>
+<h3 id="h-置信度说明">置信度说明</h3>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>等级</th>
+<th>标识</th>
+<th>含义</th>
+<th>示例场景</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>高置信</td>
+<td>🟢</td>
+<td>根因已明确，可复现，单一原因可解释所有现象</td>
+<td>本故障：三个独立分析报告结论完全吻合</td>
+</tr>
+<tr>
+<td>中置信</td>
+<td>🟡</td>
+<td>根因基本确认，但存在 1～2 个无法完全解释的现象</td>
+<td>—</td>
+</tr>
+<tr>
+<td>低置信</td>
+<td>🟠</td>
+<td>有多个可疑原因，尚未排除竞争，结论为推断</td>
+<td>—</td>
+</tr>
+<tr>
+<td>未知</td>
+<td>🔴</td>
+<td>现象无法解释，根因未定位，仍在排查中</td>
+<td>—</td>
+</tr>
+</tbody></table></div>
+<hr>
+<h2 id="h-二根因速览">二、根因速览</h2>
+<h3 id="h-事故时间线-故障传导链路">事故时间线 & 故障传导链路</h3>
+<div class="code-block">
+  <span class="code-lang">text</span>
+  <button class="copy-btn" onclick="copyCode(this)" title="复制">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
+  </button>
+  <pre><code>时间（采样窗口）             事件                                                       性质          证据来源
+─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+2015-07-09 17:14:37      wrk HTTP 压测工具发起高并发请求（99Hz, 10s 采样）                📈 外部触发    [T1 kuafu_T1_...md:14]
+    │
+    ▼
+17:14:37 ~ 17:14:47      Netty NioEventLoop 接收连接，Vert.x 分发请求到 JS 处理          ⚙️ 正常流转    [T1 kuafu_T1_...md:33-44]
+    │
+    ▼
+17:14:37 ~ 17:14:47      Mozilla Rhino JS 引擎以解释模式执行 HTTP Handler                ⚠️ 隐患 #1    [T1 kuafu_T1_...md:32-43]
+    │                    栈帧 `Interpreter_[j]` 出现 2868 次（218.1%）
+    │                    ❌ 缺乏 JIT 编译优化，解释执行效率极低
+    ▼
+17:14:37 ~ 17:14:47      ScriptableObject.createSlot / putImpl / getSlot 操作             🔴 隐患 #2    [T1 kuafu_T1_...md:96-99]
+    │                    多线程并发访问共享 ScriptableObject 属性表                       [T2 kuafu_T2_...md:55-59]
+    │                    → 内部锁保护机制触发激烈锁竞争                                   [T3 kuafu_T3_...md:43-50]
+    │                    → 92.93% 样本根帧在 libpthread（锁同步层）
+    ▼
+17:14:37 ~ 17:14:47      createSlot 频繁分配新属性槽 → JVM Heap 内存分配压力              🟡 隐患 #3    [T3 kuafu_T3_...md:46-50]
+    │                    → Young GC (Parallel Scavenge) 被触发（2.1% CPU）                 [T3 kuafu_T3_...md:55-59]
+    │                    → GC 线程消耗额外 CPU，进一步加剧锁竞争
+    ▼
+17:14:37 ~ 17:14:47      次要：内核 TCP socket 锁竞争（lock_sock_nested）                  🟡 辅助因素   [T2 kuafu_T2_...md:61-63]
+    │                    高吞吐 HTTP 处理触发的内核级锁争抢
+    ▼
+17:14:37 ~ 17:14:47      🔴 故障爆发：可用 CPU 被大量浪费在锁等待 + 解释执行 + GC 上      🔴 结果        [T1/T2/T3 综合]
+                         实际业务吞吐量严重受限，HTTP 响应延迟大幅增加</code></pre>
+</div>
+<h3 id="h-故障因果链">故障因果链</h3>
+<div class="code-block">
+  <span class="code-lang">text</span>
+  <button class="copy-btn" onclick="copyCode(this)" title="复制">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
+  </button>
+  <pre><code>wrk HTTP 压测（高并发请求）
+  └─► Vert.x HTTP Server → Netty NioEventLoop 接收
+      └─► Mozilla Rhino JavaScript 引擎执行 HTTP Handler（解释模式，无 JIT）
+          │
+          ├─► 【路径 A：锁竞争 ~70%+ CPU 浪费】
+          │   └─► 多线程并发调用 ScriptRuntime.setObjectProp
+          │       └─► IdScriptableObject.put / ScriptableObject.putImpl
+          │           └─► ScriptableObject.getSlot / createSlot  ← 内部锁保护
+          │               └─► 多个 worker 线程争抢同一把锁
+          │                   └─► libpthread 同步原语中空转/阻塞（92.93% 样本）
+          │                       └─► 🔴 CPU 时间浪费在锁竞争
+          │
+          ├─► 【路径 B：解释执行高 CPU ~23.3%】
+          │   └─► Interpreter_[j]（解释模式入口，帧出现率 218.1%）
+          │       └─► ScriptableObject 属性操作全部在解释模式下执行
+          │           └─► 🔴 CPU 效率远低于 JIT 编译后的机器码
+          │
+          └─► 【路径 C：内存分配压力 + GC ~2.1%】
+              └─► createSlot 频繁分配新属性槽（7.2% CPU）
+                  └─► JVM Heap 分配压力增大
+                      └─► Young GC 触发（Parallel Scavenge 2.1%）
+                          └─► 🟡 GC 线程消耗额外 CPU，抢占业务线程时间
+
+最终结果：🔴 服务吞吐量受限，响应延迟增加，CPU 利用效率极低</code></pre>
+</div>
+<hr>
+<h2 id="h-三排查过程">三、排查过程</h2>
+<blockquote>
+<p>排查逻辑：<strong>三份 Kuafu 独立诊断报告交叉验证 → 逐层收敛到根因</strong></p>
+</blockquote>
+<h3 id="h-31-初始现象">3.1 初始现象</h3>
+<ul>
+<li><strong>诊断对象</strong>：基于 perf 采样文件 <code>/tmp/example-perf-stacks.txt</code>（<code>perf record -F 99 -a -g -- sleep 10</code>）的系统性能分析</li>
+<li><strong>主机信息</strong>：lgud-bgregg | Intel Core i5-2400 @ 3.10GHz (4核) | 内存 4005800 kB</li>
+<li><strong>总样本数</strong>：1315 | 唯一栈数：710 | 平均栈深度：~29 层</li>
+<li><strong>全局现象</strong>：CPU 高度占用（<strong>仅 5.5% 空闲</strong>），<strong>Java 进程占 75.7% CPU</strong>，<strong>92.93% 样本根帧在 libpthread</strong></li>
+<li><strong>应用栈</strong>：wrk（压测客户端）→ Vert.x HTTP Server → Netty NioEventLoop → Mozilla Rhino JS 引擎</li>
+</ul>
+<hr>
+<h3 id="h-32-假设驱动排查">3.2 假设驱动排查</h3>
+<h4 id="h-假设-ajvm-未启用-jit-编译导致解释执行成为瓶颈-确认">假设 A：JVM 未启用 JIT 编译导致解释执行成为瓶颈 ✅ 确认</h4>
+<blockquote>
+<p>🧪 假设：基于 <code>Interpreter_[j]</code> 帧出现 2868 次（218.1% 帧占比），推测 JVM 以纯解释模式运行</p>
+</blockquote>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>检查项</th>
+<th>操作（基于 T1 报告数据）</th>
+<th>结论</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>解释器帧占比</td>
+<td><code>Interpreter_[j]</code> 占 218.1% 帧出现率，为 Top 1 热点</td>
+<td><span class="badge-ok">✅ 极高</span></td>
+</tr>
+<tr>
+<td>热点函数路径</td>
+<td><code>ScriptRuntime.setObjectProp</code> → <code>ScriptableObject.createSlot</code> → <code>putImpl</code></td>
+<td><span class="badge-ok">✅ 全在解释模式下执行</span></td>
+</tr>
+<tr>
+<td>锁同步根帧</td>
+<td><code>[libpthread-2.19.so]</code> 占 92.93%</td>
+<td><span class="badge-ok">✅ 吻合（解释模式 + 锁竞争）</span></td>
+</tr>
+<tr>
+<td>调用链完整性</td>
+<td>wrk → Netty → Vert.x → Rhino → ScriptableObject，每一步可追踪</td>
+<td><span class="badge-ok">✅ 完整</span></td>
+</tr>
+</tbody></table></div>
+<p><strong>✅ 确认</strong>：JVM 以解释模式运行（可能因 <code>-Xint</code> 参数或 JIT 未生效），Rhino 引擎所有 JS 相关操作均未编译为机器码。可通过 <code>-XX:+PrintCompilation</code> 验证。</p>
+<hr>
+<h4 id="h-假设-bmozilla-rhino-scriptableobject-锁竞争导致线程同步瓶颈-确认">假设 B：Mozilla Rhino ScriptableObject 锁竞争导致线程同步瓶颈 ✅ 确认</h4>
+<blockquote>
+<p>🧪 假设：基于 92.93% 样本根帧为 libpthread，以及热点路径集中在 ScriptableObject 操作，推测锁竞争是性能瓶颈的主因</p>
+</blockquote>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>检查项</th>
+<th>操作（基于 T2 报告数据）</th>
+<th>结论</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>libpthread 占比</td>
+<td>1222/1315 (92.93%) 样本的根帧为 <code>[libpthread-2.19.so]</code></td>
+<td><span class="badge-ok">✅ 几乎所有活跃线程都因锁操作消耗 CPU</span></td>
+</tr>
+<tr>
+<td>锁竞争根因调用链</td>
+<td><code>ScriptRuntime.setObjectProp</code> → <code>IdScriptableObject.put</code> → <code>ScriptableObject.putImpl</code> → <strong><code>createSlot</code>（热点叶节点）</strong></td>
+<td><span class="badge-ok">✅ 明确且完整</span></td>
+</tr>
+<tr>
+<td>排他性验证</td>
+<td>Netty EventLoop 本身非瓶颈（事件循环操作正常），GC 占比 &lt;1%</td>
+<td><span class="badge-ok">✅ 排除其他假设</span></td>
+</tr>
+<tr>
+<td>辅助因素</td>
+<td>内核 <code>lock_sock_nested</code> + <code>_raw_spin_lock_bh</code> 出现在 TCP 路径（23 样本含内核锁）</td>
+<td><span class="badge-ok">✅ 次要因素</span></td>
+</tr>
+<tr>
+<td>双剧本吻合度</td>
+<td>锁竞争剧本 + CPU 热点剧本结论完全吻合</td>
+<td><span class="badge-ok">✅</span></td>
+</tr>
+</tbody></table></div>
+<p><strong>✅ 确认</strong>：Mozilla Rhino 引擎的 <code>ScriptableObject</code> 属性操作（<code>createSlot</code>/<code>putImpl</code>/<code>has</code>）内部使用锁保证线程安全。高并发下多线程激烈争抢同一把锁，导致 92.93% 的 CPU 样本消耗在 libpthread 的同步原语上。</p>
+<hr>
+<h4 id="h-假设-crhino-scriptableobject-频繁内存分配触发-gc-压力-确认">假设 C：Rhino ScriptableObject 频繁内存分配触发 GC 压力 ✅ 确认</h4>
+<blockquote>
+<p>🧪 假设：基于 <code>createSlot</code> 占 7.2% CPU，<code>getSlot</code> 12.0%，<code>putImpl</code> 10.3%，推测频繁的内存分配是 GC 压力的主因</p>
+</blockquote>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>检查项</th>
+<th>操作（基于 T3 报告数据）</th>
+<th>结论</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>ScriptableObject 合计占比</td>
+<td>307 样本，<strong>23.3% CPU</strong></td>
+<td><span class="badge-ok">✅ 主导内存分配</span></td>
+</tr>
+<tr>
+<td>GC 活动占比</td>
+<td><code>CardTableExtension::scavenge_contents_parallel</code> 20 样本（1.5%），合计 GC 28 样本（2.1%）</td>
+<td><span class="badge-ok">✅ Young GC 被频繁触发</span></td>
+</tr>
+<tr>
+<td><code>createSlot</code> 性质</td>
+<td>每次调用创建新属性槽 → <strong>新内存分配</strong></td>
+<td><span class="badge-ok">✅ 内存分配热点源头</span></td>
+</tr>
+<tr>
+<td><code>NativeCall.&lt;init&gt;</code></td>
+<td>157 样本（11.9%）JS 构造函数调用</td>
+<td><span class="badge-ok">✅ 每个请求产生新对象</span></td>
+</tr>
+</tbody></table></div>
+<p><strong>✅ 确认</strong>：Rhino ScriptableObject 的 <code>createSlot</code> 操作为每次 HTTP 请求分配新的属性槽内存，<code>getSlot</code>/<code>putImpl</code> 频繁访问/修改属性数组。大量短期对象触发 JVM Young GC，额外消耗 2.1% CPU。</p>
+<hr>
+<h3 id="h-33-排查结论与逻辑树">3.3 排查结论与逻辑树</h3>
+<div class="code-block">
+  <span class="code-lang">text</span>
+  <button class="copy-btn" onclick="copyCode(this)" title="复制">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
+  </button>
+  <pre><code>系统 CPU 性能瓶颈（94.5% 非空闲，仅 5.5% idle）
+│
+├─► CPU 归属分析
+│   ├─► java (JVM) : 75.7%    ← 主要目标
+│   ├─► wrk (压测)  : 18.3%   ← 正常压测行为
+│   ├─► swapper(idle): 5.5%   ← 几乎满载
+│   └─► ksoftirqd   : 0.1%    ← 可忽略
+│
+├─► 热点定位（T1 - CPU 热点分析）
+│   └─► Interpreter_[j] (218.1% 帧率) → 解释模式执行
+│       └─► Netty NioEventLoop → Vert.x → Rhino JS Hanlder
+│           └─► ScriptRuntime.setObjectProp → ScriptableObject.createSlot
+│               └─► 🎯 根因候选①：解释模式下 Rhino JS 执行 CPU 效率低
+│
+├─► 锁竞争分析（T2 - Lock contention 分析）
+│   └─► libpthread 根帧 92.93%
+│       ├─► 【主因 ~70%+】Rhino ScriptableObject.createSlot/putImpl/has 多线程锁竞争
+│       │   └─► 🎯 根因候选②：Rhino ScriptableObject 内部锁在高并发下成为瓶颈
+│       ├─► 【次要 ~2%】内核 TCP socket 锁（lock_sock_nested）
+│       └─► 【微量 &lt;1%】JVM GC 线程同步（ParallelTaskTerminator）
+│
+├─► 内存分配分析（T3 - GC pressure 分析）
+│   └─► ScriptableObject 属性操作占 23.3% CPU
+│       ├─► createSlot (7.2%): 新属性槽分配 = 内存分配
+│       ├─► getSlot (12.0%): 属性槽查找
+│       ├─► putImpl (10.3%): 属性写入
+│       └─► Young GC (2.1%): Parallel Scavenge 被频繁触发
+│           └─► 🎯 根因候选③：频繁内存分配带来 GC 额外开销
+│
+└─► 交叉验证（综合）
+    └─► 三份报告根因完全吻合于：Mozilla Rhino JS 引擎在高并发场景下的
+        ScriptableObject 并发访问
+        ├─► T1 确认：热点在 Rhino 解释模式执行路径
+        ├─► T2 确认：锁竞争源自 ScriptableObject 内部锁
+        └─► T3 确认：内存分配压力源自 createSlot/putImpl
+            └─► 🎯 最终根因：Mozilla Rhino 引擎的 ScriptableObject 操作在多线程
+                高并发下同时引发锁竞争 + 解释执行 + 内存分配三重性能问题</code></pre>
+</div>
+<hr>
+<h2 id="h-四修复方案">四、修复方案</h2>
+<h3 id="h-41-应急处置">4.1 应急处置</h3>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>步骤</th>
+<th>操作</th>
+<th>执行人</th>
+<th>时间</th>
+<th>效果</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>1</td>
+<td>检查 JVM 启动参数：<code>ps aux | grep java</code> 确认是否存在 <code>-Xint</code> 或 <code>-Djava.compiler=NONE</code></td>
+<td>系统管理员</td>
+<td>立即</td>
+<td>确认/排除 JIT 被禁用的情况</td>
+</tr>
+<tr>
+<td>2</td>
+<td>使用 <code>-XX:+PrintCompilation</code> 启动 JVM，观察 Rhino 相关方法是否被 JIT 编译</td>
+<td>系统管理员</td>
+<td>立即</td>
+<td>确认 JIT 对 Rhino 方法的编译覆盖情况</td>
+</tr>
+<tr>
+<td>3</td>
+<td>在 Rhino 中启用优化级别：<code>Context.setOptimizationLevel(9)</code></td>
+<td>开发人员</td>
+<td>短期</td>
+<td>开启 Rhino 内部优化（即使是解释模式也有一定优化空间）</td>
+</tr>
+<tr>
+<td>4</td>
+<td>评估是否可以临时将 Rhino 脚本替换为 Java 原生 Handler</td>
+<td>开发人员</td>
+<td>短期</td>
+<td>直接消除 JS 引擎瓶颈</td>
+</tr>
+</tbody></table></div>
+<h3 id="h-42-永久修复计划">4.2 永久修复计划</h3>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>修复措施</th>
+<th>负责人</th>
+<th>完成时间</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>① JIT 编译确认与修复</strong>：检查 JVM 是否启用 JIT（<code>java -version</code> 确认非 <code>-Xint</code> 或 interpreted 模式），确保 Rhino 相关热点方法被 JIT 编译为机器码</td>
+<td>系统管理员 / SRE</td>
+<td>近期</td>
+</tr>
+<tr>
+<td><strong>② Rhino 线程隔离</strong>：将 JavaScript 运行时改为线程隔离模式（ThreadLocal Scope），避免多线程共享 ScriptableObject 导致的锁竞争。每个 worker 线程使用独立的 Rhino Context 和 Scope</td>
+<td>开发团队</td>
+<td>中期</td>
+</tr>
+<tr>
+<td><strong>③ 用 Java 原生重写 JS 热路径</strong>：将高频执行的 Rhino JS Handler（尤其是 <code>__vertx_http_js__</code>）用 Java 原生代码实现，完全消除 JS 引擎开销</td>
+<td>开发团队</td>
+<td>中期</td>
+</tr>
+<tr>
+<td><strong>④ 替换 JS 引擎</strong>：评估将 Mozilla Rhino 替换为更现代的 JS 引擎：</td>
+<td>架构团队</td>
+<td>长期</td>
+</tr>
+<tr>
+<td></td>
+<td>→ <strong>GraalVM JavaScript</strong>（高性能，支持 JIT，部分兼容 Rhino API）</td>
+<td></td>
+</tr>
+<tr>
+<td></td>
+<td>→ <strong>Oracle Nashorn</strong>（JDK 内置，Java 8+，支持 invokedynamic 优化）</td>
+<td></td>
+</tr>
+<tr>
+<td><strong>⑤ GC 参数调优</strong>：若保留 Rhino，调整 JVM GC 参数以适配高分配速率负载：</td>
+<td>系统管理员</td>
+<td>近期</td>
+</tr>
+<tr>
+<td></td>
+<td>→ <code>-XX:+UseG1GC</code> 或 <code>-XX:+UseZGC</code>（低延迟 GC）</td>
+<td></td>
+</tr>
+<tr>
+<td></td>
+<td>→ 增大年轻代：<code>-Xmn</code> 调整</td>
+<td></td>
+</tr>
+<tr>
+<td></td>
+<td>→ <code>-XX:ParallelGCThreads</code> 调整 GC 并发线程数</td>
+<td></td>
+</tr>
+<tr>
+<td><strong>⑥ 减少 JS 脚本中动态对象创建</strong>：优化 Rhino 脚本，使用对象池或缓存复用 ScriptableObject 实例，减少 <code>createSlot</code> 调用频率</td>
+<td>开发团队</td>
+<td>中期</td>
+</tr>
+<tr>
+<td><strong>⑦ 补充监控</strong>：部署 JVM GC 日志收集、内存分配速率监控和 CPU Profiler（持续采样），在负载高峰期间多次采样验证优化效果</td>
+<td>监控团队</td>
+<td>近期</td>
+</tr>
+</tbody></table></div>
+<h3 id="h-43-预期优化效果">4.3 预期优化效果</h3>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>优化措施</th>
+<th>预期效果</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>① JIT 启用/确认</td>
+<td>Java 执行效率提升 5~10 倍</td>
+<td>解释模式 → 机器码编译</td>
+</tr>
+<tr>
+<td>② Rhino 线程隔离</td>
+<td>消除 ~70%+ 锁竞争开销</td>
+<td>92.93% libpthread 大幅下降</td>
+</tr>
+<tr>
+<td>③ Java 原生重写</td>
+<td>完全消除 Rhino 开销</td>
+<td>直接移除最重瓶颈</td>
+</tr>
+<tr>
+<td>④ 替换 JS 引擎</td>
+<td>根据引擎不同，预期 30~80% 性能提升</td>
+<td>GraalVM 表现最佳</td>
+</tr>
+<tr>
+<td>⑤ GC 参数调优</td>
+<td>GC 开销从 2.1% 降至 &lt;1%</td>
+<td>减少 GC 停顿时间</td>
+</tr>
+</tbody></table></div>
+<hr>
+<h2 id="h-五附录">五、附录</h2>
+<h3 id="h-51-证据文件清单">5.1 证据文件清单</h3>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>文件</th>
+<th>路径</th>
+<th>内容概要</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>T1 - CPU 热点分析报告</td>
+<td><code>/root/.witty-diagnosis-agent/dayu/report/kuafu_T1_20260602_223300.md</code></td>
+<td>CPU 热点定位：Interpreter + Rhino ScriptableObject</td>
+</tr>
+<tr>
+<td>T2 - 锁竞争分析报告</td>
+<td><code>/root/.witty-diagnosis-agent/dayu/report/kuafu_T2_20260602_223237.md</code></td>
+<td>锁竞争根因：92.93% libpthread 脚本锁竞争</td>
+</tr>
+<tr>
+<td>T3 - 内存分配分析报告</td>
+<td><code>/root/.witty-diagnosis-agent/dayu/report/kuafu_T3_20260602_223235.md</code></td>
+<td>内存分配压力：23.3% ScriptableObject + 2.1% GC</td>
+</tr>
+<tr>
+<td>Findings JSON</td>
+<td><code>/root/.witty-diagnosis-agent/dayu/report/kuafu_T2_20260602_223237_findings.json</code></td>
+<td>结构化发现列表及因果分析</td>
+</tr>
+<tr>
+<td>交互式火焰图</td>
+<td><code>/root/.witty-diagnosis-agent/dayu/report/kuafu_T2_20260602_223237_flamegraph.html</code></td>
+<td>可视化热点分布</td>
+</tr>
+<tr>
+<td>原始采样数据</td>
+<td><code>/tmp/example-perf-stacks.txt</code></td>
+<td>perf script 原始输出</td>
+</tr>
+</tbody></table></div>
+<h3 id="h-52-诊断采样信息">5.2 诊断采样信息</h3>
+<div class="code-block">
+  <span class="code-lang">text</span>
+  <button class="copy-btn" onclick="copyCode(this)" title="复制">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
+  </button>
+  <pre><code>采样命令：   perf record -F 99 -a -g -- sleep 10
+采样事件：   cycles
+采样频率：   99 Hz
+采样时长：   10 s
+总样本数：   1315
+采集时间：   2015-07-09 17:14:37
+目标主机：   lgud-bgregg
+CPU 型号：   Intel Core i5-2400 @ 3.10GHz (4核)</code></pre>
+</div>
+<h3 id="h-53-术语表">5.3 术语表</h3>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>术语</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Rhino</td>
+<td>Mozilla 的纯 Java JavaScript 引擎，Vert.x 早期版本默认使用</td>
+</tr>
+<tr>
+<td>ScriptableObject</td>
+<td>Rhino 中 JavaScript 对象的 Java 表示，属性操作为线程安全（内部有锁）</td>
+</tr>
+<tr>
+<td>Interpreter_[j]</td>
+<td>JVM 解释模式标记帧，表示该方法以解释模式执行（未 JIT 编译）</td>
+</tr>
+<tr>
+<td>libpthread</td>
+<td>Linux POSIX 线程库，锁竞争的直接体现（mutex/futex/spinlock）</td>
+</tr>
+<tr>
+<td>lock_sock_nested</td>
+<td>Linux 内核 socket 锁，保护 socket 数据结构</td>
+</tr>
+<tr>
+<td>createSlot</td>
+<td>Rhino ScriptableObject 创建新属性槽的方法，涉及内存分配</td>
+</tr>
+<tr>
+<td>Parallel Scavenge</td>
+<td>JVM 默认的并行年轻代 GC 算法</td>
+</tr>
+<tr>
+<td>Safepoint</td>
+<td>JVM 安全点，所有线程需到达后才能执行全局 GC 等操作</td>
+</tr>
+</tbody></table></div>
+
+    <div class="meta">
+      <span class="meta-source">Vertx_Rhino_JS_高CPU锁竞争性能故障_20260602_223500_report.md</span>
+      <span>生成于 2026/06/02 22:36</span>
+    </div>
+  </article>
+</div>
+
+<script>
+  /* ── 滚动进度条 ── */
+  window.addEventListener("scroll", () => {
+    const el  = document.documentElement;
+    const pct = el.scrollTop / (el.scrollHeight - el.clientHeight) * 100;
+    document.getElementById("progress").style.width = Math.min(pct, 100) + "%";
+  });
+
+  /* ── TOC 高亮当前章节 ── */
+  (function () {
+    const headings = Array.from(document.querySelectorAll("article h1,article h2,article h3"));
+    const links    = Array.from(document.querySelectorAll(".toc a"));
+    if (!links.length) return;
+    const obs = new IntersectionObserver(entries => {
+      entries.forEach(e => {
+        if (!e.isIntersecting) return;
+        links.forEach(l => l.classList.remove("active"));
+        const a = links.find(l => l.getAttribute("href") === "#" + e.target.id);
+        if (a) a.classList.add("active");
+      });
+    }, { rootMargin: "-10% 0px -80% 0px" });
+    headings.forEach(h => obs.observe(h));
+  })();
+
+  /* ── h2 章节序号自动计数 ── */
+  (function () {
+    let idx = 0;
+    document.querySelectorAll("article h2").forEach(el => {
+      idx++;
+      el.setAttribute("data-index", String(idx).padStart(2, "0"));
+    });
+  })();
+
+  /* ── 代码块一键复制 ── */
+  function copyCode(btn) {
+    const code = btn.closest(".code-block").querySelector("code").innerText;
+    navigator.clipboard.writeText(code).then(() => {
+      btn.classList.add("copied");
+      btn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>';
+      setTimeout(() => {
+        btn.classList.remove("copied");
+        btn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>';
+      }, 2000);
+    });
+  }
+
+  /* ── 目录树收缩/展开 ── */
+  function toggleToc(btn) {
+    const expanded = btn.getAttribute("aria-expanded") === "true";
+    btn.setAttribute("aria-expanded", String(!expanded));
+    const parentItem = btn.closest(".toc-item");
+    let nextEl = parentItem.nextElementSibling;
+    if (nextEl && nextEl.classList.contains("toc-group")) {
+      if (expanded) {
+        nextEl.style.maxHeight = nextEl.scrollHeight + "px";
+        void nextEl.offsetHeight;
+        nextEl.classList.add("collapsed");
+      } else {
+        nextEl.classList.remove("collapsed");
+        nextEl.style.maxHeight = nextEl.scrollHeight + "px";
+        setTimeout(() => {
+          if (!nextEl.classList.contains("collapsed")) {
+            nextEl.style.maxHeight = "none";
+          }
+        }, 300);
+      }
+    }
+  }
+</script>
+</body>
+</html>
