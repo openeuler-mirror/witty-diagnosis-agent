@@ -90,11 +90,34 @@ def build_toc(items: List[Heading]) -> str:
     filtered = [item for item in items if item.level <= 3]
     if len([item for item in filtered if item.level <= 2]) < 2:
         return ""
-    links = "\n  ".join(
-        f'<a href="#{escape_html(item.anchor_id)}" class="toc-l{item.level}">{escape_html(item.text)}</a>'
-        for item in filtered
-    )
-    return f'<nav class="toc" id="toc">\n  <div class="toc-title">目录</div>\n  {links}\n</nav>'
+    
+    html = ['<nav class="toc" id="toc">\n  <div class="toc-title">目录</div>\n  <div class="toc-content">']
+    
+    i = 0
+    while i < len(filtered):
+        item = filtered[i]
+        if item.level <= 2:
+            # check if it has children
+            has_children = i + 1 < len(filtered) and filtered[i+1].level > item.level
+            if has_children:
+                html.append(f'<div class="toc-item has-children"><button class="toc-toggle" onclick="toggleToc(this)" aria-expanded="true">\n                <svg viewBox="0 0 24 24" width="12" height="12" stroke="currentColor" stroke-width="2" fill="none"><polyline points="6 9 12 15 18 9"></polyline></svg>\n              </button><a href="#{escape_html(item.anchor_id)}" onclick="event.preventDefault(); const target = document.getElementById(\'{escape_html(item.anchor_id)}\'); if (target) {{ target.scrollIntoView({{behavior: \'smooth\'}}); }}" class="toc-l{item.level}">{escape_html(item.text)}</a></div>')
+                html.append(f'<div class="toc-group" id="group-{escape_html(item.anchor_id)}">')
+                
+                i += 1
+                while i < len(filtered) and filtered[i].level > item.level:
+                    child = filtered[i]
+                    html.append(f'<div class="toc-item "><span class="toc-spacer"></span><a href="#{escape_html(child.anchor_id)}" onclick="event.preventDefault(); const target = document.getElementById(\'{escape_html(child.anchor_id)}\'); if (target) {{ target.scrollIntoView({{behavior: \'smooth\'}}); }}" class="toc-l{child.anchor_id[-1] if child.anchor_id[-1].isdigit() else child.level} toc-l{child.level}">{escape_html(child.text)}</a></div>')
+                    i += 1
+                html.append('</div>')
+            else:
+                html.append(f'<div class="toc-item "><span class="toc-spacer"></span><a href="#{escape_html(item.anchor_id)}" onclick="event.preventDefault(); const target = document.getElementById(\'{escape_html(item.anchor_id)}\'); if (target) {{ target.scrollIntoView({{behavior: \'smooth\'}}); }}" class="toc-l{item.level}">{escape_html(item.text)}</a></div>')
+                i += 1
+        else:
+            html.append(f'<div class="toc-item "><span class="toc-spacer"></span><a href="#{escape_html(item.anchor_id)}" onclick="event.preventDefault(); const target = document.getElementById(\'{escape_html(item.anchor_id)}\'); if (target) {{ target.scrollIntoView({{behavior: \'smooth\'}}); }}" class="toc-l{item.level}">{escape_html(item.text)}</a></div>')
+            i += 1
+            
+    html.append('  </div>\n</nav>')
+    return "\n".join(html)
 
 
 def badge_status(text: str) -> str:
@@ -352,13 +375,25 @@ def render_markdown(markdown: str) -> Tuple[str, List[Heading]]:
             plain_text = strip_inline_markup(title_md)
             anchor_id = f"h-{slugify(plain_text)}"
             headings.append(Heading(level=level, text=plain_text, anchor_id=anchor_id))
-            blocks.append(f'<h{level} id="{escape_html(anchor_id)}">{render_inline(title_md)}</h{level}>')
+            if level == 1:
+                blocks.append(f'<div class="title-container"><h{level} id="{escape_html(anchor_id)}">{render_inline(title_md)}</h{level}><div class="brand-logo">by <strong>Witty Diagnosis Agent</strong></div></div>')
+            else:
+                blocks.append(f'<h{level} id="{escape_html(anchor_id)}">{render_inline(title_md)}</h{level}>')
             index += 1
             continue
 
         if re.fullmatch(r"[-*_]{3,}", stripped):
             blocks.append("<hr>")
             index += 1
+            continue
+
+        if stripped.startswith("> "):
+            bq_lines = []
+            while index < len(lines) and lines[index].strip().startswith(">"):
+                bq_lines.append(lines[index].strip().lstrip(">").strip())
+                index += 1
+            bq_content = "\n".join(bq_lines)
+            blocks.append(f"<blockquote>\n<p>{render_inline(bq_content)}</p>\n</blockquote>")
             continue
 
         if "|" in stripped and index + 1 < len(lines) and is_table_divider(lines[index + 1]):
@@ -463,6 +498,9 @@ def main() -> None:
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>{escape_html(page_title)}</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Lora:ital,wght@0,400;0,600;1,400&family=Source+Sans+3:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
 <style>
 {style_css}
 </style>
