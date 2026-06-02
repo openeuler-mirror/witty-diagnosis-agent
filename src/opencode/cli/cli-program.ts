@@ -8,7 +8,7 @@ import type { InstallArgs } from "./types"
 import type { RunOptions } from "./run"
 import type { GetLocalVersionOptions } from "./get-local-version/types"
 import type { DoctorOptions } from "./doctor"
-import packageJson from "../../package.json" with { type: "json" }
+import packageJson from "../../../package.json" with { type: "json" }
 
 const VERSION = packageJson.version
 
