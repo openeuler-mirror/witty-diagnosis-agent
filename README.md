@@ -53,8 +53,7 @@ Witty 智能诊断 Agent 采用“Agent-Skill-工具-知识”四层解耦架构
 
 #### 环境要求
 
-- 运行环境：Node.js (>=20.0.0)
-- 依赖工具：已安装[OpenCode](https://opencode.ai/)或[xiaoO](https://gitcode.com/openeuler/xiaoO/)
+- 依赖框架：已安装[OpenCode](https://opencode.ai/)(运行环境：Node.js >= 20.0.0) 或 [xiaoO](https://gitcode.com/openeuler/xiaoO/)(运行环境：Rust 工具链和 Cargo)
 - 依赖工具：已安装 [Ansible](https://docs.ansible.com/ansible/latest/installation_guide/)（`ansible` 命令须在系统 PATH 中可用，可通过 `ansible --version` 提前验证）
 
 > ⚠️ **注意**：执行 `witty-diagnosis-agent install` 前，请确保本地已完成 Ansible 的安装与环境配置，否则安装程序将直接终止。
@@ -77,6 +76,15 @@ witty-diagnosis-agent install
 ```shell
 git clone https://atomgit.com/openeuler/witty-diagnosis-agent.git
 cd witty-diagnosis-agent
+bash install.sh
+```
+
+##### 方式三：离线包一键安装（适用于离线情况）
+
+如果您已经下载了源代码安装包，可以使用一键安装脚本自动完成环境检查、依赖安装、项目构建及插件配置，以 witty-diagnosis-agent-v0.6.0-beta.tar.gz 压缩包为例：
+```shell
+tar -xzvf witty-diagnosis-agent-v0.6.0-beta.tar.gz
+cd witty-diagnosis-agent-v0.6.0-beta
 bash install.sh
 ```
 
