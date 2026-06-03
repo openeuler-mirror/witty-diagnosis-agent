@@ -1,0 +1,17 @@
+FROM ubuntu:22.04
+RUN apt-get update -qq && DEBIAN_FRONTEND=noninteractive apt-get install -y -qq \
+    openssl curl ca-certificates nmap procps iproute2 dnsutils python3 2>&1 | tail -3 && \
+    apt-get clean
+RUN mkdir -p /skills/tls-certificate-diagnosis /test/certs
+WORKDIR /test
+COPY ./collect_tls_info.sh /skills/tls-certificate-diagnosis/
+COPY ./diagnose_cert_expiry.sh /skills/tls-certificate-diagnosis/
+COPY ./diagnose_chain_incomplete.sh /skills/tls-certificate-diagnosis/
+COPY ./diagnose_ca_trust.sh /skills/tls-certificate-diagnosis/
+COPY ./diagnose_cipher_compat.sh /skills/tls-certificate-diagnosis/
+COPY ./diagnose_sni.sh /skills/tls-certificate-diagnosis/
+COPY ./diagnose_ocsp.sh /skills/tls-certificate-diagnosis/
+COPY ./diagnose_client_cert.sh /skills/tls-certificate-diagnosis/
+COPY ./entrypoint.sh /test/
+RUN chmod +x /skills/tls-certificate-diagnosis/*.sh /test/entrypoint.sh
+CMD ["bash", "/test/entrypoint.sh"]
