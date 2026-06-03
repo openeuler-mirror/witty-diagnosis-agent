@@ -1,0 +1,964 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>故障诊断报告 — TLS OCSP Stapling 失效</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Lora:ital,wght@0,400;0,600;1,400&family=Source+Sans+3:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  /* ── Design tokens ─────────────────────────────────────────────────────── */
+  :root {
+    --bg:          #f8f7f4;
+    --surface:     #ffffff;
+    --border:      #e8e5df;
+    --border-soft: #f0ede8;
+
+    --text:        #1c1917;
+    --text-2:      #57534e;
+    --text-3:      #a8a29e;
+
+    --accent:      #1d4e6e;
+    --accent-light:#e8f1f7;
+    --accent-mid:  #3b82a0;
+
+    --red:         #c0392b;
+    --red-bg:      #fef2f2;
+    --amber:       #92400e;
+    --amber-bg:    #fffbeb;
+    --green:       #14532d;
+    --green-bg:    #f0fdf4;
+
+    --code-bg:     #1a1d27;
+    --code-text:   #cdd6f4;
+    --code-border: #2d3148;
+
+    --font-body: "Source Sans 3", "PingFang SC", "Hiragino Sans GB", sans-serif;
+    --font-head: "Lora", "PingFang SC", Georgia, serif;
+    --font-mono: "JetBrains Mono", "Fira Code", Consolas, monospace;
+
+    --radius:    8px;
+    --radius-lg: 12px;
+    --shadow:    0 1px 3px rgba(0,0,0,.06), 0 4px 16px rgba(0,0,0,.05);
+    --shadow-lg: 0 2px 8px rgba(0,0,0,.07), 0 8px 32px rgba(0,0,0,.06);
+
+    --toc-width:   240px;
+    --gap:         32px;
+  }
+
+  /* ── Progress bar ──────────────────────────────────────────────────────── */
+  #progress {
+    position: fixed; top: 0; left: 0; height: 3px; width: 0%;
+    background: linear-gradient(90deg, var(--accent-mid), var(--accent));
+    z-index: 999; transition: width .1s linear;
+    border-radius: 0 2px 2px 0;
+  }
+
+  /* ── Base ──────────────────────────────────────────────────────────────── */
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  html { font-size: 16px; scroll-behavior: smooth; }
+  body {
+    font-family: var(--font-body);
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.8;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* ── Layout ────────────────────────────────────────────────────────────── */
+  .layout {
+    display: flex;
+    align-items: flex-start;
+    max-width: calc(var(--toc-width) + 820px + var(--gap) * 3);
+    margin: 0 auto;
+    padding: 48px var(--gap) 96px;
+    gap: var(--gap);
+  }
+
+  /* ── TOC ───────────────────────────────────────────────────────────────── */
+  .toc {
+    width: var(--toc-width);
+    flex-shrink: 0;
+    position: sticky;
+    top: 32px;
+    max-height: calc(100vh - 64px);
+    overflow-y: auto;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    padding: 20px;
+    box-shadow: var(--shadow);
+    scrollbar-width: thin;
+    scrollbar-color: var(--border) transparent;
+  }
+  .toc-title {
+    font-size: 10.5px;
+    font-weight: 600;
+    letter-spacing: .1em;
+    text-transform: uppercase;
+    color: var(--text-3);
+    margin-bottom: 12px;
+    padding-bottom: 10px;
+    border-bottom: 1px solid var(--border-soft);
+  }
+  .toc-item {
+    display: flex;
+    align-items: flex-start;
+    margin: 2px 0;
+  }
+  .toc-toggle {
+    background: none;
+    border: none;
+    cursor: pointer;
+    color: var(--text-3);
+    padding: 4px;
+    margin-right: 4px;
+    margin-top: 2px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 4px;
+    transition: background 0.2s, transform 0.2s;
+  }
+  .toc-toggle:hover { background: var(--border-soft); color: var(--text); }
+  .toc-toggle[aria-expanded="false"] svg { transform: rotate(-90deg); }
+  .toc-spacer { width: 20px; flex-shrink: 0; }
+  .toc-group { overflow: hidden; transition: max-height 0.3s ease-in-out; }
+  .toc-group.collapsed { max-height: 0 !important; }
+  
+  .toc a {
+    display: block;
+    font-size: 13px;
+    color: var(--text-2);
+    text-decoration: none;
+    padding: 4px 8px;
+    border-radius: 5px;
+    line-height: 1.45;
+    transition: background .15s, color .15s;
+    word-break: break-all;
+    flex-grow: 1;
+  }
+  .toc a:hover  { background: var(--accent-light); color: var(--accent); }
+  .toc a.active { background: var(--accent-light); color: var(--accent); font-weight: 500; }
+  .toc-l1 { font-weight: 600; color: var(--text); }
+  .toc-l2 { font-weight: 600; color: var(--text); }
+  .toc-l3 { font-size: 12px !important; padding-left: 14px !important; }
+
+  /* ── Article card ──────────────────────────────────────────────────────── */
+  .article {
+    flex: 1; min-width: 0;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    padding: 52px 60px;
+    box-shadow: var(--shadow-lg);
+  }
+
+  /* ── Headings ──────────────────────────────────────────────────────────── */
+  .title-container {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-end;
+    margin: 0 0 28px;
+    padding-bottom: 18px;
+    border-bottom: 2px solid var(--text);
+  }
+  .article h1 {
+    font-family: var(--font-head);
+    font-size: 26px; font-weight: 600; line-height: 1.3;
+    margin: 0; padding-bottom: 0;
+    border-bottom: none;
+  }
+  .article h2 {
+    font-family: var(--font-head);
+    font-size: 19px; font-weight: 600;
+    margin: 48px 0 14px; padding-bottom: 8px;
+    border-bottom: 1px solid var(--border);
+  }
+  .article h2::before {
+    content: attr(data-index);
+    display: inline-block;
+    font-family: var(--font-mono);
+    font-size: 10.5px; font-weight: 500;
+    color: var(--accent-mid);
+    background: var(--accent-light);
+    padding: 1px 7px; border-radius: 4px;
+    margin-right: 10px; vertical-align: middle;
+    letter-spacing: .05em;
+  }
+  .article h3 {
+    font-family: var(--font-head);
+    font-size: 15.5px; font-weight: 600;
+    margin: 28px 0 10px;
+  }
+  .article h3::before {
+    content: "§ ";
+    color: var(--text-3);
+    font-family: var(--font-mono); font-size: 13px;
+  }
+  .article h4 {
+    font-size: 13.5px; font-weight: 600;
+    color: var(--accent); margin: 20px 0 8px;
+  }
+
+  /* ── Body text ─────────────────────────────────────────────────────────── */
+  .article p, .plain { 
+    font-size: 15px; 
+    line-height: 1.85; 
+    color: var(--text); 
+    margin: 0 0 12px; 
+    font-family: var(--font-body);
+  }
+  .article strong { font-weight: 600; }
+  .article em     { font-style: italic; color: var(--text-2); }
+  .article a {
+    color: var(--accent); text-decoration: underline;
+    text-decoration-color: var(--accent-light);
+    text-underline-offset: 3px;
+  }
+  .article a:hover { text-decoration-color: var(--accent); }
+  .article hr { border: none; border-top: 1px solid var(--border); margin: 20px 0; }
+  .article hr.heavy { border-top: 3px solid var(--text); margin: 32px 0; }
+
+  /* ── Blockquote ────────────────────────────────────────────────────────── */
+  .article blockquote {
+    border-left: 3px solid var(--accent-mid);
+    background: var(--accent-light);
+    margin: 20px 0; padding: 13px 20px 13px 20px;
+    border-radius: 0 var(--radius) var(--radius) 0;
+  }
+  .article blockquote p { font-size: 14.5px; color: var(--accent); margin: 0; line-height: 1.7; }
+  /* 支持块引用内部保留换行符（修复头部概要换行丢失问题） */
+  .article blockquote p { white-space: pre-wrap; }
+  .article blockquote strong { color: var(--accent); }
+
+  /* ── Lists ─────────────────────────────────────────────────────────────── */
+  .article ul, .article ol { padding-left: 22px; margin: 6px 0 14px; }
+  .article li { font-size: 15px; line-height: 1.8; margin: 4px 0; }
+  .article li::marker { color: var(--accent-mid); }
+  .article li > ul, .article li > ol { margin: 3px 0; }
+
+  /* ── Inline code ───────────────────────────────────────────────────────── */
+  .article :not(pre) > code {
+    font-family: var(--font-mono);
+    font-size: 12.5px; font-weight: 500;
+    background: #f3f0eb; color: var(--red);
+    padding: 1px 5px; border-radius: 4px;
+    border: 1px solid var(--border);
+  }
+
+  /* ── Code blocks ───────────────────────────────────────────────────────── */
+  .code-block {
+    position: relative; margin: 20px 0;
+    border-radius: var(--radius-lg); overflow: hidden;
+    border: 1px solid var(--code-border);
+    box-shadow: 0 4px 20px rgba(0,0,0,.16);
+  }
+  .code-lang {
+    position: absolute; top: 0; left: 0;
+    font-family: var(--font-mono); font-size: 10px; font-weight: 500;
+    color: #7c8db5; background: #222538;
+    padding: 4px 12px; border-bottom-right-radius: 6px;
+    text-transform: uppercase; letter-spacing: .08em;
+    user-select: none;
+  }
+  .copy-btn {
+    position: absolute; top: 8px; right: 10px;
+    background: #2d3148; border: 1px solid #3d4260;
+    border-radius: 5px; color: #7c8db5; cursor: pointer;
+    padding: 5px 8px; display: flex; align-items: center;
+    transition: background .15s, color .15s; z-index: 1;
+  }
+  .copy-btn:hover  { background: #3a3f60; color: #cdd6f4; }
+  .copy-btn.copied { color: #a6e3a1; border-color: #4a6a4a; }
+  .code-block pre {
+    margin: 0; padding: 36px 20px 20px;
+    background: var(--code-bg); overflow-x: auto;
+    scrollbar-width: thin; scrollbar-color: #3d4260 transparent;
+  }
+  .code-block pre::-webkit-scrollbar { height: 5px; }
+  .code-block pre::-webkit-scrollbar-thumb { background: #3d4260; border-radius: 3px; }
+  .code-block code {
+    font-family: var(--font-mono); font-size: 13px; line-height: 1.7;
+    color: var(--code-text); background: none; border: none; padding: 0;
+    white-space: pre; word-break: normal;
+  }
+
+  /* ── Tables ────────────────────────────────────────────────────────────── */
+  .table-wrap {
+    overflow-x: auto; margin: 16px 0;
+    border-radius: var(--radius-lg);
+    border: 1px solid var(--border);
+    box-shadow: var(--shadow);
+  }
+  table { width: 100%; border-collapse: collapse; font-size: 14px; min-width: 360px; }
+  thead { background: #f4f2ee; }
+  th {
+    padding: 9px 14px; text-align: left;
+    font-size: 11.5px; font-weight: 600;
+    letter-spacing: .04em; text-transform: uppercase;
+    color: var(--text-2); border-bottom: 1px solid var(--border);
+    white-space: nowrap;
+  }
+  td {
+    padding: 8px 14px; border-bottom: 1px solid var(--border-soft);
+    color: var(--text); vertical-align: top; line-height: 1.6;
+  }
+  tbody tr:last-child td { border-bottom: none; }
+  tbody tr:nth-child(even) td { background: #faf9f7; }
+  tbody tr:hover td { background: var(--accent-light); transition: background .1s; }
+
+  /* ── KV block ──────────────────────────────────────────────────────────── */
+  .kv-block { background: var(--bg); border: 1px solid var(--border); border-radius: var(--radius-lg); overflow: hidden; margin: 12px 0 20px; }
+  .kv-row { display: flex; border-bottom: 1px solid var(--border-soft); align-items: flex-start; }
+  .kv-row:last-child { border-bottom: none; }
+  .kv-key { flex: 0 0 160px; padding: 9px 16px; font-size: 13.5px; font-weight: 600; color: var(--text-2); background: var(--surface); border-right: 1px solid var(--border-soft); }
+  .kv-val { flex: 1; padding: 9px 16px; font-size: 14px; color: var(--text); }
+
+  /* ── Status badges ─────────────────────────────────────────────────────── */
+  .badge-ok { display: inline-flex; align-items: center; gap: 4px; background: var(--green-bg); color: var(--green); font-size: 13px; font-weight: 500; padding: 2px 9px; border-radius: 20px; border: 1px solid #bbf7d0; }
+  .badge-err { display: inline-flex; align-items: center; gap: 4px; background: var(--red-bg); color: var(--red); font-size: 13px; font-weight: 500; padding: 2px 9px; border-radius: 20px; border: 1px solid #fecaca; }
+  .badge-warn { display: inline-flex; align-items: center; gap: 4px; background: var(--amber-bg); color: var(--amber); font-size: 13px; font-weight: 500; padding: 2px 9px; border-radius: 20px; border: 1px solid #fde68a; }
+
+  /* ── Priority badges ───────────────────────────────────────────────────── */
+  .pri-p0 { display: inline-block; background: #fef2f2; color: #991b1b; border: 1px solid #fca5a5; font-size: 12px; font-weight: 700; padding: 2px 8px; border-radius: 4px; letter-spacing: .04em; }
+  .pri-p1 { display: inline-block; background: #fff7ed; color: #9a3412; border: 1px solid #fdba74; font-size: 12px; font-weight: 700; padding: 2px 8px; border-radius: 4px; }
+  .pri-p2 { display: inline-block; background: #fffbeb; color: #92400e; border: 1px solid #fde68a; font-size: 12px; font-weight: 700; padding: 2px 8px; border-radius: 4px; }
+  .pri-p3 { display: inline-block; background: var(--accent-light); color: var(--accent); border: 1px solid #bfdbfe; font-size: 12px; font-weight: 700; padding: 2px 8px; border-radius: 4px; }
+
+  /* ── Fault header ──────────────────────────────────────────────────────── */
+  .fault-header { display: flex; align-items: center; gap: 12px; padding: 12px 16px; border-radius: var(--radius-lg); margin: 16px 0 8px; border: 1px solid; }
+  .fh-p0 { background: #fef2f2; border-color: #fca5a5; }
+  .fh-p1 { background: #fff7ed; border-color: #fdba74; }
+  .fh-p2 { background: #fffbeb; border-color: #fde68a; }
+  .fh-p3 { background: var(--accent-light); border-color: #bfdbfe; }
+  .fh-badge { font-family: var(--font-mono); font-size: 11px; font-weight: 700; letter-spacing: .08em; }
+  .fh-p0 .fh-badge { color: #991b1b; }
+  .fh-p1 .fh-badge { color: #9a3412; }
+  .fh-p2 .fh-badge { color: #92400e; }
+  .fh-p3 .fh-badge { color: var(--accent); }
+  .fh-rest { font-size: 14px; font-weight: 500; color: var(--text); }
+
+  /* ── Timeline ──────────────────────────────────────────────────────────── */
+  .timeline { border-left: 2px solid var(--accent-mid); margin: 16px 0 16px 8px; padding-left: 20px; }
+  .tl-row { display: flex; align-items: baseline; gap: 10px; margin: 8px 0; font-size: 13.5px; }
+  .tl-ts { font-family: var(--font-mono); font-size: 12px; color: var(--text-3); flex-shrink: 0; white-space: nowrap; }
+  .tl-tag { font-size: 11px; font-weight: 600; padding: 1px 7px; border-radius: 10px; flex-shrink: 0; background: var(--accent-light); color: var(--accent); }
+  .tl-tag.err { background: var(--red-bg); color: var(--red); }
+  .tl-tag.warn { background: var(--amber-bg); color: var(--amber); }
+  .tl-desc { color: var(--text); line-height: 1.5; }
+
+  /* ── Global warn ───────────────────────────────────────────────────────── */
+  .global-warn { background: #fef2f2; border: 1px solid #fca5a5; border-radius: var(--radius-lg); padding: 14px 18px; font-size: 14.5px; font-weight: 600; color: #991b1b; margin: 16px 0; }
+
+  /* ── Tree note ─────────────────────────────────────────────────────────── */
+  .tree-note { white-space: pre-wrap; font-family: var(--font-mono); font-size: 13.5px; line-height: 1.6; color: var(--text-2); margin: 8px 0 8px 16px; }
+
+  /* ── Disclaimer ────────────────────────────────────────────────────────── */
+  .disclaimer { background: var(--bg); border: 1px solid var(--border); border-radius: var(--radius); padding: 14px 18px; font-size: 13.5px; color: var(--text-2); font-style: italic; }
+
+  /* ── Meta footer ───────────────────────────────────────────────────────── */
+  .meta {
+    margin-top: 48px; padding-top: 16px;
+    border-top: 1px solid var(--border-soft);
+    display: flex; justify-content: space-between; align-items: center;
+    font-size: 12px; color: var(--text-3);
+  }
+  .meta-source { font-family: var(--font-mono); font-size: 11.5px; }
+
+  /* ── Brand logo ────────────────────────────────────────────────────────── */
+  .brand-logo {
+    font-family: var(--font-head);
+    font-size: 14px;
+    color: var(--text-3);
+    letter-spacing: 0.05em;
+    margin-bottom: 4px;
+    flex-shrink: 0;
+    margin-left: 16px;
+  }
+  .brand-logo strong {
+    font-weight: 600;
+    color: var(--accent);
+  }
+  @media (max-width: 900px) {
+    .title-container { flex-direction: column; align-items: flex-start; gap: 12px; }
+    .brand-logo { margin-left: 0; margin-bottom: 0; }
+  }
+  /* ── Print ─────────────────────────────────────────────────────────────── */
+  @media print {
+    body { background: white; }
+    #progress, .toc { display: none; }
+    .layout { display: block; padding: 0; }
+    .article { border: none; box-shadow: none; padding: 24px; }
+    .copy-btn { display: none; }
+    .brand-logo { margin-bottom: 0; }
+  }
+
+  /* ── Responsive ────────────────────────────────────────────────────────── */
+  @media (max-width: 900px) {
+    .toc { display: none; }
+    .article { padding: 36px 28px; }
+    .layout { padding: 24px 16px 64px; }
+  }
+  @media (max-width: 480px) {
+    .article { padding: 24px 18px; }
+    .article h1 { font-size: 22px; }
+  }
+</style>
+</head>
+<body>
+
+<div id="progress"></div>
+
+<div class="layout">
+  <nav class="toc" id="toc">
+  <div class="toc-title">目录</div>
+  <div class="toc-content">
+<div class="toc-item has-children"><button class="toc-toggle" onclick="toggleToc(this)" aria-expanded="true">
+                <svg viewBox="0 0 24 24" width="12" height="12" stroke="currentColor" stroke-width="2" fill="none"><polyline points="6 9 12 15 18 9"></polyline></svg>
+              </button><a href="#h-故障诊断报告-tls-ocsp-stapling-失效" onclick="event.preventDefault(); const target = document.getElementById('h-故障诊断报告-tls-ocsp-stapling-失效'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l1">🔴 故障诊断报告 — TLS OCSP Stapling 失效</a></div>
+<div class="toc-group" id="group-h-一故障概览">
+<div class="toc-item has-children"><button class="toc-toggle" onclick="toggleToc(this)" aria-expanded="true">
+                <svg viewBox="0 0 24 24" width="12" height="12" stroke="currentColor" stroke-width="2" fill="none"><polyline points="6 9 12 15 18 9"></polyline></svg>
+              </button><a href="#h-一故障概览" onclick="event.preventDefault(); const target = document.getElementById('h-一故障概览'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l2">一、故障概览</a></div>
+<div class="toc-group" id="group-h-置信度说明">
+<div class="toc-item "><span class="toc-spacer"></span><a href="#h-置信度说明" onclick="event.preventDefault(); const target = document.getElementById('h-置信度说明'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l3">置信度说明</a></div>
+</div>
+<div class="toc-item has-children"><button class="toc-toggle" onclick="toggleToc(this)" aria-expanded="true">
+                <svg viewBox="0 0 24 24" width="12" height="12" stroke="currentColor" stroke-width="2" fill="none"><polyline points="6 9 12 15 18 9"></polyline></svg>
+              </button><a href="#h-二根因速览" onclick="event.preventDefault(); const target = document.getElementById('h-二根因速览'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l2">二、根因速览</a></div>
+<div class="toc-group" id="group-h-事故时间线-故障传导链路">
+<div class="toc-item "><span class="toc-spacer"></span><a href="#h-事故时间线-故障传导链路" onclick="event.preventDefault(); const target = document.getElementById('h-事故时间线-故障传导链路'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l3">事故时间线 & 故障传导链路</a></div>
+<div class="toc-item "><span class="toc-spacer"></span><a href="#h-故障因果链" onclick="event.preventDefault(); const target = document.getElementById('h-故障因果链'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l3">故障因果链</a></div>
+</div>
+<div class="toc-item has-children"><button class="toc-toggle" onclick="toggleToc(this)" aria-expanded="true">
+                <svg viewBox="0 0 24 24" width="12" height="12" stroke="currentColor" stroke-width="2" fill="none"><polyline points="6 9 12 15 18 9"></polyline></svg>
+              </button><a href="#h-三排查过程" onclick="event.preventDefault(); const target = document.getElementById('h-三排查过程'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l2">三、排查过程</a></div>
+<div class="toc-group" id="group-h-31-初始现象">
+<div class="toc-item "><span class="toc-spacer"></span><a href="#h-31-初始现象" onclick="event.preventDefault(); const target = document.getElementById('h-31-初始现象'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l3">3.1 初始现象</a></div>
+<div class="toc-item "><span class="toc-spacer"></span><a href="#h-32-假设驱动排查" onclick="event.preventDefault(); const target = document.getElementById('h-32-假设驱动排查'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l3">3.2 假设驱动排查</a></div>
+<div class="toc-item "><span class="toc-spacer"></span><a href="#h-33-排查结论与逻辑树" onclick="event.preventDefault(); const target = document.getElementById('h-33-排查结论与逻辑树'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l3">3.3 排查结论与逻辑树</a></div>
+</div>
+<div class="toc-item has-children"><button class="toc-toggle" onclick="toggleToc(this)" aria-expanded="true">
+                <svg viewBox="0 0 24 24" width="12" height="12" stroke="currentColor" stroke-width="2" fill="none"><polyline points="6 9 12 15 18 9"></polyline></svg>
+              </button><a href="#h-四修复方案" onclick="event.preventDefault(); const target = document.getElementById('h-四修复方案'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l2">四、修复方案</a></div>
+<div class="toc-group" id="group-h-41-应急处置无-非业务中断型故障">
+<div class="toc-item "><span class="toc-spacer"></span><a href="#h-41-应急处置无-非业务中断型故障" onclick="event.preventDefault(); const target = document.getElementById('h-41-应急处置无-非业务中断型故障'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l3">4.1 应急处置（无 — 非业务中断型故障）</a></div>
+<div class="toc-item "><span class="toc-spacer"></span><a href="#h-42-永久修复计划" onclick="event.preventDefault(); const target = document.getElementById('h-42-永久修复计划'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l3">4.2 永久修复计划</a></div>
+</div>
+</div>
+  </div>
+</nav>
+  <article class="article" id="article" style="position: relative;">
+    <div class="title-container"><h1 id="h-故障诊断报告-tls-ocsp-stapling-失效">🔴 故障诊断报告 — TLS OCSP Stapling 失效</h1><div class="brand-logo">by <strong>Witty Diagnosis Agent</strong></div></div>
+<blockquote>
+<p><strong>报告编号</strong>: RCA-20260602-001
+<strong>故障级别</strong>: P3（功能缺陷，非业务中断，但影响客户端证书信任验证效率）
+<strong>报告时间</strong>: 2026-06-02 02:10:00 UTC
+<strong>当前状态</strong>: 🔴 未恢复（持续性配置缺陷）</p>
+</blockquote>
+<hr>
+<h2 id="h-一故障概览">一、故障概览</h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>项目</th>
+<th>内容</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>故障标题</td>
+<td>tls-full 容器端口 4443 OCSP Stapling 功能失效，openssl s_client 返回 <code>OCSP response: no response sent</code></td>
+</tr>
+<tr>
+<td>影响范围</td>
+<td>容器 tls-full（端口 4443），客户端使用 <code>openssl s_client -status</code> 连接时无法获取服务端推送的证书吊销状态</td>
+</tr>
+<tr>
+<td>故障时段</td>
+<td>持续性故障 — 自服务部署起截至 2026-06-02 02:10:00 UTC 始终存在</td>
+</tr>
+<tr>
+<td>根本原因</td>
+<td>双层缺陷叠加：① 服务器证书为 X.509 Version 1，不含 AIA 扩展，无法指定 OCSP Responder URL；② <code>openssl s_server</code> 启动命令仅带 <code>-status_timeout 1</code> 但未指定 <code>-status_file</code>，导致无 OCSP 响应数据可供 stapling</td>
+</tr>
+<tr>
+<td>是否恢复</td>
+<td><span class="badge-err">❌ 未恢复</span></td>
+</tr>
+<tr>
+<td>根因置信度</td>
+<td>🟢 高置信 — 可复现，单一因果链即可解释全部现象</td>
+</tr>
+</tbody></table></div>
+<h3 id="h-置信度说明">置信度说明</h3>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>等级</th>
+<th>标识</th>
+<th>含义</th>
+<th>示例场景</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>高置信</td>
+<td>🟢</td>
+<td>根因已明确，可复现，单一原因可解释所有现象</td>
+<td>本场景：证书无 AIA + 服务端未配置 status_file → OCSP stapling 必然失败</td>
+</tr>
+<tr>
+<td>中置信</td>
+<td>🟡</td>
+<td>根因基本确认，但存在 1～2 个无法完全解释的现象</td>
+<td>—</td>
+</tr>
+<tr>
+<td>低置信</td>
+<td>🟠</td>
+<td>有多个可疑原因，尚未排除竞争，结论为推断</td>
+<td>—</td>
+</tr>
+<tr>
+<td>未知</td>
+<td>🔴</td>
+<td>现象无法解释，根因未定位，仍在排查中</td>
+<td>—</td>
+</tr>
+</tbody></table></div>
+<hr>
+<h2 id="h-二根因速览">二、根因速览</h2>
+<h3 id="h-事故时间线-故障传导链路">事故时间线 & 故障传导链路</h3>
+<div class="code-block">
+  <span class="code-lang">text</span>
+  <button class="copy-btn" onclick="copyCode(this)" title="复制">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
+  </button>
+  <pre><code>时间                         事件                                                              性质          溯源路径
+─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+
+&lt;div style="margin-bottom: 8px;"&gt;&lt;strong&gt;[服务部署时]                  tls-full 容器启动                                                    🟢 部署       [kuafu_T1_ocsp_stapling_diagnosis_20260602.md:&lt;/strong&gt; 72]&lt;/div&gt;
+
+  │                           openssl s_server -key valid.key -cert valid.pem -accept 4443
+  │                           -www -status_timeout 1
+  │
+  ▼
+
+&lt;div style="margin-bottom: 8px;"&gt;&lt;strong&gt;[服务运行期间]                valid.pem 证书为 X.509 Version 1                                      ⛔ 固有限制   [kuafu_T1_ocsp_stapling_diagnosis_20260602.md:&lt;/strong&gt; 39-53]&lt;/div&gt;
+
+  │                           无 AIA 扩展，无 OCSP Responder URL 字段
+  │                           无法嵌入 OCSP Responder 地址供客户端查询
+  │
+  ▼
+
+&lt;div style="margin-bottom: 8px;"&gt;&lt;strong&gt;[服务运行期间]                CA 证书 TestRootCA（ca.pem）也                                                          [kuafu_T1_ocsp_stapling_diagnosis_20260602.md:&lt;/strong&gt; 51-53]&lt;/div&gt;
+
+  │                           未配置 AIA 扩展
+  │                           整个 CA 体系未部署 OCSP Responder 服务实例
+  │
+  ▼
+
+&lt;div style="margin-bottom: 8px;"&gt;&lt;strong&gt;[服务运行期间]                openssl s_server 启动命令                                                                 [kuafu_T1_ocsp_stapling_diagnosis_20260602.md:&lt;/strong&gt; 77-82]&lt;/div&gt;
+
+  │                           仅带 -status_timeout 1（开启 stapling 能力标记）
+  │                           缺少 -status_file &lt;ocsp_response.der&gt; 参数
+  │                           服务端无预生成 OCSP 响应文件可发送
+  │
+  ▼
+
+&lt;div style="margin-bottom: 8px;"&gt;&lt;strong&gt;[客户端连接时]                openssl s_client -status -connect localhost:&lt;/strong&gt; 4443                       🔴 故障验证   [kuafu_T1_ocsp_stapling_diagnosis_20260602.md:14-29]&lt;/div&gt;
+
+  │                           服务端 TLS 握手时返回 "OCSP response: no response sent"
+  │                           证书链验证返回 code 21（unable to verify the first certificate）
+  │
+  ▼
+                              🔴 OCSP Stapling 完全失效 — 客户端无法获取服务端证书吊销状态</code></pre>
+</div>
+<h3 id="h-故障因果链">故障因果链</h3>
+<div class="code-block">
+  <span class="code-lang">text</span>
+  <button class="copy-btn" onclick="copyCode(this)" title="复制">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
+  </button>
+  <pre><code>证书为 X.509 Version 1（无 AIA 扩展）
+    │
+    ├─► 无 Authority Information Access 字段 → 无 OCSP Responder URL
+    │
+    ├─► CA（TestRootCA）也未配置 AIA → 无 OCSP Responder 服务可用
+    │
+    └─► 无法生成有效的 OCSP 响应文件供 stapling 使用
+            │
+            ▼
+openssl s_server 缺少 -status_file &lt;ocsp_response.der&gt;
+    │
+    └─► 虽然 -status_timeout 1 开启 Stapling 能力标记
+            │
+            └─► 服务端无 OCSP 响应数据可推送
+                    │
+                    ▼
+                    🔴 TLS 握手阶段 "OCSP response: no response sent"
+                    │
+                    └─► 客户端无法验证证书吊销状态
+                            │
+                            └─► 回退到 CRL 或完全跳过吊销检查（信任决策降级）</code></pre>
+</div>
+<hr>
+<h2 id="h-三排查过程">三、排查过程</h2>
+<blockquote>
+<p>排查逻辑：<strong>提出假设 → 收集证据 → 验证或排除 → 逐步收敛到根因</strong></p>
+</blockquote>
+<h3 id="h-31-初始现象">3.1 初始现象</h3>
+<ul>
+<li><strong>现象 1</strong>：对 tls-full:4443 执行 <code>openssl s_client -status -connect localhost:4443 -servername localhost</code>，输出第一行即显示 <code>OCSP response: no response sent</code></li>
+<li><strong>现象 2</strong>：证书链验证返回代码 <code>21 (unable to verify the first certificate)</code></li>
+<li><strong>现象 3</strong>：<code>cert_status: no AIA</code> 指示客户端无法从证书中找到 OCSP Responder 地址</li>
+</ul>
+<h3 id="h-32-假设驱动排查">3.2 假设驱动排查</h3>
+<hr>
+<h4 id="h-假设-f1ocsp-responder-不可达ocsp-responder-unreachable">假设 F1：OCSP Responder 不可达（OCSP responder unreachable）</h4>
+<blockquote>
+<p>🧪 假设：OCSP Responder 服务已部署但网络不通，服务端无法获取响应</p>
+</blockquote>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>检查项</th>
+<th>操作（基于真实历史记录）</th>
+<th>结论</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>证书 AIA 扩展</td>
+<td><code>openssl x509 -in /test/certs/valid.pem -noout -text</code></td>
+<td>❌ 证书为 Version 1，<strong>无任何扩展字段</strong>，根本不存在 AIA</td>
+</tr>
+<tr>
+<td>CA 证书 AIA</td>
+<td><code>openssl x509 -in /test/certs/ca.pem -noout -text</code></td>
+<td>❌ CA 虽为 Version 3，但也<strong>无 AIA 扩展</strong>，未指定 OCSP Responder URL</td>
+</tr>
+<tr>
+<td>OCSP Responder 服务</td>
+<td>自签名 CA 环境下推理</td>
+<td><span class="badge-err">❌ 无 AIA 意味着客户端和服务端都不知道该去向哪个 URL 查询，OCSP Responder 服务本身也未被部署</span></td>
+</tr>
+</tbody></table></div>
+<p><strong>❌ 排除</strong>：该假设的前提条件（AIA 扩展存在且指定了 OCSP URL）不成立。场景的根因更上层——证书根本不含 AIA 扩展，&quot;responder 不可达&quot;是次级问题，而非根本问题。</p>
+<hr>
+<h4 id="h-假设-f2ocsp-响应签名无效ocsp-response-signature-invalid">假设 F2：OCSP 响应签名无效（OCSP response signature invalid）</h4>
+<blockquote>
+<p>🧪 假设：OCSP Responder 响应已收到，但其数字签名被验证失败</p>
+</blockquote>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>检查项</th>
+<th>操作（基于真实历史记录）</th>
+<th>结论</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>OCSP 响应接收</td>
+<td><code>openssl s_client -status</code> 输出</td>
+<td>❌ 响应根本未被发送（<code>no response sent</code>），而非签名无效</td>
+</tr>
+</tbody></table></div>
+<p><strong>❌ 排除</strong>：服务端未发出任何 OCSP 响应，签名验证无从谈起。</p>
+<hr>
+<h4 id="h-假设-f3服务端未启用-ocsp-stapling-确认根因">假设 F3：服务端未启用 OCSP Stapling ✅ 确认根因</h4>
+<blockquote>
+<p>🧪 假设：服务端 TLS 配置不完整，导致无法发送 OCSP Stapling 响应</p>
+</blockquote>
+<p><strong>Step 1 — 确认服务端配置</strong></p>
+<div class="code-block">
+  <span class="code-lang">bash</span>
+  <button class="copy-btn" onclick="copyCode(this)" title="复制">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
+  </button>
+  <pre><code># 运行中的进程（ps aux 输出）：
+root        51  0.0  0.0   openssl s_server -key /test/certs/valid.key \
+                                           -cert /test/certs/valid.pem \
+                                           -accept 4443 -www -status_timeout 1</code></pre>
+</div>
+<p>分析：</p>
+<ul>
+<li><code>-status_timeout 1</code>：✅ <strong>已开启</strong> OCSP Stapling 能力标记，设置了 1 秒超时</li>
+<li><strong>未指定 <code>-status_file</code></strong>：❌ <code>openssl s_server</code> 必须通过 <code>-status_file &lt;ocsp_response.der&gt;</code> 指定预生成的 OCSP 响应文件</li>
+<li>缺少 <code>-status_file</code> 时，<code>openssl s_server</code> <strong>没有内置主动查询 OCSP Responder 的能力</strong>，因此永远无法生成或发送 stapling 响应</li>
+</ul>
+<p><strong>Step 2 — 验证证书是否具备 AIA</strong></p>
+<div class="code-block">
+  <span class="code-lang">bash</span>
+  <button class="copy-btn" onclick="copyCode(this)" title="复制">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
+  </button>
+  <pre><code># 服务器证书检查
+openssl x509 -in /test/certs/valid.pem -noout -text
+# 输出显示: Version: 1 (0x0)  — 无任何扩展字段
+# Version 1 证书无法包含 AIA（Authority Information Access）扩展
+
+# CA 证书检查
+openssl x509 -in /test/certs/ca.pem -noout -text
+# CA 为 Version 3，但也无 AIA 扩展 — 整个 CA 体系未配置 OCSP</code></pre>
+</div>
+<p><strong>✅ 结论（双重根因确认）</strong>：</p>
+<ol>
+<li><strong>证书层因</strong>：服务器证书 valid.pem 为 <strong>X.509 Version 1</strong>，不含 AIA 扩展，无法嵌入 OCSP Responder URL。CA 证书也未配置 AIA。</li>
+<li><strong>配置层因</strong>：<code>openssl s_server</code> 启动时虽然带有 <code>-status_timeout 1</code>，但<strong>缺少 <code>-status_file</code> 参数</strong>，没有提供预生成的 OCSP 响应 DER 文件，服务端无数据可推送。</li>
+</ol>
+<p>两个原因中的任一单独存在即可导致 OCSP Stapling 失效，二者叠加则完全阻塞了该功能。</p>
+<hr>
+<h4 id="h-假设-f4ocsp-响应已过期ocsp-response-expired">假设 F4：OCSP 响应已过期（OCSP response expired）</h4>
+<blockquote>
+<p>🧪 假设：服务端曾成功获取 OCSP 响应但已过期</p>
+</blockquote>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>检查项</th>
+<th>操作（基于真实历史记录）</th>
+<th>结论</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>响应是否存在</td>
+<td><code>openssl s_client -status</code></td>
+<td>❌ 服务端从未发送任何 OCSP 响应（<code>no response sent</code>）</td>
+</tr>
+</tbody></table></div>
+<p><strong>❌ 排除</strong>：服务端从未具备发送 OCSP 响应的能力，&quot;响应过期&quot;的前提不成立。</p>
+<hr>
+<h4 id="h-假设-f5证书已被吊销但未反映certificate-revoked">假设 F5：证书已被吊销但未反映（Certificate revoked）</h4>
+<blockquote>
+<p>🧪 假设：证书已实际吊销，但 OCSP Stapling 未生效导致无法反映吊销状态</p>
+</blockquote>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>检查项</th>
+<th>操作（基于真实历史记录）</th>
+<th>结论</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>OCSP 吊销状态查询</td>
+<td>诊断报告第 3 节</td>
+<td><span class="badge-err">❌ 无法执行——无 AIA 扩展、无 OCSP Responder URL、自签名 CA 未部署 OCSP Responder</span></td>
+</tr>
+</tbody></table></div>
+<p><strong>❌ 排除</strong>：目前无证据表明证书被吊销，且 OCSP 通道本身未建立，此假设无法验证且非当前故障的直接原因。</p>
+<hr>
+<h3 id="h-33-排查结论与逻辑树">3.3 排查结论与逻辑树</h3>
+<div class="code-block">
+  <span class="code-lang">text</span>
+  <button class="copy-btn" onclick="copyCode(this)" title="复制">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
+  </button>
+  <pre><code>OCSP response: no response sent
+│
+├─► 假设 F1：OCSP Responder 不可达    → ❌ 排除 — 证书无 AIA，根本未指定 URL
+│
+├─► 假设 F2：OCSP 响应签名无效         → ❌ 排除 — 无任何响应被发送
+│
+├─► 假设 F3：服务端 OCSP Stapling 未配置 → ✅ 确认根因
+│   │
+│   ├─► 证书层：valid.pem 为 X.509 v1，无 AIA 扩展 → 无 OCSP URL
+│   │   └─► CA (TestRootCA) 也无 AIA → 整个体系无 OCSP 服务
+│   │
+│   └─► 配置层：openssl s_server 缺少 -status_file &lt;ocsp_response.der&gt;
+│       └─► 服务端无 OCSP 响应数据可推送
+│
+├─► 假设 F4：OCSP 响应过期             → ❌ 排除 — 从未生成过响应
+│
+└─► 假设 F5：证书已被吊销              → ❌ 排除 — 无可验证证据，且非本故障直接原因
+
+🎯 根因确认：双层缺陷 — X.509 v1 证书无 AIA + openssl s_server 缺失 -status_file</code></pre>
+</div>
+<hr>
+<h2 id="h-四修复方案">四、修复方案</h2>
+<h3 id="h-41-应急处置无-非业务中断型故障">4.1 应急处置（无 — 非业务中断型故障）</h3>
+<p>当前故障为功能特性缺失（OCSP Stapling），不影响 TLS 握手与加密通信的核心功能。客户端仍可完成 TLS 连接，但无法在握手阶段获取证书吊销状态。</p>
+<blockquote>
+<p><strong>影响分析</strong>：客户端回退到 CRL（证书吊销列表）下载或完全跳过吊销检查。不建议作为 P0/P1 紧急处理，应纳入计划性修复。</p>
+</blockquote>
+<h3 id="h-42-永久修复计划">4.2 永久修复计划</h3>
+<h4 id="h-方案一推荐重建为-x509-v3-证书-配置-ocsp-stapling">方案一（推荐）：重建为 X.509 v3 证书 + 配置 OCSP Stapling</h4>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>步骤</th>
+<th>操作</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>1</td>
+<td>生成新的 X.509 v3 证书，添加 AIA 扩展字段</td>
+<td>在 <code>openssl.cnf</code> 中配置 <code>authorityInfoAccess = OCSP;URI:http://ocsp.example.com/</code></td>
+</tr>
+<tr>
+<td>2</td>
+<td>部署并配置 OCSP Responder 服务</td>
+<td>在自签名 CA 环境中使用 <code>openssl ocsp</code> 命令启动 OCSP Responder：<code>openssl ocsp -index index.txt -CA ca.pem -rsigner responder.pem -port 8888 -text</code></td>
+</tr>
+<tr>
+<td>3</td>
+<td>生成 OCSP 响应文件</td>
+<td>使用 <code>openssl ocsp -issuer ca.pem -cert valid.pem -url http://ocsp.example.com/ -respout ocsp_response.der</code> 生成响应</td>
+</tr>
+<tr>
+<td>4</td>
+<td>更新 <code>openssl s_server</code> 启动命令</td>
+<td>追加 <code>-status_file /path/to/ocsp_response.der</code> 参数</td>
+</tr>
+<tr>
+<td>5</td>
+<td>设置 OCSP 响应定期更新</td>
+<td>通过 cron/systemd timer 定期（如每 6 小时）重新生成 OCSP 响应文件并重启服务</td>
+</tr>
+<tr>
+<td>6</td>
+<td>验证</td>
+<td><code>openssl s_client -status -connect localhost:4443</code> 应显示 <code>OCSP response: OCSP Response Data</code></td>
+</tr>
+</tbody></table></div>
+<h4 id="h-方案二轻量替代使用-crl-替代-ocsp">方案二（轻量替代）：使用 CRL 替代 OCSP</h4>
+<p>如果环境复杂度有限，可考虑仅配置 CRL（证书吊销列表）分发而非 OCSP Stapling：</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>步骤</th>
+<th>操作</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>1</td>
+<td>在 CA 环境中维护 CRL：<code>openssl ca -gencrl -out ca.crl</code></td>
+</tr>
+<tr>
+<td>2</td>
+<td>在客户端配置 CRL 分发点路径</td>
+</tr>
+<tr>
+<td>3</td>
+<td>客户端 TLS 连接时主动下载 CRL 验证吊销状态</td>
+</tr>
+</tbody></table></div>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>修复措施</th>
+<th>负责人</th>
+<th>完成时间</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>生成 X.509 v3 证书（含 AIA 扩展）</td>
+<td>待定</td>
+<td>待定</td>
+</tr>
+<tr>
+<td>部署 OCSP Responder 服务</td>
+<td>待定</td>
+<td>待定</td>
+</tr>
+<tr>
+<td>配置 openssl s_server 增加 <code>-status_file</code> 参数</td>
+<td>待定</td>
+<td>待定</td>
+</tr>
+<tr>
+<td>建立 OCSP 响应定时更新机制</td>
+<td>待定</td>
+<td>待定</td>
+</tr>
+<tr>
+<td>端到端验证 OCSP Stapling 生效</td>
+<td>待定</td>
+<td>待定</td>
+</tr>
+</tbody></table></div>
+<hr>
+<blockquote>
+<p>📁 <strong>RCA 报告路径</strong>: <code>C:\Users\86188\.witty-diagnosis-agent\baize\reports\OCSP_Stapling失效诊断_tls-full_20260602_021000_report.md</code></p>
+</blockquote>
+
+    <div class="meta">
+      <span class="meta-source">OCSP_Stapling失效诊断_tls-full_20260602_021000_report.md</span>
+      <span>生成于 2026/06/02 10:24</span>
+    </div>
+  </article>
+</div>
+
+<script>
+  /* ── 滚动进度条 ── */
+  window.addEventListener("scroll", () => {
+    const el  = document.documentElement;
+    const pct = el.scrollTop / (el.scrollHeight - el.clientHeight) * 100;
+    document.getElementById("progress").style.width = Math.min(pct, 100) + "%";
+  });
+
+  /* ── TOC 高亮当前章节 ── */
+  (function () {
+    const headings = Array.from(document.querySelectorAll("article h1,article h2,article h3"));
+    const links    = Array.from(document.querySelectorAll(".toc a"));
+    if (!links.length) return;
+    const obs = new IntersectionObserver(entries => {
+      entries.forEach(e => {
+        if (!e.isIntersecting) return;
+        links.forEach(l => l.classList.remove("active"));
+        const a = links.find(l => l.getAttribute("href") === "#" + e.target.id);
+        if (a) a.classList.add("active");
+      });
+    }, { rootMargin: "-10% 0px -80% 0px" });
+    headings.forEach(h => obs.observe(h));
+  })();
+
+  /* ── h2 章节序号自动计数 ── */
+  (function () {
+    let idx = 0;
+    document.querySelectorAll("article h2").forEach(el => {
+      idx++;
+      el.setAttribute("data-index", String(idx).padStart(2, "0"));
+    });
+  })();
+
+  /* ── 代码块一键复制 ── */
+  function copyCode(btn) {
+    const code = btn.closest(".code-block").querySelector("code").innerText;
+    navigator.clipboard.writeText(code).then(() => {
+      btn.classList.add("copied");
+      btn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>';
+      setTimeout(() => {
+        btn.classList.remove("copied");
+        btn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>';
+      }, 2000);
+    });
+  }
+
+  /* ── 目录树收缩/展开 ── */
+  function toggleToc(btn) {
+    const expanded = btn.getAttribute("aria-expanded") === "true";
+    btn.setAttribute("aria-expanded", String(!expanded));
+    const parentItem = btn.closest(".toc-item");
+    let nextEl = parentItem.nextElementSibling;
+    if (nextEl && nextEl.classList.contains("toc-group")) {
+      if (expanded) {
+        nextEl.style.maxHeight = nextEl.scrollHeight + "px";
+        void nextEl.offsetHeight;
+        nextEl.classList.add("collapsed");
+      } else {
+        nextEl.classList.remove("collapsed");
+        nextEl.style.maxHeight = nextEl.scrollHeight + "px";
+        setTimeout(() => {
+          if (!nextEl.classList.contains("collapsed")) {
+            nextEl.style.maxHeight = "none";
+          }
+        }, 300);
+      }
+    }
+  }
+</script>
+</body>
+</html>

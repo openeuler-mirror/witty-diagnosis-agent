@@ -1,0 +1,1026 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>故障诊断报告：容器 tls-test — 端口 4437 TLS 证书验证失败（CA 信任缺失）</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Lora:ital,wght@0,400;0,600;1,400&family=Source+Sans+3:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  /* ── Design tokens ─────────────────────────────────────────────────────── */
+  :root {
+    --bg:          #f8f7f4;
+    --surface:     #ffffff;
+    --border:      #e8e5df;
+    --border-soft: #f0ede8;
+
+    --text:        #1c1917;
+    --text-2:      #57534e;
+    --text-3:      #a8a29e;
+
+    --accent:      #1d4e6e;
+    --accent-light:#e8f1f7;
+    --accent-mid:  #3b82a0;
+
+    --red:         #c0392b;
+    --red-bg:      #fef2f2;
+    --amber:       #92400e;
+    --amber-bg:    #fffbeb;
+    --green:       #14532d;
+    --green-bg:    #f0fdf4;
+
+    --code-bg:     #1a1d27;
+    --code-text:   #cdd6f4;
+    --code-border: #2d3148;
+
+    --font-body: "Source Sans 3", "PingFang SC", "Hiragino Sans GB", sans-serif;
+    --font-head: "Lora", "PingFang SC", Georgia, serif;
+    --font-mono: "JetBrains Mono", "Fira Code", Consolas, monospace;
+
+    --radius:    8px;
+    --radius-lg: 12px;
+    --shadow:    0 1px 3px rgba(0,0,0,.06), 0 4px 16px rgba(0,0,0,.05);
+    --shadow-lg: 0 2px 8px rgba(0,0,0,.07), 0 8px 32px rgba(0,0,0,.06);
+
+    --toc-width:   240px;
+    --gap:         32px;
+  }
+
+  /* ── Progress bar ──────────────────────────────────────────────────────── */
+  #progress {
+    position: fixed; top: 0; left: 0; height: 3px; width: 0%;
+    background: linear-gradient(90deg, var(--accent-mid), var(--accent));
+    z-index: 999; transition: width .1s linear;
+    border-radius: 0 2px 2px 0;
+  }
+
+  /* ── Base ──────────────────────────────────────────────────────────────── */
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  html { font-size: 16px; scroll-behavior: smooth; }
+  body {
+    font-family: var(--font-body);
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.8;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* ── Layout ────────────────────────────────────────────────────────────── */
+  .layout {
+    display: flex;
+    align-items: flex-start;
+    max-width: calc(var(--toc-width) + 820px + var(--gap) * 3);
+    margin: 0 auto;
+    padding: 48px var(--gap) 96px;
+    gap: var(--gap);
+  }
+
+  /* ── TOC ───────────────────────────────────────────────────────────────── */
+  .toc {
+    width: var(--toc-width);
+    flex-shrink: 0;
+    position: sticky;
+    top: 32px;
+    max-height: calc(100vh - 64px);
+    overflow-y: auto;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    padding: 20px;
+    box-shadow: var(--shadow);
+    scrollbar-width: thin;
+    scrollbar-color: var(--border) transparent;
+  }
+  .toc-title {
+    font-size: 10.5px;
+    font-weight: 600;
+    letter-spacing: .1em;
+    text-transform: uppercase;
+    color: var(--text-3);
+    margin-bottom: 12px;
+    padding-bottom: 10px;
+    border-bottom: 1px solid var(--border-soft);
+  }
+  .toc-item {
+    display: flex;
+    align-items: flex-start;
+    margin: 2px 0;
+  }
+  .toc-toggle {
+    background: none;
+    border: none;
+    cursor: pointer;
+    color: var(--text-3);
+    padding: 4px;
+    margin-right: 4px;
+    margin-top: 2px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 4px;
+    transition: background 0.2s, transform 0.2s;
+  }
+  .toc-toggle:hover { background: var(--border-soft); color: var(--text); }
+  .toc-toggle[aria-expanded="false"] svg { transform: rotate(-90deg); }
+  .toc-spacer { width: 20px; flex-shrink: 0; }
+  .toc-group { overflow: hidden; transition: max-height 0.3s ease-in-out; }
+  .toc-group.collapsed { max-height: 0 !important; }
+  
+  .toc a {
+    display: block;
+    font-size: 13px;
+    color: var(--text-2);
+    text-decoration: none;
+    padding: 4px 8px;
+    border-radius: 5px;
+    line-height: 1.45;
+    transition: background .15s, color .15s;
+    word-break: break-all;
+    flex-grow: 1;
+  }
+  .toc a:hover  { background: var(--accent-light); color: var(--accent); }
+  .toc a.active { background: var(--accent-light); color: var(--accent); font-weight: 500; }
+  .toc-l1 { font-weight: 600; color: var(--text); }
+  .toc-l2 { font-weight: 600; color: var(--text); }
+  .toc-l3 { font-size: 12px !important; padding-left: 14px !important; }
+
+  /* ── Article card ──────────────────────────────────────────────────────── */
+  .article {
+    flex: 1; min-width: 0;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    padding: 52px 60px;
+    box-shadow: var(--shadow-lg);
+  }
+
+  /* ── Headings ──────────────────────────────────────────────────────────── */
+  .title-container {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-end;
+    margin: 0 0 28px;
+    padding-bottom: 18px;
+    border-bottom: 2px solid var(--text);
+  }
+  .article h1 {
+    font-family: var(--font-head);
+    font-size: 26px; font-weight: 600; line-height: 1.3;
+    margin: 0; padding-bottom: 0;
+    border-bottom: none;
+  }
+  .article h2 {
+    font-family: var(--font-head);
+    font-size: 19px; font-weight: 600;
+    margin: 48px 0 14px; padding-bottom: 8px;
+    border-bottom: 1px solid var(--border);
+  }
+  .article h2::before {
+    content: attr(data-index);
+    display: inline-block;
+    font-family: var(--font-mono);
+    font-size: 10.5px; font-weight: 500;
+    color: var(--accent-mid);
+    background: var(--accent-light);
+    padding: 1px 7px; border-radius: 4px;
+    margin-right: 10px; vertical-align: middle;
+    letter-spacing: .05em;
+  }
+  .article h3 {
+    font-family: var(--font-head);
+    font-size: 15.5px; font-weight: 600;
+    margin: 28px 0 10px;
+  }
+  .article h3::before {
+    content: "§ ";
+    color: var(--text-3);
+    font-family: var(--font-mono); font-size: 13px;
+  }
+  .article h4 {
+    font-size: 13.5px; font-weight: 600;
+    color: var(--accent); margin: 20px 0 8px;
+  }
+
+  /* ── Body text ─────────────────────────────────────────────────────────── */
+  .article p, .plain { 
+    font-size: 15px; 
+    line-height: 1.85; 
+    color: var(--text); 
+    margin: 0 0 12px; 
+    font-family: var(--font-body);
+  }
+  .article strong { font-weight: 600; }
+  .article em     { font-style: italic; color: var(--text-2); }
+  .article a {
+    color: var(--accent); text-decoration: underline;
+    text-decoration-color: var(--accent-light);
+    text-underline-offset: 3px;
+  }
+  .article a:hover { text-decoration-color: var(--accent); }
+  .article hr { border: none; border-top: 1px solid var(--border); margin: 20px 0; }
+  .article hr.heavy { border-top: 3px solid var(--text); margin: 32px 0; }
+
+  /* ── Blockquote ────────────────────────────────────────────────────────── */
+  .article blockquote {
+    border-left: 3px solid var(--accent-mid);
+    background: var(--accent-light);
+    margin: 20px 0; padding: 13px 20px 13px 20px;
+    border-radius: 0 var(--radius) var(--radius) 0;
+  }
+  .article blockquote p { font-size: 14.5px; color: var(--accent); margin: 0; line-height: 1.7; }
+  /* 支持块引用内部保留换行符（修复头部概要换行丢失问题） */
+  .article blockquote p { white-space: pre-wrap; }
+  .article blockquote strong { color: var(--accent); }
+
+  /* ── Lists ─────────────────────────────────────────────────────────────── */
+  .article ul, .article ol { padding-left: 22px; margin: 6px 0 14px; }
+  .article li { font-size: 15px; line-height: 1.8; margin: 4px 0; }
+  .article li::marker { color: var(--accent-mid); }
+  .article li > ul, .article li > ol { margin: 3px 0; }
+
+  /* ── Inline code ───────────────────────────────────────────────────────── */
+  .article :not(pre) > code {
+    font-family: var(--font-mono);
+    font-size: 12.5px; font-weight: 500;
+    background: #f3f0eb; color: var(--red);
+    padding: 1px 5px; border-radius: 4px;
+    border: 1px solid var(--border);
+  }
+
+  /* ── Code blocks ───────────────────────────────────────────────────────── */
+  .code-block {
+    position: relative; margin: 20px 0;
+    border-radius: var(--radius-lg); overflow: hidden;
+    border: 1px solid var(--code-border);
+    box-shadow: 0 4px 20px rgba(0,0,0,.16);
+  }
+  .code-lang {
+    position: absolute; top: 0; left: 0;
+    font-family: var(--font-mono); font-size: 10px; font-weight: 500;
+    color: #7c8db5; background: #222538;
+    padding: 4px 12px; border-bottom-right-radius: 6px;
+    text-transform: uppercase; letter-spacing: .08em;
+    user-select: none;
+  }
+  .copy-btn {
+    position: absolute; top: 8px; right: 10px;
+    background: #2d3148; border: 1px solid #3d4260;
+    border-radius: 5px; color: #7c8db5; cursor: pointer;
+    padding: 5px 8px; display: flex; align-items: center;
+    transition: background .15s, color .15s; z-index: 1;
+  }
+  .copy-btn:hover  { background: #3a3f60; color: #cdd6f4; }
+  .copy-btn.copied { color: #a6e3a1; border-color: #4a6a4a; }
+  .code-block pre {
+    margin: 0; padding: 36px 20px 20px;
+    background: var(--code-bg); overflow-x: auto;
+    scrollbar-width: thin; scrollbar-color: #3d4260 transparent;
+  }
+  .code-block pre::-webkit-scrollbar { height: 5px; }
+  .code-block pre::-webkit-scrollbar-thumb { background: #3d4260; border-radius: 3px; }
+  .code-block code {
+    font-family: var(--font-mono); font-size: 13px; line-height: 1.7;
+    color: var(--code-text); background: none; border: none; padding: 0;
+    white-space: pre; word-break: normal;
+  }
+
+  /* ── Tables ────────────────────────────────────────────────────────────── */
+  .table-wrap {
+    overflow-x: auto; margin: 16px 0;
+    border-radius: var(--radius-lg);
+    border: 1px solid var(--border);
+    box-shadow: var(--shadow);
+  }
+  table { width: 100%; border-collapse: collapse; font-size: 14px; min-width: 360px; }
+  thead { background: #f4f2ee; }
+  th {
+    padding: 9px 14px; text-align: left;
+    font-size: 11.5px; font-weight: 600;
+    letter-spacing: .04em; text-transform: uppercase;
+    color: var(--text-2); border-bottom: 1px solid var(--border);
+    white-space: nowrap;
+  }
+  td {
+    padding: 8px 14px; border-bottom: 1px solid var(--border-soft);
+    color: var(--text); vertical-align: top; line-height: 1.6;
+  }
+  tbody tr:last-child td { border-bottom: none; }
+  tbody tr:nth-child(even) td { background: #faf9f7; }
+  tbody tr:hover td { background: var(--accent-light); transition: background .1s; }
+
+  /* ── KV block ──────────────────────────────────────────────────────────── */
+  .kv-block { background: var(--bg); border: 1px solid var(--border); border-radius: var(--radius-lg); overflow: hidden; margin: 12px 0 20px; }
+  .kv-row { display: flex; border-bottom: 1px solid var(--border-soft); align-items: flex-start; }
+  .kv-row:last-child { border-bottom: none; }
+  .kv-key { flex: 0 0 160px; padding: 9px 16px; font-size: 13.5px; font-weight: 600; color: var(--text-2); background: var(--surface); border-right: 1px solid var(--border-soft); }
+  .kv-val { flex: 1; padding: 9px 16px; font-size: 14px; color: var(--text); }
+
+  /* ── Status badges ─────────────────────────────────────────────────────── */
+  .badge-ok { display: inline-flex; align-items: center; gap: 4px; background: var(--green-bg); color: var(--green); font-size: 13px; font-weight: 500; padding: 2px 9px; border-radius: 20px; border: 1px solid #bbf7d0; }
+  .badge-err { display: inline-flex; align-items: center; gap: 4px; background: var(--red-bg); color: var(--red); font-size: 13px; font-weight: 500; padding: 2px 9px; border-radius: 20px; border: 1px solid #fecaca; }
+  .badge-warn { display: inline-flex; align-items: center; gap: 4px; background: var(--amber-bg); color: var(--amber); font-size: 13px; font-weight: 500; padding: 2px 9px; border-radius: 20px; border: 1px solid #fde68a; }
+
+  /* ── Priority badges ───────────────────────────────────────────────────── */
+  .pri-p0 { display: inline-block; background: #fef2f2; color: #991b1b; border: 1px solid #fca5a5; font-size: 12px; font-weight: 700; padding: 2px 8px; border-radius: 4px; letter-spacing: .04em; }
+  .pri-p1 { display: inline-block; background: #fff7ed; color: #9a3412; border: 1px solid #fdba74; font-size: 12px; font-weight: 700; padding: 2px 8px; border-radius: 4px; }
+  .pri-p2 { display: inline-block; background: #fffbeb; color: #92400e; border: 1px solid #fde68a; font-size: 12px; font-weight: 700; padding: 2px 8px; border-radius: 4px; }
+  .pri-p3 { display: inline-block; background: var(--accent-light); color: var(--accent); border: 1px solid #bfdbfe; font-size: 12px; font-weight: 700; padding: 2px 8px; border-radius: 4px; }
+
+  /* ── Fault header ──────────────────────────────────────────────────────── */
+  .fault-header { display: flex; align-items: center; gap: 12px; padding: 12px 16px; border-radius: var(--radius-lg); margin: 16px 0 8px; border: 1px solid; }
+  .fh-p0 { background: #fef2f2; border-color: #fca5a5; }
+  .fh-p1 { background: #fff7ed; border-color: #fdba74; }
+  .fh-p2 { background: #fffbeb; border-color: #fde68a; }
+  .fh-p3 { background: var(--accent-light); border-color: #bfdbfe; }
+  .fh-badge { font-family: var(--font-mono); font-size: 11px; font-weight: 700; letter-spacing: .08em; }
+  .fh-p0 .fh-badge { color: #991b1b; }
+  .fh-p1 .fh-badge { color: #9a3412; }
+  .fh-p2 .fh-badge { color: #92400e; }
+  .fh-p3 .fh-badge { color: var(--accent); }
+  .fh-rest { font-size: 14px; font-weight: 500; color: var(--text); }
+
+  /* ── Timeline ──────────────────────────────────────────────────────────── */
+  .timeline { border-left: 2px solid var(--accent-mid); margin: 16px 0 16px 8px; padding-left: 20px; }
+  .tl-row { display: flex; align-items: baseline; gap: 10px; margin: 8px 0; font-size: 13.5px; }
+  .tl-ts { font-family: var(--font-mono); font-size: 12px; color: var(--text-3); flex-shrink: 0; white-space: nowrap; }
+  .tl-tag { font-size: 11px; font-weight: 600; padding: 1px 7px; border-radius: 10px; flex-shrink: 0; background: var(--accent-light); color: var(--accent); }
+  .tl-tag.err { background: var(--red-bg); color: var(--red); }
+  .tl-tag.warn { background: var(--amber-bg); color: var(--amber); }
+  .tl-desc { color: var(--text); line-height: 1.5; }
+
+  /* ── Global warn ───────────────────────────────────────────────────────── */
+  .global-warn { background: #fef2f2; border: 1px solid #fca5a5; border-radius: var(--radius-lg); padding: 14px 18px; font-size: 14.5px; font-weight: 600; color: #991b1b; margin: 16px 0; }
+
+  /* ── Tree note ─────────────────────────────────────────────────────────── */
+  .tree-note { white-space: pre-wrap; font-family: var(--font-mono); font-size: 13.5px; line-height: 1.6; color: var(--text-2); margin: 8px 0 8px 16px; }
+
+  /* ── Disclaimer ────────────────────────────────────────────────────────── */
+  .disclaimer { background: var(--bg); border: 1px solid var(--border); border-radius: var(--radius); padding: 14px 18px; font-size: 13.5px; color: var(--text-2); font-style: italic; }
+
+  /* ── Meta footer ───────────────────────────────────────────────────────── */
+  .meta {
+    margin-top: 48px; padding-top: 16px;
+    border-top: 1px solid var(--border-soft);
+    display: flex; justify-content: space-between; align-items: center;
+    font-size: 12px; color: var(--text-3);
+  }
+  .meta-source { font-family: var(--font-mono); font-size: 11.5px; }
+
+  /* ── Brand logo ────────────────────────────────────────────────────────── */
+  .brand-logo {
+    font-family: var(--font-head);
+    font-size: 14px;
+    color: var(--text-3);
+    letter-spacing: 0.05em;
+    margin-bottom: 4px;
+    flex-shrink: 0;
+    margin-left: 16px;
+  }
+  .brand-logo strong {
+    font-weight: 600;
+    color: var(--accent);
+  }
+  @media (max-width: 900px) {
+    .title-container { flex-direction: column; align-items: flex-start; gap: 12px; }
+    .brand-logo { margin-left: 0; margin-bottom: 0; }
+  }
+  /* ── Print ─────────────────────────────────────────────────────────────── */
+  @media print {
+    body { background: white; }
+    #progress, .toc { display: none; }
+    .layout { display: block; padding: 0; }
+    .article { border: none; box-shadow: none; padding: 24px; }
+    .copy-btn { display: none; }
+    .brand-logo { margin-bottom: 0; }
+  }
+
+  /* ── Responsive ────────────────────────────────────────────────────────── */
+  @media (max-width: 900px) {
+    .toc { display: none; }
+    .article { padding: 36px 28px; }
+    .layout { padding: 24px 16px 64px; }
+  }
+  @media (max-width: 480px) {
+    .article { padding: 24px 18px; }
+    .article h1 { font-size: 22px; }
+  }
+</style>
+</head>
+<body>
+
+<div id="progress"></div>
+
+<div class="layout">
+  <nav class="toc" id="toc">
+  <div class="toc-title">目录</div>
+  <div class="toc-content">
+<div class="toc-item has-children"><button class="toc-toggle" onclick="toggleToc(this)" aria-expanded="true">
+                <svg viewBox="0 0 24 24" width="12" height="12" stroke="currentColor" stroke-width="2" fill="none"><polyline points="6 9 12 15 18 9"></polyline></svg>
+              </button><a href="#h-故障诊断报告容器-tls-test-端口-4437-tls-证书验证失败ca-信任缺失" onclick="event.preventDefault(); const target = document.getElementById('h-故障诊断报告容器-tls-test-端口-4437-tls-证书验证失败ca-信任缺失'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l1">🔴 故障诊断报告：容器 tls-test — 端口 4437 TLS 证书验证失败（CA 信任缺失）</a></div>
+<div class="toc-group" id="group-h-一故障概览">
+<div class="toc-item has-children"><button class="toc-toggle" onclick="toggleToc(this)" aria-expanded="true">
+                <svg viewBox="0 0 24 24" width="12" height="12" stroke="currentColor" stroke-width="2" fill="none"><polyline points="6 9 12 15 18 9"></polyline></svg>
+              </button><a href="#h-一故障概览" onclick="event.preventDefault(); const target = document.getElementById('h-一故障概览'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l2">一、故障概览</a></div>
+<div class="toc-group" id="group-h-置信度说明">
+<div class="toc-item "><span class="toc-spacer"></span><a href="#h-置信度说明" onclick="event.preventDefault(); const target = document.getElementById('h-置信度说明'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l3">置信度说明</a></div>
+</div>
+<div class="toc-item has-children"><button class="toc-toggle" onclick="toggleToc(this)" aria-expanded="true">
+                <svg viewBox="0 0 24 24" width="12" height="12" stroke="currentColor" stroke-width="2" fill="none"><polyline points="6 9 12 15 18 9"></polyline></svg>
+              </button><a href="#h-二根因速览" onclick="event.preventDefault(); const target = document.getElementById('h-二根因速览'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l2">二、根因速览</a></div>
+<div class="toc-group" id="group-h-事故时间线-故障传导链路">
+<div class="toc-item "><span class="toc-spacer"></span><a href="#h-事故时间线-故障传导链路" onclick="event.preventDefault(); const target = document.getElementById('h-事故时间线-故障传导链路'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l3">事故时间线 & 故障传导链路</a></div>
+<div class="toc-item "><span class="toc-spacer"></span><a href="#h-故障因果链" onclick="event.preventDefault(); const target = document.getElementById('h-故障因果链'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l3">故障因果链</a></div>
+</div>
+<div class="toc-item has-children"><button class="toc-toggle" onclick="toggleToc(this)" aria-expanded="true">
+                <svg viewBox="0 0 24 24" width="12" height="12" stroke="currentColor" stroke-width="2" fill="none"><polyline points="6 9 12 15 18 9"></polyline></svg>
+              </button><a href="#h-三排查过程" onclick="event.preventDefault(); const target = document.getElementById('h-三排查过程'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l2">三、排查过程</a></div>
+<div class="toc-group" id="group-h-31-初始现象">
+<div class="toc-item "><span class="toc-spacer"></span><a href="#h-31-初始现象" onclick="event.preventDefault(); const target = document.getElementById('h-31-初始现象'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l3">3.1 初始现象</a></div>
+<div class="toc-item "><span class="toc-spacer"></span><a href="#h-32-假设驱动排查" onclick="event.preventDefault(); const target = document.getElementById('h-32-假设驱动排查'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l3">3.2 假设驱动排查</a></div>
+<div class="toc-item "><span class="toc-spacer"></span><a href="#h-33-排查结论与逻辑树" onclick="event.preventDefault(); const target = document.getElementById('h-33-排查结论与逻辑树'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l3">3.3 排查结论与逻辑树</a></div>
+</div>
+<div class="toc-item has-children"><button class="toc-toggle" onclick="toggleToc(this)" aria-expanded="true">
+                <svg viewBox="0 0 24 24" width="12" height="12" stroke="currentColor" stroke-width="2" fill="none"><polyline points="6 9 12 15 18 9"></polyline></svg>
+              </button><a href="#h-四修复方案" onclick="event.preventDefault(); const target = document.getElementById('h-四修复方案'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l2">四、修复方案</a></div>
+<div class="toc-group" id="group-h-41-应急处置">
+<div class="toc-item "><span class="toc-spacer"></span><a href="#h-41-应急处置" onclick="event.preventDefault(); const target = document.getElementById('h-41-应急处置'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l3">4.1 应急处置</a></div>
+<div class="toc-item "><span class="toc-spacer"></span><a href="#h-42-永久修复计划" onclick="event.preventDefault(); const target = document.getElementById('h-42-永久修复计划'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l3">4.2 永久修复计划</a></div>
+<div class="toc-item "><span class="toc-spacer"></span><a href="#h-43-dockerfile-修复示例永久方案" onclick="event.preventDefault(); const target = document.getElementById('h-43-dockerfile-修复示例永久方案'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l3">4.3 Dockerfile 修复示例（永久方案）</a></div>
+</div>
+<div class="toc-item has-children"><button class="toc-toggle" onclick="toggleToc(this)" aria-expanded="true">
+                <svg viewBox="0 0 24 24" width="12" height="12" stroke="currentColor" stroke-width="2" fill="none"><polyline points="6 9 12 15 18 9"></polyline></svg>
+              </button><a href="#h-五附录" onclick="event.preventDefault(); const target = document.getElementById('h-五附录'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l2">五、附录</a></div>
+<div class="toc-group" id="group-h-51-关键证据来源">
+<div class="toc-item "><span class="toc-spacer"></span><a href="#h-51-关键证据来源" onclick="event.preventDefault(); const target = document.getElementById('h-51-关键证据来源'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l3">5.1 关键证据来源</a></div>
+<div class="toc-item "><span class="toc-spacer"></span><a href="#h-52-已排除假设汇总" onclick="event.preventDefault(); const target = document.getElementById('h-52-已排除假设汇总'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l3">5.2 已排除假设汇总</a></div>
+<div class="toc-item "><span class="toc-spacer"></span><a href="#h-53-相关错误码参考" onclick="event.preventDefault(); const target = document.getElementById('h-53-相关错误码参考'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l3">5.3 相关错误码参考</a></div>
+</div>
+</div>
+  </div>
+</nav>
+  <article class="article" id="article" style="position: relative;">
+    <div class="title-container"><h1 id="h-故障诊断报告容器-tls-test-端口-4437-tls-证书验证失败ca-信任缺失">🔴 故障诊断报告：容器 tls-test — 端口 4437 TLS 证书验证失败（CA 信任缺失）</h1><div class="brand-logo">by <strong>Witty Diagnosis Agent</strong></div></div>
+<blockquote>
+<p><strong>报告编号</strong>：RCA-20260529-001
+<strong>故障级别</strong>：P2（服务不可用-配置类）
+<strong>报告时间</strong>：2026-05-29 13:20:00 UTC
+<strong>当前状态</strong>：🔴 未恢复</p>
+</blockquote>
+<hr>
+<h2 id="h-一故障概览">一、故障概览</h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>项目</th>
+<th>内容</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>故障标题</td>
+<td>容器 tls-test 端口 4437 服务证书验证失败 (unable to get local issuer certificate)</td>
+</tr>
+<tr>
+<td>影响范围</td>
+<td>容器 <code>tls-test</code> 内监听端口 4437 的 HTTPS/TLS 服务；所有依赖该端口的 TLS 客户端均无法完成证书链验证</td>
+</tr>
+<tr>
+<td>故障时段</td>
+<td>自证书部署至今持续存在（2026-05-29 15:50:33 起）</td>
+</tr>
+<tr>
+<td>根本原因</td>
+<td>服务端证书由 <code>CN = OtherCA</code> 签发，但该 CA 根证书<strong>未被安装</strong>到容器 tls-test 的系统 CA 信任存储 <code>/etc/ssl/certs/ca-certificates.crt</code> 中，且系统中不存在该 CA 的 .crt 证书文件</td>
+</tr>
+<tr>
+<td>是否恢复</td>
+<td><span class="badge-err">❌ 未恢复</span></td>
+</tr>
+<tr>
+<td>根因置信度</td>
+<td>🟢 高置信</td>
+</tr>
+</tbody></table></div>
+<h3 id="h-置信度说明">置信度说明</h3>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>等级</th>
+<th>标识</th>
+<th>含义</th>
+<th>示例场景</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>高置信</td>
+<td>🟢</td>
+<td>根因已明确，可复现，单一原因可解释所有现象</td>
+<td>本案例：所有证据指向同一结论 — CA 根证书缺失</td>
+</tr>
+<tr>
+<td>中置信</td>
+<td>🟡</td>
+<td>根因基本确认，但存在 1～2 个无法完全解释的现象</td>
+<td>—</td>
+</tr>
+<tr>
+<td>低置信</td>
+<td>🟠</td>
+<td>有多个可疑原因，尚未排除竞争，结论为推断</td>
+<td>—</td>
+</tr>
+<tr>
+<td>未知</td>
+<td>🔴</td>
+<td>现象无法解释，根因未定位，仍在排查中</td>
+<td>—</td>
+</tr>
+</tbody></table></div>
+<hr>
+<h2 id="h-二根因速览">二、根因速览</h2>
+<h3 id="h-事故时间线-故障传导链路">事故时间线 & 故障传导链路</h3>
+<div class="code-block">
+  <span class="code-lang">text</span>
+  <button class="copy-btn" onclick="copyCode(this)" title="复制">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
+  </button>
+  <pre><code>时间                          事件                                                      性质          证据路径
+──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+2026-05-29 15:50:33          服务器证书在端口 4437 部署生效                               🟢 外部动作    未知（服务部署时）
+  │                           证书 Subject: CN = unknownca.example.com
+  │                           证书 Issuer:  CN = OtherCA
+  │
+  ▼
+2026-05-29 15:50:33 + ε      客户端首次 TLS 握手，openssl s_client 连接端口 4437            🔍 检测触发    G:\witty-diagnosis-agent\dayu\report\kuafu_T1_CA_trust_diagnosis_20260529.md:15-24
+  │                           → Verify return code: 21 (unable to verify the first certificate)
+  │                           → Verify error: num=20 (unable to get local issuer certificate)
+  │
+  ▼
+2026-05-29 15:50:33 + ε      openssl verify 独立验证服务器证书                              🔍 交叉验证    G:\witty-diagnosis-agent\dayu\report\kuafu_T1_CA_trust_diagnosis_20260529.md:39-45
+  │                           → error 20 at 0 depth lookup: unable to get local issuer certificate
+  │
+  ▼
+2026-05-29 ~13:20:00         Kuafu agent 执行诊断：检查 CA 信任存储                         🔍 根因定位    G:\witty-diagnosis-agent\dayu\report\kuafu_T1_CA_trust_diagnosis_20260529.md:60-68
+  │                           → grep -c 'OtherCA' = 0 (信任存储 146 个 CA 中无 OtherCA)
+  │
+  ▼
+2026-05-29 ~13:20:00         Kuafu agent 搜索 CA 证书文件                                  🔍 最终确认    G:\witty-diagnosis-agent\dayu\report\kuafu_T1_CA_trust_diagnosis_20260529.md:72-80
+  │                           → /usr/local/share/ca-certificates/ 和 /usr/share/ca-certificates/
+  │                             均不存在 OtherCA 的 .crt 文件
+  │
+  ▼
+
+&lt;div style="margin-bottom: 8px;"&gt;&lt;strong&gt;[当前]                        故障状态:&lt;/strong&gt; 持续。TLS 客户端连接端口 4437 始终返回 error 20/21     🔴 未恢复&lt;/div&gt;
+</code></pre>
+</div>
+<h3 id="h-故障因果链">故障因果链</h3>
+<div class="code-block">
+  <span class="code-lang">text</span>
+  <button class="copy-btn" onclick="copyCode(this)" title="复制">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
+  </button>
+  <pre><code>服务部署时未安装 OtherCA 根证书到容器信任存储
+    └─► openssl s_client/s_server 在证书链验证时，无法在信任存储中找到 Issuer (CN=OtherCA)
+            └─► 证书链构建失败（证书链仅 1 级，无中间 CA 辅助）
+                    └─► Verify return code: 21 — unable to verify the first certificate
+                            └─► openssl verify 确认：error 20 — unable to get local issuer certificate
+                                    └─► 🔴 所有 TLS 客户端连接端口 4437 均验证失败</code></pre>
+</div>
+<hr>
+<h2 id="h-三排查过程">三、排查过程</h2>
+<blockquote>
+<p>排查逻辑：<strong>提出多个假设 → 收集证据 → 逐一验证或排除 → 收敛到唯一根因</strong></p>
+</blockquote>
+<h3 id="h-31-初始现象">3.1 初始现象</h3>
+<ul>
+<li><strong>现象 1</strong>：通过 <code>openssl s_client -connect &lt;host&gt;:4437 -showcerts</code> 连接容器 tls-test 的端口 4437 时，返回 <code>Verify return code: 21 (unable to verify the first certificate)</code> 和 <code>Verify error: num=20 (unable to get local issuer certificate)</code>。</li>
+<li><strong>现象 2</strong>：通过 <code>openssl verify</code> 独立验证服务器证书文件时，返回 <code>error 20 at 0 depth lookup: unable to get local issuer certificate</code>。</li>
+<li><strong>现象 3</strong>：服务器证书信息显示：Subject <code>CN = unknownca.example.com</code>，Issuer <code>CN = OtherCA</code>，有效期 2026-05-29 ~ 2027-05-29，证书链仅 1 级（无中间证书）。</li>
+</ul>
+<h3 id="h-32-假设驱动排查">3.2 假设驱动排查</h3>
+<h4 id="h-假设-c1根-ca-未加入信任存储-root-ca-not-in-trust-store-确认根因">假设 C1：根 CA 未加入信任存储 (Root CA Not in Trust Store) ✅ 确认根因</h4>
+<blockquote>
+<p>🧪 假设：服务证书由 CN=OtherCA 签发，但该 CA 证书未安装到容器 tls-test 的系统信任存储中。</p>
+</blockquote>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>检查项</th>
+<th>操作</th>
+<th>结论</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>服务器证书 Issuer 确认</td>
+<td><code>openssl s_client -showcerts</code> 结果</td>
+<td>Issuer: <code>CN = OtherCA</code> ✅</td>
+</tr>
+<tr>
+<td>CA 信任存储证书总量</td>
+<td><code>grep -c &#39;BEGIN CERTIFICATE&#39; /etc/ssl/certs/ca-certificates.crt</code></td>
+<td><span class="badge-ok">146 个 ✅</span></td>
+</tr>
+<tr>
+<td>OtherCA 是否在信任存储中</td>
+<td><code>grep -c &#39;OtherCA&#39; /etc/ssl/certs/ca-certificates.crt</code></td>
+<td><strong>0 — 不存在</strong> ❌</td>
+</tr>
+<tr>
+<td>OtherCA 证书文件是否存在</td>
+<td>搜索 <code>/usr/local/share/ca-certificates/</code> 和 <code>/usr/share/ca-certificates/</code></td>
+<td><strong>不存在</strong> ❌</td>
+</tr>
+</tbody></table></div>
+<p><strong>✅ 结论：CN=OtherCA 的根 CA 证书</strong>不在容器 tls-test 的系统 CA 信任存储 <code>/etc/ssl/certs/ca-certificates.crt</code> 中，且系统中不存在该 CA 的任何 .crt 证书文件。这直接导致 error 20 — 无法在本地找到签发者证书来完成证书链验证。</p>
+<hr>
+<h4 id="h-假设-c2根-ca-已过期-root-ca-expired">假设 C2：根 CA 已过期 (Root CA Expired)</h4>
+<blockquote>
+<p>🧪 假设：OtherCA 根证书本身可能已过期，导致即使安装了也无法通过验证。</p>
+</blockquote>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>检查项</th>
+<th>操作</th>
+<th>结论</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>服务器证书有效期</td>
+<td><code>openssl x509 -in server_cert.pem -noout -dates</code> (Kuafu 已提取)</td>
+<td><span class="badge-ok">NotBefore: 2026-05-29 15:50:33 GMT; NotAfter: 2027-05-29 15:50:33 GMT ✅</span></td>
+</tr>
+<tr>
+<td>当前时间</td>
+<td>诊断执行时间</td>
+<td><span class="badge-ok">2026-05-29 13:20 UTC ✅</span></td>
+</tr>
+</tbody></table></div>
+<p><strong>❌ 排除</strong>：服务器证书在有效期内（2026-05-29 ~ 2027-05-29）。虽然无法直接检查 OtherCA 根证书的过期时间（因为根证书文件不存在），但由于服务器证书本身是 2026-05-29（今天）才签发的，假定 OtherCA 是自签名根 CA，其有效期通常远长于叶子证书。即使假设根 CA 已过期，<strong>首要问题依然是根证书根本不存在于信任存储中</strong>——证书不存在则过期检查无从谈起。该假设被 C1 的吸收排除。</p>
+<hr>
+<h4 id="h-假设-c3中间-ca-未安装-intermediate-ca-not-installed">假设 C3：中间 CA 未安装 (Intermediate CA Not Installed)</h4>
+<blockquote>
+<p>🧪 假设：证书链中缺少中间 CA 证书，服务端未在 TLS 握手时发送完整链。</p>
+</blockquote>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>检查项</th>
+<th>操作</th>
+<th>结论</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>证书链层级检查</td>
+<td><code>openssl s_client -showcerts</code> 输出</td>
+<td>证书链仅 1 级（只有服务器证书），无中间证书</td>
+</tr>
+<tr>
+<td>证书 Issuer 与 Subject</td>
+<td>输出中 <code>s:CN = unknownca.example.com</code> 和 <code>i:CN = OtherCA</code></td>
+<td>Issuer 直接为 OtherCA，无中间层级</td>
+</tr>
+</tbody></table></div>
+<p><strong>❌ 排除</strong>：该证书链中服务器证书直接由 CN=OtherCA 签发，不存在中间 CA（intermediate CA）层级。证书链只有 1 级深度。因此&quot;中间 CA 未安装&quot;在此场景中不适用——不存在中间 CA 需要安装。验证失败的直接原因是根 CA (OtherCA) 不在信任存储中，而非中间 CA 缺失。</p>
+<hr>
+<h4 id="h-假设-c4ca-证书路径错误-wrong-ca-certificate-path">假设 C4：CA 证书路径错误 (Wrong CA Certificate Path)</h4>
+<blockquote>
+<p>🧪 假设：系统中存在 OtherCA 的证书文件，但路径不正确或路径搜索机制失效。</p>
+</blockquote>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>检查项</th>
+<th>操作</th>
+<th>结论</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>标准 CA 目录搜索</td>
+<td>搜索 <code>/usr/local/share/ca-certificates/</code></td>
+<td><strong>OtherCA .crt 不存在</strong> ❌</td>
+</tr>
+<tr>
+<td>备选 CA 目录搜索</td>
+<td>搜索 <code>/usr/share/ca-certificates/</code></td>
+<td><strong>OtherCA .crt 不存在</strong> ❌</td>
+</tr>
+<tr>
+<td>信任存储内容检查</td>
+<td><code>grep &#39;OtherCA&#39; /etc/ssl/certs/ca-certificates.crt</code></td>
+<td><strong>返回 0</strong> ❌</td>
+</tr>
+</tbody></table></div>
+<p><strong>❌ 排除</strong>：系统中<strong>根本不存在</strong> OtherCA 的 .crt 证书文件，无论在任何路径下。None of the standard CA directories contain OtherCA files, and the consolidated trust store (/etc/ssl/certs/ca-certificates.crt) does not include OtherCA. 路径问题不是根因——问题是证书完全不存在。</p>
+<hr>
+<h4 id="h-假设-c5证书已被吊销-certificate-revoked">假设 C5：证书已被吊销 (Certificate Revoked)</h4>
+<blockquote>
+<p>🧪 假设：OtherCA 或服务器证书已被吊销，CRL/OCSP 验证失败导致连接拒绝。</p>
+</blockquote>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>检查项</th>
+<th>操作</th>
+<th>结论</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>错误码分析</td>
+<td>openssl s_client 返回 error 20 (unable to get local issuer certificate)</td>
+<td>非吊销相关错误码</td>
+</tr>
+<tr>
+<td>吊销相关错误码</td>
+<td>openssl 吊销错误码通常为 error 12 (CRL has expired), error 10 (certificate has expired), error 23 (certificate revoked)</td>
+<td>当前错误码 ≠ 任何吊销相关码</td>
+</tr>
+</tbody></table></div>
+<p><strong>❌ 排除</strong>：error 20 和 error 21 都是证书链验证路径问题，与吊销状态检查完全无关。吊销检查是基于已构建的证书链进行的后续验证步骤——如果证书链本身都因为找不到签发 CA 而构建失败，吊销检查根本不会执行。此假设与观察到的错误码不兼容。</p>
+<hr>
+<h3 id="h-33-排查结论与逻辑树">3.3 排查结论与逻辑树</h3>
+<div class="code-block">
+  <span class="code-lang">text</span>
+  <button class="copy-btn" onclick="copyCode(this)" title="复制">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
+  </button>
+  <pre><code>端口 4437 TLS 验证失败 (Verify return code 21 / error 20)
+│
+├─► 假设 C2：根 CA 过期              → ❌ 排除（服务器证书在有效期内，根证书不存在比过期更优先）
+│
+├─► 假设 C3：中间 CA 未安装           → ❌ 排除（无中间 CA 层级，Issuer 直接为 OtherCA）
+│
+├─► 假设 C4：CA 证书路径错误          → ❌ 排除（系统中不存在 OtherCA 的任何 .crt 文件）
+│
+├─► 假设 C5：证书已被吊销             → ❌ 排除（错误码为 error 20/21，非吊销相关错误码）
+│
+└─► 假设 C1：根 CA 未加入信任存储     → 🎯 **确认根因**
+        │
+        └─► CN=OtherCA 不在 /etc/ssl/certs/ca-certificates.crt (grep=0)
+            └─► OtherCA .crt 文件不存在于标准 CA 目录
+                └─► 信任存储中有 146 个 CA，但没有签发本证书的 OtherCA
+                    └─► 🔴 openssl 无法完成证书链（找不到签发者）</code></pre>
+</div>
+<hr>
+<h2 id="h-四修复方案">四、修复方案</h2>
+<h3 id="h-41-应急处置">4.1 应急处置</h3>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>步骤</th>
+<th>操作</th>
+<th>执行人</th>
+<th>时间</th>
+<th>效果</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>1</td>
+<td>获取 OtherCA 的 CA 根证书文件（从签发方获取 OtherCA.crt 或 .pem 文件）</td>
+<td>运维/证书管理员</td>
+<td>待定</td>
+<td>准备修复所需的 CA 文件</td>
+</tr>
+<tr>
+<td>2</td>
+<td>将 OtherCA.crt 复制到容器 tls-test 的 <code>/usr/local/share/ca-certificates/</code> 目录</td>
+<td>系统管理员</td>
+<td>待定</td>
+<td>在标准 CA 目录中添加 CA 文件</td>
+</tr>
+<tr>
+<td>3</td>
+<td>执行 <code>update-ca-certificates</code> 更新系统 CA 信任存储</td>
+<td>系统管理员</td>
+<td>待定</td>
+<td>将 OtherCA 合并到 <code>/etc/ssl/certs/ca-certificates.crt</code></td>
+</tr>
+<tr>
+<td>4</td>
+<td>验证：执行 <code>openssl verify -CAfile /etc/ssl/certs/ca-certificates.crt server_cert.pem</code></td>
+<td>验证者</td>
+<td>待定</td>
+<td>预期返回 <code>OK</code></td>
+</tr>
+<tr>
+<td>5</td>
+<td>验证：执行 <code>openssl s_client -connect &lt;host&gt;:4437 -CAfile /etc/ssl/certs/ca-certificates.crt</code></td>
+<td>验证者</td>
+<td>待定</td>
+<td>预期 Verify return code: 0</td>
+</tr>
+</tbody></table></div>
+<p><strong>具体命令示例（在容器 tls-test 内执行）：</strong></p>
+<div class="code-block">
+  <span class="code-lang">bash</span>
+  <button class="copy-btn" onclick="copyCode(this)" title="复制">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
+  </button>
+  <pre><code># 步骤 2：复制 CA 证书文件
+cp /path/to/OtherCA.crt /usr/local/share/ca-certificates/OtherCA.crt
+
+# 步骤 3：更新 CA 信任存储
+update-ca-certificates
+
+# 步骤 4-5：验证修复效果
+openssl verify -CAfile /etc/ssl/certs/ca-certificates.crt /path/to/server_cert.pem
+echo "Q" | openssl s_client -connect localhost:4437 -CAfile /etc/ssl/certs/ca-certificates.crt 2&gt;/dev/null | grep -A 2 "Verify return code"</code></pre>
+</div>
+<h3 id="h-42-永久修复计划">4.2 永久修复计划</h3>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>修复措施</th>
+<th>负责人</th>
+<th>完成时间</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>将 OtherCA 根证书纳入容器镜像构建流程（Dockerfile 中添加 COPY + update-ca-certificates 步骤）</td>
+<td>DevOps / 容器团队</td>
+<td>待定</td>
+</tr>
+<tr>
+<td>建立证书依赖清单（明确记录每个服务端口使用的 CA 及对应的信任链）</td>
+<td>SRE 团队</td>
+<td>待定</td>
+</tr>
+<tr>
+<td>在 CI/CD 流水线中增加 TLS 证书链完整性检查步骤</td>
+<td>DevOps 团队</td>
+<td>待定</td>
+</tr>
+<tr>
+<td>考虑使用证书透明日志 (CT) 监控所有证书签发活动</td>
+<td>安全团队</td>
+<td>待定</td>
+</tr>
+</tbody></table></div>
+<h3 id="h-43-dockerfile-修复示例永久方案">4.3 Dockerfile 修复示例（永久方案）</h3>
+<div class="code-block">
+  <span class="code-lang">dockerfile</span>
+  <button class="copy-btn" onclick="copyCode(this)" title="复制">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
+  </button>
+  <pre><code># Dockerfile 中添加以下内容
+FROM base-image:latest
+
+# 复制 CA 证书到系统信任存储
+COPY OtherCA.crt /usr/local/share/ca-certificates/OtherCA.crt
+
+# 更新 CA 信任存储
+RUN update-ca-certificates
+
+# 其他应用配置...
+EXPOSE 4437
+CMD ["your-app"]</code></pre>
+</div>
+<hr>
+<h2 id="h-五附录">五、附录</h2>
+<h3 id="h-51-关键证据来源">5.1 关键证据来源</h3>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>证据文件</th>
+<th>内容说明</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>G:\witty-diagnosis-agent\dayu\report\kuafu_T1_CA_trust_diagnosis_20260529.md</code></td>
+<td>Kuafu 执行节点 T1 诊断结果：CA 信任证书缺失验证</td>
+</tr>
+</tbody></table></div>
+<h3 id="h-52-已排除假设汇总">5.2 已排除假设汇总</h3>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>假设编号</th>
+<th>假设描述</th>
+<th>排除理由</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>C2</td>
+<td>根 CA 已过期</td>
+<td>服务器证书在有效期内；CA 不存在比过期更优先</td>
+</tr>
+<tr>
+<td>C3</td>
+<td>中间 CA 未安装</td>
+<td>Issuer 直接为 OtherCA，无中间 CA 层级</td>
+</tr>
+<tr>
+<td>C4</td>
+<td>CA 证书路径错误</td>
+<td>系统中不存在 OtherCA 的任何 .crt 文件</td>
+</tr>
+<tr>
+<td>C5</td>
+<td>证书已被吊销</td>
+<td>错误码为 error 20/21，非吊销相关码</td>
+</tr>
+</tbody></table></div>
+<h3 id="h-53-相关错误码参考">5.3 相关错误码参考</h3>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>OpenSSL 错误码</th>
+<th>含义</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>error 20 (X509_V_ERR_UNABLE_TO_GET_ISSUER_CERT_LOCALLY)</td>
+<td>无法在本地信任存储中找到证书的签发者 CA</td>
+</tr>
+<tr>
+<td>error 21 (X509_V_ERR_UNABLE_TO_VERIFY_FIRST_CERTIFICATE)</td>
+<td>无法验证证书链中第一个证书（根 CA 不自签名或不信任）</td>
+</tr>
+<tr>
+<td>error 10 (X509_V_ERR_CERT_HAS_EXPIRED)</td>
+<td>证书已过期</td>
+</tr>
+<tr>
+<td>error 23 (X509_V_ERR_CERT_REVOKED)</td>
+<td>证书已被吊销</td>
+</tr>
+</tbody></table></div>
+
+    <div class="meta">
+      <span class="meta-source">tls_ca_temp.md</span>
+      <span>生成于 2026/05/31 10:58</span>
+    </div>
+  </article>
+</div>
+
+<script>
+  /* ── 滚动进度条 ── */
+  window.addEventListener("scroll", () => {
+    const el  = document.documentElement;
+    const pct = el.scrollTop / (el.scrollHeight - el.clientHeight) * 100;
+    document.getElementById("progress").style.width = Math.min(pct, 100) + "%";
+  });
+
+  /* ── TOC 高亮当前章节 ── */
+  (function () {
+    const headings = Array.from(document.querySelectorAll("article h1,article h2,article h3"));
+    const links    = Array.from(document.querySelectorAll(".toc a"));
+    if (!links.length) return;
+    const obs = new IntersectionObserver(entries => {
+      entries.forEach(e => {
+        if (!e.isIntersecting) return;
+        links.forEach(l => l.classList.remove("active"));
+        const a = links.find(l => l.getAttribute("href") === "#" + e.target.id);
+        if (a) a.classList.add("active");
+      });
+    }, { rootMargin: "-10% 0px -80% 0px" });
+    headings.forEach(h => obs.observe(h));
+  })();
+
+  /* ── h2 章节序号自动计数 ── */
+  (function () {
+    let idx = 0;
+    document.querySelectorAll("article h2").forEach(el => {
+      idx++;
+      el.setAttribute("data-index", String(idx).padStart(2, "0"));
+    });
+  })();
+
+  /* ── 代码块一键复制 ── */
+  function copyCode(btn) {
+    const code = btn.closest(".code-block").querySelector("code").innerText;
+    navigator.clipboard.writeText(code).then(() => {
+      btn.classList.add("copied");
+      btn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>';
+      setTimeout(() => {
+        btn.classList.remove("copied");
+        btn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>';
+      }, 2000);
+    });
+  }
+
+  /* ── 目录树收缩/展开 ── */
+  function toggleToc(btn) {
+    const expanded = btn.getAttribute("aria-expanded") === "true";
+    btn.setAttribute("aria-expanded", String(!expanded));
+    const parentItem = btn.closest(".toc-item");
+    let nextEl = parentItem.nextElementSibling;
+    if (nextEl && nextEl.classList.contains("toc-group")) {
+      if (expanded) {
+        nextEl.style.maxHeight = nextEl.scrollHeight + "px";
+        void nextEl.offsetHeight;
+        nextEl.classList.add("collapsed");
+      } else {
+        nextEl.classList.remove("collapsed");
+        nextEl.style.maxHeight = nextEl.scrollHeight + "px";
+        setTimeout(() => {
+          if (!nextEl.classList.contains("collapsed")) {
+            nextEl.style.maxHeight = "none";
+          }
+        }, 300);
+      }
+    }
+  }
+</script>
+</body>
+</html>
