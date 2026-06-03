@@ -1141,7 +1141,7 @@ witty-diagnosis-agent/
 │   ├── disk-health-diagnosis/    # 磁盘健康诊断
 │   ├── docker-fault-analysis/    # Docker 故障分析
 │   ├── fault-model/              # 故障模式关联
-│   ├── flamegraph-analyzer/      # Flame Graph 分析
+│   ├── flamegraph-analysis/      # Flame Graph 分析
 │   ├── grub-ibmc-diagnosis/     # GRUB/IBMC 诊断
 │   ├── linux-oom-analyzer/       # Linux OOM 分析
 │   ├── linux-security-diagnosis/ # Linux 安全诊断
