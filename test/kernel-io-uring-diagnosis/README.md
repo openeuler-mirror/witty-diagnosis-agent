@@ -15,7 +15,8 @@ test/kernel-io-uring-diagnosis/
 │   └── src/
 │       └── io_uring_fault_probe.c
 └── reports/
-    └── sample_report.md
+    ├── sample_report.md
+    └── *_report.md / *_report.html
 ```
 
 ## 前置条件
@@ -37,6 +38,21 @@ test/kernel-io-uring-diagnosis/
 | SQPOLL | `./run.sh run sqpoll` | SQPOLL setup 成功或返回 errno |
 | O_DIRECT 对齐 | `./run.sh run odirect` | 支持 Direct I/O 的文件系统上未对齐写入返回 `EINVAL` |
 | feature 兼容 | `./run.sh run compat` | 内核、header 和 probe 证据 |
+
+## Xuanyuan 报告覆盖
+
+`reports/` 保存 OpenCode `Xuanyuan (Controller)` 端到端诊断后由 Witty 原配 Baize
+和 `report_visualization` 生成的 Markdown/HTML 报告。报告文件直接位于 `reports/`
+目录根层，并保留生成时的原始文件名。
+
+| 场景 | 归档报告 | 核心证据 |
+| --- | --- | --- |
+| baseline | `io_uring_baseline_WSL2验证_20260603_080036_report.md` / `.html` | `io_uring_setup`、`setup_entries`、内核支持 |
+| memlock/fixed buffer | `io_uring_memlock_diagnosis_20260603_115317.md` / `.html` | `io_uring_register_buffers`、`RLIMIT_MEMLOCK` |
+| ring 压力 | `io_uring_Ring容量压力测试覆盖缺失_20260603_173000_report.md` / `.html` | `io_uring_enter`、`entries=2`、ring 容量 |
+| SQPOLL | `kernel_io_uring_sqpoll_diagnosis_report.md` / `.html` | `IORING_SETUP_SQPOLL`、`setup_flags=0x2`、`io_uring_setup` |
+| O_DIRECT 对齐 | `O_DIRECT未对齐写入EINVAL故障诊断报告_20260603_173600.md` / `.html` | `O_DIRECT_unaligned_write`、`EINVAL`、`odirect_buffer_offset` |
+| feature 兼容 | `io_uring内核特性兼容性验证报告_20260603_095235_20260603_095700_report.md` / `.html` | `linux/io_uring.h`、`IORING_FEAT`、`io_uring_setup` |
 
 ## 使用流程
 

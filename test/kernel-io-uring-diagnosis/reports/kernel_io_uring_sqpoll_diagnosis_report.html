@@ -1,0 +1,1084 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>iouring SQPOLL 设置诊断报告</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Lora:ital,wght@0,400;0,600;1,400&family=Source+Sans+3:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  /* ── Design tokens ─────────────────────────────────────────────────────── */
+  :root {
+    --bg:          #f8f7f4;
+    --surface:     #ffffff;
+    --border:      #e8e5df;
+    --border-soft: #f0ede8;
+
+    --text:        #1c1917;
+    --text-2:      #57534e;
+    --text-3:      #a8a29e;
+
+    --accent:      #1d4e6e;
+    --accent-light:#e8f1f7;
+    --accent-mid:  #3b82a0;
+
+    --red:         #c0392b;
+    --red-bg:      #fef2f2;
+    --amber:       #92400e;
+    --amber-bg:    #fffbeb;
+    --green:       #14532d;
+    --green-bg:    #f0fdf4;
+
+    --code-bg:     #1a1d27;
+    --code-text:   #cdd6f4;
+    --code-border: #2d3148;
+
+    --font-body: "Source Sans 3", "PingFang SC", "Hiragino Sans GB", sans-serif;
+    --font-head: "Lora", "PingFang SC", Georgia, serif;
+    --font-mono: "JetBrains Mono", "Fira Code", Consolas, monospace;
+
+    --radius:    8px;
+    --radius-lg: 12px;
+    --shadow:    0 1px 3px rgba(0,0,0,.06), 0 4px 16px rgba(0,0,0,.05);
+    --shadow-lg: 0 2px 8px rgba(0,0,0,.07), 0 8px 32px rgba(0,0,0,.06);
+
+    --toc-width:   240px;
+    --gap:         32px;
+  }
+
+  /* ── Progress bar ──────────────────────────────────────────────────────── */
+  #progress {
+    position: fixed; top: 0; left: 0; height: 3px; width: 0%;
+    background: linear-gradient(90deg, var(--accent-mid), var(--accent));
+    z-index: 999; transition: width .1s linear;
+    border-radius: 0 2px 2px 0;
+  }
+
+  /* ── Base ──────────────────────────────────────────────────────────────── */
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  html { font-size: 16px; scroll-behavior: smooth; }
+  body {
+    font-family: var(--font-body);
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.8;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* ── Layout ────────────────────────────────────────────────────────────── */
+  .layout {
+    display: flex;
+    align-items: flex-start;
+    max-width: calc(var(--toc-width) + 820px + var(--gap) * 3);
+    margin: 0 auto;
+    padding: 48px var(--gap) 96px;
+    gap: var(--gap);
+  }
+
+  /* ── TOC ───────────────────────────────────────────────────────────────── */
+  .toc {
+    width: var(--toc-width);
+    flex-shrink: 0;
+    position: sticky;
+    top: 32px;
+    max-height: calc(100vh - 64px);
+    overflow-y: auto;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    padding: 20px;
+    box-shadow: var(--shadow);
+    scrollbar-width: thin;
+    scrollbar-color: var(--border) transparent;
+  }
+  .toc-title {
+    font-size: 10.5px;
+    font-weight: 600;
+    letter-spacing: .1em;
+    text-transform: uppercase;
+    color: var(--text-3);
+    margin-bottom: 12px;
+    padding-bottom: 10px;
+    border-bottom: 1px solid var(--border-soft);
+  }
+  .toc-item {
+    display: flex;
+    align-items: flex-start;
+    margin: 2px 0;
+  }
+  .toc-toggle {
+    background: none;
+    border: none;
+    cursor: pointer;
+    color: var(--text-3);
+    padding: 4px;
+    margin-right: 4px;
+    margin-top: 2px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 4px;
+    transition: background 0.2s, transform 0.2s;
+  }
+  .toc-toggle:hover { background: var(--border-soft); color: var(--text); }
+  .toc-toggle[aria-expanded="false"] svg { transform: rotate(-90deg); }
+  .toc-spacer { width: 20px; flex-shrink: 0; }
+  .toc-group { overflow: hidden; transition: max-height 0.3s ease-in-out; }
+  .toc-group.collapsed { max-height: 0 !important; }
+
+  .toc a {
+    display: block;
+    font-size: 13px;
+    color: var(--text-2);
+    text-decoration: none;
+    padding: 4px 8px;
+    border-radius: 5px;
+    line-height: 1.45;
+    transition: background .15s, color .15s;
+    word-break: break-all;
+    flex-grow: 1;
+  }
+  .toc a:hover  { background: var(--accent-light); color: var(--accent); }
+  .toc a.active { background: var(--accent-light); color: var(--accent); font-weight: 500; }
+  .toc-l1 { font-weight: 600; color: var(--text); }
+  .toc-l2 { font-weight: 600; color: var(--text); }
+  .toc-l3 { font-size: 12px !important; padding-left: 14px !important; }
+
+  /* ── Article card ──────────────────────────────────────────────────────── */
+  .article {
+    flex: 1; min-width: 0;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    padding: 52px 60px;
+    box-shadow: var(--shadow-lg);
+  }
+
+  /* ── Headings ──────────────────────────────────────────────────────────── */
+  .title-container {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-end;
+    margin: 0 0 28px;
+    padding-bottom: 18px;
+    border-bottom: 2px solid var(--text);
+  }
+  .article h1 {
+    font-family: var(--font-head);
+    font-size: 26px; font-weight: 600; line-height: 1.3;
+    margin: 0; padding-bottom: 0;
+    border-bottom: none;
+  }
+  .article h2 {
+    font-family: var(--font-head);
+    font-size: 19px; font-weight: 600;
+    margin: 48px 0 14px; padding-bottom: 8px;
+    border-bottom: 1px solid var(--border);
+  }
+  .article h2::before {
+    content: attr(data-index);
+    display: inline-block;
+    font-family: var(--font-mono);
+    font-size: 10.5px; font-weight: 500;
+    color: var(--accent-mid);
+    background: var(--accent-light);
+    padding: 1px 7px; border-radius: 4px;
+    margin-right: 10px; vertical-align: middle;
+    letter-spacing: .05em;
+  }
+  .article h3 {
+    font-family: var(--font-head);
+    font-size: 15.5px; font-weight: 600;
+    margin: 28px 0 10px;
+  }
+  .article h3::before {
+    content: "§ ";
+    color: var(--text-3);
+    font-family: var(--font-mono); font-size: 13px;
+  }
+  .article h4 {
+    font-size: 13.5px; font-weight: 600;
+    color: var(--accent); margin: 20px 0 8px;
+  }
+
+  /* ── Body text ─────────────────────────────────────────────────────────── */
+  .article p, .plain {
+    font-size: 15px;
+    line-height: 1.85;
+    color: var(--text);
+    margin: 0 0 12px;
+    font-family: var(--font-body);
+  }
+  .article strong { font-weight: 600; }
+  .article em     { font-style: italic; color: var(--text-2); }
+  .article a {
+    color: var(--accent); text-decoration: underline;
+    text-decoration-color: var(--accent-light);
+    text-underline-offset: 3px;
+  }
+  .article a:hover { text-decoration-color: var(--accent); }
+  .article hr { border: none; border-top: 1px solid var(--border); margin: 20px 0; }
+  .article hr.heavy { border-top: 3px solid var(--text); margin: 32px 0; }
+
+  /* ── Blockquote ────────────────────────────────────────────────────────── */
+  .article blockquote {
+    border-left: 3px solid var(--accent-mid);
+    background: var(--accent-light);
+    margin: 20px 0; padding: 13px 20px 13px 20px;
+    border-radius: 0 var(--radius) var(--radius) 0;
+  }
+  .article blockquote p { font-size: 14.5px; color: var(--accent); margin: 0; line-height: 1.7; }
+  /* 支持块引用内部保留换行符（修复头部概要换行丢失问题） */
+  .article blockquote p { white-space: pre-wrap; }
+  .article blockquote strong { color: var(--accent); }
+
+  /* ── Lists ─────────────────────────────────────────────────────────────── */
+  .article ul, .article ol { padding-left: 22px; margin: 6px 0 14px; }
+  .article li { font-size: 15px; line-height: 1.8; margin: 4px 0; }
+  .article li::marker { color: var(--accent-mid); }
+  .article li > ul, .article li > ol { margin: 3px 0; }
+
+  /* ── Inline code ───────────────────────────────────────────────────────── */
+  .article :not(pre) > code {
+    font-family: var(--font-mono);
+    font-size: 12.5px; font-weight: 500;
+    background: #f3f0eb; color: var(--red);
+    padding: 1px 5px; border-radius: 4px;
+    border: 1px solid var(--border);
+  }
+
+  /* ── Code blocks ───────────────────────────────────────────────────────── */
+  .code-block {
+    position: relative; margin: 20px 0;
+    border-radius: var(--radius-lg); overflow: hidden;
+    border: 1px solid var(--code-border);
+    box-shadow: 0 4px 20px rgba(0,0,0,.16);
+  }
+  .code-lang {
+    position: absolute; top: 0; left: 0;
+    font-family: var(--font-mono); font-size: 10px; font-weight: 500;
+    color: #7c8db5; background: #222538;
+    padding: 4px 12px; border-bottom-right-radius: 6px;
+    text-transform: uppercase; letter-spacing: .08em;
+    user-select: none;
+  }
+  .copy-btn {
+    position: absolute; top: 8px; right: 10px;
+    background: #2d3148; border: 1px solid #3d4260;
+    border-radius: 5px; color: #7c8db5; cursor: pointer;
+    padding: 5px 8px; display: flex; align-items: center;
+    transition: background .15s, color .15s; z-index: 1;
+  }
+  .copy-btn:hover  { background: #3a3f60; color: #cdd6f4; }
+  .copy-btn.copied { color: #a6e3a1; border-color: #4a6a4a; }
+  .code-block pre {
+    margin: 0; padding: 36px 20px 20px;
+    background: var(--code-bg); overflow-x: auto;
+    scrollbar-width: thin; scrollbar-color: #3d4260 transparent;
+  }
+  .code-block pre::-webkit-scrollbar { height: 5px; }
+  .code-block pre::-webkit-scrollbar-thumb { background: #3d4260; border-radius: 3px; }
+  .code-block code {
+    font-family: var(--font-mono); font-size: 13px; line-height: 1.7;
+    color: var(--code-text); background: none; border: none; padding: 0;
+    white-space: pre; word-break: normal;
+  }
+
+  /* ── Tables ────────────────────────────────────────────────────────────── */
+  .table-wrap {
+    overflow-x: auto; margin: 16px 0;
+    border-radius: var(--radius-lg);
+    border: 1px solid var(--border);
+    box-shadow: var(--shadow);
+  }
+  table { width: 100%; border-collapse: collapse; font-size: 14px; min-width: 360px; }
+  thead { background: #f4f2ee; }
+  th {
+    padding: 9px 14px; text-align: left;
+    font-size: 11.5px; font-weight: 600;
+    letter-spacing: .04em; text-transform: uppercase;
+    color: var(--text-2); border-bottom: 1px solid var(--border);
+    white-space: nowrap;
+  }
+  td {
+    padding: 8px 14px; border-bottom: 1px solid var(--border-soft);
+    color: var(--text); vertical-align: top; line-height: 1.6;
+  }
+  tbody tr:last-child td { border-bottom: none; }
+  tbody tr:nth-child(even) td { background: #faf9f7; }
+  tbody tr:hover td { background: var(--accent-light); transition: background .1s; }
+
+  /* ── KV block ──────────────────────────────────────────────────────────── */
+  .kv-block { background: var(--bg); border: 1px solid var(--border); border-radius: var(--radius-lg); overflow: hidden; margin: 12px 0 20px; }
+  .kv-row { display: flex; border-bottom: 1px solid var(--border-soft); align-items: flex-start; }
+  .kv-row:last-child { border-bottom: none; }
+  .kv-key { flex: 0 0 160px; padding: 9px 16px; font-size: 13.5px; font-weight: 600; color: var(--text-2); background: var(--surface); border-right: 1px solid var(--border-soft); }
+  .kv-val { flex: 1; padding: 9px 16px; font-size: 14px; color: var(--text); }
+
+  /* ── Status badges ─────────────────────────────────────────────────────── */
+  .badge-ok { display: inline-flex; align-items: center; gap: 4px; background: var(--green-bg); color: var(--green); font-size: 13px; font-weight: 500; padding: 2px 9px; border-radius: 20px; border: 1px solid #bbf7d0; }
+  .badge-err { display: inline-flex; align-items: center; gap: 4px; background: var(--red-bg); color: var(--red); font-size: 13px; font-weight: 500; padding: 2px 9px; border-radius: 20px; border: 1px solid #fecaca; }
+  .badge-warn { display: inline-flex; align-items: center; gap: 4px; background: var(--amber-bg); color: var(--amber); font-size: 13px; font-weight: 500; padding: 2px 9px; border-radius: 20px; border: 1px solid #fde68a; }
+
+  /* ── Priority badges ───────────────────────────────────────────────────── */
+  .pri-p0 { display: inline-block; background: #fef2f2; color: #991b1b; border: 1px solid #fca5a5; font-size: 12px; font-weight: 700; padding: 2px 8px; border-radius: 4px; letter-spacing: .04em; }
+  .pri-p1 { display: inline-block; background: #fff7ed; color: #9a3412; border: 1px solid #fdba74; font-size: 12px; font-weight: 700; padding: 2px 8px; border-radius: 4px; }
+  .pri-p2 { display: inline-block; background: #fffbeb; color: #92400e; border: 1px solid #fde68a; font-size: 12px; font-weight: 700; padding: 2px 8px; border-radius: 4px; }
+  .pri-p3 { display: inline-block; background: var(--accent-light); color: var(--accent); border: 1px solid #bfdbfe; font-size: 12px; font-weight: 700; padding: 2px 8px; border-radius: 4px; }
+
+  /* ── Fault header ──────────────────────────────────────────────────────── */
+  .fault-header { display: flex; align-items: center; gap: 12px; padding: 12px 16px; border-radius: var(--radius-lg); margin: 16px 0 8px; border: 1px solid; }
+  .fh-p0 { background: #fef2f2; border-color: #fca5a5; }
+  .fh-p1 { background: #fff7ed; border-color: #fdba74; }
+  .fh-p2 { background: #fffbeb; border-color: #fde68a; }
+  .fh-p3 { background: var(--accent-light); border-color: #bfdbfe; }
+  .fh-badge { font-family: var(--font-mono); font-size: 11px; font-weight: 700; letter-spacing: .08em; }
+  .fh-p0 .fh-badge { color: #991b1b; }
+  .fh-p1 .fh-badge { color: #9a3412; }
+  .fh-p2 .fh-badge { color: #92400e; }
+  .fh-p3 .fh-badge { color: var(--accent); }
+  .fh-rest { font-size: 14px; font-weight: 500; color: var(--text); }
+
+  /* ── Timeline ──────────────────────────────────────────────────────────── */
+  .timeline { border-left: 2px solid var(--accent-mid); margin: 16px 0 16px 8px; padding-left: 20px; }
+  .tl-row { display: flex; align-items: baseline; gap: 10px; margin: 8px 0; font-size: 13.5px; }
+  .tl-ts { font-family: var(--font-mono); font-size: 12px; color: var(--text-3); flex-shrink: 0; white-space: nowrap; }
+  .tl-tag { font-size: 11px; font-weight: 600; padding: 1px 7px; border-radius: 10px; flex-shrink: 0; background: var(--accent-light); color: var(--accent); }
+  .tl-tag.err { background: var(--red-bg); color: var(--red); }
+  .tl-tag.warn { background: var(--amber-bg); color: var(--amber); }
+  .tl-desc { color: var(--text); line-height: 1.5; }
+
+  /* ── Global warn ───────────────────────────────────────────────────────── */
+  .global-warn { background: #fef2f2; border: 1px solid #fca5a5; border-radius: var(--radius-lg); padding: 14px 18px; font-size: 14.5px; font-weight: 600; color: #991b1b; margin: 16px 0; }
+
+  /* ── Tree note ─────────────────────────────────────────────────────────── */
+  .tree-note { white-space: pre-wrap; font-family: var(--font-mono); font-size: 13.5px; line-height: 1.6; color: var(--text-2); margin: 8px 0 8px 16px; }
+
+  /* ── Disclaimer ────────────────────────────────────────────────────────── */
+  .disclaimer { background: var(--bg); border: 1px solid var(--border); border-radius: var(--radius); padding: 14px 18px; font-size: 13.5px; color: var(--text-2); font-style: italic; }
+
+  /* ── Meta footer ───────────────────────────────────────────────────────── */
+  .meta {
+    margin-top: 48px; padding-top: 16px;
+    border-top: 1px solid var(--border-soft);
+    display: flex; justify-content: space-between; align-items: center;
+    font-size: 12px; color: var(--text-3);
+  }
+  .meta-source { font-family: var(--font-mono); font-size: 11.5px; }
+
+  /* ── Brand logo ────────────────────────────────────────────────────────── */
+  .brand-logo {
+    font-family: var(--font-head);
+    font-size: 14px;
+    color: var(--text-3);
+    letter-spacing: 0.05em;
+    margin-bottom: 4px;
+    flex-shrink: 0;
+    margin-left: 16px;
+  }
+  .brand-logo strong {
+    font-weight: 600;
+    color: var(--accent);
+  }
+  @media (max-width: 900px) {
+    .title-container { flex-direction: column; align-items: flex-start; gap: 12px; }
+    .brand-logo { margin-left: 0; margin-bottom: 0; }
+  }
+  /* ── Print ─────────────────────────────────────────────────────────────── */
+  @media print {
+    body { background: white; }
+    #progress, .toc { display: none; }
+    .layout { display: block; padding: 0; }
+    .article { border: none; box-shadow: none; padding: 24px; }
+    .copy-btn { display: none; }
+    .brand-logo { margin-bottom: 0; }
+  }
+
+  /* ── Responsive ────────────────────────────────────────────────────────── */
+  @media (max-width: 900px) {
+    .toc { display: none; }
+    .article { padding: 36px 28px; }
+    .layout { padding: 24px 16px 64px; }
+  }
+  @media (max-width: 480px) {
+    .article { padding: 24px 18px; }
+    .article h1 { font-size: 22px; }
+  }
+</style>
+</head>
+<body>
+
+<div id="progress"></div>
+
+<div class="layout">
+  <nav class="toc" id="toc">
+  <div class="toc-title">目录</div>
+  <div class="toc-content">
+<div class="toc-item has-children"><button class="toc-toggle" onclick="toggleToc(this)" aria-expanded="true">
+                <svg viewBox="0 0 24 24" width="12" height="12" stroke="currentColor" stroke-width="2" fill="none"><polyline points="6 9 12 15 18 9"></polyline></svg>
+              </button><a href="#h-iouring-sqpoll-设置诊断报告" onclick="event.preventDefault(); const target = document.getElementById('h-iouring-sqpoll-设置诊断报告'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l1">io_uring SQPOLL 设置诊断报告</a></div>
+<div class="toc-group" id="group-h-故障概要">
+<div class="toc-item "><span class="toc-spacer"></span><a href="#h-故障概要" onclick="event.preventDefault(); const target = document.getElementById('h-故障概要'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l2">故障概要</a></div>
+<div class="toc-item "><span class="toc-spacer"></span><a href="#h-用户可见现象" onclick="event.preventDefault(); const target = document.getElementById('h-用户可见现象'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l2">用户可见现象</a></div>
+<div class="toc-item has-children"><button class="toc-toggle" onclick="toggleToc(this)" aria-expanded="true">
+                <svg viewBox="0 0 24 24" width="12" height="12" stroke="currentColor" stroke-width="2" fill="none"><polyline points="6 9 12 15 18 9"></polyline></svg>
+              </button><a href="#h-运行证据轨道结论" onclick="event.preventDefault(); const target = document.getElementById('h-运行证据轨道结论'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l2">运行证据轨道结论</a></div>
+<div class="toc-group" id="group-h-运行的诊断脚本">
+<div class="toc-item "><span class="toc-spacer"></span><a href="#h-运行的诊断脚本" onclick="event.preventDefault(); const target = document.getElementById('h-运行的诊断脚本'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l3">运行的诊断脚本</a></div>
+</div>
+<div class="toc-item has-children"><button class="toc-toggle" onclick="toggleToc(this)" aria-expanded="true">
+                <svg viewBox="0 0 24 24" width="12" height="12" stroke="currentColor" stroke-width="2" fill="none"><polyline points="6 9 12 15 18 9"></polyline></svg>
+              </button><a href="#h-内核语义轨道结论" onclick="event.preventDefault(); const target = document.getElementById('h-内核语义轨道结论'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l2">内核语义轨道结论</a></div>
+<div class="toc-group" id="group-h-解码-setupflags0x2">
+<div class="toc-item "><span class="toc-spacer"></span><a href="#h-解码-setupflags0x2" onclick="event.preventDefault(); const target = document.getElementById('h-解码-setupflags0x2'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l3">解码 setup_flags=0x2</a></div>
+<div class="toc-item "><span class="toc-spacer"></span><a href="#h-解码-returnedfeatures0x3fff" onclick="event.preventDefault(); const target = document.getElementById('h-解码-returnedfeatures0x3fff'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l3">解码 returned_features=0x3fff</a></div>
+</div>
+<div class="toc-item "><span class="toc-spacer"></span><a href="#h-交叉验证结果" onclick="event.preventDefault(); const target = document.getElementById('h-交叉验证结果'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l2">交叉验证结果</a></div>
+<div class="toc-item "><span class="toc-spacer"></span><a href="#h-完整因果链双轨收敛后" onclick="event.preventDefault(); const target = document.getElementById('h-完整因果链双轨收敛后'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l2">完整因果链（双轨收敛后）</a></div>
+<div class="toc-item "><span class="toc-spacer"></span><a href="#h-排除的替代假设" onclick="event.preventDefault(); const target = document.getElementById('h-排除的替代假设'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l2">排除的替代假设</a></div>
+<div class="toc-item "><span class="toc-spacer"></span><a href="#h-风险与影响" onclick="event.preventDefault(); const target = document.getElementById('h-风险与影响'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l2">风险与影响</a></div>
+<div class="toc-item has-children"><button class="toc-toggle" onclick="toggleToc(this)" aria-expanded="true">
+                <svg viewBox="0 0 24 24" width="12" height="12" stroke="currentColor" stroke-width="2" fill="none"><polyline points="6 9 12 15 18 9"></polyline></svg>
+              </button><a href="#h-修复建议" onclick="event.preventDefault(); const target = document.getElementById('h-修复建议'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l2">修复建议</a></div>
+<div class="toc-group" id="group-h-只读建议">
+<div class="toc-item "><span class="toc-spacer"></span><a href="#h-只读建议" onclick="event.preventDefault(); const target = document.getElementById('h-只读建议'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l3">只读建议</a></div>
+<div class="toc-item "><span class="toc-spacer"></span><a href="#h-需要审批的操作" onclick="event.preventDefault(); const target = document.getElementById('h-需要审批的操作'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l3">需要审批的操作</a></div>
+</div>
+<div class="toc-item "><span class="toc-spacer"></span><a href="#h-缺失证据" onclick="event.preventDefault(); const target = document.getElementById('h-缺失证据'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l2">缺失证据</a></div>
+<div class="toc-item "><span class="toc-spacer"></span><a href="#h-已执行命令" onclick="event.preventDefault(); const target = document.getElementById('h-已执行命令'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l2">已执行命令</a></div>
+<div class="toc-item "><span class="toc-spacer"></span><a href="#h-清理结果" onclick="event.preventDefault(); const target = document.getElementById('h-清理结果'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l2">清理结果</a></div>
+<div class="toc-item "><span class="toc-spacer"></span><a href="#h-附录-asetupflags0x2-详细解码" onclick="event.preventDefault(); const target = document.getElementById('h-附录-asetupflags0x2-详细解码'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l2">附录 A：setup_flags=0x2 详细解码</a></div>
+<div class="toc-item "><span class="toc-spacer"></span><a href="#h-附录-breturnedfeatures0x3fff-语义" onclick="event.preventDefault(); const target = document.getElementById('h-附录-breturnedfeatures0x3fff-语义'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l2">附录 B：returned_features=0x3fff 语义</a></div>
+</div>
+  </div>
+</nav>
+  <article class="article" id="article" style="position: relative;">
+    <div class="title-container"><h1 id="h-iouring-sqpoll-设置诊断报告">io_uring SQPOLL 设置诊断报告</h1><div class="brand-logo">by <strong>Witty Diagnosis Agent</strong></div></div>
+<h2 id="h-故障概要">故障概要</h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>字段</th>
+<th>值</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>故障模式</strong></td>
+<td>SQPOLL 设置验证（setup_flags=0x2）</td>
+</tr>
+<tr>
+<td><strong>置信度</strong></td>
+<td>高</td>
+</tr>
+<tr>
+<td><strong>分析轨道</strong></td>
+<td>双轨（运行证据 + 内核语义）</td>
+</tr>
+<tr>
+<td><strong>内核版本</strong></td>
+<td>6.6.87.2-microsoft-standard-WSL2（诊断工作站）</td>
+</tr>
+<tr>
+<td><strong>目标对象</strong></td>
+<td>测试用例：<code>sqpoll</code> 场景，复现命令 <code>bash ./run.sh run sqpoll</code></td>
+</tr>
+<tr>
+<td><strong>时间窗口</strong></td>
+<td>日志提供时间未标注，以日志内容为完整故障证据</td>
+</tr>
+</tbody></table></div>
+<hr>
+<h2 id="h-用户可见现象">用户可见现象</h2>
+<p>测试程序通过 raw syscall 调用 <code>io_uring_setup</code>，使用 <code>setup_flags=0x2</code>（<code>IORING_SETUP_SQPOLL</code>）。</p>
+<p><strong>日志输出</strong>：</p>
+<div class="code-block">
+
+  <button class="copy-btn" onclick="copyCode(this)" title="复制">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
+  </button>
+  <pre><code>io_uring_setup: ret=3 errno=0
+setup_entries=8 setup_flags=0x2 returned_features=0x3fff</code></pre>
+</div>
+<p><strong>现场还原</strong>：</p>
+<ul>
+<li>syscall 返回 fd=3（成功，非负 fd）</li>
+<li>errno=0（无错误）</li>
+<li>内核返回 features=0x3fff（14 个 feature 位均已置位）</li>
+</ul>
+<hr>
+<h2 id="h-运行证据轨道结论">运行证据轨道结论</h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>维度</th>
+<th>结论</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>异常阶段</strong></td>
+<td>无异常——<code>io_uring_setup</code> 成功完成</td>
+</tr>
+<tr>
+<td><strong>关键 errno</strong></td>
+<td>0（无错误）</td>
+</tr>
+<tr>
+<td><strong>关键日志</strong></td>
+<td><code>io_uring_setup: ret=3 errno=0</code></td>
+</tr>
+<tr>
+<td><strong>setup 参数</strong></td>
+<td>entries=8, flags=0x2 (IORING_SETUP_SQPOLL)</td>
+</tr>
+<tr>
+<td><strong>返回 features</strong></td>
+<td>0x3fff（14 bit 全部置位）</td>
+</tr>
+<tr>
+<td><strong>资源状态</strong></td>
+<td>测试环境未触发资源限制（errno=0 即无需排查限制）</td>
+</tr>
+<tr>
+<td><strong>线程状态</strong></td>
+<td>无可用 PID 快照；SQPOLL setup 成功即表明内核已创建 <code>iou-sqp</code> 内核线程</td>
+</tr>
+<tr>
+<td><strong>运行证据归因假设</strong></td>
+<td><code>IORING_SETUP_SQPOLL</code> 模式下 ring 创建成功，内核正常启动 SQPOLL 内核线程</td>
+</tr>
+</tbody></table></div>
+<h3 id="h-运行的诊断脚本">运行的诊断脚本</h3>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>脚本</th>
+<th>执行结果</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>diagnose_io_uring_workers.sh</code></td>
+<td>无运行中的 <code>iou-sqp</code>/<code>iou-wrk</code> 线程（测试程序已退出），解释性输出已记录</td>
+</tr>
+<tr>
+<td><code>diagnose_io_uring_compat.sh</code></td>
+<td>成功从日志中提取 <code>io_uring_setup</code> 行和 <code>setup_flags</code>，解码 flags 和 features</td>
+</tr>
+<tr>
+<td><code>diagnose_io_uring_limits.sh</code></td>
+<td>确认当前 shell <code>max locked memory=65536 kB</code>，日志中无 <code>ENOMEM</code>/<code>EPERM</code></td>
+</tr>
+<tr>
+<td><code>diagnose_io_uring_rings.sh</code></td>
+<td>日志无 SQ full、CQ overflow 或 completion 延迟信号</td>
+</tr>
+</tbody></table></div>
+<hr>
+<h2 id="h-内核语义轨道结论">内核语义轨道结论</h2>
+<h3 id="h-解码-setupflags0x2">解码 setup_flags=0x2</h3>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>位掩码</th>
+<th>标志</th>
+<th>含义</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>(1U &lt;&lt; 1)</code> = 0x2</td>
+<td><code>IORING_SETUP_SQPOLL</code></td>
+<td>请求内核创建独立的 SQ 轮询线程</td>
+</tr>
+</tbody></table></div>
+<h3 id="h-解码-returnedfeatures0x3fff">解码 returned_features=0x3fff</h3>
+<p><code>0x3fff</code> 二进制展开为 <code>0011 1111 1111 1111</code>（bits 0–13 全部置位）：</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th align="center">Bit</th>
+<th align="center">掩码</th>
+<th>Feature 名称</th>
+<th align="center">状态</th>
+</tr>
+</thead>
+<tbody><tr>
+<td align="center">0</td>
+<td align="center">0x001</td>
+<td><code>IORING_FEAT_SINGLE_MMAP</code></td>
+<td align="center">✓ 支持</td>
+</tr>
+<tr>
+<td align="center">1</td>
+<td align="center">0x002</td>
+<td><code>IORING_FEAT_NODROP</code></td>
+<td align="center">✓ 支持</td>
+</tr>
+<tr>
+<td align="center">2</td>
+<td align="center">0x004</td>
+<td><code>IORING_FEAT_SUBMIT_STABLE</code></td>
+<td align="center">✓ 支持</td>
+</tr>
+<tr>
+<td align="center">3</td>
+<td align="center">0x008</td>
+<td><code>IORING_FEAT_RW_CUR_POS</code></td>
+<td align="center">✓ 支持</td>
+</tr>
+<tr>
+<td align="center">4</td>
+<td align="center">0x010</td>
+<td><code>IORING_FEAT_CUR_PERSONALITY</code></td>
+<td align="center">✓ 支持</td>
+</tr>
+<tr>
+<td align="center">5</td>
+<td align="center">0x020</td>
+<td><code>IORING_FEAT_FAST_POLL</code></td>
+<td align="center">✓ 支持</td>
+</tr>
+<tr>
+<td align="center">6</td>
+<td align="center">0x040</td>
+<td><code>IORING_FEAT_POLL_32BITS</code></td>
+<td align="center">✓ 支持</td>
+</tr>
+<tr>
+<td align="center">7</td>
+<td align="center">0x080</td>
+<td><code>IORING_FEAT_SQPOLL_NONFIXED</code></td>
+<td align="center">✓ 支持</td>
+</tr>
+<tr>
+<td align="center">8</td>
+<td align="center">0x100</td>
+<td><code>IORING_FEAT_EXT_ARG</code></td>
+<td align="center">✓ 支持</td>
+</tr>
+<tr>
+<td align="center">9</td>
+<td align="center">0x200</td>
+<td><code>IORING_FEAT_NATIVE_WORKERS</code></td>
+<td align="center">✓ 支持</td>
+</tr>
+<tr>
+<td align="center">10</td>
+<td align="center">0x400</td>
+<td><code>IORING_FEAT_RSRC_TAGS</code></td>
+<td align="center">✓ 支持</td>
+</tr>
+<tr>
+<td align="center">11</td>
+<td align="center">0x800</td>
+<td><code>IORING_FEAT_CQE_SKIP</code></td>
+<td align="center">✓ 支持</td>
+</tr>
+<tr>
+<td align="center">12</td>
+<td align="center">0x1000</td>
+<td><code>IORING_FEAT_LINKED_FILE</code></td>
+<td align="center">✓ 支持</td>
+</tr>
+<tr>
+<td align="center">13</td>
+<td align="center">0x2000</td>
+<td><code>IORING_FEAT_REG_REG_RING</code></td>
+<td align="center">✓ 支持</td>
+</tr>
+</tbody></table></div>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>维度</th>
+<th>结论</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>根因类型</strong></td>
+<td>无异常 — SQPOLL 设置成功</td>
+</tr>
+<tr>
+<td><strong>语义解释</strong></td>
+<td><code>setup_flags=0x2</code> 对应 <code>IORING_SETUP_SQPOLL</code>，内核接受该 flag 并成功创建 ring</td>
+</tr>
+<tr>
+<td><strong>触发条件</strong></td>
+<td>内核版本 &gt;= 5.11 且编译了 <code>CONFIG_IO_URING</code></td>
+</tr>
+<tr>
+<td><strong>因果链</strong></td>
+<td><code>[io_uring_setup(entries=8, flags=IORING_SETUP_SQPOLL)]</code> → <code>[内核分配 ring buffers + 创建 SQPOLL 内核线程]</code> → <code>[返回 fd=3, errno=0]</code> → <code>[返回 features=0x3fff 表明 14 个 feature 全部可用]</code></td>
+</tr>
+</tbody></table></div>
+<p><strong>关键发现</strong>：</p>
+<ul>
+<li><code>IORING_FEAT_SQPOLL_NONFIXED</code> (bit 7) 置位表明：SQPOLL 模式下不需要固定（pin）内存，这是 5.19+ 内核的重要改进</li>
+<li><code>IORING_FEAT_NATIVE_WORKERS</code> (bit 9) 置位表明：内核使用原生 io_uring worker 线程模型（非 io-wq 回退）</li>
+<li>所有 14 个 feature 位全量支持，表明内核 io_uring 实现功能完备</li>
+</ul>
+<hr>
+<h2 id="h-交叉验证结果">交叉验证结果</h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>验证维度</th>
+<th>运行证据结论</th>
+<th>内核语义结论</th>
+<th align="center">吻合？</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>异常阶段</td>
+<td>setup 成功，无异常</td>
+<td>setup 路径正常返回</td>
+<td align="center">✓ 吻合</td>
+</tr>
+<tr>
+<td>关键 errno</td>
+<td>errno=0</td>
+<td>参数合法、资源充足 → errno=0</td>
+<td align="center">✓ 吻合</td>
+</tr>
+<tr>
+<td>资源状态</td>
+<td>无需排查限制</td>
+<td>memlock 充足，entries=8 极小</td>
+<td align="center">✓ 吻合</td>
+</tr>
+<tr>
+<td>feature 支持</td>
+<td>returned_features=0x3fff</td>
+<td>header 中 IORING_FEAT_ bits 1–13 全部定义</td>
+<td align="center">✓ 吻合</td>
+</tr>
+<tr>
+<td>时间序列</td>
+<td>单次 setup 调用</td>
+<td>同步返回，无延迟</td>
+<td align="center">✓ 吻合</td>
+</tr>
+</tbody></table></div>
+<p><strong>综合判断</strong>：双轨完全吻合。SQPOLL 设置成功，无任何异常信号。</p>
+<hr>
+<h2 id="h-完整因果链双轨收敛后">完整因果链（双轨收敛后）</h2>
+<div class="code-block">
+
+  <button class="copy-btn" onclick="copyCode(this)" title="复制">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
+  </button>
+  <pre><code>[触发条件]
+  └─ 测试程序调用 io_uring_setup(entries=8, flags=IORING_SETUP_SQPOLL)
+      └─ 内核版本支持 io_uring 且支持 SQPOLL
+          └─ [根因判定]
+              └─ 无故障 — 设置成功返回 fd=3
+
+[内核行为]
+  └─ 分配 SQ ring (8 entries) + CQ ring + SQPOLL 内核线程
+      └─ 返回 errno=0, returned_features=0x3fff
+
+&lt;div style="margin-bottom: 8px;"&gt;&lt;strong&gt;
+[系统表现]
+  └─ io_uring_setup:&lt;/strong&gt; ret=3 errno=0&lt;/div&gt;
+
+      └─ setup_entries=8 setup_flags=0x2 returned_features=0x3fff</code></pre>
+</div>
+<p><strong>结论</strong>：该日志是正常的 <code>IORING_SETUP_SQPOLL</code> 成功设置记录，不属于故障场景。</p>
+<hr>
+<h2 id="h-排除的替代假设">排除的替代假设</h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>假设</th>
+<th>排除原因</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>内核不支持 io_uring/SQPOLL</td>
+<td>errno=0 且 returned_features=0x3fff 强证据排除</td>
+</tr>
+<tr>
+<td>资源限制导致 setup 失败</td>
+<td>errno=0，且 entries=8 极小，memlock=64MB 充足</td>
+</tr>
+<tr>
+<td>Ring 容量不足</td>
+<td>日志范围仅含 setup，无 submit/complete 阶段证据</td>
+</tr>
+<tr>
+<td>PQPOLL 调度异常</td>
+<td>无运行时线程快照，但 setup 成功表明内核线程已创建</td>
+</tr>
+<tr>
+<td>Direct I/O 对齐问题</td>
+<td>本场景不涉及 O_DIRECT</td>
+</tr>
+</tbody></table></div>
+<hr>
+<h2 id="h-风险与影响">风险与影响</h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>维度</th>
+<th>评估</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>数据一致性风险</strong></td>
+<td>无—诊断过程只读，且 setup 阶段不涉及数据操作</td>
+</tr>
+<tr>
+<td><strong>性能风险</strong></td>
+<td>无—仅执行只读诊断脚本</td>
+</tr>
+<tr>
+<td><strong>影响范围</strong></td>
+<td>诊断工作站（Windows 11），通过 WSL2 Ubuntu 24.04 执行脚本</td>
+</tr>
+<tr>
+<td><strong>故障范围</strong></td>
+<td>非故障 — SQPOLL 设置成功</td>
+</tr>
+</tbody></table></div>
+<hr>
+<h2 id="h-修复建议">修复建议</h2>
+<h3 id="h-只读建议">只读建议</h3>
+<blockquote>
+<p>⚠️ 本案例不属于故障场景。SQPOLL 设置已成功，无需修复。</p>
+</blockquote>
+<p>如欲验证 SQPOLL 运行时行为，建议：</p>
+<ol>
+<li><strong>持久化 PID 快照</strong>：在 <code>io_uring_setup</code> 成功后立即采集 <code>/proc/&lt;pid&gt;/task/*</code> 中 <code>iou-sqp</code> 线程的 <code>status</code>、<code>wchan</code> 和 <code>stack</code></li>
+<li><strong>运行 strace 追踪 submit/complete 路径</strong>：<code>strace -f -e trace=io_uring_setup,io_uring_enter,io_uring_register -p &lt;pid&gt;</code></li>
+<li><strong>验证 SQPOLL busy polling 行为</strong>：观察 <code>iou-sqp</code> 线程 CPU 使用率，确认是否存在异常高占用</li>
+</ol>
+<h3 id="h-需要审批的操作">需要审批的操作</h3>
+<p>不适用（无故障场景）。</p>
+<hr>
+<h2 id="h-缺失证据">缺失证据</h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>缺失项</th>
+<th>说明</th>
+<th>影响</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>PID 快照</td>
+<td>未提供测试程序运行时的 PID 和 <code>/proc</code> 状态</td>
+<td>无法验证 <code>iou-sqp</code> 线程的调度状态</td>
+</tr>
+<tr>
+<td>strace 输出</td>
+<td>未提供 strace 跟踪</td>
+<td>无法校验 <code>io_uring_enter</code>/<code>io_uring_register</code> 行为</td>
+</tr>
+<tr>
+<td>内核日志</td>
+<td>未提供 <code>dmesg</code> 或 <code>journalctl -k</code> 输出</td>
+<td>无法确认是否存在 SQPOLL 相关的内核日志</td>
+</tr>
+<tr>
+<td>复现环境内核版本</td>
+<td>当前日志来自测试环境，未标注内核版本</td>
+<td>特征解码基于通用 WSL2 内核 header，非实际目标内核</td>
+</tr>
+</tbody></table></div>
+<p>以上缺失不影响本结论（高置信度），但在 SQPOLL 运行时行为分析场景中为必要证据。</p>
+<hr>
+<h2 id="h-已执行命令">已执行命令</h2>
+<div class="code-block">
+  <span class="code-lang">bash</span>
+  <button class="copy-btn" onclick="copyCode(this)" title="复制">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
+  </button>
+  <pre><code># 基线信息采集
+uname -a
+cat /etc/os-release
+grep -R "IORING_FEAT_\|IORING_SETUP_" /usr/include/linux/io_uring.h
+
+# 分支诊断脚本执行
+bash diagnose_io_uring_workers.sh -l sqpoll.log
+bash diagnose_io_uring_compat.sh -l sqpoll.log
+bash diagnose_io_uring_limits.sh -l sqpoll.log
+bash diagnose_io_uring_rings.sh -l sqpoll.log</code></pre>
+</div>
+<hr>
+<h2 id="h-清理结果">清理结果</h2>
+<p>只读诊断不需要清理。若后续通过 test 套件的 <code>./run.sh run sqpoll</code> 复现，应执行 <code>./run.sh clean</code> 清理 <code>out/</code> 目录下的测试产物。</p>
+<hr>
+<h2 id="h-附录-asetupflags0x2-详细解码">附录 A：setup_flags=0x2 详细解码</h2>
+<div class="code-block">
+  <span class="code-lang">text</span>
+  <button class="copy-btn" onclick="copyCode(this)" title="复制">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
+  </button>
+  <pre><code>IORING_SETUP_SQPOLL = (1U &lt;&lt; 1) = 0x2</code></pre>
+</div>
+<p><code>0x2</code> 仅包含 <code>IORING_SETUP_SQPOLL</code> 一个标志位，说明测试程序：</p>
+<ul>
+<li>请求了 SQ 轮询模式（内核创建 <code>iou-sqp</code> 线程）</li>
+<li><strong>未</strong>指定 <code>IORING_SETUP_SQ_AFF</code>（bit 2），因此 SQPOLL 线程的 CPU 亲和性由内核自动选择</li>
+<li><strong>未</strong>指定 <code>IORING_SETUP_IOPOLL</code>（bit 0），使用中断驱动而非轮询完成</li>
+</ul>
+<h2 id="h-附录-breturnedfeatures0x3fff-语义">附录 B：returned_features=0x3fff 语义</h2>
+<p><code>0x3fff</code> = <code>0011 1111 1111 1111</code>：</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>特征</th>
+<th>含义</th>
+<th align="center">since 内核版本</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>SINGLE_MMAP</td>
+<td>SQ 和 CQ 可单次 mmap</td>
+<td align="center">5.6</td>
+</tr>
+<tr>
+<td>NODROP</td>
+<td>溢出时不丢 CQE</td>
+<td align="center">5.6</td>
+</tr>
+<tr>
+<td>SUBMIT_STABLE</td>
+<td>SQE 提交后内核不再引用</td>
+<td align="center">5.6</td>
+</tr>
+<tr>
+<td>RW_CUR_POS</td>
+<td>read/write 使用当前文件位置</td>
+<td align="center">5.6</td>
+</tr>
+<tr>
+<td>CUR_PERSONALITY</td>
+<td>支持 personalities</td>
+<td align="center">5.6</td>
+</tr>
+<tr>
+<td>FAST_POLL</td>
+<td>快速轮询路径</td>
+<td align="center">5.7</td>
+</tr>
+<tr>
+<td>POLL_32BITS</td>
+<td>poll events 32 位</td>
+<td align="center">5.8</td>
+</tr>
+<tr>
+<td>SQPOLL_NONFIXED</td>
+<td>SQPOLL 不需固定内存</td>
+<td align="center">5.19</td>
+</tr>
+<tr>
+<td>EXT_ARG</td>
+<td>扩展超时参数</td>
+<td align="center">5.11</td>
+</tr>
+<tr>
+<td>NATIVE_WORKERS</td>
+<td>原生 worker 线程</td>
+<td align="center">6.0</td>
+</tr>
+<tr>
+<td>RSRC_TAGS</td>
+<td>资源标签</td>
+<td align="center">5.13</td>
+</tr>
+<tr>
+<td>CQE_SKIP</td>
+<td>跳过 CQE 生成</td>
+<td align="center">6.1</td>
+</tr>
+<tr>
+<td>LINKED_FILE</td>
+<td>链接文件支持</td>
+<td align="center">6.6</td>
+</tr>
+<tr>
+<td>REG_REG_RING</td>
+<td>注册 ring fd</td>
+<td align="center">6.7</td>
+</tr>
+</tbody></table></div>
+<p>全量 feature 可用表明内核 &gt;= 6.7，io_uring 实现成熟完整。</p>
+
+    <div class="meta">
+      <span class="meta-source">kernel_io_uring_sqpoll_diagnosis_report.md</span>
+      <span>生成于 2026/06/03 17:35</span>
+    </div>
+  </article>
+</div>
+
+<script>
+  /* ── 滚动进度条 ── */
+  window.addEventListener("scroll", () => {
+    const el  = document.documentElement;
+    const pct = el.scrollTop / (el.scrollHeight - el.clientHeight) * 100;
+    document.getElementById("progress").style.width = Math.min(pct, 100) + "%";
+  });
+
+  /* ── TOC 高亮当前章节 ── */
+  (function () {
+    const headings = Array.from(document.querySelectorAll("article h1,article h2,article h3"));
+    const links    = Array.from(document.querySelectorAll(".toc a"));
+    if (!links.length) return;
+    const obs = new IntersectionObserver(entries => {
+      entries.forEach(e => {
+        if (!e.isIntersecting) return;
+        links.forEach(l => l.classList.remove("active"));
+        const a = links.find(l => l.getAttribute("href") === "#" + e.target.id);
+        if (a) a.classList.add("active");
+      });
+    }, { rootMargin: "-10% 0px -80% 0px" });
+    headings.forEach(h => obs.observe(h));
+  })();
+
+  /* ── h2 章节序号自动计数 ── */
+  (function () {
+    let idx = 0;
+    document.querySelectorAll("article h2").forEach(el => {
+      idx++;
+      el.setAttribute("data-index", String(idx).padStart(2, "0"));
+    });
+  })();
+
+  /* ── 代码块一键复制 ── */
+  function copyCode(btn) {
+    const code = btn.closest(".code-block").querySelector("code").innerText;
+    navigator.clipboard.writeText(code).then(() => {
+      btn.classList.add("copied");
+      btn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>';
+      setTimeout(() => {
+        btn.classList.remove("copied");
+        btn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>';
+      }, 2000);
+    });
+  }
+
+  /* ── 目录树收缩/展开 ── */
+  function toggleToc(btn) {
+    const expanded = btn.getAttribute("aria-expanded") === "true";
+    btn.setAttribute("aria-expanded", String(!expanded));
+    const parentItem = btn.closest(".toc-item");
+    let nextEl = parentItem.nextElementSibling;
+    if (nextEl && nextEl.classList.contains("toc-group")) {
+      if (expanded) {
+        nextEl.style.maxHeight = nextEl.scrollHeight + "px";
+        void nextEl.offsetHeight;
+        nextEl.classList.add("collapsed");
+      } else {
+        nextEl.classList.remove("collapsed");
+        nextEl.style.maxHeight = nextEl.scrollHeight + "px";
+        setTimeout(() => {
+          if (!nextEl.classList.contains("collapsed")) {
+            nextEl.style.maxHeight = "none";
+          }
+        }, 300);
+      }
+    }
+  }
+</script>
+</body>
+</html>
