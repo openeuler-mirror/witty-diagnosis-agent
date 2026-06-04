@@ -402,7 +402,10 @@ def recommendation(groups: list[dict[str, Any]], pids: list[dict[str, Any]], pro
             pid_hint = ", ".join(str(match.get("pid")) for match in process_matches[:5])
         return {
             "recommended_path": "live_pid_external_readonly",
-            "next_actions": [f"Run monitor_rss.py --pid <PID>; candidate PIDs: {pid_hint or '<PID>'}. Do not claim Python root cause without heap evidence."],
+            "next_actions": [
+                f"Run live_process_snapshot.py --pid <PID>, then monitor_rss.py --pid <PID>; candidate PIDs: {pid_hint or '<PID>'}.",
+                "Do not claim Python root cause without heap and retention evidence; run correlate_evidence.py before final reporting.",
+            ],
             "minimal_questions": ["是否允许重启复现或提供故障目录/日志目录？"],
         }
     if not groups:

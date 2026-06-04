@@ -134,6 +134,38 @@ def has_semantic_evidence(semantic: dict[str, Any]) -> bool:
     return bool(signals) or summary.get("verdict") == "semantic_leak_signals_observed"
 
 
+def semantic_metrics(semantic: dict[str, Any]) -> dict[str, Any]:
+    summary = semantic.get("summary", {})
+    signals = summary.get("dominant_signals") or semantic.get("dominant_signals") or []
+    compact_signals: list[dict[str, Any]] = []
+    if isinstance(signals, list):
+        for signal in signals[:5]:
+            if not isinstance(signal, dict):
+                continue
+            compact_signals.append(
+                {
+                    "name": signal.get("name"),
+                    "labels": signal.get("labels"),
+                    "score": signal.get("score"),
+                    "len_delta": signal.get("len_delta"),
+                    "currsize_delta": signal.get("currsize_delta"),
+                }
+            )
+    return {
+        "verdict": summary.get("verdict"),
+        "dominant_signals": compact_signals,
+        "competing_signal_count": summary.get("competing_signal_count"),
+    }
+
+
+def retention_metrics(retention: dict[str, Any]) -> dict[str, Any]:
+    summary = retention.get("summary", {})
+    return {
+        "verdict": summary.get("verdict"),
+        "root_kind_summary": summary.get("root_kind_summary") if isinstance(summary.get("root_kind_summary"), dict) else {},
+    }
+
+
 def mapping_file_shmem_dominant(snapshot: dict[str, Any]) -> bool:
     status = nested(snapshot, "memory_breakdown", "status") or {}
     rss = status.get("VmRSS_bytes") or 0
@@ -157,6 +189,8 @@ def classify(
     rss_delta = monitor_net(monitor, "rss_bytes")
     object_info = object_metrics(object_data)
     trace_info = tracemalloc_metrics(tracemalloc_data)
+    semantic_info = semantic_metrics(semantic)
+    retention_info = retention_metrics(retention)
     denominator = private_delta if private_delta and private_delta > 0 else rss_delta
     python_heap_ratio = safe_ratio(trace_info["net_size_diff_bytes"], denominator)
     tracked_ratio = safe_ratio(object_info["positive_tracked_bytes"], denominator)
@@ -167,19 +201,32 @@ def classify(
     min_peak = int(CONFIG["correlation"]["transient_peak_bytes"])
     confirm_ratio = float(CONFIG["correlation"]["python_heap_ratio_confirm"])
     native_ratio = float(CONFIG["correlation"]["native_heap_ratio_suspect"])
+    coverage_ratio = float(CONFIG["correlation"]["candidate_coverage_ratio"])
     heap_evidence = has_semantic_evidence(semantic) or has_retention_evidence(retention)
+    object_growth_seen = object_info["positive_tracked_bytes"] > 0 or bool(object_info.get("checkpoint_net_tracked_growth_bytes"))
+    trace_growth_seen = (trace_info["net_size_diff_bytes"] or 0) > 0
+    monotonic_growth = object_info.get("checkpoint_verdict") == "monotonic_growth"
 
     reason = "Evidence is insufficient to classify memory root cause."
     confidence_cap = "weak"
     verdict = "readonly_insufficient"
+    coverage_warning = None
 
     peak_minus_final = trace_info["peak_minus_final_bytes"] or object_info["checkpoint_peak_minus_final_bytes"] or 0
     net_trace = trace_info["net_size_diff_bytes"] or 0
     checkpoint_verdict = object_info.get("checkpoint_verdict")
-    if peak_minus_final >= min_peak and net_trace < min_peak and checkpoint_verdict in {None, "released_after_peak", "plateau"}:
+    if peak_minus_final >= min_peak and net_trace < min_peak and checkpoint_verdict != "monotonic_growth":
         verdict = "transient_peak_not_retained"
         reason = "Peak memory is materially higher than final retained memory."
         confidence_cap = "medium_without_fix_retest"
+    elif monitor_verdict in {"cgroup_growth_not_target", "worker_skew_growth"}:
+        verdict = "readonly_insufficient"
+        reason = "Observed memory growth is outside the selected target PID scope."
+        confidence_cap = "weak_scope_mismatch"
+    elif monitor_verdict == "plateau_high_water":
+        verdict = "allocator_reuse_or_fragmentation_possible"
+        reason = "RSS reached a high-water plateau without sustained final retained growth evidence."
+        confidence_cap = "direction_only_without_longer_window"
     elif monitor_verdict == "file_or_shmem_growth" or mapping_file_shmem_dominant(snapshot):
         verdict = "mmap_or_file_backed_growth"
         reason = "RSS growth or snapshot is dominated by file/shmem-backed mappings."
@@ -191,6 +238,10 @@ def classify(
         verdict = "python_retained_leak_likely"
         reason = "Python heap evidence explains the dominant private/RSS growth and retention/semantic evidence exists."
         confidence_cap = "medium_static_retention"
+    elif denominator is None and heap_evidence and (monotonic_growth or object_growth_seen or trace_growth_seen):
+        verdict = "python_retained_leak_likely"
+        reason = "Reproducible workload shows Python object/allocation growth with semantic or retention evidence, but no process RSS denominator was provided."
+        confidence_cap = "medium_workload_only_without_live_rss_scope"
     elif denominator and denominator > 0 and (
         (python_heap_ratio is not None and python_heap_ratio <= native_ratio)
         and (tracked_ratio is None or tracked_ratio <= native_ratio)
@@ -202,10 +253,17 @@ def classify(
         verdict = "mixed_growth"
         reason = "Python heap explains part, but not all, of observed process memory growth."
         confidence_cap = "medium_mixed_evidence"
-    elif monitor_verdict in {"cgroup_growth_not_target", "worker_skew_growth"}:
-        verdict = "readonly_insufficient"
-        reason = "Observed memory growth is outside the selected target PID scope."
-        confidence_cap = "weak_scope_mismatch"
+
+    dominant_signals = semantic_info.get("dominant_signals") or []
+    competing_count = semantic_info.get("competing_signal_count") or 0
+    has_competing_semantics = bool(competing_count) or len(dominant_signals) > 1
+    if (
+        verdict in {"python_retained_leak_likely", "mixed_growth"}
+        and has_competing_semantics
+        and object_info["candidate_coverage_ratio"] is not None
+        and object_info["candidate_coverage_ratio"] < coverage_ratio
+    ):
+        coverage_warning = "top_candidate_low_coverage_check_competing_semantic_and_retention_signals"
 
     return {
         "verdict": verdict,
@@ -227,8 +285,11 @@ def classify(
             "verdict": trace_info["verdict"],
         },
         "candidate_coverage_ratio": object_info["candidate_coverage_ratio"],
+        "coverage_warning": coverage_warning,
         "object_growth": object_info,
         "tracemalloc": trace_info,
+        "semantic": semantic_info,
+        "retention": retention_info,
     }
 
 

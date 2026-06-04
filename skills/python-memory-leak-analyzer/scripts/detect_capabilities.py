@@ -85,7 +85,7 @@ def main() -> int:
         degraded.append("online injection tools missing: live process analysis is external-observation only")
 
     if proc["proc_available"]:
-        recommended_path = "可重启/可复现时使用 --script 进程内分析；线上 PID 先用 monitor_rss 外部观测。"
+        recommended_path = "可重启/可复现时使用 --script 进程内分析；线上 PID 先用 live_process_snapshot 定界，再用 monitor_rss 外部观测。"
     else:
         recommended_path = "当前环境缺少 /proc；仅可运行 workload 脚本级 Python 堆分析。"
 
@@ -106,9 +106,11 @@ def main() -> int:
         backend_used="stdlib",
         degraded_capabilities=degraded,
         next_steps=[
-            "先运行 monitor_rss.py 判断 RSS 增长形态。",
+            "已有 PID 时先运行 live_process_snapshot.py 复核 PID、cgroup、mapping 和子进程范围。",
+            "再运行 monitor_rss.py 判断 RSS/Private_Dirty/cgroup/worker 增长形态。",
             "可重启复现时运行 object_growth.py 与 tracemalloc_probe.py。",
             "候选对象明确后运行 retention_chain.py，再决定是否做 reachability_probe.py 反事实验证。",
+            "最终报告前运行 correlate_evidence.py，并引用 verdict、confidence_cap 和 missing_evidence。",
         ],
     )
     print_json(payload, args.output)

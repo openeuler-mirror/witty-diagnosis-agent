@@ -4,6 +4,7 @@
 # Usage:
 #   ./run.sh run <global|cache|fragmentation|all>
 #   ./run.sh run-stress <scenario|all>
+#   ./run.sh run-prod <scenario|all>
 #   ./run.sh prompt <scenario> <minimal|sparse|normal>
 #   ./run.sh score <scenario> <report-path>
 #   ./run.sh status
@@ -30,6 +31,16 @@ weakref_finalize
 multi_source_mismatch
 short_window_inconclusive
 live_pid_readonly
+"
+
+PROD_SCENARIOS="
+live_pid_python_object_leak
+native_ctypes_malloc_growth
+mmap_file_or_shmem_growth
+allocator_fragmentation_plateau
+prefork_worker_skew
+transient_peak_copy_volume
+cgroup_sibling_growth
 "
 
 usage() {
@@ -108,6 +119,54 @@ stress_summary() {
 
 stress_scenarios() {
   printf '%s\n' $STRESS_SCENARIOS
+}
+
+prod_script() {
+  case "$1" in
+    live_pid_python_object_leak) echo "$ROOT_DIR/fault-injection/production/live_pid_python_object_leak.py" ;;
+    native_ctypes_malloc_growth) echo "$ROOT_DIR/fault-injection/production/native_ctypes_malloc_growth.py" ;;
+    mmap_file_or_shmem_growth) echo "$ROOT_DIR/fault-injection/production/mmap_file_or_shmem_growth.py" ;;
+    allocator_fragmentation_plateau) echo "$ROOT_DIR/fault-injection/production/allocator_fragmentation_plateau.py" ;;
+    prefork_worker_skew) echo "$ROOT_DIR/fault-injection/production/prefork_worker_skew.py" ;;
+    transient_peak_copy_volume) echo "$ROOT_DIR/fault-injection/production/transient_peak_copy_volume.py" ;;
+    cgroup_sibling_growth) echo "$ROOT_DIR/fault-injection/production/cgroup_sibling_growth.py" ;;
+    *) return 1 ;;
+  esac
+}
+
+prod_scenarios() {
+  printf '%s\n' $PROD_SCENARIOS
+}
+
+prod_summary() {
+  case "$1" in
+    live_pid_python_object_leak) echo "真实 PID 只读阶段只能确认目标 PID 在涨；复现阶段应确认 Python retained leak。" ;;
+    native_ctypes_malloc_growth) echo "ctypes malloc native memory retained；Python heap ratio 低，Private_Dirty/RssAnon 增长。" ;;
+    mmap_file_or_shmem_growth) echo "文件或 /dev/shm mmap retained mapping 增长；不应误报 Python heap leak。" ;;
+    allocator_fragmentation_plateau) echo "大量分配释放后 RSS 高位平台；应输出 plateau/high-water，不确认 retained leak。" ;;
+    prefork_worker_skew) echo "master 稳定、worker 子进程增长；应提示切换 worker/process tree scope。" ;;
+    transient_peak_copy_volume) echo "短时复制峰值高但最终释放；应输出 peak high but not retained。" ;;
+    cgroup_sibling_growth) echo "目标父进程稳定但同 cgroup 子进程增长；应提示 target PID 不足以解释 cgroup memory。" ;;
+    *) return 1 ;;
+  esac
+}
+
+prod_iterations() {
+  case "$1" in
+    native_ctypes_malloc_growth) echo 12 ;;
+    mmap_file_or_shmem_growth) echo 8 ;;
+    allocator_fragmentation_plateau) echo 20 ;;
+    transient_peak_copy_volume) echo 600 ;;
+    *) echo 300 ;;
+  esac
+}
+
+prod_retention_selector_args() {
+  case "$1" in
+    live_pid_python_object_leak) echo '--type-filter builtins.dict' ;;
+    prefork_worker_skew|cgroup_sibling_growth) echo '--type-filter builtins.dict' ;;
+    *) echo '--type-filter builtins.dict' ;;
+  esac
 }
 
 retention_selector_args() {
@@ -210,7 +269,8 @@ run_one() {
     "$OUT_DIR/$scenario/tracemalloc.json" \
     "$OUT_DIR/$scenario/retention.json" \
     "$OUT_DIR/$scenario/reachability_static.json" \
-    "$OUT_DIR/$scenario/reachability_counterfactual.json"
+    "$OUT_DIR/$scenario/reachability_counterfactual.json" \
+    "$OUT_DIR/$scenario/correlation.json"
   local log="$OUT_DIR/$scenario/${scenario}.log"
   local iterations=800
   [ "$scenario" = "fragmentation" ] && iterations=80
@@ -268,6 +328,14 @@ run_one() {
         python "$SKILL_DIR/scripts/reachability_probe.py" --script "$script" --iterations "$iterations" --name-contains "bytearray" --output "$OUT_DIR/$scenario/reachability_static.json" || true
         ;;
     esac
+    echo ""
+    echo "== correlate_evidence =="
+    python "$SKILL_DIR/scripts/correlate_evidence.py" \
+      --object-growth "$OUT_DIR/$scenario/object_growth.json" \
+      --tracemalloc "$OUT_DIR/$scenario/tracemalloc.json" \
+      --semantic "$OUT_DIR/$scenario/semantic.json" \
+      --retention "$OUT_DIR/$scenario/retention.json" \
+      --output "$OUT_DIR/$scenario/correlation.json"
     echo ""
     echo "== Xuanyuan prompt facts =="
     echo "目标 skill: python-memory-leak-analyzer"
@@ -327,7 +395,8 @@ run_stress_one() {
     "$scenario_dir/tracemalloc.json" \
     "$scenario_dir/retention.json" \
     "$scenario_dir/reachability_static.json" \
-    "$scenario_dir/reachability_counterfactual.json"
+    "$scenario_dir/reachability_counterfactual.json" \
+    "$scenario_dir/correlation.json"
   write_stress_metadata "$scenario" "$scenario_dir/metadata.json"
   if [ "$scenario" = "live_pid_readonly" ]; then
     rm -f \
@@ -392,6 +461,13 @@ run_stress_one() {
         run_json_step "reachability_probe_sandbox_counterfactual" python "$SKILL_DIR/scripts/reachability_probe.py" --script "$script" --iterations "$iterations" $selector --global-name "$global_name" --allow-mutation --output "$scenario_dir/reachability_counterfactual.json"
         echo ""
       fi
+      run_json_step "correlate_evidence" python "$SKILL_DIR/scripts/correlate_evidence.py" \
+        --object-growth "$scenario_dir/object_growth.json" \
+        --tracemalloc "$scenario_dir/tracemalloc.json" \
+        --semantic "$scenario_dir/semantic.json" \
+        --retention "$scenario_dir/retention.json" \
+        --output "$scenario_dir/correlation.json"
+      echo ""
       run_json_step "discover_evidence_after_analysis" python "$SKILL_DIR/scripts/discover_evidence.py" "$scenario_dir" --output "$scenario_dir/discovery.json"
       echo ""
       echo "== Xuanyuan minimal prompt =="
@@ -413,6 +489,137 @@ run_stress_one() {
 
   write_prompt_files "$scenario" "$scenario_dir" "$log"
   update_scorecard "$scenario" "generated" "not-run" "$log" "$scenario_dir"
+  echo "log=$log"
+}
+
+start_prod_processes() {
+  local scenario="$1"
+  local script="$2"
+  local scenario_dir="$3"
+  local target_log="$scenario_dir/live-target.log"
+  local sibling_log="$scenario_dir/live-sibling.log"
+  if [ "$scenario" = "cgroup_sibling_growth" ]; then
+    python "$script" --sibling > "$sibling_log" 2>&1 &
+    local sibling_pid=$!
+    echo "$sibling_pid" > "$scenario_dir/sibling.pid"
+    python "$script" --live > "$target_log" 2>&1 &
+    local target_pid=$!
+    echo "$target_pid" > "$scenario_dir/live.pid"
+  else
+    python "$script" --live > "$target_log" 2>&1 &
+    local target_pid=$!
+    echo "$target_pid" > "$scenario_dir/live.pid"
+  fi
+}
+
+stop_prod_processes() {
+  local scenario_dir="$1"
+  local pid_file
+  for pid_file in "$scenario_dir/live.pid" "$scenario_dir/sibling.pid"; do
+    if [ -f "$pid_file" ]; then
+      local pid
+      pid=$(cat "$pid_file" 2>/dev/null || true)
+      if [ -n "$pid" ] && kill -0 "$pid" 2>/dev/null; then
+        kill "$pid" 2>/dev/null || true
+      fi
+    fi
+  done
+  sleep 0.5
+  for pid_file in "$scenario_dir/live.pid" "$scenario_dir/sibling.pid"; do
+    if [ -f "$pid_file" ]; then
+      local pid
+      pid=$(cat "$pid_file" 2>/dev/null || true)
+      if [ -n "$pid" ] && kill -0 "$pid" 2>/dev/null; then
+        kill -9 "$pid" 2>/dev/null || true
+      fi
+    fi
+  done
+}
+
+run_prod_one() {
+  local scenario="$1"
+  local script
+  script=$(prod_script "$scenario") || {
+    echo "ERROR: unknown production scenario: $scenario" >&2
+    exit 2
+  }
+  local summary
+  summary=$(prod_summary "$scenario")
+  local scenario_dir="$OUT_DIR/production/$scenario"
+  local log="$scenario_dir/${scenario}.log"
+  local iterations
+  iterations=$(prod_iterations "$scenario")
+  local selector
+  selector=$(prod_retention_selector_args "$scenario")
+
+  mkdir -p "$scenario_dir"
+  rm -f \
+    "$scenario_dir/capabilities.json" \
+    "$scenario_dir/discovery.json" \
+    "$scenario_dir/live_process_snapshot.json" \
+    "$scenario_dir/monitor_rss_pid.json" \
+    "$scenario_dir/object_growth.json" \
+    "$scenario_dir/semantic.json" \
+    "$scenario_dir/tracemalloc.json" \
+    "$scenario_dir/retention.json" \
+    "$scenario_dir/correlation.json" \
+    "$scenario_dir/live.pid" \
+    "$scenario_dir/sibling.pid" \
+    "$scenario_dir/live-target.log" \
+    "$scenario_dir/live-sibling.log"
+
+  {
+    echo "scenario=$scenario"
+    echo "summary=$summary"
+    echo "workload=$script"
+    echo "skill_dir=$SKILL_DIR"
+    echo "iterations=$iterations"
+    echo "reproduce=./run.sh run-prod $scenario"
+    echo "diagnosis_boundary=stdlib-only, no attach, no ptrace, no mutation against production PID"
+    echo ""
+    run_json_step "detect_capabilities" python "$SKILL_DIR/scripts/detect_capabilities.py" --output "$scenario_dir/capabilities.json"
+    echo ""
+    start_prod_processes "$scenario" "$script" "$scenario_dir"
+    sleep 1
+    local live_pid
+    live_pid=$(cat "$scenario_dir/live.pid")
+    echo "live_pid=$live_pid"
+    if [ -f "$scenario_dir/sibling.pid" ]; then
+      echo "sibling_pid=$(cat "$scenario_dir/sibling.pid")"
+    fi
+    echo ""
+    run_json_step "live_process_snapshot" python "$SKILL_DIR/scripts/live_process_snapshot.py" --pid "$live_pid" --output "$scenario_dir/live_process_snapshot.json"
+    echo ""
+    run_json_step "monitor_rss_pid" python "$SKILL_DIR/scripts/monitor_rss.py" --pid "$live_pid" --interval 0.5 --duration 4 --output "$scenario_dir/monitor_rss_pid.json"
+    echo ""
+    stop_prod_processes "$scenario_dir"
+    echo ""
+    run_json_step "object_growth" python "$SKILL_DIR/scripts/object_growth.py" --script "$script" --iterations "$iterations" --output "$scenario_dir/object_growth.json"
+    echo ""
+    run_json_step "semantic_probe" python "$SKILL_DIR/scripts/semantic_probe.py" --script "$script" --iterations "$iterations" --output "$scenario_dir/semantic.json"
+    echo ""
+    run_json_step "tracemalloc_probe" python "$SKILL_DIR/scripts/tracemalloc_probe.py" --script "$script" --iterations "$iterations" --output "$scenario_dir/tracemalloc.json"
+    echo ""
+    # shellcheck disable=SC2086
+    run_json_step "retention_chain" python "$SKILL_DIR/scripts/retention_chain.py" --script "$script" --iterations "$iterations" $selector --output "$scenario_dir/retention.json"
+    echo ""
+    run_json_step "correlate_evidence" python "$SKILL_DIR/scripts/correlate_evidence.py" \
+      --monitor "$scenario_dir/monitor_rss_pid.json" \
+      --snapshot "$scenario_dir/live_process_snapshot.json" \
+      --object-growth "$scenario_dir/object_growth.json" \
+      --tracemalloc "$scenario_dir/tracemalloc.json" \
+      --semantic "$scenario_dir/semantic.json" \
+      --retention "$scenario_dir/retention.json" \
+      --output "$scenario_dir/correlation.json"
+    echo ""
+    run_json_step "discover_evidence_after_prod" python "$SKILL_DIR/scripts/discover_evidence.py" "$scenario_dir" "$script" --output "$scenario_dir/discovery.json"
+    echo ""
+    echo "== expected_focus =="
+    echo "$summary"
+    echo "final_report_must_reference=$scenario_dir/correlation.json"
+  } 2>&1 | tee "$log"
+
+  stop_prod_processes "$scenario_dir"
   echo "log=$log"
 }
 
@@ -501,6 +708,18 @@ case "${1:-}" in
         ;;
       *)
         run_stress_one "$2"
+        ;;
+    esac
+    ;;
+  run-prod)
+    case "${2:-all}" in
+      all)
+        for scenario in $(prod_scenarios); do
+          run_prod_one "$scenario"
+        done
+        ;;
+      *)
+        run_prod_one "$2"
         ;;
     esac
     ;;

@@ -14,6 +14,14 @@ test/python-memory-leak-analyzer/
 │   ├── global_container_leak.py
 │   ├── lru_cache_unbounded.py
 │   ├── rss_fragmentation_like.py
+│   ├── production/
+│   │   ├── live_pid_python_object_leak.py
+│   │   ├── native_ctypes_malloc_growth.py
+│   │   ├── mmap_file_or_shmem_growth.py
+│   │   ├── allocator_fragmentation_plateau.py
+│   │   ├── prefork_worker_skew.py
+│   │   ├── transient_peak_copy_volume.py
+│   │   └── cgroup_sibling_growth.py
 │   └── advanced/
 │       ├── method_cache_self_leak.py
 │       ├── callback_registry_leak.py
@@ -132,6 +140,54 @@ stress suite 用于测试 skill 在低提示词、复杂保留链和竞争假设
 - `fail`：未使用 skill、漏读关键证据或根因错误。
 - `hallucination-risk`：越界操作、过度确认或把 RSS/短窗口证据误报为确认根因。
 
+## 生产化思路场景
+
+production suite 用于把 skill 从离线小样例推进到真实复杂场景可用的诊断编排。它不引入
+Memray、Scalene、py-spy、BCC、Fil、memory_profiler 等第三方依赖，也不执行 attach、
+ptrace、清缓存、`malloc_trim`、重启服务或生产 PID 进程内注入；只用 stdlib 和 `/proc`
+验证目标范围、趋势、mapping、cgroup 与 Python heap 证据对账。
+
+```bash
+# 运行单个生产化场景
+./run.sh run-prod native_ctypes_malloc_growth
+
+# 运行全部生产化场景
+./run.sh run-prod all
+```
+
+生产化场景覆盖：
+
+| 场景 | 目标压力点 | 预期边界 |
+| --- | --- | --- |
+| `live_pid_python_object_leak` | 长跑 PID 中全局容器增长 | 只读阶段只能确认 PID 在涨；复现 heap/retention 后才可确认 Python retained leak |
+| `native_ctypes_malloc_growth` | `ctypes` 保留 native malloc 指针 | Python heap ratio 低、Private_Dirty/RssAnon 增长，输出 native/allocator suspect |
+| `mmap_file_or_shmem_growth` | 文件或 `/dev/shm` mmap retained mapping | maps/smaps 指向 file/shmem，不误判 Python heap |
+| `allocator_fragmentation_plateau` | 大量分配释放后 RSS 高位平台 | 输出 `plateau_high_water` 或 allocator reuse/fragmentation possible |
+| `prefork_worker_skew` | master 稳定、worker 子进程增长 | process tree 找到增长 worker，提示不能只看 master PID |
+| `transient_peak_copy_volume` | 短时复制峰值高但最终释放 | 输出 peak high but not retained，不误判 retained leak |
+| `cgroup_sibling_growth` | 目标 PID 稳定、同 cgroup 另一个进程增长 | 输出 cgroup growth not target 或 scope mismatch |
+
+每个 production 场景会在 `out/production/<scenario>/` 生成：
+
+- `<scenario>.log`
+- `live_process_snapshot.json`
+- `monitor_rss_pid.json`
+- `object_growth.json`
+- `semantic.json`
+- `tracemalloc.json`
+- `retention.json`
+- `correlation.json`
+- `discovery.json`
+- `live.pid` 和必要时的 `sibling.pid`
+
+报告评分重点：
+
+- 不凭 RSS 单独确认 Python 根因。
+- 最终报告优先引用 `correlation.json` 的 `summary.verdict`、`confidence_cap` 和 `missing_evidence`。
+- 按 `skills/python-memory-leak-analyzer/references/evidence-analysis.md` 填写竞争假设矩阵，不只罗列采集结果。
+- native/mmap/allocator/pre-fork/cgroup mismatch 能正确封顶置信度。
+- 只读 PID 场景把 `/proc` 证据作为定界证据，而不是进程内 heap 根因证据。
+
 ## Xuanyuan 端到端验证规则
 
 脚本级证据可以批量生成，但 Xuanyuan 端到端验证必须按场景拆开：
@@ -143,6 +199,8 @@ stress suite 用于测试 skill 在低提示词、复杂保留链和竞争假设
 - 每个场景完成后归档两份 Witty 原流程报告：Markdown `*.md` 和 HTML `*.html`。
 - HTML 必须通过官方 `report_visualization` 特征校验；不能只用手写 Markdown 或日志输出替代。
 - `live_pid_readonly` 场景只允许 PID/RSS 外部只读证据；报告不得从复现脚本反推确认的 Python 根因。
+
+本轮分析层补强后只要求抽样端到端验证：`global`、`multi_source_mismatch` 和一个 native/allocator production 场景即可。stress 与 production 全量运行保留为后续回归，不作为本轮合入前置条件。
 
 低输入验证时，正式提示词不应逐个指定 `semantic.json`、`object_growth.json` 等文件。使用中性故障描述和粗故障范围即可，例如：
 

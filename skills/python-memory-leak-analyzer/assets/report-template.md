@@ -29,8 +29,10 @@
 - missing_evidence：
 - Python heap / Private_Dirty ratio：
 - tracked object / Private_Dirty ratio：
+- coverage_warning：
 - peak vs final：
 - 报告结论边界：
+- 已按 `references/evidence-analysis.md` 完成 verdict 措辞检查：是/否
 
 ## 5. RSS 与增长形态
 
@@ -71,12 +73,24 @@
 | G3 可达性 |  |  |
 | G4 隔离复测 |  |  |
 
+## 10.1 竞争假设矩阵
+
+| 假设 | 支持证据 | 反证/缺口 | 当前判断 |
+| --- | --- | --- | --- |
+| Python retained leak |  |  |  |
+| native/allocator |  |  |  |
+| mmap/file/shmem |  |  |  |
+| plateau/high-water |  |  |  |
+| short-window |  |  |  |
+| scope mismatch |  |  |  |
+
 ## 11. 根因结论
 
 - 根因类型：
 - 根因描述：
 - 置信度：
 - 未验证项：
+- 禁止越级说明：若 verdict 为只读、native、mmap 或 high-water，说明为何不确认 Python 根因。
 
 ## 12. 修复建议
 
