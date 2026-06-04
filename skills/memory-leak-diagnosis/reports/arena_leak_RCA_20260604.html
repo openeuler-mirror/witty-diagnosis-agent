@@ -1,0 +1,923 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>malloc Arena 膨胀诊断报告 (Branch B3)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Lora:ital,wght@0,400;0,600;1,400&family=Source+Sans+3:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  /* ── Design tokens ─────────────────────────────────────────────────────── */
+  :root {
+    --bg:          #f8f7f4;
+    --surface:     #ffffff;
+    --border:      #e8e5df;
+    --border-soft: #f0ede8;
+
+    --text:        #1c1917;
+    --text-2:      #57534e;
+    --text-3:      #a8a29e;
+
+    --accent:      #1d4e6e;
+    --accent-light:#e8f1f7;
+    --accent-mid:  #3b82a0;
+
+    --red:         #c0392b;
+    --red-bg:      #fef2f2;
+    --amber:       #92400e;
+    --amber-bg:    #fffbeb;
+    --green:       #14532d;
+    --green-bg:    #f0fdf4;
+
+    --code-bg:     #1a1d27;
+    --code-text:   #cdd6f4;
+    --code-border: #2d3148;
+
+    --font-body: "Source Sans 3", "PingFang SC", "Hiragino Sans GB", sans-serif;
+    --font-head: "Lora", "PingFang SC", Georgia, serif;
+    --font-mono: "JetBrains Mono", "Fira Code", Consolas, monospace;
+
+    --radius:    8px;
+    --radius-lg: 12px;
+    --shadow:    0 1px 3px rgba(0,0,0,.06), 0 4px 16px rgba(0,0,0,.05);
+    --shadow-lg: 0 2px 8px rgba(0,0,0,.07), 0 8px 32px rgba(0,0,0,.06);
+
+    --toc-width:   240px;
+    --gap:         32px;
+  }
+
+  /* ── Progress bar ──────────────────────────────────────────────────────── */
+  #progress {
+    position: fixed; top: 0; left: 0; height: 3px; width: 0%;
+    background: linear-gradient(90deg, var(--accent-mid), var(--accent));
+    z-index: 999; transition: width .1s linear;
+    border-radius: 0 2px 2px 0;
+  }
+
+  /* ── Base ──────────────────────────────────────────────────────────────── */
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  html { font-size: 16px; scroll-behavior: smooth; }
+  body {
+    font-family: var(--font-body);
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.8;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* ── Layout ────────────────────────────────────────────────────────────── */
+  .layout {
+    display: flex;
+    align-items: flex-start;
+    max-width: calc(var(--toc-width) + 820px + var(--gap) * 3);
+    margin: 0 auto;
+    padding: 48px var(--gap) 96px;
+    gap: var(--gap);
+  }
+
+  /* ── TOC ───────────────────────────────────────────────────────────────── */
+  .toc {
+    width: var(--toc-width);
+    flex-shrink: 0;
+    position: sticky;
+    top: 32px;
+    max-height: calc(100vh - 64px);
+    overflow-y: auto;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    padding: 20px;
+    box-shadow: var(--shadow);
+    scrollbar-width: thin;
+    scrollbar-color: var(--border) transparent;
+  }
+  .toc-title {
+    font-size: 10.5px;
+    font-weight: 600;
+    letter-spacing: .1em;
+    text-transform: uppercase;
+    color: var(--text-3);
+    margin-bottom: 12px;
+    padding-bottom: 10px;
+    border-bottom: 1px solid var(--border-soft);
+  }
+  .toc-item {
+    display: flex;
+    align-items: flex-start;
+    margin: 2px 0;
+  }
+  .toc-toggle {
+    background: none;
+    border: none;
+    cursor: pointer;
+    color: var(--text-3);
+    padding: 4px;
+    margin-right: 4px;
+    margin-top: 2px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 4px;
+    transition: background 0.2s, transform 0.2s;
+  }
+  .toc-toggle:hover { background: var(--border-soft); color: var(--text); }
+  .toc-toggle[aria-expanded="false"] svg { transform: rotate(-90deg); }
+  .toc-spacer { width: 20px; flex-shrink: 0; }
+  .toc-group { overflow: hidden; transition: max-height 0.3s ease-in-out; }
+  .toc-group.collapsed { max-height: 0 !important; }
+  
+  .toc a {
+    display: block;
+    font-size: 13px;
+    color: var(--text-2);
+    text-decoration: none;
+    padding: 4px 8px;
+    border-radius: 5px;
+    line-height: 1.45;
+    transition: background .15s, color .15s;
+    word-break: break-all;
+    flex-grow: 1;
+  }
+  .toc a:hover  { background: var(--accent-light); color: var(--accent); }
+  .toc a.active { background: var(--accent-light); color: var(--accent); font-weight: 500; }
+  .toc-l1 { font-weight: 600; color: var(--text); }
+  .toc-l2 { font-weight: 600; color: var(--text); }
+  .toc-l3 { font-size: 12px !important; padding-left: 14px !important; }
+
+  /* ── Article card ──────────────────────────────────────────────────────── */
+  .article {
+    flex: 1; min-width: 0;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    padding: 52px 60px;
+    box-shadow: var(--shadow-lg);
+  }
+
+  /* ── Headings ──────────────────────────────────────────────────────────── */
+  .title-container {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-end;
+    margin: 0 0 28px;
+    padding-bottom: 18px;
+    border-bottom: 2px solid var(--text);
+  }
+  .article h1 {
+    font-family: var(--font-head);
+    font-size: 26px; font-weight: 600; line-height: 1.3;
+    margin: 0; padding-bottom: 0;
+    border-bottom: none;
+  }
+  .article h2 {
+    font-family: var(--font-head);
+    font-size: 19px; font-weight: 600;
+    margin: 48px 0 14px; padding-bottom: 8px;
+    border-bottom: 1px solid var(--border);
+  }
+  .article h2::before {
+    content: attr(data-index);
+    display: inline-block;
+    font-family: var(--font-mono);
+    font-size: 10.5px; font-weight: 500;
+    color: var(--accent-mid);
+    background: var(--accent-light);
+    padding: 1px 7px; border-radius: 4px;
+    margin-right: 10px; vertical-align: middle;
+    letter-spacing: .05em;
+  }
+  .article h3 {
+    font-family: var(--font-head);
+    font-size: 15.5px; font-weight: 600;
+    margin: 28px 0 10px;
+  }
+  .article h3::before {
+    content: "§ ";
+    color: var(--text-3);
+    font-family: var(--font-mono); font-size: 13px;
+  }
+  .article h4 {
+    font-size: 13.5px; font-weight: 600;
+    color: var(--accent); margin: 20px 0 8px;
+  }
+
+  /* ── Body text ─────────────────────────────────────────────────────────── */
+  .article p, .plain { 
+    font-size: 15px; 
+    line-height: 1.85; 
+    color: var(--text); 
+    margin: 0 0 12px; 
+    font-family: var(--font-body);
+  }
+  .article strong { font-weight: 600; }
+  .article em     { font-style: italic; color: var(--text-2); }
+  .article a {
+    color: var(--accent); text-decoration: underline;
+    text-decoration-color: var(--accent-light);
+    text-underline-offset: 3px;
+  }
+  .article a:hover { text-decoration-color: var(--accent); }
+  .article hr { border: none; border-top: 1px solid var(--border); margin: 20px 0; }
+  .article hr.heavy { border-top: 3px solid var(--text); margin: 32px 0; }
+
+  /* ── Blockquote ────────────────────────────────────────────────────────── */
+  .article blockquote {
+    border-left: 3px solid var(--accent-mid);
+    background: var(--accent-light);
+    margin: 20px 0; padding: 13px 20px 13px 20px;
+    border-radius: 0 var(--radius) var(--radius) 0;
+  }
+  .article blockquote p { font-size: 14.5px; color: var(--accent); margin: 0; line-height: 1.7; }
+  /* 支持块引用内部保留换行符（修复头部概要换行丢失问题） */
+  .article blockquote p { white-space: pre-wrap; }
+  .article blockquote strong { color: var(--accent); }
+
+  /* ── Lists ─────────────────────────────────────────────────────────────── */
+  .article ul, .article ol { padding-left: 22px; margin: 6px 0 14px; }
+  .article li { font-size: 15px; line-height: 1.8; margin: 4px 0; }
+  .article li::marker { color: var(--accent-mid); }
+  .article li > ul, .article li > ol { margin: 3px 0; }
+
+  /* ── Inline code ───────────────────────────────────────────────────────── */
+  .article :not(pre) > code {
+    font-family: var(--font-mono);
+    font-size: 12.5px; font-weight: 500;
+    background: #f3f0eb; color: var(--red);
+    padding: 1px 5px; border-radius: 4px;
+    border: 1px solid var(--border);
+  }
+
+  /* ── Code blocks ───────────────────────────────────────────────────────── */
+  .code-block {
+    position: relative; margin: 20px 0;
+    border-radius: var(--radius-lg); overflow: hidden;
+    border: 1px solid var(--code-border);
+    box-shadow: 0 4px 20px rgba(0,0,0,.16);
+  }
+  .code-lang {
+    position: absolute; top: 0; left: 0;
+    font-family: var(--font-mono); font-size: 10px; font-weight: 500;
+    color: #7c8db5; background: #222538;
+    padding: 4px 12px; border-bottom-right-radius: 6px;
+    text-transform: uppercase; letter-spacing: .08em;
+    user-select: none;
+  }
+  .copy-btn {
+    position: absolute; top: 8px; right: 10px;
+    background: #2d3148; border: 1px solid #3d4260;
+    border-radius: 5px; color: #7c8db5; cursor: pointer;
+    padding: 5px 8px; display: flex; align-items: center;
+    transition: background .15s, color .15s; z-index: 1;
+  }
+  .copy-btn:hover  { background: #3a3f60; color: #cdd6f4; }
+  .copy-btn.copied { color: #a6e3a1; border-color: #4a6a4a; }
+  .code-block pre {
+    margin: 0; padding: 36px 20px 20px;
+    background: var(--code-bg); overflow-x: auto;
+    scrollbar-width: thin; scrollbar-color: #3d4260 transparent;
+  }
+  .code-block pre::-webkit-scrollbar { height: 5px; }
+  .code-block pre::-webkit-scrollbar-thumb { background: #3d4260; border-radius: 3px; }
+  .code-block code {
+    font-family: var(--font-mono); font-size: 13px; line-height: 1.7;
+    color: var(--code-text); background: none; border: none; padding: 0;
+    white-space: pre; word-break: normal;
+  }
+
+  /* ── Tables ────────────────────────────────────────────────────────────── */
+  .table-wrap {
+    overflow-x: auto; margin: 16px 0;
+    border-radius: var(--radius-lg);
+    border: 1px solid var(--border);
+    box-shadow: var(--shadow);
+  }
+  table { width: 100%; border-collapse: collapse; font-size: 14px; min-width: 360px; }
+  thead { background: #f4f2ee; }
+  th {
+    padding: 9px 14px; text-align: left;
+    font-size: 11.5px; font-weight: 600;
+    letter-spacing: .04em; text-transform: uppercase;
+    color: var(--text-2); border-bottom: 1px solid var(--border);
+    white-space: nowrap;
+  }
+  td {
+    padding: 8px 14px; border-bottom: 1px solid var(--border-soft);
+    color: var(--text); vertical-align: top; line-height: 1.6;
+  }
+  tbody tr:last-child td { border-bottom: none; }
+  tbody tr:nth-child(even) td { background: #faf9f7; }
+  tbody tr:hover td { background: var(--accent-light); transition: background .1s; }
+
+  /* ── KV block ──────────────────────────────────────────────────────────── */
+  .kv-block { background: var(--bg); border: 1px solid var(--border); border-radius: var(--radius-lg); overflow: hidden; margin: 12px 0 20px; }
+  .kv-row { display: flex; border-bottom: 1px solid var(--border-soft); align-items: flex-start; }
+  .kv-row:last-child { border-bottom: none; }
+  .kv-key { flex: 0 0 160px; padding: 9px 16px; font-size: 13.5px; font-weight: 600; color: var(--text-2); background: var(--surface); border-right: 1px solid var(--border-soft); }
+  .kv-val { flex: 1; padding: 9px 16px; font-size: 14px; color: var(--text); }
+
+  /* ── Status badges ─────────────────────────────────────────────────────── */
+  .badge-ok { display: inline-flex; align-items: center; gap: 4px; background: var(--green-bg); color: var(--green); font-size: 13px; font-weight: 500; padding: 2px 9px; border-radius: 20px; border: 1px solid #bbf7d0; }
+  .badge-err { display: inline-flex; align-items: center; gap: 4px; background: var(--red-bg); color: var(--red); font-size: 13px; font-weight: 500; padding: 2px 9px; border-radius: 20px; border: 1px solid #fecaca; }
+  .badge-warn { display: inline-flex; align-items: center; gap: 4px; background: var(--amber-bg); color: var(--amber); font-size: 13px; font-weight: 500; padding: 2px 9px; border-radius: 20px; border: 1px solid #fde68a; }
+
+  /* ── Priority badges ───────────────────────────────────────────────────── */
+  .pri-p0 { display: inline-block; background: #fef2f2; color: #991b1b; border: 1px solid #fca5a5; font-size: 12px; font-weight: 700; padding: 2px 8px; border-radius: 4px; letter-spacing: .04em; }
+  .pri-p1 { display: inline-block; background: #fff7ed; color: #9a3412; border: 1px solid #fdba74; font-size: 12px; font-weight: 700; padding: 2px 8px; border-radius: 4px; }
+  .pri-p2 { display: inline-block; background: #fffbeb; color: #92400e; border: 1px solid #fde68a; font-size: 12px; font-weight: 700; padding: 2px 8px; border-radius: 4px; }
+  .pri-p3 { display: inline-block; background: var(--accent-light); color: var(--accent); border: 1px solid #bfdbfe; font-size: 12px; font-weight: 700; padding: 2px 8px; border-radius: 4px; }
+
+  /* ── Fault header ──────────────────────────────────────────────────────── */
+  .fault-header { display: flex; align-items: center; gap: 12px; padding: 12px 16px; border-radius: var(--radius-lg); margin: 16px 0 8px; border: 1px solid; }
+  .fh-p0 { background: #fef2f2; border-color: #fca5a5; }
+  .fh-p1 { background: #fff7ed; border-color: #fdba74; }
+  .fh-p2 { background: #fffbeb; border-color: #fde68a; }
+  .fh-p3 { background: var(--accent-light); border-color: #bfdbfe; }
+  .fh-badge { font-family: var(--font-mono); font-size: 11px; font-weight: 700; letter-spacing: .08em; }
+  .fh-p0 .fh-badge { color: #991b1b; }
+  .fh-p1 .fh-badge { color: #9a3412; }
+  .fh-p2 .fh-badge { color: #92400e; }
+  .fh-p3 .fh-badge { color: var(--accent); }
+  .fh-rest { font-size: 14px; font-weight: 500; color: var(--text); }
+
+  /* ── Timeline ──────────────────────────────────────────────────────────── */
+  .timeline { border-left: 2px solid var(--accent-mid); margin: 16px 0 16px 8px; padding-left: 20px; }
+  .tl-row { display: flex; align-items: baseline; gap: 10px; margin: 8px 0; font-size: 13.5px; }
+  .tl-ts { font-family: var(--font-mono); font-size: 12px; color: var(--text-3); flex-shrink: 0; white-space: nowrap; }
+  .tl-tag { font-size: 11px; font-weight: 600; padding: 1px 7px; border-radius: 10px; flex-shrink: 0; background: var(--accent-light); color: var(--accent); }
+  .tl-tag.err { background: var(--red-bg); color: var(--red); }
+  .tl-tag.warn { background: var(--amber-bg); color: var(--amber); }
+  .tl-desc { color: var(--text); line-height: 1.5; }
+
+  /* ── Global warn ───────────────────────────────────────────────────────── */
+  .global-warn { background: #fef2f2; border: 1px solid #fca5a5; border-radius: var(--radius-lg); padding: 14px 18px; font-size: 14.5px; font-weight: 600; color: #991b1b; margin: 16px 0; }
+
+  /* ── Tree note ─────────────────────────────────────────────────────────── */
+  .tree-note { white-space: pre-wrap; font-family: var(--font-mono); font-size: 13.5px; line-height: 1.6; color: var(--text-2); margin: 8px 0 8px 16px; }
+
+  /* ── Disclaimer ────────────────────────────────────────────────────────── */
+  .disclaimer { background: var(--bg); border: 1px solid var(--border); border-radius: var(--radius); padding: 14px 18px; font-size: 13.5px; color: var(--text-2); font-style: italic; }
+
+  /* ── Meta footer ───────────────────────────────────────────────────────── */
+  .meta {
+    margin-top: 48px; padding-top: 16px;
+    border-top: 1px solid var(--border-soft);
+    display: flex; justify-content: space-between; align-items: center;
+    font-size: 12px; color: var(--text-3);
+  }
+  .meta-source { font-family: var(--font-mono); font-size: 11.5px; }
+
+  /* ── Brand logo ────────────────────────────────────────────────────────── */
+  .brand-logo {
+    font-family: var(--font-head);
+    font-size: 14px;
+    color: var(--text-3);
+    letter-spacing: 0.05em;
+    margin-bottom: 4px;
+    flex-shrink: 0;
+    margin-left: 16px;
+  }
+  .brand-logo strong {
+    font-weight: 600;
+    color: var(--accent);
+  }
+  @media (max-width: 900px) {
+    .title-container { flex-direction: column; align-items: flex-start; gap: 12px; }
+    .brand-logo { margin-left: 0; margin-bottom: 0; }
+  }
+  /* ── Print ─────────────────────────────────────────────────────────────── */
+  @media print {
+    body { background: white; }
+    #progress, .toc { display: none; }
+    .layout { display: block; padding: 0; }
+    .article { border: none; box-shadow: none; padding: 24px; }
+    .copy-btn { display: none; }
+    .brand-logo { margin-bottom: 0; }
+  }
+
+  /* ── Responsive ────────────────────────────────────────────────────────── */
+  @media (max-width: 900px) {
+    .toc { display: none; }
+    .article { padding: 36px 28px; }
+    .layout { padding: 24px 16px 64px; }
+  }
+  @media (max-width: 480px) {
+    .article { padding: 24px 18px; }
+    .article h1 { font-size: 22px; }
+  }
+</style>
+</head>
+<body>
+
+<div id="progress"></div>
+
+<div class="layout">
+  <nav class="toc" id="toc">
+  <div class="toc-title">目录</div>
+  <div class="toc-content">
+<div class="toc-item has-children"><button class="toc-toggle" onclick="toggleToc(this)" aria-expanded="true">
+                <svg viewBox="0 0 24 24" width="12" height="12" stroke="currentColor" stroke-width="2" fill="none"><polyline points="6 9 12 15 18 9"></polyline></svg>
+              </button><a href="#h-malloc-arena-膨胀诊断报告-branch-b3" onclick="event.preventDefault(); const target = document.getElementById('h-malloc-arena-膨胀诊断报告-branch-b3'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l1">🔴 malloc Arena 膨胀诊断报告 (Branch B3)</a></div>
+<div class="toc-group" id="group-h-一故障概览">
+<div class="toc-item has-children"><button class="toc-toggle" onclick="toggleToc(this)" aria-expanded="true">
+                <svg viewBox="0 0 24 24" width="12" height="12" stroke="currentColor" stroke-width="2" fill="none"><polyline points="6 9 12 15 18 9"></polyline></svg>
+              </button><a href="#h-一故障概览" onclick="event.preventDefault(); const target = document.getElementById('h-一故障概览'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l2">一、故障概览</a></div>
+<div class="toc-group" id="group-h-置信度说明">
+<div class="toc-item "><span class="toc-spacer"></span><a href="#h-置信度说明" onclick="event.preventDefault(); const target = document.getElementById('h-置信度说明'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l3">置信度说明</a></div>
+</div>
+<div class="toc-item has-children"><button class="toc-toggle" onclick="toggleToc(this)" aria-expanded="true">
+                <svg viewBox="0 0 24 24" width="12" height="12" stroke="currentColor" stroke-width="2" fill="none"><polyline points="6 9 12 15 18 9"></polyline></svg>
+              </button><a href="#h-二根因速览" onclick="event.preventDefault(); const target = document.getElementById('h-二根因速览'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l2">二、根因速览</a></div>
+<div class="toc-group" id="group-h-故障因果链">
+<div class="toc-item "><span class="toc-spacer"></span><a href="#h-故障因果链" onclick="event.preventDefault(); const target = document.getElementById('h-故障因果链'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l3">故障因果链</a></div>
+<div class="toc-item "><span class="toc-spacer"></span><a href="#h-事故时间线" onclick="event.preventDefault(); const target = document.getElementById('h-事故时间线'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l3">事故时间线</a></div>
+</div>
+<div class="toc-item has-children"><button class="toc-toggle" onclick="toggleToc(this)" aria-expanded="true">
+                <svg viewBox="0 0 24 24" width="12" height="12" stroke="currentColor" stroke-width="2" fill="none"><polyline points="6 9 12 15 18 9"></polyline></svg>
+              </button><a href="#h-三排查过程" onclick="event.preventDefault(); const target = document.getElementById('h-三排查过程'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l2">三、排查过程</a></div>
+<div class="toc-group" id="group-h-31-初始现象">
+<div class="toc-item "><span class="toc-spacer"></span><a href="#h-31-初始现象" onclick="event.preventDefault(); const target = document.getElementById('h-31-初始现象'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l3">3.1 初始现象</a></div>
+<div class="toc-item "><span class="toc-spacer"></span><a href="#h-32-假设驱动排查" onclick="event.preventDefault(); const target = document.getElementById('h-32-假设驱动排查'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l3">3.2 假设驱动排查</a></div>
+<div class="toc-item "><span class="toc-spacer"></span><a href="#h-33-排查结论与逻辑树" onclick="event.preventDefault(); const target = document.getElementById('h-33-排查结论与逻辑树'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l3">3.3 排查结论与逻辑树</a></div>
+</div>
+<div class="toc-item "><span class="toc-spacer"></span><a href="#h-四关键证据" onclick="event.preventDefault(); const target = document.getElementById('h-四关键证据'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l2">四、关键证据</a></div>
+<div class="toc-item "><span class="toc-spacer"></span><a href="#h-五反事实验证" onclick="event.preventDefault(); const target = document.getElementById('h-五反事实验证'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l2">五、反事实验证</a></div>
+<div class="toc-item "><span class="toc-spacer"></span><a href="#h-六排除的替代假设" onclick="event.preventDefault(); const target = document.getElementById('h-六排除的替代假设'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l2">六、排除的替代假设</a></div>
+<div class="toc-item has-children"><button class="toc-toggle" onclick="toggleToc(this)" aria-expanded="true">
+                <svg viewBox="0 0 24 24" width="12" height="12" stroke="currentColor" stroke-width="2" fill="none"><polyline points="6 9 12 15 18 9"></polyline></svg>
+              </button><a href="#h-七修复建议" onclick="event.preventDefault(); const target = document.getElementById('h-七修复建议'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l2">七、修复建议</a></div>
+<div class="toc-group" id="group-h-71-应急处置">
+<div class="toc-item "><span class="toc-spacer"></span><a href="#h-71-应急处置" onclick="event.preventDefault(); const target = document.getElementById('h-71-应急处置'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l3">7.1 应急处置</a></div>
+<div class="toc-item "><span class="toc-spacer"></span><a href="#h-72-永久修复" onclick="event.preventDefault(); const target = document.getElementById('h-72-永久修复'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l3">7.2 永久修复</a></div>
+<div class="toc-item "><span class="toc-spacer"></span><a href="#h-73-预防措施" onclick="event.preventDefault(); const target = document.getElementById('h-73-预防措施'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l3">7.3 预防措施</a></div>
+</div>
+<div class="toc-item "><span class="toc-spacer"></span><a href="#h-八附件" onclick="event.preventDefault(); const target = document.getElementById('h-八附件'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l2">八、附件</a></div>
+</div>
+  </div>
+</nav>
+  <article class="article" id="article" style="position: relative;">
+    <div class="title-container"><h1 id="h-malloc-arena-膨胀诊断报告-branch-b3">🔴 malloc Arena 膨胀诊断报告 (Branch B3)</h1><div class="brand-logo">by <strong>Witty Diagnosis Agent</strong></div></div>
+<blockquote>
+<p><strong>报告编号</strong>: BAIZE-RCA-20260604-ARE003
+<strong>故障级别</strong>: P1 (严重)
+<strong>报告时间</strong>: 2026-06-04 02:05 UTC
+<strong>诊断来源</strong>: Kuafu 全分支诊断报告 (<code>kuafu_full_test_report_20260604.md</code>)
+<strong>当前状态</strong>: 🔴 处理中</p>
+</blockquote>
+<hr>
+<h2 id="h-一故障概览">一、故障概览</h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>项目</th>
+<th>内容</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>故障标题</td>
+<td>进程 PID 57 (fault_arena_expand) glibc malloc arena 膨胀</td>
+</tr>
+<tr>
+<td>影响范围</td>
+<td>容器 memleak-test 内 PID 57 进程，已消耗 198MB RSS / 225MB VmData</td>
+</tr>
+<tr>
+<td>故障时段</td>
+<td>2026-06-04 01:55 ~ 至今 (持续中)</td>
+</tr>
+<tr>
+<td>根本原因</td>
+<td>单线程进程通过反复调用 <code>malloc()</code> 大量分配内存，触发 glibc 创建 4 个 ~49MB 的 malloc arena，导致 VmData 膨胀至 225MB</td>
+</tr>
+<tr>
+<td>是否恢复</td>
+<td><span class="badge-err">❌ 未恢复</span></td>
+</tr>
+<tr>
+<td>根因置信度</td>
+<td>🟢 高置信</td>
+</tr>
+</tbody></table></div>
+<h3 id="h-置信度说明">置信度说明</h3>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>等级</th>
+<th>标识</th>
+<th>含义</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>高置信</td>
+<td>🟢</td>
+<td>根因已明确，反事实验证全通过，排除所有替代假设</td>
+</tr>
+<tr>
+<td>中置信</td>
+<td>🟡</td>
+<td>根因基本确认，但有 1-2 个维度依赖推断</td>
+</tr>
+<tr>
+<td>低置信</td>
+<td>🟠</td>
+<td>有多个可疑原因，尚未排除竞争，结论为推断</td>
+</tr>
+<tr>
+<td>未知</td>
+<td>🔴</td>
+<td>现象无法解释，根因未定位，仍在排查中</td>
+</tr>
+</tbody></table></div>
+<hr>
+<h2 id="h-二根因速览">二、根因速览</h2>
+<p><strong>根本原因</strong>：<code>fault_arena_expand</code> 进程在单线程下通过 <code>malloc()</code> 反复分配大块内存。glibc 的 malloc 实现为减少锁竞争会创建多个 arena（<code>M_ARENA_MAX</code> 默认值为 8 倍 CPU 核数），但单线程场景下本无需多个 arena。由于分配模式触发了 arena 创建逻辑，glibc 使用 <code>mmap()</code> 分配了 4 个 ~49MB 的匿名映射作为 arena 的 subheap，加上其他小分配共形成 <strong>38 个匿名 mmap 区域</strong>，导致 VmData 膨胀至 225MB、RSS 达 198MB。</p>
+<h3 id="h-故障因果链">故障因果链</h3>
+<div class="code-block">
+  
+  <button class="copy-btn" onclick="copyCode(this)" title="复制">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
+  </button>
+  <pre><code>fault_arena_expand 启动（PID 57，单线程）
+    └─► malloc(large_size) 反复调用
+        └─► glibc 检测到当前 arena 锁竞争（或分配模式触发多 arena 策略）
+            └─► 创建新的 malloc arena（每个 arena 通过 mmap 分配约 49MB 匿名映射）
+                └─► 共创建 4 个大型 arena（4 x ~49MB）
+                └─► + 34 个小匿名 mmap 区域 = 38 个 total
+                    └─► VmData 膨胀至 230,700 kB (~225 MB)
+                    └─► VmRSS 膨胀至 198,400 kB (~194 MB)
+                    └─► Anonymous 页 = 197,840 kB
+                        └─► 内存严重浪费，OOM 风险升高</code></pre>
+</div>
+<h3 id="h-事故时间线">事故时间线</h3>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>时间点 (UTC)</th>
+<th>事件</th>
+<th>证据来源</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>2026-06-04 01:55</td>
+<td>容器启动，PID 57 (fault_arena_expand) 运行</td>
+<td><code>process_baseline.csv</code></td>
+</tr>
+<tr>
+<td>2026-06-04 01:57</td>
+<td>基线采集：VmRSS=198,400 kB, VmData=230,700 kB</td>
+<td><code>pmap_57.txt</code>, <code>arena_trend_57.csv</code></td>
+</tr>
+<tr>
+<td>2026-06-04 01:57</td>
+<td>pmap 检测到 38 个匿名 mmap 区域，4 个 ~49MB</td>
+<td><code>pmap_57.txt</code> 分析</td>
+</tr>
+<tr>
+<td>2026-06-04 01:58</td>
+<td>Kuafu 完成 Arena 膨胀分支诊断确认</td>
+<td><code>kuafu_full_test_report_20260604.md</code></td>
+</tr>
+<tr>
+<td>至今</td>
+<td>4 个 ~49MB arena 持续驻留，VmData=225MB</td>
+<td>持续监控中</td>
+</tr>
+</tbody></table></div>
+<hr>
+<h2 id="h-三排查过程">三、排查过程</h2>
+<h3 id="h-31-初始现象">3.1 初始现象</h3>
+<ul>
+<li><strong>进程信息</strong>: PID 57, <code>fault_arena_expand</code>, 单线程</li>
+<li><strong>RSS 极高</strong>: 198,400 kB (~194 MB)</li>
+<li><strong>VmData &gt;&gt; VmRSS</strong>: VmData=230,700 kB (~225 MB) &gt; VmRSS=198,400 kB，表明部分内存已分配但未驻留（swapped 或未触页）</li>
+<li><strong>匿名 mmap 数量</strong>: 38 个匿名映射区域</li>
+<li><strong>匿名页总量</strong>: 197,840 kB（占 RSS 99.7%）</li>
+<li><strong>大型匿名区域分布</strong>: 4 个 ~49MB 区域，特征高度符合 glibc malloc arena subheap</li>
+</ul>
+<h3 id="h-32-假设驱动排查">3.2 假设驱动排查</h3>
+<h4 id="h-假设-b3-malloc-arena-膨胀-确认根因">假设 B3: malloc arena 膨胀 ✅ 确认根因</h4>
+<blockquote>
+<p>🧪 假设：glibc malloc 为减少锁竞争创建了多个 arena，每个 arena 预分配大块 mmap 区域</p>
+</blockquote>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>检查项</th>
+<th>操作</th>
+<th>结论</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>匿名 mmap 数量</td>
+<td><code>pmap -x 57 | grep anon | wc -l</code></td>
+<td>38 个匿名区域</td>
+</tr>
+<tr>
+<td>大型匿名区域分布</td>
+<td><code>pmap -x 57 | sort -k3 -rn | head -10</code></td>
+<td>4 个 ~49MB 大区域 (49,152 kB)</td>
+</tr>
+<tr>
+<td>VmData vs RSS</td>
+<td><code>grep -E &quot;VmData|VmRSS&quot; /proc/57/status</code></td>
+<td>VmData=230,700 &gt; VmRSS=198,400</td>
+</tr>
+<tr>
+<td>线程数</td>
+<td><code>ls /proc/57/task/ | wc -l</code></td>
+<td>1（单线程却有多 arena）</td>
+</tr>
+<tr>
+<td>arena 典型大小</td>
+<td>glibc 默认 arena subheap 大小</td>
+<td>64-bit 系统默认 64MB，此处 ~49MB 合理</td>
+</tr>
+</tbody></table></div>
+<p><strong>✅ 结论</strong>：单线程进程创建了 4 个 malloc arena，每个引用 ~49MB mmap 匿名区域，导致 VmData 膨胀至 225MB。38 个匿名 mmap 中 4 个大区域为 arena subheap。</p>
+<h4 id="h-假设-b1-堆内存未释放-heap-段泄漏">假设 B1: 堆内存未释放 (heap 段泄漏)</h4>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>检查项</th>
+<th>操作</th>
+<th>结论</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>[heap] 段 RSS</td>
+<td><code>pmap -x 57 | grep &quot;\[heap\]&quot;</code></td>
+<td>非传统 heap 段增长，而是匿名 mmap</td>
+</tr>
+<tr>
+<td>VmData 构成分析</td>
+<td>pmap 详细输出</td>
+<td>匿名 mmap 占主导，非 brk() 堆</td>
+</tr>
+</tbody></table></div>
+<p><strong>❌ 排除</strong>：增长模式为 mmap 匿名映射而非传统 brk heap。</p>
+<h4 id="h-假设-b2-mmap-匿名映射未释放-应用层-mmap">假设 B2: mmap 匿名映射未释放 (应用层 mmap)</h4>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>检查项</th>
+<th>操作</th>
+<th>结论</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>区域大小分布</td>
+<td>pmap 排序输出</td>
+<td>4 个 ~49MB 区域 + 34 个小区域</td>
+</tr>
+<tr>
+<td>区域特征</td>
+<td>大小一致、地址对齐</td>
+<td>4 个大区域大小一致(~49MB)，符合 glibc arena 特征而非应用层 mmap</td>
+</tr>
+</tbody></table></div>
+<p><strong>❌ 排除</strong>：区域大小和数量特征指向 glibc 内部机制，非应用代码直接 mmap。</p>
+<h4 id="h-假设-b4-递归增长缓存">假设 B4: 递归增长缓存</h4>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>检查项</th>
+<th>操作</th>
+<th>结论</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>内存增长模式</td>
+<td>arena 增长为阶梯式而非线性</td>
+<td>4 个 ~49MB 区域非缓存碎片模式</td>
+</tr>
+</tbody></table></div>
+<p><strong>❌ 排除</strong>：阶梯式大块增长不符合缓存渐进膨胀特征。</p>
+<h4 id="h-假设-b5-内存池碎片化">假设 B5: 内存池碎片化</h4>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>检查项</th>
+<th>操作</th>
+<th>结论</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>碎片特征</td>
+<td>pmap 小区域分布</td>
+<td>34 个小区域但总量远小于 4 个大区域</td>
+</tr>
+</tbody></table></div>
+<p><strong>❌ 排除</strong>：主要内存消耗来自 4 个大 arena 而非碎片。</p>
+<h3 id="h-33-排查结论与逻辑树">3.3 排查结论与逻辑树</h3>
+<div class="code-block">
+  
+  <button class="copy-btn" onclick="copyCode(this)" title="复制">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
+  </button>
+  <pre><code>PID 57 VmData=225MB &gt; VmRSS=194MB，38 个匿名 mmap 区域
+├─► 假设 B1: heap 段泄漏       → ❌ 非 brk heap 增长，排除
+├─► 假设 B2: 应用层 mmap 泄漏  → ❌ 区域大小一致，为 glibc 内部机制，排除
+├─► 假设 B3: malloc arena 膨胀 → 🎯 确认根因
+│       ├─► 4 个 ~49MB 大匿名区域 = glibc arena subheap
+│       ├─► 单线程却有多 arena（M_ARENA_MAX 默认策略）
+│       └─► VmData &gt; VmRSS 说明部分 arena 内存未驻留
+├─► 假设 B4: 递归增长缓存     → ❌ 阶梯式非缓存增长
+└─► 假设 B5: 内存池碎片化     → ❌ 大区域主导非碎片</code></pre>
+</div>
+<hr>
+<h2 id="h-四关键证据">四、关键证据</h2>
+<ol>
+<li><strong>证据1 — 匿名 mmap 计数与分布</strong>：<code>pmap_57.txt</code> 显示 <strong>38 个匿名 mmap 区域</strong>，其中 <strong>4 个 ~49,152 kB 的大区域</strong> — 大小高度一致，这是 glibc arena 创建 <code>mmap()</code> subheap 的典型特征。</li>
+<li><strong>证据2 — VmData &gt;&gt; VmRSS</strong>：VmData=230,700 kB vs VmRSS=198,400 kB，差值约 32MB 表明部分 arena 内存已分配但尚未触页驻留（demand paging）。</li>
+<li><strong>证据3 — 单线程多 arena</strong>：进程仅 1 线程却拥有 4 个 arena，确认是 glibc arena 分配策略导致。</li>
+<li><strong>证据4 — 匿名页占 RSS 99.7%</strong>：AnonPages=197,840 kB，几乎全部 RSS 由匿名页构成，确认无文件缓存干扰。</li>
+</ol>
+<hr>
+<h2 id="h-五反事实验证">五、反事实验证</h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>维度</th>
+<th>推演结果</th>
+<th>实际现象</th>
+<th>是否吻合</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Arena 膨胀 → VmData &gt; RSS</td>
+<td>VmData &gt; VmRSS，差值约 10-20%</td>
+<td>VmData=230,700 &gt; VmRSS=198,400 (差 14%)</td>
+<td><span class="badge-ok">✅ 是</span></td>
+</tr>
+<tr>
+<td>Arena 膨胀 → 多匿名区域</td>
+<td>匿名 mmap 数 &gt;&gt; 正常 (&lt;10)</td>
+<td>38 个匿名区域（4 个 ~49MB 大区域）</td>
+<td><span class="badge-ok">✅ 是</span></td>
+</tr>
+<tr>
+<td>Arena 膨胀 → 区域大小一致</td>
+<td>多个区域大小接近</td>
+<td>4 个区域均为 49,152 kB (±少量偏移)</td>
+<td><span class="badge-ok">✅ 是</span></td>
+</tr>
+<tr>
+<td>Arena 膨胀 → 单线程场景</td>
+<td>1 线程但 arena 数 &gt; 1</td>
+<td>4 个 arena / 1 线程</td>
+<td><span class="badge-ok">✅ 是</span></td>
+</tr>
+</tbody></table></div>
+<hr>
+<h2 id="h-六排除的替代假设">六、排除的替代假设</h2>
+<ul>
+<li><strong>假设 B1 (Heap 段泄漏)</strong>：排除。内存增长来自匿名 mmap 区域而非传统 <code>[heap]</code> 段，<code>brk()</code> 机制正常。</li>
+<li><strong>假设 B2 (应用层 mmap 泄漏)</strong>：排除。4 个 ~49MB 大区域大小高度一致，对齐地址，符合 glibc arena 内部 mmap 策略特征，非应用代码直接调用。</li>
+<li><strong>假设 B4 (递归增长缓存)</strong>：排除。内存消耗为阶梯式大块分配而非缓存渐进增长。</li>
+<li><strong>假设 B5 (内存池碎片化)</strong>：排除。内存主要集中在大区域，非碎片积累。</li>
+</ul>
+<hr>
+<h2 id="h-七修复建议">七、修复建议</h2>
+<h3 id="h-71-应急处置">7.1 应急处置</h3>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>步骤</th>
+<th>操作</th>
+<th>执行人</th>
+<th>预期效果</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>1</td>
+<td><code>kill -9 57</code></td>
+<td>系统管理员</td>
+<td>终止进程，释放所有内存</td>
+</tr>
+<tr>
+<td>2</td>
+<td>确认释放: <code>free -h</code> 观察可用内存回升</td>
+<td>系统管理员</td>
+<td>内存恢复正常</td>
+</tr>
+</tbody></table></div>
+<h3 id="h-72-永久修复">7.2 永久修复</h3>
+<div class="code-block">
+  <span class="code-lang">c</span>
+  <button class="copy-btn" onclick="copyCode(this)" title="复制">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
+  </button>
+  <pre><code>// 方案1：启动时设置 M_ARENA_MAX 环境变量限制 arena 数量
+// 在启动命令前设置（推荐值：CPU 核数或 1 对于单线程）
+// MALLOC_ARENA_MAX=1 ./fault_arena_expand
+
+// 方案2：代码中使用 mallopt() 限制 arena 数量
+#include &lt;malloc.h&gt;
+mallopt(M_ARENA_MAX, 1);  // 限制最多 1 个 arena
+
+// 修复前（故障代码模式 - 大量大块 malloc 触发多 arena）
+for (int i = 0; i &lt; iterations; i++) {
+    void *p = malloc(large_size);  // 反复大块分配
+    // ❌ 未释放 或 释放后 arena 不归还给 OS
+}
+
+// 修复后（考虑使用 mmap 大块或限制 arena）
+mallopt(M_ARENA_MAX, 1);
+// 或改用 mmap 直接管理大块内存</code></pre>
+</div>
+<h3 id="h-73-预防措施">7.3 预防措施</h3>
+<ol>
+<li><strong>环境变量调优</strong>：对于单线程或低并发服务，设置 <code>MALLOC_ARENA_MAX=1</code> 或 <code>MALLOC_ARENA_MAX=&lt;CPU核数&gt;</code>，避免 arena 过度创建。</li>
+<li><strong>内存分配策略</strong>：大块内存（&gt;128KB）考虑直接使用 <code>mmap()</code> + <code>munmap()</code>，避免经过 glibc arena。</li>
+<li><strong>监控指标</strong>：监控进程 <code>VmData</code> 与 <code>VmRSS</code> 比值，若 <code>VmData &gt; VmRSS * 1.2</code> 且匿名 mmap 数 &gt; 20，触发 arena 膨胀告警。</li>
+<li><strong>替代分配器</strong>：考虑使用 <code>jemalloc</code> 或 <code>tcmalloc</code> 替代 glibc malloc，在多线程场景下有更好的 arena 管理策略。</li>
+</ol>
+<hr>
+<h2 id="h-八附件">八、附件</h2>
+<ul>
+<li>进程基线表: <code>process_baseline.csv</code> (PID 57 行: VmRSS=198,400 kB, VmData=230,700 kB)</li>
+<li>Arena 趋势数据: <code>arena_trend_57.csv</code></li>
+<li>进程内存映射: <code>pmap_57.txt</code> (38 个匿名区域, 4 x ~49MB)</li>
+<li>系统内存快照: <code>meminfo_final.txt</code></li>
+<li>容器环境: memleak-test, Linux 6.6.87.2-microsoft-standard-WSL2</li>
+<li>Kuafu 全分支报告: <code>kuafu_full_test_report_20260604.md</code> (行 121-131)</li>
+</ul>
+
+    <div class="meta">
+      <span class="meta-source">arena_leak_RCA_20260604.md</span>
+      <span>生成于 2026/06/04 10:05</span>
+    </div>
+  </article>
+</div>
+
+<script>
+  /* ── 滚动进度条 ── */
+  window.addEventListener("scroll", () => {
+    const el  = document.documentElement;
+    const pct = el.scrollTop / (el.scrollHeight - el.clientHeight) * 100;
+    document.getElementById("progress").style.width = Math.min(pct, 100) + "%";
+  });
+
+  /* ── TOC 高亮当前章节 ── */
+  (function () {
+    const headings = Array.from(document.querySelectorAll("article h1,article h2,article h3"));
+    const links    = Array.from(document.querySelectorAll(".toc a"));
+    if (!links.length) return;
+    const obs = new IntersectionObserver(entries => {
+      entries.forEach(e => {
+        if (!e.isIntersecting) return;
+        links.forEach(l => l.classList.remove("active"));
+        const a = links.find(l => l.getAttribute("href") === "#" + e.target.id);
+        if (a) a.classList.add("active");
+      });
+    }, { rootMargin: "-10% 0px -80% 0px" });
+    headings.forEach(h => obs.observe(h));
+  })();
+
+  /* ── h2 章节序号自动计数 ── */
+  (function () {
+    let idx = 0;
+    document.querySelectorAll("article h2").forEach(el => {
+      idx++;
+      el.setAttribute("data-index", String(idx).padStart(2, "0"));
+    });
+  })();
+
+  /* ── 代码块一键复制 ── */
+  function copyCode(btn) {
+    const code = btn.closest(".code-block").querySelector("code").innerText;
+    navigator.clipboard.writeText(code).then(() => {
+      btn.classList.add("copied");
+      btn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>';
+      setTimeout(() => {
+        btn.classList.remove("copied");
+        btn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>';
+      }, 2000);
+    });
+  }
+
+  /* ── 目录树收缩/展开 ── */
+  function toggleToc(btn) {
+    const expanded = btn.getAttribute("aria-expanded") === "true";
+    btn.setAttribute("aria-expanded", String(!expanded));
+    const parentItem = btn.closest(".toc-item");
+    let nextEl = parentItem.nextElementSibling;
+    if (nextEl && nextEl.classList.contains("toc-group")) {
+      if (expanded) {
+        nextEl.style.maxHeight = nextEl.scrollHeight + "px";
+        void nextEl.offsetHeight;
+        nextEl.classList.add("collapsed");
+      } else {
+        nextEl.classList.remove("collapsed");
+        nextEl.style.maxHeight = nextEl.scrollHeight + "px";
+        setTimeout(() => {
+          if (!nextEl.classList.contains("collapsed")) {
+            nextEl.style.maxHeight = "none";
+          }
+        }, 300);
+      }
+    }
+  }
+</script>
+</body>
+</html>

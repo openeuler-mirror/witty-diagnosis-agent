@@ -1,0 +1,26 @@
+FROM ubuntu:22.04
+RUN apt-get update -qq && DEBIAN_FRONTEND=noninteractive apt-get install -y -qq \
+    procps iproute2 strace lsof gdb valgrind bc gcc python3 2>&1 | tail -3 && \
+    apt-get clean
+RUN mkdir -p /skills/memory-leak-diagnosis /test /tmp/mem_diag
+WORKDIR /test
+COPY ./collect_mem_info.sh /skills/memory-leak-diagnosis/
+COPY ./diagnose_rss_growth.sh /skills/memory-leak-diagnosis/
+COPY ./diagnose_anon_page.sh /skills/memory-leak-diagnosis/
+COPY ./diagnose_heap_profiler.sh /skills/memory-leak-diagnosis/
+COPY ./diagnose_slab_leak.sh /skills/memory-leak-diagnosis/
+COPY ./diagnose_vmalloc_leak.sh /skills/memory-leak-diagnosis/
+COPY ./diagnose_kmalloc_leak.sh /skills/memory-leak-diagnosis/
+COPY ./diagnose_memcg_leak.sh /skills/memory-leak-diagnosis/
+COPY ./run_all_mem_tests.sh /skills/memory-leak-diagnosis/
+COPY ./fault_heap_leak.c /test/
+COPY ./fault_heap_leak_v2.py /test/
+COPY ./fault_mmap_anon_leak.c /test/
+COPY ./fault_thread_leak.py /test/
+COPY ./fault_fd_leak.py /test/
+COPY ./entrypoint.sh /test/
+RUN chmod +x /skills/memory-leak-diagnosis/*.sh /test/entrypoint.sh /test/*.py
+RUN gcc -g -O0 -o /tmp/fault_heap_leak /test/fault_heap_leak.c 2>/dev/null; \
+    gcc -g -O0 -o /tmp/fault_mmap_anon_leak /test/fault_mmap_anon_leak.c 2>/dev/null; \
+    echo "[BUILD] Fault injectors compiled"
+CMD ["bash", "/test/entrypoint.sh"]
