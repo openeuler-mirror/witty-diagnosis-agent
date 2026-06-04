@@ -1,0 +1,999 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>故障诊断报告</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Lora:ital,wght@0,400;0,600;1,400&family=Source+Sans+3:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  /* ── Design tokens ─────────────────────────────────────────────────────── */
+  :root {
+    --bg:          #f8f7f4;
+    --surface:     #ffffff;
+    --border:      #e8e5df;
+    --border-soft: #f0ede8;
+
+    --text:        #1c1917;
+    --text-2:      #57534e;
+    --text-3:      #a8a29e;
+
+    --accent:      #1d4e6e;
+    --accent-light:#e8f1f7;
+    --accent-mid:  #3b82a0;
+
+    --red:         #c0392b;
+    --red-bg:      #fef2f2;
+    --amber:       #92400e;
+    --amber-bg:    #fffbeb;
+    --green:       #14532d;
+    --green-bg:    #f0fdf4;
+
+    --code-bg:     #1a1d27;
+    --code-text:   #cdd6f4;
+    --code-border: #2d3148;
+
+    --font-body: "Source Sans 3", "PingFang SC", "Hiragino Sans GB", sans-serif;
+    --font-head: "Lora", "PingFang SC", Georgia, serif;
+    --font-mono: "JetBrains Mono", "Fira Code", Consolas, monospace;
+
+    --radius:    8px;
+    --radius-lg: 12px;
+    --shadow:    0 1px 3px rgba(0,0,0,.06), 0 4px 16px rgba(0,0,0,.05);
+    --shadow-lg: 0 2px 8px rgba(0,0,0,.07), 0 8px 32px rgba(0,0,0,.06);
+
+    --toc-width:   240px;
+    --gap:         32px;
+  }
+
+  /* ── Progress bar ──────────────────────────────────────────────────────── */
+  #progress {
+    position: fixed; top: 0; left: 0; height: 3px; width: 0%;
+    background: linear-gradient(90deg, var(--accent-mid), var(--accent));
+    z-index: 999; transition: width .1s linear;
+    border-radius: 0 2px 2px 0;
+  }
+
+  /* ── Base ──────────────────────────────────────────────────────────────── */
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  html { font-size: 16px; scroll-behavior: smooth; }
+  body {
+    font-family: var(--font-body);
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.8;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* ── Layout ────────────────────────────────────────────────────────────── */
+  .layout {
+    display: flex;
+    align-items: flex-start;
+    max-width: calc(var(--toc-width) + 820px + var(--gap) * 3);
+    margin: 0 auto;
+    padding: 48px var(--gap) 96px;
+    gap: var(--gap);
+  }
+
+  /* ── TOC ───────────────────────────────────────────────────────────────── */
+  .toc {
+    width: var(--toc-width);
+    flex-shrink: 0;
+    position: sticky;
+    top: 32px;
+    max-height: calc(100vh - 64px);
+    overflow-y: auto;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    padding: 20px;
+    box-shadow: var(--shadow);
+    scrollbar-width: thin;
+    scrollbar-color: var(--border) transparent;
+  }
+  .toc-title {
+    font-size: 10.5px;
+    font-weight: 600;
+    letter-spacing: .1em;
+    text-transform: uppercase;
+    color: var(--text-3);
+    margin-bottom: 12px;
+    padding-bottom: 10px;
+    border-bottom: 1px solid var(--border-soft);
+  }
+  .toc-item {
+    display: flex;
+    align-items: flex-start;
+    margin: 2px 0;
+  }
+  .toc-toggle {
+    background: none;
+    border: none;
+    cursor: pointer;
+    color: var(--text-3);
+    padding: 4px;
+    margin-right: 4px;
+    margin-top: 2px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 4px;
+    transition: background 0.2s, transform 0.2s;
+  }
+  .toc-toggle:hover { background: var(--border-soft); color: var(--text); }
+  .toc-toggle[aria-expanded="false"] svg { transform: rotate(-90deg); }
+  .toc-spacer { width: 20px; flex-shrink: 0; }
+  .toc-group { overflow: hidden; transition: max-height 0.3s ease-in-out; }
+  .toc-group.collapsed { max-height: 0 !important; }
+  
+  .toc a {
+    display: block;
+    font-size: 13px;
+    color: var(--text-2);
+    text-decoration: none;
+    padding: 4px 8px;
+    border-radius: 5px;
+    line-height: 1.45;
+    transition: background .15s, color .15s;
+    word-break: break-all;
+    flex-grow: 1;
+  }
+  .toc a:hover  { background: var(--accent-light); color: var(--accent); }
+  .toc a.active { background: var(--accent-light); color: var(--accent); font-weight: 500; }
+  .toc-l1 { font-weight: 600; color: var(--text); }
+  .toc-l2 { font-weight: 600; color: var(--text); }
+  .toc-l3 { font-size: 12px !important; padding-left: 14px !important; }
+
+  /* ── Article card ──────────────────────────────────────────────────────── */
+  .article {
+    flex: 1; min-width: 0;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    padding: 52px 60px;
+    box-shadow: var(--shadow-lg);
+  }
+
+  /* ── Headings ──────────────────────────────────────────────────────────── */
+  .title-container {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-end;
+    margin: 0 0 28px;
+    padding-bottom: 18px;
+    border-bottom: 2px solid var(--text);
+  }
+  .article h1 {
+    font-family: var(--font-head);
+    font-size: 26px; font-weight: 600; line-height: 1.3;
+    margin: 0; padding-bottom: 0;
+    border-bottom: none;
+  }
+  .article h2 {
+    font-family: var(--font-head);
+    font-size: 19px; font-weight: 600;
+    margin: 48px 0 14px; padding-bottom: 8px;
+    border-bottom: 1px solid var(--border);
+  }
+  .article h2::before {
+    content: attr(data-index);
+    display: inline-block;
+    font-family: var(--font-mono);
+    font-size: 10.5px; font-weight: 500;
+    color: var(--accent-mid);
+    background: var(--accent-light);
+    padding: 1px 7px; border-radius: 4px;
+    margin-right: 10px; vertical-align: middle;
+    letter-spacing: .05em;
+  }
+  .article h3 {
+    font-family: var(--font-head);
+    font-size: 15.5px; font-weight: 600;
+    margin: 28px 0 10px;
+  }
+  .article h3::before {
+    content: "§ ";
+    color: var(--text-3);
+    font-family: var(--font-mono); font-size: 13px;
+  }
+  .article h4 {
+    font-size: 13.5px; font-weight: 600;
+    color: var(--accent); margin: 20px 0 8px;
+  }
+
+  /* ── Body text ─────────────────────────────────────────────────────────── */
+  .article p, .plain { 
+    font-size: 15px; 
+    line-height: 1.85; 
+    color: var(--text); 
+    margin: 0 0 12px; 
+    font-family: var(--font-body);
+  }
+  .article strong { font-weight: 600; }
+  .article em     { font-style: italic; color: var(--text-2); }
+  .article a {
+    color: var(--accent); text-decoration: underline;
+    text-decoration-color: var(--accent-light);
+    text-underline-offset: 3px;
+  }
+  .article a:hover { text-decoration-color: var(--accent); }
+  .article hr { border: none; border-top: 1px solid var(--border); margin: 20px 0; }
+  .article hr.heavy { border-top: 3px solid var(--text); margin: 32px 0; }
+
+  /* ── Blockquote ────────────────────────────────────────────────────────── */
+  .article blockquote {
+    border-left: 3px solid var(--accent-mid);
+    background: var(--accent-light);
+    margin: 20px 0; padding: 13px 20px 13px 20px;
+    border-radius: 0 var(--radius) var(--radius) 0;
+  }
+  .article blockquote p { font-size: 14.5px; color: var(--accent); margin: 0; line-height: 1.7; }
+  /* 支持块引用内部保留换行符（修复头部概要换行丢失问题） */
+  .article blockquote p { white-space: pre-wrap; }
+  .article blockquote strong { color: var(--accent); }
+
+  /* ── Lists ─────────────────────────────────────────────────────────────── */
+  .article ul, .article ol { padding-left: 22px; margin: 6px 0 14px; }
+  .article li { font-size: 15px; line-height: 1.8; margin: 4px 0; }
+  .article li::marker { color: var(--accent-mid); }
+  .article li > ul, .article li > ol { margin: 3px 0; }
+
+  /* ── Inline code ───────────────────────────────────────────────────────── */
+  .article :not(pre) > code {
+    font-family: var(--font-mono);
+    font-size: 12.5px; font-weight: 500;
+    background: #f3f0eb; color: var(--red);
+    padding: 1px 5px; border-radius: 4px;
+    border: 1px solid var(--border);
+  }
+
+  /* ── Code blocks ───────────────────────────────────────────────────────── */
+  .code-block {
+    position: relative; margin: 20px 0;
+    border-radius: var(--radius-lg); overflow: hidden;
+    border: 1px solid var(--code-border);
+    box-shadow: 0 4px 20px rgba(0,0,0,.16);
+  }
+  .code-lang {
+    position: absolute; top: 0; left: 0;
+    font-family: var(--font-mono); font-size: 10px; font-weight: 500;
+    color: #7c8db5; background: #222538;
+    padding: 4px 12px; border-bottom-right-radius: 6px;
+    text-transform: uppercase; letter-spacing: .08em;
+    user-select: none;
+  }
+  .copy-btn {
+    position: absolute; top: 8px; right: 10px;
+    background: #2d3148; border: 1px solid #3d4260;
+    border-radius: 5px; color: #7c8db5; cursor: pointer;
+    padding: 5px 8px; display: flex; align-items: center;
+    transition: background .15s, color .15s; z-index: 1;
+  }
+  .copy-btn:hover  { background: #3a3f60; color: #cdd6f4; }
+  .copy-btn.copied { color: #a6e3a1; border-color: #4a6a4a; }
+  .code-block pre {
+    margin: 0; padding: 36px 20px 20px;
+    background: var(--code-bg); overflow-x: auto;
+    scrollbar-width: thin; scrollbar-color: #3d4260 transparent;
+  }
+  .code-block pre::-webkit-scrollbar { height: 5px; }
+  .code-block pre::-webkit-scrollbar-thumb { background: #3d4260; border-radius: 3px; }
+  .code-block code {
+    font-family: var(--font-mono); font-size: 13px; line-height: 1.7;
+    color: var(--code-text); background: none; border: none; padding: 0;
+    white-space: pre; word-break: normal;
+  }
+
+  /* ── Tables ────────────────────────────────────────────────────────────── */
+  .table-wrap {
+    overflow-x: auto; margin: 16px 0;
+    border-radius: var(--radius-lg);
+    border: 1px solid var(--border);
+    box-shadow: var(--shadow);
+  }
+  table { width: 100%; border-collapse: collapse; font-size: 14px; min-width: 360px; }
+  thead { background: #f4f2ee; }
+  th {
+    padding: 9px 14px; text-align: left;
+    font-size: 11.5px; font-weight: 600;
+    letter-spacing: .04em; text-transform: uppercase;
+    color: var(--text-2); border-bottom: 1px solid var(--border);
+    white-space: nowrap;
+  }
+  td {
+    padding: 8px 14px; border-bottom: 1px solid var(--border-soft);
+    color: var(--text); vertical-align: top; line-height: 1.6;
+  }
+  tbody tr:last-child td { border-bottom: none; }
+  tbody tr:nth-child(even) td { background: #faf9f7; }
+  tbody tr:hover td { background: var(--accent-light); transition: background .1s; }
+
+  /* ── KV block ──────────────────────────────────────────────────────────── */
+  .kv-block { background: var(--bg); border: 1px solid var(--border); border-radius: var(--radius-lg); overflow: hidden; margin: 12px 0 20px; }
+  .kv-row { display: flex; border-bottom: 1px solid var(--border-soft); align-items: flex-start; }
+  .kv-row:last-child { border-bottom: none; }
+  .kv-key { flex: 0 0 160px; padding: 9px 16px; font-size: 13.5px; font-weight: 600; color: var(--text-2); background: var(--surface); border-right: 1px solid var(--border-soft); }
+  .kv-val { flex: 1; padding: 9px 16px; font-size: 14px; color: var(--text); }
+
+  /* ── Status badges ─────────────────────────────────────────────────────── */
+  .badge-ok { display: inline-flex; align-items: center; gap: 4px; background: var(--green-bg); color: var(--green); font-size: 13px; font-weight: 500; padding: 2px 9px; border-radius: 20px; border: 1px solid #bbf7d0; }
+  .badge-err { display: inline-flex; align-items: center; gap: 4px; background: var(--red-bg); color: var(--red); font-size: 13px; font-weight: 500; padding: 2px 9px; border-radius: 20px; border: 1px solid #fecaca; }
+  .badge-warn { display: inline-flex; align-items: center; gap: 4px; background: var(--amber-bg); color: var(--amber); font-size: 13px; font-weight: 500; padding: 2px 9px; border-radius: 20px; border: 1px solid #fde68a; }
+
+  /* ── Priority badges ───────────────────────────────────────────────────── */
+  .pri-p0 { display: inline-block; background: #fef2f2; color: #991b1b; border: 1px solid #fca5a5; font-size: 12px; font-weight: 700; padding: 2px 8px; border-radius: 4px; letter-spacing: .04em; }
+  .pri-p1 { display: inline-block; background: #fff7ed; color: #9a3412; border: 1px solid #fdba74; font-size: 12px; font-weight: 700; padding: 2px 8px; border-radius: 4px; }
+  .pri-p2 { display: inline-block; background: #fffbeb; color: #92400e; border: 1px solid #fde68a; font-size: 12px; font-weight: 700; padding: 2px 8px; border-radius: 4px; }
+  .pri-p3 { display: inline-block; background: var(--accent-light); color: var(--accent); border: 1px solid #bfdbfe; font-size: 12px; font-weight: 700; padding: 2px 8px; border-radius: 4px; }
+
+  /* ── Fault header ──────────────────────────────────────────────────────── */
+  .fault-header { display: flex; align-items: center; gap: 12px; padding: 12px 16px; border-radius: var(--radius-lg); margin: 16px 0 8px; border: 1px solid; }
+  .fh-p0 { background: #fef2f2; border-color: #fca5a5; }
+  .fh-p1 { background: #fff7ed; border-color: #fdba74; }
+  .fh-p2 { background: #fffbeb; border-color: #fde68a; }
+  .fh-p3 { background: var(--accent-light); border-color: #bfdbfe; }
+  .fh-badge { font-family: var(--font-mono); font-size: 11px; font-weight: 700; letter-spacing: .08em; }
+  .fh-p0 .fh-badge { color: #991b1b; }
+  .fh-p1 .fh-badge { color: #9a3412; }
+  .fh-p2 .fh-badge { color: #92400e; }
+  .fh-p3 .fh-badge { color: var(--accent); }
+  .fh-rest { font-size: 14px; font-weight: 500; color: var(--text); }
+
+  /* ── Timeline ──────────────────────────────────────────────────────────── */
+  .timeline { border-left: 2px solid var(--accent-mid); margin: 16px 0 16px 8px; padding-left: 20px; }
+  .tl-row { display: flex; align-items: baseline; gap: 10px; margin: 8px 0; font-size: 13.5px; }
+  .tl-ts { font-family: var(--font-mono); font-size: 12px; color: var(--text-3); flex-shrink: 0; white-space: nowrap; }
+  .tl-tag { font-size: 11px; font-weight: 600; padding: 1px 7px; border-radius: 10px; flex-shrink: 0; background: var(--accent-light); color: var(--accent); }
+  .tl-tag.err { background: var(--red-bg); color: var(--red); }
+  .tl-tag.warn { background: var(--amber-bg); color: var(--amber); }
+  .tl-desc { color: var(--text); line-height: 1.5; }
+
+  /* ── Global warn ───────────────────────────────────────────────────────── */
+  .global-warn { background: #fef2f2; border: 1px solid #fca5a5; border-radius: var(--radius-lg); padding: 14px 18px; font-size: 14.5px; font-weight: 600; color: #991b1b; margin: 16px 0; }
+
+  /* ── Tree note ─────────────────────────────────────────────────────────── */
+  .tree-note { white-space: pre-wrap; font-family: var(--font-mono); font-size: 13.5px; line-height: 1.6; color: var(--text-2); margin: 8px 0 8px 16px; }
+
+  /* ── Disclaimer ────────────────────────────────────────────────────────── */
+  .disclaimer { background: var(--bg); border: 1px solid var(--border); border-radius: var(--radius); padding: 14px 18px; font-size: 13.5px; color: var(--text-2); font-style: italic; }
+
+  /* ── Meta footer ───────────────────────────────────────────────────────── */
+  .meta {
+    margin-top: 48px; padding-top: 16px;
+    border-top: 1px solid var(--border-soft);
+    display: flex; justify-content: space-between; align-items: center;
+    font-size: 12px; color: var(--text-3);
+  }
+  .meta-source { font-family: var(--font-mono); font-size: 11.5px; }
+
+  /* ── Brand logo ────────────────────────────────────────────────────────── */
+  .brand-logo {
+    font-family: var(--font-head);
+    font-size: 14px;
+    color: var(--text-3);
+    letter-spacing: 0.05em;
+    margin-bottom: 4px;
+    flex-shrink: 0;
+    margin-left: 16px;
+  }
+  .brand-logo strong {
+    font-weight: 600;
+    color: var(--accent);
+  }
+  @media (max-width: 900px) {
+    .title-container { flex-direction: column; align-items: flex-start; gap: 12px; }
+    .brand-logo { margin-left: 0; margin-bottom: 0; }
+  }
+  /* ── Print ─────────────────────────────────────────────────────────────── */
+  @media print {
+    body { background: white; }
+    #progress, .toc { display: none; }
+    .layout { display: block; padding: 0; }
+    .article { border: none; box-shadow: none; padding: 24px; }
+    .copy-btn { display: none; }
+    .brand-logo { margin-bottom: 0; }
+  }
+
+  /* ── Responsive ────────────────────────────────────────────────────────── */
+  @media (max-width: 900px) {
+    .toc { display: none; }
+    .article { padding: 36px 28px; }
+    .layout { padding: 24px 16px 64px; }
+  }
+  @media (max-width: 480px) {
+    .article { padding: 24px 18px; }
+    .article h1 { font-size: 22px; }
+  }
+</style>
+</head>
+<body>
+
+<div id="progress"></div>
+
+<div class="layout">
+  <nav class="toc" id="toc">
+  <div class="toc-title">目录</div>
+  <div class="toc-content">
+<div class="toc-item has-children"><button class="toc-toggle" onclick="toggleToc(this)" aria-expanded="true">
+                <svg viewBox="0 0 24 24" width="12" height="12" stroke="currentColor" stroke-width="2" fill="none"><polyline points="6 9 12 15 18 9"></polyline></svg>
+              </button><a href="#h-故障诊断报告" onclick="event.preventDefault(); const target = document.getElementById('h-故障诊断报告'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l1">🔴 故障诊断报告</a></div>
+<div class="toc-group" id="group-h-一故障概览">
+<div class="toc-item has-children"><button class="toc-toggle" onclick="toggleToc(this)" aria-expanded="true">
+                <svg viewBox="0 0 24 24" width="12" height="12" stroke="currentColor" stroke-width="2" fill="none"><polyline points="6 9 12 15 18 9"></polyline></svg>
+              </button><a href="#h-一故障概览" onclick="event.preventDefault(); const target = document.getElementById('h-一故障概览'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l2">一、故障概览</a></div>
+<div class="toc-group" id="group-h-置信度说明">
+<div class="toc-item "><span class="toc-spacer"></span><a href="#h-置信度说明" onclick="event.preventDefault(); const target = document.getElementById('h-置信度说明'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l3">置信度说明</a></div>
+</div>
+<div class="toc-item has-children"><button class="toc-toggle" onclick="toggleToc(this)" aria-expanded="true">
+                <svg viewBox="0 0 24 24" width="12" height="12" stroke="currentColor" stroke-width="2" fill="none"><polyline points="6 9 12 15 18 9"></polyline></svg>
+              </button><a href="#h-二根因速览" onclick="event.preventDefault(); const target = document.getElementById('h-二根因速览'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l2">二、根因速览</a></div>
+<div class="toc-group" id="group-h-事故时间线-故障传导链路">
+<div class="toc-item "><span class="toc-spacer"></span><a href="#h-事故时间线-故障传导链路" onclick="event.preventDefault(); const target = document.getElementById('h-事故时间线-故障传导链路'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l3">事故时间线 & 故障传导链路</a></div>
+<div class="toc-item "><span class="toc-spacer"></span><a href="#h-故障因果链" onclick="event.preventDefault(); const target = document.getElementById('h-故障因果链'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l3">故障因果链</a></div>
+</div>
+<div class="toc-item has-children"><button class="toc-toggle" onclick="toggleToc(this)" aria-expanded="true">
+                <svg viewBox="0 0 24 24" width="12" height="12" stroke="currentColor" stroke-width="2" fill="none"><polyline points="6 9 12 15 18 9"></polyline></svg>
+              </button><a href="#h-三排查过程" onclick="event.preventDefault(); const target = document.getElementById('h-三排查过程'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l2">三、排查过程</a></div>
+<div class="toc-group" id="group-h-31-初始现象">
+<div class="toc-item "><span class="toc-spacer"></span><a href="#h-31-初始现象" onclick="event.preventDefault(); const target = document.getElementById('h-31-初始现象'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l3">3.1 初始现象</a></div>
+<div class="toc-item "><span class="toc-spacer"></span><a href="#h-32-假设驱动排查" onclick="event.preventDefault(); const target = document.getElementById('h-32-假设驱动排查'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l3">3.2 假设驱动排查</a></div>
+<div class="toc-item "><span class="toc-spacer"></span><a href="#h-33-排查结论" onclick="event.preventDefault(); const target = document.getElementById('h-33-排查结论'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l3">3.3 排查结论</a></div>
+</div>
+<div class="toc-item has-children"><button class="toc-toggle" onclick="toggleToc(this)" aria-expanded="true">
+                <svg viewBox="0 0 24 24" width="12" height="12" stroke="currentColor" stroke-width="2" fill="none"><polyline points="6 9 12 15 18 9"></polyline></svg>
+              </button><a href="#h-四修复方案" onclick="event.preventDefault(); const target = document.getElementById('h-四修复方案'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l2">四、修复方案</a></div>
+<div class="toc-group" id="group-h-41-应急处置">
+<div class="toc-item "><span class="toc-spacer"></span><a href="#h-41-应急处置" onclick="event.preventDefault(); const target = document.getElementById('h-41-应急处置'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l3">4.1 应急处置</a></div>
+<div class="toc-item "><span class="toc-spacer"></span><a href="#h-42-永久修复计划" onclick="event.preventDefault(); const target = document.getElementById('h-42-永久修复计划'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l3">4.2 永久修复计划</a></div>
+<div class="toc-item "><span class="toc-spacer"></span><a href="#h-43-预防措施" onclick="event.preventDefault(); const target = document.getElementById('h-43-预防措施'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l3">4.3 预防措施</a></div>
+</div>
+<div class="toc-item has-children"><button class="toc-toggle" onclick="toggleToc(this)" aria-expanded="true">
+                <svg viewBox="0 0 24 24" width="12" height="12" stroke="currentColor" stroke-width="2" fill="none"><polyline points="6 9 12 15 18 9"></polyline></svg>
+              </button><a href="#h-五附录" onclick="event.preventDefault(); const target = document.getElementById('h-五附录'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l2">五、附录</a></div>
+<div class="toc-group" id="group-h-51-诊断执行信息">
+<div class="toc-item "><span class="toc-spacer"></span><a href="#h-51-诊断执行信息" onclick="event.preventDefault(); const target = document.getElementById('h-51-诊断执行信息'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l3">5.1 诊断执行信息</a></div>
+<div class="toc-item "><span class="toc-spacer"></span><a href="#h-52-关键诊断命令输出摘要" onclick="event.preventDefault(); const target = document.getElementById('h-52-关键诊断命令输出摘要'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l3">5.2 关键诊断命令输出摘要</a></div>
+<div class="toc-item "><span class="toc-spacer"></span><a href="#h-53-系统指纹" onclick="event.preventDefault(); const target = document.getElementById('h-53-系统指纹'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l3">5.3 系统指纹</a></div>
+</div>
+</div>
+  </div>
+</nav>
+  <article class="article" id="article" style="position: relative;">
+    <div class="title-container"><h1 id="h-故障诊断报告">🔴 故障诊断报告</h1><div class="brand-logo">by <strong>Witty Diagnosis Agent</strong></div></div>
+<blockquote>
+<p><strong>报告编号</strong>：RCA-20260602-001
+<strong>故障级别</strong>：P3（低优先 - 单用户本地环境，已自行恢复）
+<strong>报告时间</strong>：2026-06-02 20:34:26
+<strong>当前状态</strong>：🟢 已恢复</p>
+</blockquote>
+<hr>
+<h2 id="h-一故障概览">一、故障概览</h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>项目</th>
+<th>内容</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>故障标题</td>
+<td>WSL2 Ubuntu 22.04 实例 DNS TCP 查询因 iptables DROP 规则超时</td>
+</tr>
+<tr>
+<td>影响范围</td>
+<td>目标主机 172.29.89.45（WSL2 Ubuntu 22.04 实例），本地 DNS TCP 解析功能</td>
+</tr>
+<tr>
+<td>故障时段</td>
+<td>用户发现时持续存在 ～ 2026-06-02 20:31:25（WSL2 实例重启后自动恢复）</td>
+</tr>
+<tr>
+<td>根本原因</td>
+<td>iptables OUTPUT 链中存在 DROP tcp dpt:53 规则，阻塞了所有出站 TCP DNS 查询；WSL2 实例停止/重启后规则被清空</td>
+</tr>
+<tr>
+<td>是否恢复</td>
+<td><span class="badge-ok">✅ 已恢复（WSL2 重启后 iptables 规则集清空，问题不复现）</span></td>
+</tr>
+<tr>
+<td>根因置信度</td>
+<td>🟡 中置信</td>
+</tr>
+</tbody></table></div>
+<h3 id="h-置信度说明">置信度说明</h3>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>等级</th>
+<th>标识</th>
+<th>含义</th>
+<th>示例场景</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>高置信</td>
+<td>🟢</td>
+<td>根因已明确，可复现，单一原因可解释所有现象</td>
+<td>SQL 无索引 → 复现后加索引立即恢复</td>
+</tr>
+<tr>
+<td>中置信</td>
+<td>🟡</td>
+<td>根因基本确认，但存在 1～2 个无法完全解释的现象</td>
+<td>定位到慢查询，但流量突增原因待查</td>
+</tr>
+<tr>
+<td>低置信</td>
+<td>🟠</td>
+<td>有多个可疑原因，尚未排除竞争，结论为推断</td>
+<td>多个组件同时异常，无法判断触发顺序</td>
+</tr>
+<tr>
+<td>未知</td>
+<td>🔴</td>
+<td>现象无法解释，根因未定位，仍在排查中</td>
+<td>服务偶发崩溃，日志无异常，无法复现</td>
+</tr>
+</tbody></table></div>
+<hr>
+<h2 id="h-二根因速览">二、根因速览</h2>
+<h3 id="h-事故时间线-故障传导链路">事故时间线 & 故障传导链路</h3>
+<div class="code-block">
+  <span class="code-lang">text</span>
+  <button class="copy-btn" onclick="copyCode(this)" title="复制">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
+  </button>
+  <pre><code>时间                        事件                                               性质         溯源路径
+─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+故障发生前                  iptables OUTPUT 链被添加了一条 DROP tcp dpt:53 规则    📥 未知植入   （规则来源不可追溯）
+                            （可能来源：Docker 网络配置 / 手动执行 / 启动脚本）
+                              │
+                              ▼
+用户操作时                  dig +tcp @8.8.8.8 baidu.com → 超时无响应                🔴 故障激活   [用户描述]
+                              │  出站 SYN → iptables DROP → 无响应
+                              │
+                              ▼
+用户检查时                  sudo iptables -L OUTPUT → DROP tcp dpt:53 可见          🔍 用户确认   [用户描述]
+                              │  UDP DNS 正常（不受 DROP 规则影响）
+                              │
+                              ▼
+诊断接入前                  WSL2 实例处于 Stopped 状态（原因未知）                   🔄 状态变更   [Kuafu 诊断报告]
+                              │  可能是 Windows 关机/休眠/WSL 自动超时/手动停止
+                              │
+                              ▼
+诊断启动 WSL2 实例后        iptables 规则集被完全清空                               🧹 证据丢失   [C:\Users\86135\.witty-diagnosis-agent\dayu\report\kuafu_T1_20260602_203211.md]
+                              │  WSL2 特性：每次启动为"干净"内核状态
+                              │  iptables-persistent 未安装
+                              ▼
+诊断验证时                  dig +tcp @8.8.8.8 baidu.com → NOERROR, 172ms  ✅         🟢 已恢复     [同上]
+                              /dev/tcp/8.8.8.8/53 → OK</code></pre>
+</div>
+<h3 id="h-故障因果链">故障因果链</h3>
+<div class="code-block">
+  <span class="code-lang">text</span>
+  <button class="copy-btn" onclick="copyCode(this)" title="复制">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
+  </button>
+  <pre><code>iptables OUTPUT 链被植入 DROP tcp dpt:53 规则（来源不明）
+    └─► DNS TCP 查询的出站 SYN 包被内核丢弃
+            └─► dig +tcp @8.8.8.8 baidu.com 等待响应直到超时（默认 5~10s）
+                    └─► 依赖 TCP DNS 的应用/工具受影响
+                            │
+                            ├─► UDP DNS（dig @8.8.8.8 baidu.com）→ ✅ 正常
+                            │       规则仅匹配 TCP，不匹配 UDP
+                            │
+                            └─► 🔴 故障表现：TCP DNS 超时
+
+WSL2 实例停止（原因未明确）→ 重启
+    └─► iptables 规则集随内核状态一起丢失（WSL2 设计特性）
+            └─► 现场证据不可追溯，历史规则无法复原
+                    └─► 问题自动消失，但根因未根治</code></pre>
+</div>
+<hr>
+<h2 id="h-三排查过程">三、排查过程</h2>
+<blockquote>
+<p>排查逻辑：<strong>提出假设 → 收集证据 → 验证或排除 → 逐步收敛到根因</strong></p>
+</blockquote>
+<h3 id="h-31-初始现象">3.1 初始现象</h3>
+<ul>
+<li><strong>用户描述</strong>：<code>dig +tcp @8.8.8.8 baidu.com</code> 持续超时无响应；<code>dig @8.8.8.8 baidu.com</code>（UDP）正常返回解析结果。</li>
+<li><strong>用户检查</strong>：<code>sudo iptables -L OUTPUT</code> 中可观察到 <code>DROP tcp dpt:53</code> 规则。</li>
+<li><strong>影响</strong>：WSL2 Ubuntu 22.04 实例（172.29.89.45）上所有依赖 TCP 协议的 DNS 查询（如 DNS over TCP、部分 stub resolver 回退逻辑）均不可用。</li>
+</ul>
+<hr>
+<h3 id="h-32-假设驱动排查">3.2 假设驱动排查</h3>
+<h4 id="h-假设-aiptables-drop-tcp53-规则导致-dns-tcp-查询超时-确认历史状态">假设 A：iptables DROP tcp/53 规则导致 DNS TCP 查询超时 ✅ 确认（历史状态）</h4>
+<blockquote>
+<p>🧪 假设：iptables OUTPUT 链中的 DROP tcp dpt:53 规则阻止了出站 TCP/53 报文，造成 DNS TCP 查询超时。</p>
+</blockquote>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>检查项</th>
+<th>操作</th>
+<th>结论</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>用户观察到的 iptables 规则</td>
+<td>用户执行 <code>iptables -L OUTPUT</code></td>
+<td><span class="badge-ok">✅ 存在 DROP tcp dpt:53</span></td>
+</tr>
+<tr>
+<td>UDP DNS 是否受影响</td>
+<td><code>dig @8.8.8.8 baidu.com</code>（UDP）</td>
+<td><span class="badge-ok">✅ 正常，UDP 不受规则影响</span></td>
+</tr>
+<tr>
+<td>TCP DNS 是否受影响</td>
+<td><code>dig +tcp @8.8.8.8 baidu.com</code></td>
+<td><span class="badge-ok">✅ 超时，与规则完全吻合</span></td>
+</tr>
+<tr>
+<td>规则匹配行为</td>
+<td>DROP 在 OUTPUT 链拦截出站 SYN</td>
+<td><span class="badge-ok">✅ 出站 TCP/53 SYN 被丢弃 → 无响应</span></td>
+</tr>
+</tbody></table></div>
+<p><strong>分析</strong>：该规则精确匹配 TCP 协议 + 目标端口 53，这是 DNS TCP 查询使用的协议/端口组合。UDP DNS 查询不受影响的事实进一步佐证了该规则的存在和作用。</p>
+<p><strong>✅ 结论：该假设可完美解释所有现象。但由于 WSL2 实例重启导致规则丢失，属于&quot;历史已确认、当前无法复现&quot;的状态。</strong></p>
+<hr>
+<h4 id="h-假设-bwsl2-网络栈或-windows-防火墙导致-tcp-dns-异常">假设 B：WSL2 网络栈或 Windows 防火墙导致 TCP DNS 异常</h4>
+<blockquote>
+<p>🧪 假设：WSL2 的虚拟化网络栈或 Windows 宿主机防火墙拦截了 TCP/53 流量</p>
+</blockquote>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>检查项</th>
+<th>操作</th>
+<th>结论</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>WSL2 网络状态</td>
+<td><code>wsl --list --verbose</code> → Running 后测试</td>
+<td><span class="badge-ok">✅ TCP DNS 正常</span></td>
+</tr>
+<tr>
+<td>TCP/53 端口可达性</td>
+<td><code>/dev/tcp/8.8.8.8/53</code></td>
+<td><span class="badge-ok">✅ OK（3 个 DNS 服务器均正常）</span></td>
+</tr>
+<tr>
+<td>nftables 规则</td>
+<td><code>sudo nft list ruleset</code></td>
+<td><span class="badge-ok">✅ 无规则</span></td>
+</tr>
+<tr>
+<td>ufw 状态</td>
+<td><code>sudo ufw status verbose</code></td>
+<td><span class="badge-ok">✅ inactive</span></td>
+</tr>
+</tbody></table></div>
+<p><strong>❌ 排除</strong>：当前 WSL2 网络栈中不存在任何阻碍 TCP/53 的机制。</p>
+<hr>
+<h4 id="h-假设-ciptables-规则因-wsl2-重启丢失导致证据不可追溯">假设 C：iptables 规则因 WSL2 重启丢失，导致证据不可追溯</h4>
+<blockquote>
+<p>🧪 假设：WSL2 实例在诊断前被停止，重启后 iptables 规则集被清空</p>
+</blockquote>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>检查项</th>
+<th>操作</th>
+<th>结论</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>诊断启动前 WSL 状态</td>
+<td><code>wsl --list --verbose</code> → <strong>Stopped</strong></td>
+<td><span class="badge-ok">✅ 确认经历过停止周期</span></td>
+</tr>
+<tr>
+<td>iptables 全表扫描</td>
+<td><code>iptables-save</code> + 5 张表逐一检查</td>
+<td><span class="badge-ok">✅ 全部为空，无任何规则</span></td>
+</tr>
+<tr>
+<td>iptables-persistent 安装</td>
+<td><code>dpkg -l iptables-persistent</code></td>
+<td><span class="badge-ok">✅ 未安装，规则不持久化</span></td>
+</tr>
+<tr>
+<td>/etc/iptables/ 目录</td>
+<td><code>ls /etc/iptables/</code></td>
+<td><span class="badge-ok">✅ 目录不存在</span></td>
+</tr>
+<tr>
+<td>内核/iptables 日志</td>
+<td><code>dmesg</code> / <code>journalctl -k</code></td>
+<td><span class="badge-ok">✅ 无相关条目</span></td>
+</tr>
+<tr>
+<td>历史启动记录</td>
+<td>系统已记录 30 次启动（boot -29 至 boot 0）</td>
+<td><span class="badge-ok">✅ 多次启动周期</span></td>
+</tr>
+</tbody></table></div>
+<p><strong>✅ 结论：WSL2 实例重启后 iptables 规则集完全丢失，且没有任何持久化机制或日志可以恢复历史状态。这是证据不可追溯的根本原因。</strong></p>
+<hr>
+<h3 id="h-33-排查结论">3.3 排查结论</h3>
+<div class="code-block">
+  <span class="code-lang">text</span>
+  <button class="copy-btn" onclick="copyCode(this)" title="复制">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
+  </button>
+  <pre><code>DNS TCP 查询超时
+├─► 假设 A：iptables DROP tcp/53 规则导致超时
+│       ├─► 用户观察到规则 ✅
+│       ├─► UDP DNS 正常 ✅
+│       ├─► TCP DNS 超时 ✅
+│       └─► 🎯 根因确认（历史状态）
+│
+├─► 假设 B：WSL2/Windows 网络栈问题
+│       ├─► WSL2 重启后 TCP DNS 正常 ❌ 排除
+│       ├─► nftables 为空 ❌ 排除
+│       └─► ufw inactive ❌ 排除
+│
+└─► 假设 C：重启导致证据丢失
+        ├─► WSL2 初始为 Stopped ✅
+        ├─► iptables 全空 ✅
+        ├─► 无持久化机制 ✅
+        └─► 🎯 确认证据丢失路径</code></pre>
+</div>
+<p><strong>最终根因判定</strong>：iptables OUTPUT 链中的 <code>DROP tcp dpt:53</code> 规则是 DNS TCP 查询超时的直接原因。该规则的植入来源无法追溯（可能为 Docker 网络配置、startup script、或手动误操作），但 WSL2 在实例停止后不持久化 iptables 规则的设计特性导致证据在重启后完全丢失。</p>
+<hr>
+<h2 id="h-四修复方案">四、修复方案</h2>
+<h3 id="h-41-应急处置">4.1 应急处置</h3>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>步骤</th>
+<th>操作</th>
+<th>执行人</th>
+<th>时间</th>
+<th>效果</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>1</td>
+<td>WSL2 实例重启（已发生）</td>
+<td>系统/诊断过程</td>
+<td>2026-06-02 20:31:25</td>
+<td>iptables 规则集被清空，DNS TCP 查询恢复正常</td>
+</tr>
+<tr>
+<td>2</td>
+<td>验证 DNS TCP 连通性</td>
+<td>Kuafu 诊断</td>
+<td>2026-06-02 20:31:25</td>
+<td>dig +tcp @8.8.8.8 baidu.com → NOERROR, 172ms</td>
+</tr>
+<tr>
+<td>3</td>
+<td>验证多 DNS 服务器 TCP 可达性</td>
+<td>Kuafu 诊断</td>
+<td>2026-06-02 20:31:25</td>
+<td>8.8.8.8/114.114.114.114/223.5.5.5 均正常</td>
+</tr>
+</tbody></table></div>
+<p>当前故障已自然恢复，无需额外应急处置。</p>
+<h3 id="h-42-永久修复计划">4.2 永久修复计划</h3>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>修复措施</th>
+<th>负责人</th>
+<th>完成时间</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>排查 DROP tcp/53 规则的来源（检查 Docker 网络配置、systemd 服务、cron 脚本、用户历史命令等）</td>
+<td>用户/待定</td>
+<td>待定</td>
+</tr>
+<tr>
+<td>如本机需持久化 iptables 规则，安装 <code>iptables-persistent</code> 并在确认规则集正确后执行 <code>sudo netfilter-persistent save</code></td>
+<td>用户/待定</td>
+<td>待定</td>
+</tr>
+<tr>
+<td>在添加任何 iptables 规则前先保存备份：<code>sudo iptables-save &gt; ~/iptables_backup_$(date +%Y%m%d_%H%M%S).txt</code></td>
+<td>用户/自持</td>
+<td>持续执行</td>
+</tr>
+<tr>
+<td>建立 WSL2 启动后 iptables 规则校验机制（如检查关键规则是否存在，避免规则意外丢失或混入）</td>
+<td>用户/待定</td>
+<td>待定</td>
+</tr>
+</tbody></table></div>
+<h3 id="h-43-预防措施">4.3 预防措施</h3>
+<ol>
+<li><p><strong>WSL2 特性认知</strong>：WSL2 实例每次启动都是&quot;干净&quot;内核状态，iptables 规则不持久化。如需持久化，必须通过 <code>iptables-persistent</code> 或 <code>wsl.conf</code> 启动脚本实现。</p>
+</li>
+<li><p><strong>规则来源溯源</strong>：若再次出现异常 iptables 规则，建议立即执行以下命令在规则被清空前保存证据：</p>
+<div class="code-block">
+  <span class="code-lang">bash</span>
+  <button class="copy-btn" onclick="copyCode(this)" title="复制">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
+  </button>
+  <pre><code>sudo iptables-save &gt; ~/iptables_evidence_$(date +%Y%m%d_%H%M%S).txt
+sudo iptables -L -n -v --line-numbers &gt; ~/iptables_detail_$(date +%Y%m%d_%H%M%S).txt</code></pre>
+</div>
+</li>
+<li><p><strong>Docker 联动排查</strong>：如果在 WSL2 中运行 Docker，注意 Docker 可能通过 iptables 管理网络规则。检查 Docker daemon 配置中是否有 DNS 相关的策略。</p>
+</li>
+<li><p><strong>规则变更审计</strong>：可在 <code>.bashrc</code> 或 <code>.bash_logout</code> 中添加 iptables 快照钩子，记录每次 shell 会话开始/结束时的 iptables 状态。</p>
+</li>
+</ol>
+<hr>
+<h2 id="h-五附录">五、附录</h2>
+<h3 id="h-51-诊断执行信息">5.1 诊断执行信息</h3>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>项目</th>
+<th>内容</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>诊断报告源</td>
+<td><code>C:\Users\86135\.witty-diagnosis-agent\dayu\report\kuafu_T1_20260602_203211.md</code></td>
+</tr>
+<tr>
+<td>诊断执行器</td>
+<td>Kuafu T1</td>
+</tr>
+<tr>
+<td>目标主机</td>
+<td>172.29.89.45（WSL2 Ubuntu 22.04）</td>
+</tr>
+<tr>
+<td>诊断执行时间</td>
+<td>2026-06-02 20:31:25 CST</td>
+</tr>
+</tbody></table></div>
+<h3 id="h-52-关键诊断命令输出摘要">5.2 关键诊断命令输出摘要</h3>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>命令</th>
+<th>输出摘要</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>sudo iptables-save</code></td>
+<td>无输出（规则集为空）</td>
+</tr>
+<tr>
+<td><code>dig @8.8.8.8 baidu.com</code> (UDP)</td>
+<td>NOERROR, 4 条 A 记录, 4ms</td>
+</tr>
+<tr>
+<td><code>dig +tcp @8.8.8.8 baidu.com</code> (TCP)</td>
+<td>NOERROR, 4 条 A 记录, 172ms</td>
+</tr>
+<tr>
+<td><code>/dev/tcp/8.8.8.8/53</code></td>
+<td>OK</td>
+</tr>
+<tr>
+<td><code>sudo nft list ruleset</code></td>
+<td>无输出</td>
+</tr>
+<tr>
+<td><code>sudo ufw status verbose</code></td>
+<td>Status: inactive</td>
+</tr>
+</tbody></table></div>
+<h3 id="h-53-系统指纹">5.3 系统指纹</h3>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>属性</th>
+<th>值</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>操作系统</td>
+<td>WSL2 Ubuntu 22.04</td>
+</tr>
+<tr>
+<td>内核</td>
+<td>WSL2 内核（每次启动干净状态）</td>
+</tr>
+<tr>
+<td>iptables 持久化</td>
+<td>未安装 iptables-persistent</td>
+</tr>
+<tr>
+<td>历史启动次数</td>
+<td>30 次</td>
+</tr>
+<tr>
+<td>宿主机</td>
+<td>Windows（WSL2 管理）</td>
+</tr>
+</tbody></table></div>
+
+    <div class="meta">
+      <span class="meta-source">WSL2_DNS_TCP查询超时_iptables规则丢失_20260602_203426_report.md</span>
+      <span>生成于 2026/06/02 20:35</span>
+    </div>
+  </article>
+</div>
+
+<script>
+  /* ── 滚动进度条 ── */
+  window.addEventListener("scroll", () => {
+    const el  = document.documentElement;
+    const pct = el.scrollTop / (el.scrollHeight - el.clientHeight) * 100;
+    document.getElementById("progress").style.width = Math.min(pct, 100) + "%";
+  });
+
+  /* ── TOC 高亮当前章节 ── */
+  (function () {
+    const headings = Array.from(document.querySelectorAll("article h1,article h2,article h3"));
+    const links    = Array.from(document.querySelectorAll(".toc a"));
+    if (!links.length) return;
+    const obs = new IntersectionObserver(entries => {
+      entries.forEach(e => {
+        if (!e.isIntersecting) return;
+        links.forEach(l => l.classList.remove("active"));
+        const a = links.find(l => l.getAttribute("href") === "#" + e.target.id);
+        if (a) a.classList.add("active");
+      });
+    }, { rootMargin: "-10% 0px -80% 0px" });
+    headings.forEach(h => obs.observe(h));
+  })();
+
+  /* ── h2 章节序号自动计数 ── */
+  (function () {
+    let idx = 0;
+    document.querySelectorAll("article h2").forEach(el => {
+      idx++;
+      el.setAttribute("data-index", String(idx).padStart(2, "0"));
+    });
+  })();
+
+  /* ── 代码块一键复制 ── */
+  function copyCode(btn) {
+    const code = btn.closest(".code-block").querySelector("code").innerText;
+    navigator.clipboard.writeText(code).then(() => {
+      btn.classList.add("copied");
+      btn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>';
+      setTimeout(() => {
+        btn.classList.remove("copied");
+        btn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>';
+      }, 2000);
+    });
+  }
+
+  /* ── 目录树收缩/展开 ── */
+  function toggleToc(btn) {
+    const expanded = btn.getAttribute("aria-expanded") === "true";
+    btn.setAttribute("aria-expanded", String(!expanded));
+    const parentItem = btn.closest(".toc-item");
+    let nextEl = parentItem.nextElementSibling;
+    if (nextEl && nextEl.classList.contains("toc-group")) {
+      if (expanded) {
+        nextEl.style.maxHeight = nextEl.scrollHeight + "px";
+        void nextEl.offsetHeight;
+        nextEl.classList.add("collapsed");
+      } else {
+        nextEl.classList.remove("collapsed");
+        nextEl.style.maxHeight = nextEl.scrollHeight + "px";
+        setTimeout(() => {
+          if (!nextEl.classList.contains("collapsed")) {
+            nextEl.style.maxHeight = "none";
+          }
+        }, 300);
+      }
+    }
+  }
+</script>
+</body>
+</html>
