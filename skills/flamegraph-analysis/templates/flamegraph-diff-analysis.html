@@ -1,0 +1,670 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Witty 智能诊断 Agent · 差分火焰图</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400;12..96,600;12..96,800&family=IBM+Plex+Mono:wght@400;500;600;700&family=Noto+Sans+SC:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#ffffff;
+    --bg-2:#f7f8fb;
+    --panel:#ffffff;
+    --panel-2:#f2f4f8;
+    --line:#e7eaf0;
+    --line-2:#d4dae4;
+    --ink:#161b24;
+    --ink-dim:#5c6675;
+    --ink-faint:#98a1b0;
+    --reg:#e5484d;          /* 性能回退（更慢） */
+    --reg-bright:#c01c22;   /* 白底深红文字 */
+    --imp:#0fb39a;          /* 性能改善（更快） */
+    --imp-bright:#0a7a68;   /* 白底深青文字 */
+    --neutral:#dbe0e8;
+    --accent:#d97706;
+    --search:#c026d3;
+    --row:25px;
+    --mono:'IBM Plex Mono',ui-monospace,monospace;
+    --sans:'Noto Sans SC','IBM Plex Sans',system-ui,sans-serif;
+    --display:'Bricolage Grotesque','Noto Sans SC',var(--sans);
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{height:100%}
+  body{
+    background:var(--bg);
+    color:var(--ink);
+    font-family:var(--sans);
+    overflow:hidden;
+    -webkit-font-smoothing:antialiased;
+  }
+  /* 浅色氛围 */
+  body::before{
+    content:"";position:fixed;inset:0;pointer-events:none;z-index:0;
+    background:
+      radial-gradient(1200px 620px at 80% -12%, rgba(15,179,154,.06), transparent 60%),
+      radial-gradient(940px 520px at 10% 6%, rgba(229,72,77,.05), transparent 55%),
+      linear-gradient(180deg,#ffffff,#f7f9fc);
+  }
+  body::after{
+    content:"";position:fixed;inset:0;pointer-events:none;z-index:0;opacity:.6;
+    background-image:
+      linear-gradient(rgba(90,110,150,.05) 1px,transparent 1px),
+      linear-gradient(90deg,rgba(90,110,150,.05) 1px,transparent 1px);
+    background-size:42px 42px;
+    mask-image:radial-gradient(circle at 50% 40%,#000 30%,transparent 95%);
+  }
+  .app{position:relative;z-index:1;height:100vh;display:flex;flex-direction:column}
+
+  /* ───────────── 顶栏 ───────────── */
+  .topbar{
+    display:flex;align-items:center;gap:22px;
+    padding:0 22px;height:58px;flex:0 0 auto;
+    border-bottom:1px solid var(--line);
+    background:rgba(255,255,255,.82);
+    backdrop-filter:blur(8px);
+  }
+  .brand{display:flex;align-items:center;gap:11px}
+  .glyph{
+    width:30px;height:30px;border-radius:7px;flex:0 0 auto;position:relative;
+    background:linear-gradient(150deg,var(--reg),var(--accent) 55%,var(--imp));
+    box-shadow:0 0 0 1px rgba(0,0,0,.06),0 6px 18px -6px rgba(229,72,77,.45);
+    overflow:hidden;
+  }
+  .glyph::before{content:"";position:absolute;inset:0;background:
+    repeating-linear-gradient(90deg,rgba(255,255,255,.35) 0 2px,transparent 2px 5px);}
+  .brand b{font-family:var(--display);font-weight:800;font-size:18px;letter-spacing:-.2px;white-space:nowrap}
+  .brand b span{color:var(--ink-dim);font-weight:500;font-size:15px}
+  .brand small{display:block;font-family:var(--mono);font-size:10px;color:var(--ink-faint);
+    letter-spacing:1px;margin-top:1px}
+
+  .compare{
+    display:flex;align-items:center;gap:10px;margin-left:6px;
+    font-family:var(--mono);font-size:12px;
+    padding:7px 13px;border:1px solid var(--line);border-radius:9px;
+    background:var(--bg-2);
+  }
+  .compare .build{display:flex;flex-direction:column;line-height:1.3}
+  .compare .build .lbl{font-size:10px;color:var(--ink-faint)}
+  .compare .build .v{color:var(--ink);font-weight:600}
+  .compare .build.base .v{color:var(--ink-dim)}
+  .compare .arrow{color:var(--accent);font-size:15px}
+  .compare .build.curr .v{color:var(--imp-bright)}
+
+  .top-right{margin-left:auto;display:flex;align-items:center;gap:18px;font-family:var(--mono);font-size:11px;color:var(--ink-dim)}
+  .pill{display:flex;align-items:center;gap:7px;padding:5px 11px;border:1px solid var(--line);border-radius:20px;background:var(--bg-2)}
+  .dot{width:7px;height:7px;border-radius:50%;background:var(--imp);box-shadow:0 0 7px rgba(15,179,154,.7);animation:pulse 2.4s infinite}
+  @keyframes pulse{0%,100%{opacity:1}50%{opacity:.35}}
+
+  /* ───────────── 工作区 ───────────── */
+  .workspace{flex:1 1 auto;display:grid;grid-template-columns:1fr 340px;min-height:0}
+  .main{display:flex;flex-direction:column;min-width:0;border-right:1px solid var(--line)}
+
+  /* 工具栏 */
+  .toolbar{
+    display:flex;align-items:center;gap:14px;padding:12px 18px;flex:0 0 auto;
+    border-bottom:1px solid var(--line);background:rgba(247,248,251,.7);
+  }
+  .search{position:relative;flex:0 0 290px}
+  .search input{
+    width:100%;font-family:var(--sans);font-size:12.5px;color:var(--ink);
+    background:#fff;border:1px solid var(--line-2);border-radius:8px;
+    padding:9px 12px 9px 32px;outline:none;transition:border-color .18s,box-shadow .18s;
+  }
+  .search input:focus{border-color:var(--search);box-shadow:0 0 0 3px rgba(192,38,211,.12)}
+  .search input::placeholder{color:var(--ink-faint)}
+  .search svg{position:absolute;left:10px;top:50%;transform:translateY(-50%);color:var(--ink-faint)}
+  .search .hits{position:absolute;right:10px;top:50%;transform:translateY(-50%);
+    font-family:var(--mono);font-size:10px;color:var(--search);opacity:0;transition:opacity .2s}
+  .search.active .hits{opacity:1}
+
+  .seg{display:flex;border:1px solid var(--line-2);border-radius:8px;overflow:hidden;background:#fff}
+  .seg button{
+    font-family:var(--sans);font-size:12px;color:var(--ink-dim);
+    background:transparent;border:none;padding:8px 14px;cursor:pointer;
+    border-right:1px solid var(--line);transition:all .16s;
+  }
+  .seg button:last-child{border-right:none}
+  .seg button:hover{color:var(--ink);background:var(--panel-2)}
+  .seg button.on{color:#fff;background:var(--ink);font-weight:600}
+  .seg button.on[data-m="diff"]{background:linear-gradient(90deg,var(--reg),var(--imp));color:#fff;text-shadow:0 1px 2px rgba(0,0,0,.25)}
+
+  .tool-spacer{margin-left:auto}
+  .btn-ghost{
+    font-family:var(--sans);font-size:12px;color:var(--ink-dim);cursor:pointer;
+    background:#fff;border:1px solid var(--line-2);border-radius:8px;
+    padding:8px 13px;display:flex;align-items:center;gap:7px;transition:all .16s;
+  }
+  .btn-ghost:hover{color:var(--accent);border-color:var(--accent)}
+
+  /* 面包屑 */
+  .crumbs{display:flex;align-items:center;gap:4px;padding:9px 18px;flex:0 0 auto;
+    border-bottom:1px solid var(--line);font-family:var(--mono);font-size:11px;
+    background:var(--bg-2);overflow-x:auto;white-space:nowrap;min-height:36px}
+  .crumbs .c{color:var(--ink-dim);cursor:pointer;padding:3px 8px;border-radius:5px;transition:.14s}
+  .crumbs .c:hover{color:var(--ink);background:var(--panel-2)}
+  .crumbs .c.cur{color:var(--accent);background:rgba(217,119,6,.1)}
+  .crumbs .sep{color:var(--ink-faint)}
+
+  /* 火焰图 */
+  .flame-wrap{flex:1 1 auto;overflow:auto;padding:16px 18px 28px;min-height:0;position:relative;background:
+    repeating-linear-gradient(0deg,transparent 0 24px,rgba(90,110,150,.02) 24px 25px)}
+  .flame{position:relative;width:100%}
+  .frame{
+    position:absolute;height:calc(var(--row) - 2px);
+    border-radius:3px;overflow:hidden;cursor:pointer;
+    display:flex;align-items:center;
+    font-family:var(--mono);font-size:11px;font-weight:500;
+    padding:0 7px;white-space:nowrap;
+    border:1px solid rgba(0,0,0,.08);
+    transition:filter .14s,box-shadow .14s,opacity .18s,transform .12s;
+    box-shadow:inset 0 1px 0 rgba(255,255,255,.35),inset 0 -1px 0 rgba(0,0,0,.06);
+    animation:frameIn .42s cubic-bezier(.2,.9,.25,1) backwards;
+    will-change:transform,opacity;
+  }
+  @keyframes frameIn{from{opacity:0;transform:translateY(7px) scaleY(.6)}to{opacity:1;transform:none}}
+  .frame:hover{box-shadow:0 0 0 1.5px rgba(22,27,36,.55),0 8px 20px -8px rgba(22,27,36,.4);z-index:5}
+  .frame.ctx{opacity:.5;cursor:pointer;background-image:repeating-linear-gradient(135deg,rgba(0,0,0,.07) 0 5px,transparent 5px 10px)}
+  .frame.dim{opacity:.2;filter:saturate(.45)}
+  .frame.match{box-shadow:0 0 0 2px var(--search),0 0 14px -2px rgba(192,38,211,.6);z-index:6}
+  .frame .lbl{overflow:hidden;text-overflow:ellipsis}
+  .frame .d{margin-left:auto;padding-left:8px;font-weight:700;opacity:.9;font-variant-numeric:tabular-nums}
+
+  /* 图例 */
+  .legend{flex:0 0 auto;display:flex;align-items:center;gap:26px;padding:11px 20px;
+    border-top:1px solid var(--line);background:rgba(247,248,251,.7);font-family:var(--sans);font-size:11px;color:var(--ink-dim)}
+  .scale{display:flex;align-items:center;gap:9px}
+  .scale .bar{width:160px;height:9px;border-radius:5px;
+    background:linear-gradient(90deg,var(--imp),#e9edf3 45%,#e9edf3 55%,var(--reg))}
+  .scale .ends{display:flex;justify-content:space-between;width:160px;font-size:9px;margin-top:2px}
+  .legend .meta{margin-left:auto;color:var(--ink-faint);font-family:var(--mono)}
+
+  /* ───────────── 侧栏 ───────────── */
+  .panel{background:var(--bg-2);display:flex;flex-direction:column;min-height:0;overflow-y:auto}
+  .pblock{padding:18px 18px;border-bottom:1px solid var(--line)}
+  .pblock h3{font-family:var(--sans);font-size:12px;font-weight:700;letter-spacing:.5px;
+    color:var(--ink-dim);margin-bottom:14px;display:flex;align-items:center;gap:10px}
+  .pblock h3 .tick{width:14px;height:1px;background:var(--line-2);flex:1}
+
+  /* 概览 */
+  .summary{display:grid;grid-template-columns:1fr 1fr;gap:11px}
+  .stat{border:1px solid var(--line);border-radius:10px;padding:12px 13px;background:#fff;box-shadow:0 1px 2px rgba(22,27,36,.03)}
+  .stat .k{font-family:var(--sans);font-size:11px;color:var(--ink-faint)}
+  .stat .v{font-family:var(--display);font-weight:800;font-size:25px;letter-spacing:-.5px;margin-top:5px;font-variant-numeric:tabular-nums}
+  .stat .v small{font-size:12px;color:var(--ink-dim);font-weight:500;font-family:var(--sans);margin-left:4px}
+  .stat.net{grid-column:1/3}
+  .stat.net .v.up{color:var(--reg-bright)}
+  .stat.net .v.down{color:var(--imp-bright)}
+  .netbar{height:7px;border-radius:4px;background:var(--panel-2);margin-top:10px;overflow:hidden;position:relative}
+  .netbar i{position:absolute;top:0;bottom:0;left:50%;width:1px;background:var(--line-2)}
+  .netbar b{position:absolute;top:0;bottom:0;display:block;border-radius:4px}
+
+  /* 排行榜 */
+  .rank{display:flex;flex-direction:column;gap:6px}
+  .ritem{display:flex;align-items:center;gap:10px;padding:9px 10px;border-radius:8px;cursor:pointer;
+    border:1px solid var(--line);transition:.14s;background:#fff}
+  .ritem:hover{background:var(--panel-2);border-color:var(--line-2);transform:translateX(2px)}
+  .ritem .bar{width:4px;align-self:stretch;border-radius:3px;flex:0 0 auto}
+  .ritem .body{flex:1;min-width:0}
+  .ritem .nm{font-family:var(--mono);font-size:12px;color:var(--ink);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .ritem .sub{font-family:var(--mono);font-size:9.5px;color:var(--ink-faint);margin-top:2px}
+  .ritem .delta{font-family:var(--mono);font-size:12.5px;font-weight:700;font-variant-numeric:tabular-nums;text-align:right}
+  .ritem.reg .delta{color:var(--reg-bright)}.ritem.reg .bar{background:var(--reg)}
+  .ritem.imp .delta{color:var(--imp-bright)}.ritem.imp .bar{background:var(--imp)}
+
+  /* 检查器 */
+  .detail .empty{font-family:var(--sans);font-size:12px;color:var(--ink-faint);line-height:1.9}
+  .detail .fname{font-family:var(--mono);font-size:14px;font-weight:600;color:var(--ink);
+    word-break:break-all;margin-bottom:14px;padding:10px 12px;border-radius:8px;background:#fff;border:1px solid var(--line-2)}
+  .drow{display:flex;justify-content:space-between;align-items:baseline;padding:8px 0;border-bottom:1px dashed var(--line)}
+  .drow:last-child{border-bottom:none}
+  .drow .k{font-family:var(--sans);font-size:12px;color:var(--ink-dim)}
+  .drow .v{font-family:var(--mono);font-size:13px;color:var(--ink);font-weight:600;font-variant-numeric:tabular-nums}
+  .drow .v.reg{color:var(--reg-bright)}.drow .v.imp{color:var(--imp-bright)}
+
+  /* 悬浮提示 */
+  .tip{position:fixed;z-index:99;pointer-events:none;opacity:0;transform:translateY(4px);
+    transition:opacity .12s;background:rgba(255,255,255,.97);border:1px solid var(--line-2);
+    border-radius:9px;padding:11px 13px;font-family:var(--mono);font-size:11.5px;
+    box-shadow:0 14px 40px -10px rgba(22,27,36,.28);max-width:340px;backdrop-filter:blur(8px)}
+  .tip.show{opacity:1;transform:none}
+  .tip .t-nm{color:var(--ink);font-weight:600;margin-bottom:7px;word-break:break-all}
+  .tip .t-row{display:flex;justify-content:space-between;gap:24px;color:var(--ink-dim);line-height:1.7}
+  .tip .t-row span{font-family:var(--sans)}
+  .tip .t-row b{color:var(--ink);font-weight:600}
+  .tip .t-row.delta b.reg{color:var(--reg-bright)}.tip .t-row.delta b.imp{color:var(--imp-bright)}
+
+  /* 状态栏 */
+  .statusbar{flex:0 0 auto;height:30px;display:flex;align-items:center;gap:20px;
+    padding:0 20px;border-top:1px solid var(--line);background:rgba(247,248,251,.85);
+    font-family:var(--mono);font-size:10.5px;color:var(--ink-faint)}
+  .statusbar .s{display:flex;align-items:center;gap:6px}
+  .statusbar .s b{color:var(--ink-dim);font-family:var(--sans);font-weight:500}
+  .statusbar .right{margin-left:auto;display:flex;gap:20px}
+
+  ::-webkit-scrollbar{width:10px;height:10px}
+  ::-webkit-scrollbar-track{background:transparent}
+  ::-webkit-scrollbar-thumb{background:var(--line-2);border-radius:6px;border:2px solid var(--bg)}
+  ::-webkit-scrollbar-thumb:hover{background:#bcc4d0}
+</style>
+</head>
+<body>
+<div class="app">
+
+  <!-- 顶栏 -->
+  <header class="topbar">
+    <div class="brand">
+      <div class="glyph"></div>
+      <div>
+        <b>Witty<span> 智能诊断 Agent</span></b>
+        <small>差分火焰图 · Differential Flame Graph</small>
+      </div>
+    </div>
+    <div class="compare">
+      <div class="build base"><span class="lbl">基线</span><span class="v">v2.14.0 · 7d3f1a</span></div>
+      <div class="arrow">→</div>
+      <div class="build curr"><span class="lbl">当前</span><span class="v">v2.15.0 · b91c4e</span></div>
+    </div>
+    <div class="top-right">
+      <span class="pill"><span class="dot"></span>CPU · on-CPU 采样</span>
+      <span>99 Hz · 30 秒窗口</span>
+    </div>
+  </header>
+
+  <!-- 工作区 -->
+  <div class="workspace">
+    <section class="main">
+      <!-- 工具栏 -->
+      <div class="toolbar">
+        <div class="search" id="searchWrap">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>
+          <input id="search" placeholder="过滤函数帧（支持正则）…" spellcheck="false" autocomplete="off">
+          <span class="hits" id="hits"></span>
+        </div>
+        <div class="seg" id="modeSeg">
+          <button data-m="diff" class="on">差分</button>
+          <button data-m="baseline">基线</button>
+          <button data-m="current">当前</button>
+        </div>
+        <div class="tool-spacer"></div>
+        <button class="btn-ghost" id="resetBtn">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5"/></svg>
+          重置缩放
+        </button>
+      </div>
+      <!-- 面包屑 -->
+      <div class="crumbs" id="crumbs"></div>
+      <!-- 火焰图 -->
+      <div class="flame-wrap" id="flameWrap">
+        <div class="flame" id="flame"></div>
+      </div>
+      <!-- 图例 -->
+      <div class="legend">
+        <div class="scale">
+          <span>Δ 采样数</span>
+          <div>
+            <div class="bar"></div>
+            <div class="ends"><span style="color:var(--imp-bright)">− 更快</span><span style="color:var(--reg-bright)">+ 更慢</span></div>
+          </div>
+        </div>
+        <span class="meta" id="legendMeta">宽度 ∝ 当前采样数 · 颜色 ∝ 相对基线的 Δ</span>
+      </div>
+    </section>
+
+    <!-- 侧栏 -->
+    <aside class="panel">
+      <div class="pblock">
+        <h3>性能剖析概览 <span class="tick"></span></h3>
+        <div class="summary" id="summary"></div>
+      </div>
+      <div class="pblock">
+        <h3>主要性能回退 <span class="tick"></span></h3>
+        <div class="rank" id="regList"></div>
+      </div>
+      <div class="pblock">
+        <h3>主要性能改善 <span class="tick"></span></h3>
+        <div class="rank" id="impList"></div>
+      </div>
+      <div class="pblock detail">
+        <h3>检查器 <span class="tick"></span></h3>
+        <div id="detail"><div class="empty">悬停任意帧可快速查看明细。<br>点击帧可下钻进入其子树。<br>从右侧排行榜中选择可直接跳转。</div></div>
+      </div>
+    </aside>
+  </div>
+
+  <!-- 状态栏 -->
+  <footer class="statusbar">
+    <div class="s"><b>服务</b> api-gateway / request-handler</div>
+    <div class="s"><b>帧数</b> <span id="stFrames"></span></div>
+    <div class="s"><b>深度</b> <span id="stDepth"></span></div>
+    <div class="right">
+      <div class="s"><b>基线</b> <span id="stBase"></span> 采样</div>
+      <div class="s"><b>当前</b> <span id="stCurr"></span> 采样</div>
+    </div>
+  </footer>
+</div>
+
+<div class="tip" id="tip"></div>
+
+<script>
+/* ─────────────────────────────────────────────
+   合成的合并 profile（基线 b vs 当前 c）
+   ───────────────────────────────────────────── */
+function f(name, sb, sc, children){
+  children = children || [];
+  const cb = children.reduce((s,n)=>s+n.b,0);
+  const cc = children.reduce((s,n)=>s+n.c,0);
+  return {name, selfB:sb, selfC:sc, b:sb+cb, c:sc+cc, children};
+}
+
+const tree =
+f('all (api-gateway)',0,0,[
+  f('main',6,6,[
+    f('httpServer.listen',4,4,[
+      f('handleConnection',10,10,[
+        f('parseRequest',5,5,[
+          f('parseHeaders',18,17),
+          f('parseBody',6,6,[
+            f('JSON.parse',35,70)              // 回退：请求体变大
+          ])
+        ]),
+        f('router.match',22,20),
+        f('middleware.run',10,10,[
+          f('auth.verify',8,8,[
+            f('jwt.decode',25,22),
+            f('crypto.verifySignature',40,118)  // 回退：RSA2048→4096
+          ]),
+          f('rateLimit.check',5,5,[
+            f('redis.get',30,17)                // 改善：管道化
+          ])
+        ]),
+        f('controller.handle',8,8,[
+          f('userService.getProfile',10,10,[
+            f('db.query',15,15,[
+              f('pg.acquireConn',20,58),         // 回退：连接池耗尽
+              f('pg.execute',120,236)            // 回退：缺少索引
+            ]),
+            f('cache.lookup',92,11)              // 改善：新增缓存
+          ]),
+          f('render.template',12,12,[
+            f('compileTemplate',40,42),
+            f('interpolate',60,57)
+          ])
+        ]),
+        f('serialize.response',4,4,[
+          f('JSON.stringify',45,43)
+        ]),
+        f('sendResponse',15,14)
+      ])
+    ])
+  ])
+]);
+
+/* 索引所有节点并计算 delta */
+let allNodes=[], maxAbsDelta=0, maxDepth=0;
+(function index(n,depth,parent){
+  n.depth=depth; n.parent=parent; n.delta=n.c-n.b;
+  allNodes.push(n);
+  maxAbsDelta=Math.max(maxAbsDelta,Math.abs(n.delta));
+  maxDepth=Math.max(maxDepth,depth);
+  n.children.forEach(c=>index(c,depth+1,n));
+})(tree,0,null);
+
+const ROOT=tree;
+let focus=ROOT, mode='diff', query='';
+
+/* ─────────────────────────────────────────────
+   配色逻辑（针对白底优化）
+   ───────────────────────────────────────────── */
+function diffColor(n){
+  if(n.delta===0) return {bg:'hsl(220 18% 91%)', tx:'#5a6478'};
+  const t=Math.sqrt(Math.abs(n.delta)/maxAbsDelta); // 感知校正
+  if(n.delta>0){ // 回退红：越严重越深
+    const l=70-t*28;            // 70%  → 42%
+    return {bg:`hsl(4 80% ${l}%)`, tx: l<56?'#fff':'#5c1012'};
+  } else {        // 改善青
+    const l=68-t*30;            // 68%  → 38%
+    return {bg:`hsl(170 60% ${l}%)`, tx: l<52?'#fff':'#06352e'};
+  }
+}
+function heatColor(n,metric){ // 基线/当前视图的经典火焰配色
+  let h=0; for(let i=0;i<n.name.length;i++) h=(h*31+n.name.charCodeAt(i))>>>0;
+  const hue=20+(h%32);              // 橙→琥珀
+  const v=metric==='b'?n.b:n.c;
+  const l=72-Math.min(26,(v/ROOT.c)*60); // 占比越大越深
+  return {bg:`hsl(${hue} 86% ${l}%)`, tx: l<56?'#fff':'#3a2200'};
+}
+function frameStyle(n){
+  if(mode==='diff') return diffColor(n);
+  return heatColor(n, mode==='baseline'?'b':'c');
+}
+function metricVal(n){ return mode==='baseline'? n.b : n.c; }
+
+/* ─────────────────────────────────────────────
+   渲染
+   ───────────────────────────────────────────── */
+const flame=document.getElementById('flame');
+const flameWrap=document.getElementById('flameWrap');
+const ROW=25;
+
+function ancestors(node){const a=[];let p=node;while(p){a.unshift(p);p=p.parent;}return a;}
+
+let rxCache=null;
+function matchQuery(name){
+  if(!query) return false;
+  try{ if(!rxCache||rxCache.src!==query){rxCache={src:query,rx:new RegExp(query,'i')};} return rxCache.rx.test(name);}
+  catch(e){ return name.toLowerCase().includes(query.toLowerCase()); }
+}
+
+function render(){
+  flame.innerHTML='';
+  const path=ancestors(focus);
+  const baseDepth=path.length-1;
+  let totalDepth=baseDepth;
+  let matchCount=0;
+  const anyQuery=!!query;
+
+  // 上层祖先（全宽上下文）
+  path.slice(0,-1).forEach((n,i)=>{
+    flame.appendChild(makeFrame(n,0,1,i,true,anyQuery,()=>{}));
+  });
+
+  // 聚焦子树
+  (function lay(n,x,w,depth){
+    totalDepth=Math.max(totalDepth,depth);
+    const isMatch=matchQuery(n.name);
+    if(isMatch) matchCount++;
+    flame.appendChild(makeFrame(n,x,w,depth,false,anyQuery,()=>{},isMatch));
+    const denom=metricVal(n)||1;
+    let cx=x;
+    n.children.forEach(ch=>{
+      const cw=w*(metricVal(ch)/denom);
+      if(cw>0) lay(ch,cx,cw,depth+1);
+      cx+=cw;
+    });
+  })(focus,0,1,baseDepth);
+
+  flame.style.height=((totalDepth+1)*ROW+4)+'px';
+
+  const hits=document.getElementById('hits');
+  const sw=document.getElementById('searchWrap');
+  if(anyQuery){ sw.classList.add('active'); hits.textContent=matchCount+' 处命中'; }
+  else sw.classList.remove('active');
+
+  renderCrumbs();
+}
+
+function makeFrame(n,x,w,depth,isCtx,anyQuery,_,isMatch){
+  const el=document.createElement('div');
+  el.className='frame'+(isCtx?' ctx':'');
+  if(anyQuery){ if(isMatch) el.classList.add('match'); else el.classList.add('dim'); }
+  const st=frameStyle(n);
+  el.style.background=st.bg;
+  el.style.color=st.tx;
+  el.style.left=(x*100)+'%';
+  el.style.width='calc('+(w*100)+'% - 2px)';
+  el.style.top=(depth*ROW)+'px';
+  el.style.animationDelay=Math.min(depth*28,260)+'ms';
+
+  const showLbl=w>0.018;
+  let inner='';
+  if(showLbl){
+    inner='<span class="lbl">'+esc(n.name)+'</span>';
+    if(mode==='diff' && n.delta!==0 && w>0.07){
+      inner+='<span class="d">'+(n.delta>0?'+':'')+n.delta+'</span>';
+    }
+  }
+  el.innerHTML=inner;
+
+  el.addEventListener('mousemove',e=>showTip(e,n));
+  el.addEventListener('mouseleave',hideTip);
+  el.addEventListener('click',e=>{e.stopPropagation();focus=n;hideTip();render();renderDetail(n);});
+  return el;
+}
+
+function esc(s){return s.replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));}
+
+/* 面包屑 */
+function renderCrumbs(){
+  const el=document.getElementById('crumbs');
+  const path=ancestors(focus);
+  el.innerHTML='';
+  path.forEach((n,i)=>{
+    const c=document.createElement('span');
+    c.className='c'+(i===path.length-1?' cur':'');
+    c.textContent=n.name.replace(/\s*\(.*\)/,'');
+    c.onclick=()=>{focus=n;render();renderDetail(n);};
+    el.appendChild(c);
+    if(i<path.length-1){const s=document.createElement('span');s.className='sep';s.textContent=' ›';el.appendChild(s);}
+  });
+}
+
+/* 悬浮提示 */
+const tip=document.getElementById('tip');
+function showTip(e,n){
+  const pct=(x)=>((x/ROOT.c)*100).toFixed(1);
+  const dpct = n.b? ((n.delta/n.b)*100) : (n.c>0?100:0);
+  const cls=n.delta>0?'reg':n.delta<0?'imp':'';
+  tip.innerHTML=
+    '<div class="t-nm">'+esc(n.name)+'</div>'+
+    '<div class="t-row"><span>基线</span><b>'+n.b+' 采样 · '+pct(n.b)+'%</b></div>'+
+    '<div class="t-row"><span>当前</span><b>'+n.c+' 采样 · '+pct(n.c)+'%</b></div>'+
+    '<div class="t-row delta"><span>差值 Δ</span><b class="'+cls+'">'+(n.delta>0?'+':'')+n.delta+' 采样（'+(dpct>0?'+':'')+dpct.toFixed(0)+'%）</b></div>'+
+    '<div class="t-row"><span>自身耗时</span><b>'+n.selfC+' 采样</b></div>';
+  tip.classList.add('show');
+  const pad=14,tw=tip.offsetWidth,th=tip.offsetHeight;
+  let x=e.clientX+pad,y=e.clientY+pad;
+  if(x+tw>innerWidth-8)x=e.clientX-tw-pad;
+  if(y+th>innerHeight-8)y=e.clientY-th-pad;
+  tip.style.left=x+'px';tip.style.top=y+'px';
+}
+function hideTip(){tip.classList.remove('show');}
+
+/* ─────────────────────────────────────────────
+   侧栏
+   ───────────────────────────────────────────── */
+function renderSummary(){
+  const net=ROOT.c-ROOT.b;
+  const pct=((net/ROOT.b)*100);
+  const up=net>0;
+  const frac=Math.min(.5,Math.abs(net)/ROOT.b*1.3);
+  document.getElementById('summary').innerHTML=
+    '<div class="stat"><div class="k">基线</div><div class="v">'+ROOT.b+'<small>采样</small></div></div>'+
+    '<div class="stat"><div class="k">当前</div><div class="v">'+ROOT.c+'<small>采样</small></div></div>'+
+    '<div class="stat net"><div class="k">净变化</div>'+
+      '<div class="v '+(up?'up':'down')+'">'+(up?'+':'')+net+'<small>'+(up?'+':'')+pct.toFixed(1)+'%</small></div>'+
+      '<div class="netbar"><i></i><b style="'+
+        (up?'left:50%;background:linear-gradient(90deg,var(--reg),var(--reg-bright));width:'+(frac*100)+'%'
+           :'right:50%;background:linear-gradient(90deg,var(--imp-bright),var(--imp));width:'+(frac*100)+'%')+'"></b></div>'+
+    '</div>';
+}
+
+function renderRanks(){
+  const movers=allNodes.filter(n=>n.delta!==0 && n!==ROOT);
+  const regs=[...movers].filter(n=>n.delta>0).sort((a,b)=>b.delta-a.delta).slice(0,5);
+  const imps=[...movers].filter(n=>n.delta<0).sort((a,b)=>a.delta-b.delta).slice(0,5);
+  document.getElementById('regList').innerHTML=regs.map(n=>ritem(n,'reg')).join('')||emptyRow();
+  document.getElementById('impList').innerHTML=imps.map(n=>ritem(n,'imp')).join('')||emptyRow();
+  bindRanks();
+}
+function ritem(n,cls){
+  const dpct=n.b?((n.delta/n.b)*100):100;
+  return '<div class="ritem '+cls+'" data-nm="'+encodeURIComponent(n.name)+'">'+
+    '<span class="bar"></span>'+
+    '<div class="body"><div class="nm">'+esc(n.name)+'</div>'+
+    '<div class="sub">'+n.b+' → '+n.c+' 采样 · '+(dpct>0?'+':'')+dpct.toFixed(0)+'%</div></div>'+
+    '<div class="delta">'+(n.delta>0?'+':'')+n.delta+'</div></div>';
+}
+function emptyRow(){return '<div class="empty" style="font-family:var(--sans);font-size:12px;color:var(--ink-faint)">— 无 —</div>';}
+function bindRanks(){
+  document.querySelectorAll('.ritem').forEach(el=>{
+    el.onclick=()=>{
+      const nm=decodeURIComponent(el.dataset.nm);
+      const node=allNodes.find(n=>n.name===nm);
+      if(node){focus=node;render();renderDetail(node);
+        flameWrap.scrollTo({top:0,behavior:'smooth'});}
+    };
+  });
+}
+
+function renderDetail(n){
+  if(!n||n===ROOT){
+    document.getElementById('detail').innerHTML='<div class="empty">悬停任意帧可快速查看明细。<br>点击帧可下钻进入其子树。<br>从右侧排行榜中选择可直接跳转。</div>';
+    return;
+  }
+  const dpct=n.b?((n.delta/n.b)*100):100;
+  const cls=n.delta>0?'reg':n.delta<0?'imp':'';
+  const verdict=n.delta>0?'性能回退':n.delta<0?'性能改善':'无变化';
+  document.getElementById('detail').innerHTML=
+    '<div class="fname">'+esc(n.name)+'</div>'+
+    '<div class="drow"><span class="k">状态</span><span class="v '+cls+'">'+verdict+'</span></div>'+
+    '<div class="drow"><span class="k">基线（总计）</span><span class="v">'+n.b+' 采样</span></div>'+
+    '<div class="drow"><span class="k">当前（总计）</span><span class="v">'+n.c+' 采样</span></div>'+
+    '<div class="drow"><span class="k">Δ 总计</span><span class="v '+cls+'">'+(n.delta>0?'+':'')+n.delta+'（'+(dpct>0?'+':'')+dpct.toFixed(1)+'%）</span></div>'+
+    '<div class="drow"><span class="k">自身 · 基线/当前</span><span class="v">'+n.selfB+' / '+n.selfC+'</span></div>'+
+    '<div class="drow"><span class="k">深度</span><span class="v">'+n.depth+'</span></div>'+
+    '<div class="drow"><span class="k">子节点数</span><span class="v">'+n.children.length+'</span></div>'+
+    '<div class="drow"><span class="k">占剖析比例</span><span class="v">'+((n.c/ROOT.c)*100).toFixed(1)+'%</span></div>';
+}
+
+/* 状态栏 */
+function renderStatus(){
+  document.getElementById('stFrames').textContent=allNodes.length;
+  document.getElementById('stDepth').textContent=maxDepth;
+  document.getElementById('stBase').textContent=ROOT.b;
+  document.getElementById('stCurr').textContent=ROOT.c;
+}
+
+/* 图例说明（随视图切换） */
+function renderLegendMeta(){
+  const m=document.getElementById('legendMeta');
+  if(mode==='diff') m.textContent='宽度 ∝ 当前采样数 · 颜色 ∝ 相对基线的 Δ';
+  else if(mode==='baseline') m.textContent='宽度 ∝ 基线采样数 · 经典火焰配色';
+  else m.textContent='宽度 ∝ 当前采样数 · 经典火焰配色';
+  document.querySelector('.scale').style.opacity = mode==='diff'?'1':'.3';
+}
+
+/* ─────────────────────────────────────────────
+   控件
+   ───────────────────────────────────────────── */
+document.getElementById('modeSeg').addEventListener('click',e=>{
+  const b=e.target.closest('button'); if(!b)return;
+  mode=b.dataset.m;
+  document.querySelectorAll('#modeSeg button').forEach(x=>x.classList.toggle('on',x===b));
+  renderLegendMeta(); render();
+});
+document.getElementById('resetBtn').onclick=()=>{focus=ROOT;render();renderDetail(ROOT);};
+document.getElementById('search').addEventListener('input',e=>{query=e.target.value.trim();render();});
+flameWrap.addEventListener('click',()=>{ /* 点击空白区域：无操作 */ });
+
+/* 初始化 */
+renderSummary();
+renderRanks();
+renderStatus();
+renderLegendMeta();
+render();
+renderDetail(ROOT);
+</script>
+</body>
+</html>

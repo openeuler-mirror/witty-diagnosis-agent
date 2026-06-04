@@ -83,6 +83,7 @@ bash install.sh
 ---
 
 ### 如何使用
+
 #### 基于opencode框架启动
 
 1. 启动 \*\*OpenCode \*\*。
@@ -108,6 +109,7 @@ bash install.sh
 如需了解更多操作细节，可查阅[用户手册](docs/guide/MANUAL.md)。
 
 #### 基于xiaoO框架启动
+
 1. 启动 \*\*xiaoO \*\*。
 
 2. 使用`tab`键，切换`Xuanyuan`Agent。
@@ -127,7 +129,6 @@ bash install.sh
 5. 诊断完成后，系统将生成[HTML](docs/reference/reports/hard_disk_fault_diagnosis_report.html)和[Markdown](docs/reference/reports/hard_disk_fault_diagnosis_report.md)两种格式的诊断分析报告，同时在界面上展示完整报告内容：
    
    <img src="docs/assets/xiaoO_guide_auto_diag_report.png" alt="诊断报告" width="800" />
-
 
 ---
 
@@ -261,6 +262,57 @@ opencode
 ```
 
 4）系统将自动执行智能诊断流程，分析硬盘故障原因并输出诊断报告。
+
+---
+
+### 火焰图性能分析示例
+
+本节演示依托 Witty 智能诊断 Agent 排查性能瓶颈，导入 perf script 采样数据后，平台自动生成火焰图并精准定位 CPU 热点函数。
+
+#### 1. 在 OpenCode 中启动分析
+
+**启动 OpenCode**：
+
+```bash
+opencode
+```
+
+**加载 Xuanyuan Agent**：执行 `/agents` 命令，选择 `Xuanyuan` Agent。
+
+**输入问题描述**：
+
+```
+依托/tmp/perf-vertx-stacks-01.txt采样数据，排查性能瓶颈根因。
+```
+
+> **提示**：路径按需替换，测试样例预置路径：test/lamegraph-analysis/data/perf-vertx-stacks-01.txt。
+
+#### 3. 系统自动执行分析流程
+
+系统将自动完成以下分析步骤：
+
+1. **数据转换**：将 `perf script` 格式转换为折叠栈格式
+2. **热点分析**：识别 CPU 热点函数与调用链
+3. **模式匹配**：检测常见性能反模式（如锁竞争、GC overhead、正则回溯等）
+4. **归因分析**：关联系统资源与业务逻辑
+5. **生成报告**：输出交互式火焰图HTML报告与Markdown报告
+
+#### 4. 分析结果示例
+
+分析完成后，系统将生成交互式 HTML 火焰图，直观展示热点调用栈：
+
+<img src="docs/assets/flamegraph_report.png" alt="火焰图分析结果" width="900" />
+
+图中展示了 Java 应用的关键热点函数，火焰越高表示该函数占用的 CPU 时间越多。通过火焰图可以快速定位到性能瓶颈的根源函数。
+
+**HTML 火焰图报告功能说明**：
+
+- **根因分析**：报告顶部提供核心性能问题的根因总结，帮助用户快速理解性能瓶颈所在
+- **关键性能瓶颈项列表**：列出分析到的所有关键性能瓶颈项，每项包含问题描述、帧栈、CPU占用率和样本数
+- **交互式钻取**：点击每个关键发现卡片，火焰图将自动定位并高亮显示对应的调用帧栈，方便用户确认和深入分析
+- **Markdown 报告**：同时生成 Markdown 格式的分析报告，便于归档和分享
+
+💡 请参见[HTML火焰图报告](test/flamegraph-analysis/reports/Vert.x应用火焰图分析报告.html)。
 
 ---
 
