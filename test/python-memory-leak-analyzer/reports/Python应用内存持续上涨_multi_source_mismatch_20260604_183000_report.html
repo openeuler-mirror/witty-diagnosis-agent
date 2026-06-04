@@ -1,0 +1,1286 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>故障诊断报告</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Lora:ital,wght@0,400;0,600;1,400&family=Source+Sans+3:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  /* ── Design tokens ─────────────────────────────────────────────────────── */
+  :root {
+    --bg:          #f8f7f4;
+    --surface:     #ffffff;
+    --border:      #e8e5df;
+    --border-soft: #f0ede8;
+
+    --text:        #1c1917;
+    --text-2:      #57534e;
+    --text-3:      #a8a29e;
+
+    --accent:      #1d4e6e;
+    --accent-light:#e8f1f7;
+    --accent-mid:  #3b82a0;
+
+    --red:         #c0392b;
+    --red-bg:      #fef2f2;
+    --amber:       #92400e;
+    --amber-bg:    #fffbeb;
+    --green:       #14532d;
+    --green-bg:    #f0fdf4;
+
+    --code-bg:     #1a1d27;
+    --code-text:   #cdd6f4;
+    --code-border: #2d3148;
+
+    --font-body: "Source Sans 3", "PingFang SC", "Hiragino Sans GB", sans-serif;
+    --font-head: "Lora", "PingFang SC", Georgia, serif;
+    --font-mono: "JetBrains Mono", "Fira Code", Consolas, monospace;
+
+    --radius:    8px;
+    --radius-lg: 12px;
+    --shadow:    0 1px 3px rgba(0,0,0,.06), 0 4px 16px rgba(0,0,0,.05);
+    --shadow-lg: 0 2px 8px rgba(0,0,0,.07), 0 8px 32px rgba(0,0,0,.06);
+
+    --toc-width:   240px;
+    --gap:         32px;
+  }
+
+  /* ── Progress bar ──────────────────────────────────────────────────────── */
+  #progress {
+    position: fixed; top: 0; left: 0; height: 3px; width: 0%;
+    background: linear-gradient(90deg, var(--accent-mid), var(--accent));
+    z-index: 999; transition: width .1s linear;
+    border-radius: 0 2px 2px 0;
+  }
+
+  /* ── Base ──────────────────────────────────────────────────────────────── */
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  html { font-size: 16px; scroll-behavior: smooth; }
+  body {
+    font-family: var(--font-body);
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.8;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* ── Layout ────────────────────────────────────────────────────────────── */
+  .layout {
+    display: flex;
+    align-items: flex-start;
+    max-width: calc(var(--toc-width) + 820px + var(--gap) * 3);
+    margin: 0 auto;
+    padding: 48px var(--gap) 96px;
+    gap: var(--gap);
+  }
+
+  /* ── TOC ───────────────────────────────────────────────────────────────── */
+  .toc {
+    width: var(--toc-width);
+    flex-shrink: 0;
+    position: sticky;
+    top: 32px;
+    max-height: calc(100vh - 64px);
+    overflow-y: auto;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    padding: 20px;
+    box-shadow: var(--shadow);
+    scrollbar-width: thin;
+    scrollbar-color: var(--border) transparent;
+  }
+  .toc-title {
+    font-size: 10.5px;
+    font-weight: 600;
+    letter-spacing: .1em;
+    text-transform: uppercase;
+    color: var(--text-3);
+    margin-bottom: 12px;
+    padding-bottom: 10px;
+    border-bottom: 1px solid var(--border-soft);
+  }
+  .toc-item {
+    display: flex;
+    align-items: flex-start;
+    margin: 2px 0;
+  }
+  .toc-toggle {
+    background: none;
+    border: none;
+    cursor: pointer;
+    color: var(--text-3);
+    padding: 4px;
+    margin-right: 4px;
+    margin-top: 2px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 4px;
+    transition: background 0.2s, transform 0.2s;
+  }
+  .toc-toggle:hover { background: var(--border-soft); color: var(--text); }
+  .toc-toggle[aria-expanded="false"] svg { transform: rotate(-90deg); }
+  .toc-spacer { width: 20px; flex-shrink: 0; }
+  .toc-group { overflow: hidden; transition: max-height 0.3s ease-in-out; }
+  .toc-group.collapsed { max-height: 0 !important; }
+  
+  .toc a {
+    display: block;
+    font-size: 13px;
+    color: var(--text-2);
+    text-decoration: none;
+    padding: 4px 8px;
+    border-radius: 5px;
+    line-height: 1.45;
+    transition: background .15s, color .15s;
+    word-break: break-all;
+    flex-grow: 1;
+  }
+  .toc a:hover  { background: var(--accent-light); color: var(--accent); }
+  .toc a.active { background: var(--accent-light); color: var(--accent); font-weight: 500; }
+  .toc-l1 { font-weight: 600; color: var(--text); }
+  .toc-l2 { font-weight: 600; color: var(--text); }
+  .toc-l3 { font-size: 12px !important; padding-left: 14px !important; }
+
+  /* ── Article card ──────────────────────────────────────────────────────── */
+  .article {
+    flex: 1; min-width: 0;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    padding: 52px 60px;
+    box-shadow: var(--shadow-lg);
+  }
+
+  /* ── Headings ──────────────────────────────────────────────────────────── */
+  .title-container {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-end;
+    margin: 0 0 28px;
+    padding-bottom: 18px;
+    border-bottom: 2px solid var(--text);
+  }
+  .article h1 {
+    font-family: var(--font-head);
+    font-size: 26px; font-weight: 600; line-height: 1.3;
+    margin: 0; padding-bottom: 0;
+    border-bottom: none;
+  }
+  .article h2 {
+    font-family: var(--font-head);
+    font-size: 19px; font-weight: 600;
+    margin: 48px 0 14px; padding-bottom: 8px;
+    border-bottom: 1px solid var(--border);
+  }
+  .article h2::before {
+    content: attr(data-index);
+    display: inline-block;
+    font-family: var(--font-mono);
+    font-size: 10.5px; font-weight: 500;
+    color: var(--accent-mid);
+    background: var(--accent-light);
+    padding: 1px 7px; border-radius: 4px;
+    margin-right: 10px; vertical-align: middle;
+    letter-spacing: .05em;
+  }
+  .article h3 {
+    font-family: var(--font-head);
+    font-size: 15.5px; font-weight: 600;
+    margin: 28px 0 10px;
+  }
+  .article h3::before {
+    content: "§ ";
+    color: var(--text-3);
+    font-family: var(--font-mono); font-size: 13px;
+  }
+  .article h4 {
+    font-size: 13.5px; font-weight: 600;
+    color: var(--accent); margin: 20px 0 8px;
+  }
+
+  /* ── Body text ─────────────────────────────────────────────────────────── */
+  .article p, .plain { 
+    font-size: 15px; 
+    line-height: 1.85; 
+    color: var(--text); 
+    margin: 0 0 12px; 
+    font-family: var(--font-body);
+  }
+  .article strong { font-weight: 600; }
+  .article em     { font-style: italic; color: var(--text-2); }
+  .article a {
+    color: var(--accent); text-decoration: underline;
+    text-decoration-color: var(--accent-light);
+    text-underline-offset: 3px;
+  }
+  .article a:hover { text-decoration-color: var(--accent); }
+  .article hr { border: none; border-top: 1px solid var(--border); margin: 20px 0; }
+  .article hr.heavy { border-top: 3px solid var(--text); margin: 32px 0; }
+
+  /* ── Blockquote ────────────────────────────────────────────────────────── */
+  .article blockquote {
+    border-left: 3px solid var(--accent-mid);
+    background: var(--accent-light);
+    margin: 20px 0; padding: 13px 20px 13px 20px;
+    border-radius: 0 var(--radius) var(--radius) 0;
+  }
+  .article blockquote p { font-size: 14.5px; color: var(--accent); margin: 0; line-height: 1.7; }
+  /* 支持块引用内部保留换行符（修复头部概要换行丢失问题） */
+  .article blockquote p { white-space: pre-wrap; }
+  .article blockquote strong { color: var(--accent); }
+
+  /* ── Lists ─────────────────────────────────────────────────────────────── */
+  .article ul, .article ol { padding-left: 22px; margin: 6px 0 14px; }
+  .article li { font-size: 15px; line-height: 1.8; margin: 4px 0; }
+  .article li::marker { color: var(--accent-mid); }
+  .article li > ul, .article li > ol { margin: 3px 0; }
+
+  /* ── Inline code ───────────────────────────────────────────────────────── */
+  .article :not(pre) > code {
+    font-family: var(--font-mono);
+    font-size: 12.5px; font-weight: 500;
+    background: #f3f0eb; color: var(--red);
+    padding: 1px 5px; border-radius: 4px;
+    border: 1px solid var(--border);
+  }
+
+  /* ── Code blocks ───────────────────────────────────────────────────────── */
+  .code-block {
+    position: relative; margin: 20px 0;
+    border-radius: var(--radius-lg); overflow: hidden;
+    border: 1px solid var(--code-border);
+    box-shadow: 0 4px 20px rgba(0,0,0,.16);
+  }
+  .code-lang {
+    position: absolute; top: 0; left: 0;
+    font-family: var(--font-mono); font-size: 10px; font-weight: 500;
+    color: #7c8db5; background: #222538;
+    padding: 4px 12px; border-bottom-right-radius: 6px;
+    text-transform: uppercase; letter-spacing: .08em;
+    user-select: none;
+  }
+  .copy-btn {
+    position: absolute; top: 8px; right: 10px;
+    background: #2d3148; border: 1px solid #3d4260;
+    border-radius: 5px; color: #7c8db5; cursor: pointer;
+    padding: 5px 8px; display: flex; align-items: center;
+    transition: background .15s, color .15s; z-index: 1;
+  }
+  .copy-btn:hover  { background: #3a3f60; color: #cdd6f4; }
+  .copy-btn.copied { color: #a6e3a1; border-color: #4a6a4a; }
+  .code-block pre {
+    margin: 0; padding: 36px 20px 20px;
+    background: var(--code-bg); overflow-x: auto;
+    scrollbar-width: thin; scrollbar-color: #3d4260 transparent;
+  }
+  .code-block pre::-webkit-scrollbar { height: 5px; }
+  .code-block pre::-webkit-scrollbar-thumb { background: #3d4260; border-radius: 3px; }
+  .code-block code {
+    font-family: var(--font-mono); font-size: 13px; line-height: 1.7;
+    color: var(--code-text); background: none; border: none; padding: 0;
+    white-space: pre; word-break: normal;
+  }
+
+  /* ── Tables ────────────────────────────────────────────────────────────── */
+  .table-wrap {
+    overflow-x: auto; margin: 16px 0;
+    border-radius: var(--radius-lg);
+    border: 1px solid var(--border);
+    box-shadow: var(--shadow);
+  }
+  table { width: 100%; border-collapse: collapse; font-size: 14px; min-width: 360px; }
+  thead { background: #f4f2ee; }
+  th {
+    padding: 9px 14px; text-align: left;
+    font-size: 11.5px; font-weight: 600;
+    letter-spacing: .04em; text-transform: uppercase;
+    color: var(--text-2); border-bottom: 1px solid var(--border);
+    white-space: nowrap;
+  }
+  td {
+    padding: 8px 14px; border-bottom: 1px solid var(--border-soft);
+    color: var(--text); vertical-align: top; line-height: 1.6;
+  }
+  tbody tr:last-child td { border-bottom: none; }
+  tbody tr:nth-child(even) td { background: #faf9f7; }
+  tbody tr:hover td { background: var(--accent-light); transition: background .1s; }
+
+  /* ── KV block ──────────────────────────────────────────────────────────── */
+  .kv-block { background: var(--bg); border: 1px solid var(--border); border-radius: var(--radius-lg); overflow: hidden; margin: 12px 0 20px; }
+  .kv-row { display: flex; border-bottom: 1px solid var(--border-soft); align-items: flex-start; }
+  .kv-row:last-child { border-bottom: none; }
+  .kv-key { flex: 0 0 160px; padding: 9px 16px; font-size: 13.5px; font-weight: 600; color: var(--text-2); background: var(--surface); border-right: 1px solid var(--border-soft); }
+  .kv-val { flex: 1; padding: 9px 16px; font-size: 14px; color: var(--text); }
+
+  /* ── Status badges ─────────────────────────────────────────────────────── */
+  .badge-ok { display: inline-flex; align-items: center; gap: 4px; background: var(--green-bg); color: var(--green); font-size: 13px; font-weight: 500; padding: 2px 9px; border-radius: 20px; border: 1px solid #bbf7d0; }
+  .badge-err { display: inline-flex; align-items: center; gap: 4px; background: var(--red-bg); color: var(--red); font-size: 13px; font-weight: 500; padding: 2px 9px; border-radius: 20px; border: 1px solid #fecaca; }
+  .badge-warn { display: inline-flex; align-items: center; gap: 4px; background: var(--amber-bg); color: var(--amber); font-size: 13px; font-weight: 500; padding: 2px 9px; border-radius: 20px; border: 1px solid #fde68a; }
+
+  /* ── Priority badges ───────────────────────────────────────────────────── */
+  .pri-p0 { display: inline-block; background: #fef2f2; color: #991b1b; border: 1px solid #fca5a5; font-size: 12px; font-weight: 700; padding: 2px 8px; border-radius: 4px; letter-spacing: .04em; }
+  .pri-p1 { display: inline-block; background: #fff7ed; color: #9a3412; border: 1px solid #fdba74; font-size: 12px; font-weight: 700; padding: 2px 8px; border-radius: 4px; }
+  .pri-p2 { display: inline-block; background: #fffbeb; color: #92400e; border: 1px solid #fde68a; font-size: 12px; font-weight: 700; padding: 2px 8px; border-radius: 4px; }
+  .pri-p3 { display: inline-block; background: var(--accent-light); color: var(--accent); border: 1px solid #bfdbfe; font-size: 12px; font-weight: 700; padding: 2px 8px; border-radius: 4px; }
+
+  /* ── Fault header ──────────────────────────────────────────────────────── */
+  .fault-header { display: flex; align-items: center; gap: 12px; padding: 12px 16px; border-radius: var(--radius-lg); margin: 16px 0 8px; border: 1px solid; }
+  .fh-p0 { background: #fef2f2; border-color: #fca5a5; }
+  .fh-p1 { background: #fff7ed; border-color: #fdba74; }
+  .fh-p2 { background: #fffbeb; border-color: #fde68a; }
+  .fh-p3 { background: var(--accent-light); border-color: #bfdbfe; }
+  .fh-badge { font-family: var(--font-mono); font-size: 11px; font-weight: 700; letter-spacing: .08em; }
+  .fh-p0 .fh-badge { color: #991b1b; }
+  .fh-p1 .fh-badge { color: #9a3412; }
+  .fh-p2 .fh-badge { color: #92400e; }
+  .fh-p3 .fh-badge { color: var(--accent); }
+  .fh-rest { font-size: 14px; font-weight: 500; color: var(--text); }
+
+  /* ── Timeline ──────────────────────────────────────────────────────────── */
+  .timeline { border-left: 2px solid var(--accent-mid); margin: 16px 0 16px 8px; padding-left: 20px; }
+  .tl-row { display: flex; align-items: baseline; gap: 10px; margin: 8px 0; font-size: 13.5px; }
+  .tl-ts { font-family: var(--font-mono); font-size: 12px; color: var(--text-3); flex-shrink: 0; white-space: nowrap; }
+  .tl-tag { font-size: 11px; font-weight: 600; padding: 1px 7px; border-radius: 10px; flex-shrink: 0; background: var(--accent-light); color: var(--accent); }
+  .tl-tag.err { background: var(--red-bg); color: var(--red); }
+  .tl-tag.warn { background: var(--amber-bg); color: var(--amber); }
+  .tl-desc { color: var(--text); line-height: 1.5; }
+
+  /* ── Global warn ───────────────────────────────────────────────────────── */
+  .global-warn { background: #fef2f2; border: 1px solid #fca5a5; border-radius: var(--radius-lg); padding: 14px 18px; font-size: 14.5px; font-weight: 600; color: #991b1b; margin: 16px 0; }
+
+  /* ── Tree note ─────────────────────────────────────────────────────────── */
+  .tree-note { white-space: pre-wrap; font-family: var(--font-mono); font-size: 13.5px; line-height: 1.6; color: var(--text-2); margin: 8px 0 8px 16px; }
+
+  /* ── Disclaimer ────────────────────────────────────────────────────────── */
+  .disclaimer { background: var(--bg); border: 1px solid var(--border); border-radius: var(--radius); padding: 14px 18px; font-size: 13.5px; color: var(--text-2); font-style: italic; }
+
+  /* ── Meta footer ───────────────────────────────────────────────────────── */
+  .meta {
+    margin-top: 48px; padding-top: 16px;
+    border-top: 1px solid var(--border-soft);
+    display: flex; justify-content: space-between; align-items: center;
+    font-size: 12px; color: var(--text-3);
+  }
+  .meta-source { font-family: var(--font-mono); font-size: 11.5px; }
+
+  /* ── Brand logo ────────────────────────────────────────────────────────── */
+  .brand-logo {
+    font-family: var(--font-head);
+    font-size: 14px;
+    color: var(--text-3);
+    letter-spacing: 0.05em;
+    margin-bottom: 4px;
+    flex-shrink: 0;
+    margin-left: 16px;
+  }
+  .brand-logo strong {
+    font-weight: 600;
+    color: var(--accent);
+  }
+  @media (max-width: 900px) {
+    .title-container { flex-direction: column; align-items: flex-start; gap: 12px; }
+    .brand-logo { margin-left: 0; margin-bottom: 0; }
+  }
+  /* ── Print ─────────────────────────────────────────────────────────────── */
+  @media print {
+    body { background: white; }
+    #progress, .toc { display: none; }
+    .layout { display: block; padding: 0; }
+    .article { border: none; box-shadow: none; padding: 24px; }
+    .copy-btn { display: none; }
+    .brand-logo { margin-bottom: 0; }
+  }
+
+  /* ── Responsive ────────────────────────────────────────────────────────── */
+  @media (max-width: 900px) {
+    .toc { display: none; }
+    .article { padding: 36px 28px; }
+    .layout { padding: 24px 16px 64px; }
+  }
+  @media (max-width: 480px) {
+    .article { padding: 24px 18px; }
+    .article h1 { font-size: 22px; }
+  }
+</style>
+</head>
+<body>
+
+<div id="progress"></div>
+
+<div class="layout">
+  <nav class="toc" id="toc">
+  <div class="toc-title">目录</div>
+  <div class="toc-content">
+<div class="toc-item has-children"><button class="toc-toggle" onclick="toggleToc(this)" aria-expanded="true">
+                <svg viewBox="0 0 24 24" width="12" height="12" stroke="currentColor" stroke-width="2" fill="none"><polyline points="6 9 12 15 18 9"></polyline></svg>
+              </button><a href="#h-故障诊断报告" onclick="event.preventDefault(); const target = document.getElementById('h-故障诊断报告'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l1">🔴 故障诊断报告</a></div>
+<div class="toc-group" id="group-h-一故障概览">
+<div class="toc-item has-children"><button class="toc-toggle" onclick="toggleToc(this)" aria-expanded="true">
+                <svg viewBox="0 0 24 24" width="12" height="12" stroke="currentColor" stroke-width="2" fill="none"><polyline points="6 9 12 15 18 9"></polyline></svg>
+              </button><a href="#h-一故障概览" onclick="event.preventDefault(); const target = document.getElementById('h-一故障概览'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l2">一、故障概览</a></div>
+<div class="toc-group" id="group-h-置信度说明">
+<div class="toc-item "><span class="toc-spacer"></span><a href="#h-置信度说明" onclick="event.preventDefault(); const target = document.getElementById('h-置信度说明'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l3">置信度说明</a></div>
+</div>
+<div class="toc-item has-children"><button class="toc-toggle" onclick="toggleToc(this)" aria-expanded="true">
+                <svg viewBox="0 0 24 24" width="12" height="12" stroke="currentColor" stroke-width="2" fill="none"><polyline points="6 9 12 15 18 9"></polyline></svg>
+              </button><a href="#h-二根因速览" onclick="event.preventDefault(); const target = document.getElementById('h-二根因速览'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l2">二、根因速览</a></div>
+<div class="toc-group" id="group-h-事故时间线-故障传导链路">
+<div class="toc-item "><span class="toc-spacer"></span><a href="#h-事故时间线-故障传导链路" onclick="event.preventDefault(); const target = document.getElementById('h-事故时间线-故障传导链路'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l3">事故时间线 & 故障传导链路</a></div>
+<div class="toc-item "><span class="toc-spacer"></span><a href="#h-故障因果链" onclick="event.preventDefault(); const target = document.getElementById('h-故障因果链'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l3">故障因果链</a></div>
+</div>
+<div class="toc-item has-children"><button class="toc-toggle" onclick="toggleToc(this)" aria-expanded="true">
+                <svg viewBox="0 0 24 24" width="12" height="12" stroke="currentColor" stroke-width="2" fill="none"><polyline points="6 9 12 15 18 9"></polyline></svg>
+              </button><a href="#h-三排查过程" onclick="event.preventDefault(); const target = document.getElementById('h-三排查过程'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l2">三、排查过程</a></div>
+<div class="toc-group" id="group-h-31-初始现象">
+<div class="toc-item "><span class="toc-spacer"></span><a href="#h-31-初始现象" onclick="event.preventDefault(); const target = document.getElementById('h-31-初始现象'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l3">3.1 初始现象</a></div>
+<div class="toc-item "><span class="toc-spacer"></span><a href="#h-32-假设驱动排查" onclick="event.preventDefault(); const target = document.getElementById('h-32-假设驱动排查'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l3">3.2 假设驱动排查</a></div>
+<div class="toc-item "><span class="toc-spacer"></span><a href="#h-33-排查结论与逻辑树" onclick="event.preventDefault(); const target = document.getElementById('h-33-排查结论与逻辑树'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l3">3.3 排查结论与逻辑树</a></div>
+</div>
+<div class="toc-item has-children"><button class="toc-toggle" onclick="toggleToc(this)" aria-expanded="true">
+                <svg viewBox="0 0 24 24" width="12" height="12" stroke="currentColor" stroke-width="2" fill="none"><polyline points="6 9 12 15 18 9"></polyline></svg>
+              </button><a href="#h-四详细诊断证据三报告交叉验证" onclick="event.preventDefault(); const target = document.getElementById('h-四详细诊断证据三报告交叉验证'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l2">四、详细诊断证据（三报告交叉验证）</a></div>
+<div class="toc-group" id="group-h-41-g1-量化对账双来源联合解释-99-分配增长">
+<div class="toc-item "><span class="toc-spacer"></span><a href="#h-41-g1-量化对账双来源联合解释-99-分配增长" onclick="event.preventDefault(); const target = document.getElementById('h-41-g1-量化对账双来源联合解释-99-分配增长'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l3">4.1 G1 量化对账：双来源联合解释 99%+ 分配增长</a></div>
+<div class="toc-item "><span class="toc-spacer"></span><a href="#h-42-g2-干扰项排除smallglobal-验证结论" onclick="event.preventDefault(); const target = document.getElementById('h-42-g2-干扰项排除smallglobal-验证结论'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l3">4.2 G2 干扰项排除：SMALL_GLOBAL 验证结论</a></div>
+<div class="toc-item "><span class="toc-spacer"></span><a href="#h-43-g3-证据链一致性矩阵" onclick="event.preventDefault(); const target = document.getElementById('h-43-g3-证据链一致性矩阵'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l3">4.3 G3 证据链一致性矩阵</a></div>
+<div class="toc-item "><span class="toc-spacer"></span><a href="#h-44-t1t2t3-报告验证门汇总" onclick="event.preventDefault(); const target = document.getElementById('h-44-t1t2t3-报告验证门汇总'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l3">4.4 T1、T2、T3 报告验证门汇总</a></div>
+</div>
+<div class="toc-item has-children"><button class="toc-toggle" onclick="toggleToc(this)" aria-expanded="true">
+                <svg viewBox="0 0 24 24" width="12" height="12" stroke="currentColor" stroke-width="2" fill="none"><polyline points="6 9 12 15 18 9"></polyline></svg>
+              </button><a href="#h-五修复方案" onclick="event.preventDefault(); const target = document.getElementById('h-五修复方案'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l2">五、修复方案</a></div>
+<div class="toc-group" id="group-h-51-应急处置">
+<div class="toc-item "><span class="toc-spacer"></span><a href="#h-51-应急处置" onclick="event.preventDefault(); const target = document.getElementById('h-51-应急处置'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l3">5.1 应急处置</a></div>
+<div class="toc-item "><span class="toc-spacer"></span><a href="#h-52-永久修复计划" onclick="event.preventDefault(); const target = document.getElementById('h-52-永久修复计划'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l3">5.2 永久修复计划</a></div>
+</div>
+<div class="toc-item "><span class="toc-spacer"></span><a href="#h-六复测方案" onclick="event.preventDefault(); const target = document.getElementById('h-六复测方案'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l2">六、复测方案</a></div>
+<div class="toc-item "><span class="toc-spacer"></span><a href="#h-七未验证项与下一步" onclick="event.preventDefault(); const target = document.getElementById('h-七未验证项与下一步'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l2">七、未验证项与下一步</a></div>
+<div class="toc-item "><span class="toc-spacer"></span><a href="#h-诊断质量自查" onclick="event.preventDefault(); const target = document.getElementById('h-诊断质量自查'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l2">诊断质量自查</a></div>
+</div>
+  </div>
+</nav>
+  <article class="article" id="article" style="position: relative;">
+    <div class="title-container"><h1 id="h-故障诊断报告">🔴 故障诊断报告</h1><div class="brand-logo">by <strong>Witty Diagnosis Agent</strong></div></div>
+<blockquote>
+<p><strong>报告编号</strong>：RCA-20260604-001
+<strong>故障级别</strong>：P2（开发/测试环境内存泄漏，上生产可达 P1）
+<strong>报告时间</strong>：2026-06-04 18:30:00
+<strong>当前状态</strong>：🟡 观察中（根因已确认，待修复）</p>
+</blockquote>
+<hr>
+<h2 id="h-一故障概览">一、故障概览</h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>项目</th>
+<th>内容</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>故障标题</td>
+<td>Python 应用 multi_source_mismatch 场景下 RSS 持续上涨 — 双来源并发内存泄漏</td>
+</tr>
+<tr>
+<td>影响范围</td>
+<td><code>multi_source_mismatch.py</code> 工作负载运行环境（沙箱复现），600 次迭代 RSS 增长 ~22.5 MiB</td>
+</tr>
+<tr>
+<td>故障时段</td>
+<td>2026-06-04 09:20:57 ~ 2026-06-04 09:20:58（证据生成窗口）</td>
+</tr>
+<tr>
+<td>根本原因</td>
+<td><strong>LISTENERS 全局注册表无界增长</strong> + <strong>tenant_lookup 无界缓存</strong> 双来源并发内存泄漏</td>
+</tr>
+<tr>
+<td>是否恢复</td>
+<td><span class="badge-err">❌ 未恢复（代码层面未修复，泄漏在持续运行下将继续恶化）</span></td>
+</tr>
+<tr>
+<td>根因置信度</td>
+<td>🟢 高置信（五线证据对齐，反事实验证通过）</td>
+</tr>
+</tbody></table></div>
+<h3 id="h-置信度说明">置信度说明</h3>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>等级</th>
+<th>标识</th>
+<th>含义</th>
+<th>当前场景对照</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>高置信</td>
+<td>🟢</td>
+<td>根因已明确，可复现，单一原因可解释所有现象</td>
+<td>三个独立 Kuafu 报告证据完全一致，反事实验证 100% 回收</td>
+</tr>
+<tr>
+<td>中置信</td>
+<td>🟡</td>
+<td>根因基本确认，但存在 1～2 个无法完全解释的现象</td>
+<td>—</td>
+</tr>
+<tr>
+<td>低置信</td>
+<td>🟠</td>
+<td>有多个可疑原因，尚未排除竞争，结论为推断</td>
+<td>—</td>
+</tr>
+<tr>
+<td>未知</td>
+<td>🔴</td>
+<td>现象无法解释，根因未定位，仍在排查中</td>
+<td>—</td>
+</tr>
+</tbody></table></div>
+<hr>
+<h2 id="h-二根因速览">二、根因速览</h2>
+<h3 id="h-事故时间线-故障传导链路">事故时间线 & 故障传导链路</h3>
+<div class="code-block">
+  <span class="code-lang">text</span>
+  <button class="copy-btn" onclick="copyCode(this)" title="复制">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
+  </button>
+  <pre><code>时间                                                   事件                                            性质       证据来源
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+2026-06-04 09:20:57    Python 应用 multi_source_mismatch 启动，run_workload(iterations=600)        🟢 执行开始  [discovery.json]
+  │
+  ▼ (每迭代一次，以下三个操作同时发生)
+2026-06-04 09:20:57    LargeTenant.__init__() 创建 profile 字符串（~20KB/次）                        📦 分配增长  [tracemalloc.json]
+  │                    ↳ tenant_lookup() 被调用，@lru_cache 写入缓存条目（maxsize=None）
+  │                    ↳ LISTENERS.append(callback_bound_method) 注册回调
+  │                    ↳ SMALL_GLOBAL.append({'index': i}) 小全局列表（干扰项）
+  │
+  ▼ (600 次迭代后)
+2026-06-04 09:20:58    证据采集完成                                                                    🔍 证据冻结  [collect time]
+  │
+  │  ┌── 对象增长结果：
+  │  │   builtins.method:  +600 (38,400 bytes)
+  │  │   LargeTenant:      +600 (28,800 bytes)
+  │  │   tenant_lookup:    currsize 0→600 (maxsize=None)
+  │  │   LISTENERS:         len=600
+  │  │   SMALL_GLOBAL:      len=30 (312 bytes, 干扰项)
+  │  └──
+  │
+  ▼
+2026-06-04 09:21:02    Kuafu T1 诊断开始（全局分析 + 量化对账）                                      📋 诊断     [kuafu_T1_*.md:1-281]
+  │                    LISTENERS + tenant_lookup 联合解释 99% 分配增长 ✅ G1 PASS
+  │                    语义信号 score: LISTENERS=645, tenant_lookup=600, SMALL_GLOBAL=30 ✅ G2 PASS
+  │                    反事实: clear(LISTENERS) → 100% 回收 ✅ G3 PASS
+  │                    整体置信度: HIGH
+  │
+  ▼
+2026-06-04 09:21:02    Kuafu T3 诊断开始（G2 专项验证 — SMALL_GLOBAL 干扰项排除）                    🧪 验证     [kuafu_T3_*.md:1-296]
+  │                    score 比: 645:30 = 21.5x, 大小比: 312 bytes : 22.543 MiB ≈ 1:75,000
+  │                    结论: SMALL_GLOBAL 确认干扰项 ✅ G2 PASSED strong
+  │
+  ▼
+2026-06-04 17:25:15    Kuafu T2 诊断完成（完整双来源 RCA 报告）                                      📋 诊断     [kuafu_T2_*.md:1-425]
+  │                    LISTENERS 52.5% + tenant_lookup 46.9% = 99.5% 分配增长被解释
+  │                    保留链 100% 指向 module_global:LISTENERS
+  │                    整体置信度: 高（可确认）
+  │
+  ▼
+2026-06-04 18:30:00    Baize 综合 RCA 报告生成（本报告）                                              📝 报告     本文件</code></pre>
+</div>
+<h3 id="h-故障因果链">故障因果链</h3>
+<div class="code-block">
+  <span class="code-lang">text</span>
+  <button class="copy-btn" onclick="copyCode(this)" title="复制">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
+  </button>
+  <pre><code>故障现象: Python 应用 RSS 持续上涨（600 次迭代 +22.543 MiB）
+    │
+    ├─► 来源 #1 (52.5%): LISTENERS 全局注册表
+    │       └─► 每次 LargeTenant 构造 → callback bound method 追加到 LISTENERS 列表
+    │             └─► bound method.__self__ 强引用持有 LargeTenant 实例（含 ~20KB profile 字符串）
+    │                   └─► module_global:LISTENERS 是唯一保留根，600 个实例不可被 GC 回收
+    │                         └─► 反事实验证: clear(LISTENERS) → 100% 回收 (strong confidence)
+    │
+    ├─► 来源 #2 (46.9%): tenant_lookup 无界缓存
+    │       └─► @lru_cache(maxsize=None) 装饰 tenant_lookup 函数
+    │             └─► 每次查找 unique tenant_id → 新增缓存条目（profile 字符串）
+    │                   └─► currsize: 0 → 600，hits=0（永不命中已有缓存）
+    │                         └─► 无淘汰机制，每条 ~18KB，持续堆积
+    │
+    └─► 干扰项: SMALL_GLOBAL (0.01%)
+            └─► 30 个 {'index': N} 小 dict，浅层 312 字节
+            └─► score 30 vs 645/600，显眼但量级完全不可比</code></pre>
+</div>
+<hr>
+<h2 id="h-三排查过程">三、排查过程</h2>
+<h3 id="h-31-初始现象">3.1 初始现象</h3>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>现象</th>
+<th>来源</th>
+<th>证据</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>RSS 持续增长信号</td>
+<td><code>discovery.json</code> 日志信号</td>
+<td><code>rss_growth_observed</code></td>
+</tr>
+<tr>
+<td>Tracemalloc 追踪到分配增长</td>
+<td><code>tracemalloc.json</code></td>
+<td>总计 22.543 MiB (23,638,084 bytes)</td>
+</tr>
+<tr>
+<td>应用层对象增长</td>
+<td><code>object_growth.json</code></td>
+<td><code>builtins.method</code> +600, <code>LargeTenant</code> +600</td>
+</tr>
+<tr>
+<td>语义泄漏信号</td>
+<td><code>semantic.json</code></td>
+<td><code>semantic_leak_signals_observed</code>, 2 个主导信号</td>
+</tr>
+<tr>
+<td>保留链确认</td>
+<td><code>retention.json</code></td>
+<td>root_kind 均为 <code>module_global:LISTENERS</code></td>
+</tr>
+</tbody></table></div>
+<h3 id="h-32-假设驱动排查">3.2 假设驱动排查</h3>
+<h4 id="h-假设-asmallglobal-全局列表泄漏-干扰项-排除">假设 A：SMALL_GLOBAL 全局列表泄漏 —— 干扰项 ✅ 排除</h4>
+<blockquote>
+<p>🧪 假设：SMALL_GLOBAL 全局列表明显增大（在代码中显眼），可能是泄漏主因。</p>
+</blockquote>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>检查项</th>
+<th>操作（基于真实诊断数据）</th>
+<th>结论</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>语义 score 对比</td>
+<td><code>semantic.json</code> — LISTENERS score=645 vs SMALL_GLOBAL score=30</td>
+<td>score 差距 21.5x</td>
+</tr>
+<tr>
+<td>对象增长量化</td>
+<td><code>object_growth.json</code> — SMALL_GLOBAL len=30, shallow≈312 bytes vs 总增长 22.543 MiB</td>
+<td>差距 ~75,000x (312:22.5M)</td>
+</tr>
+<tr>
+<td>分配热点</td>
+<td><code>tracemalloc.json</code> — SMALL_GLOBAL 分配完全不可见于 top 分配栈</td>
+<td>分配量 &lt;0.01%</td>
+</tr>
+<tr>
+<td>保留链指向</td>
+<td><code>retention.json</code> — 100% 采样指向 LISTENERS, 未命中 SMALL_GLOBAL</td>
+<td>非保留根</td>
+</tr>
+</tbody></table></div>
+<p><strong>✅ 排除</strong>：SMALL_GLOBAL 确认为干扰项（Distractor），其 30 个小型 dict 条目（~312 bytes）完全无法解释 22.543 MiB 的主泄漏。详细验证记录参见 <code>C:\Users\duanz\.witty-diagnosis-agent\dayu\report\kuafu_T3_20260604_092102.md</code>。</p>
+<hr>
+<h4 id="h-假设-bnative-内存泄漏c-扩展python-堆外泄漏">假设 B：Native 内存泄漏（C 扩展/Python 堆外泄漏）</h4>
+<blockquote>
+<p>🧪 假设：内存增长发生在 Python 堆之外，由 native 代码分配导致。</p>
+</blockquote>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>检查项</th>
+<th>操作（基于真实诊断数据）</th>
+<th>结论</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>tracemalloc vs RSS</td>
+<td>tracemalloc 22.543 MiB ≈ Python 堆总增长</td>
+<td>无背离信号</td>
+</tr>
+<tr>
+<td>对象增长形态</td>
+<td><code>object_growth.json</code> 方法+实例增量可完整解释</td>
+<td>Python 层已覆盖</td>
+</tr>
+<tr>
+<td>memray 可用性</td>
+<td>memray 缺失，但不需要</td>
+<td>native 方向无背离</td>
+</tr>
+</tbody></table></div>
+<p><strong>✅ 排除</strong>：RSS 增长 ≈ tracemalloc 总量，Python 层已能解释主要增长，无需追踪 native 分配。</p>
+<hr>
+<h4 id="h-假设-c碎片化或预热伪泄漏">假设 C：碎片化或预热伪泄漏</h4>
+<blockquote>
+<p>🧪 假设：内存增长可能是堆碎片化或缓存预热后的稳定状态 plateau。</p>
+</blockquote>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>检查项</th>
+<th>操作（基于真实诊断数据）</th>
+<th>结论</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>hits 统计</td>
+<td><code>tenant_lookup</code> hits=0, misses=600</td>
+<td>每次都是新 key，非预热</td>
+</tr>
+<tr>
+<td>增长形态</td>
+<td>600 次迭代持续增长</td>
+<td>无 plateau 迹象</td>
+</tr>
+<tr>
+<td>缺失 GC 循环</td>
+<td><code>garbage_len=0, debug_saveall_active=false</code></td>
+<td>无循环引用泄漏</td>
+</tr>
+</tbody></table></div>
+<p><strong>✅ 排除</strong>：每次迭代均为唯一 key，不存在预热 plateau。增长持续，非碎片化。</p>
+<hr>
+<h4 id="h-假设-dlisteners-全局注册表泄漏-根因-a-确认">假设 D：LISTENERS 全局注册表泄漏 —— 根因 A ✅ 确认</h4>
+<blockquote>
+<p>🧪 假设：基于语义信号 score=645 和 retention 链 100% 指向，LISTENERS 为主保留泄漏源。</p>
+</blockquote>
+<p><strong>Step 1 — 量级确认</strong></p>
+<div class="code-block">
+  <span class="code-lang">text</span>
+  <button class="copy-btn" onclick="copyCode(this)" title="复制">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
+  </button>
+  <pre><code>语义 score: 645（排名 #1，远高于 #3 干扰项 30）
+对象增长: builtins.method +600, LargeTenant +600
+分配占比: ~52.5% (11.847 MiB / 22.543 MiB)</code></pre>
+</div>
+<p><strong>Step 2 — 保留链追踪</strong></p>
+<div class="code-block">
+  <span class="code-lang">text</span>
+  <button class="copy-btn" onclick="copyCode(this)" title="复制">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
+  </button>
+  <pre><code>LargeTenant object (#0)
+    ↓ self.__self__
+bound method LargeTenant.callback
+    ↓ list element
+builtins.list (module_global:LISTENERS)</code></pre>
+</div>
+<ul>
+<li>100% 的保留链采样（3/3）指向 <code>module_global:LISTENERS</code></li>
+<li>每个 bound method 通过 <code>self</code> 引用持有完整的 <code>LargeTenant</code> 实例</li>
+</ul>
+<p><strong>Step 3 — 反事实验证</strong></p>
+<ul>
+<li>干预操作：<code>clear(LISTENERS)</code> 清空全局列表</li>
+<li>before_count: 600 → after_count: 0</li>
+<li>回收比例: <strong>100%</strong> (confidence: <strong>strong</strong>)</li>
+</ul>
+<p><strong>✅ 结论</strong>：LISTENERS 全局注册表是无界增长泄漏源 A，每次 workload 迭代绑定的 callback bound method 永不清理，导致关联的 LargeTenant 实例无法被 GC 回收。</p>
+<hr>
+<h4 id="h-假设-etenantlookup-无界缓存泄漏-根因-b-确认">假设 E：tenant_lookup 无界缓存泄漏 —— 根因 B ✅ 确认</h4>
+<blockquote>
+<p>🧪 假设：基于语义信号 score=600 和 tracemalloc 分配热点 #2，<code>@lru_cache(maxsize=None)</code> 是无界缓存泄漏源。</p>
+</blockquote>
+<p><strong>Step 1 — 缓存配置确认</strong></p>
+<div class="code-block">
+  <span class="code-lang">text</span>
+  <button class="copy-btn" onclick="copyCode(this)" title="复制">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
+  </button>
+  <pre><code>@lru_cache(maxsize=None)   # 无上限！
+currsize: 0 → 600
+hits: 0                    # 永不命中已有缓存
+maxsize: None              # 无淘汰</code></pre>
+</div>
+<p><strong>Step 2 — 分配量化</strong></p>
+<div class="code-block">
+  <span class="code-lang">text</span>
+  <button class="copy-btn" onclick="copyCode(this)" title="复制">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
+  </button>
+  <pre><code>tracemalloc 分配 #2 (line 13): 10.570 MiB, 占比 46.9%
+对应: tenant_lookup 返回的 profile 字符串缓存</code></pre>
+</div>
+<p><strong>Step 3 — 语义确认</strong></p>
+<div class="code-block">
+  <span class="code-lang">text</span>
+  <button class="copy-btn" onclick="copyCode(this)" title="复制">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
+  </button>
+  <pre><code>semantic.json verdict: unbounded_cache_growth (score=600)
+标签明确指示为无界缓存增长</code></pre>
+</div>
+<p><strong>✅ 结论</strong>：<code>@lru_cache(maxsize=None)</code> 导致 tenant_lookup 缓存条目永不淘汰，每次 unique tenant_id 产生新缓存，是泄漏源 B（占比 ~46.9%）。</p>
+<hr>
+<h3 id="h-33-排查结论与逻辑树">3.3 排查结论与逻辑树</h3>
+<div class="code-block">
+  <span class="code-lang">text</span>
+  <button class="copy-btn" onclick="copyCode(this)" title="复制">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
+  </button>
+  <pre><code>Python 应用 RSS 持续上涨 (+22.543 MiB / 600 iter)
+│
+├─► 假设 A: SMALL_GLOBAL 全局列表 → ✅ score=30 (21.5x &lt; LISTENERS), 312 bytes (75,000x &lt; 总增长) → 排除为干扰项
+│       [证据: kuafu_T3_*.md — G2 PASSED, 语义信号 score 对比, tracemalloc 不可见]
+│
+├─► 假设 B: Native 内存泄漏 → ✅ tracemalloc 22.543 MiB ≈ RSS 增长, 无背离 → 排除
+│       [证据: kuafu_T1_*.md §2 — 无 native 背离信号]
+│
+├─► 假设 C: 碎片化/预热伪泄漏 → ✅ hits=0, 持续增长无 plateau, garbage_len=0 → 排除
+│       [证据: kuafu_T2_*.md §5.4 — GC 语义正常]
+│
+├─► 假设 D: LISTENERS 全局注册表 → ✅ 根因 A (52.5%) 🎯
+│       ├─ evidence: semantic score=645, retention 链 100% 指向, counterfactual 100% 回收
+│       ├─ mechanism: LargeTenant.callback → LISTENERS.append → bound method.__self__ → LargeTenant retained
+│       └─ 修复: 改用 WeakSet / 设置容量上限 / 绑定生命周期注销
+│
+└─► 假设 E: tenant_lookup 无界缓存 → ✅ 根因 B (46.9%) 🎯
+        ├─ evidence: semantic score=600, tracemalloc line 13 = 10.570 MiB, maxsize=None
+        ├─ mechanism: @lru_cache(maxsize=None) → 每查询新 key 新增缓存 → currsize=600, hits=0
+        └─ 修复: 设置 maxsize / 改用 TTL 缓存</code></pre>
+</div>
+<hr>
+<h2 id="h-四详细诊断证据三报告交叉验证">四、详细诊断证据（三报告交叉验证）</h2>
+<h3 id="h-41-g1-量化对账双来源联合解释-99-分配增长">4.1 G1 量化对账：双来源联合解释 99%+ 分配增长</h3>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>来源</th>
+<th align="center">Tracemalloc 分配量 (MiB)</th>
+<th align="center">占比</th>
+<th align="center">语义 Score</th>
+<th align="center">对象增长 (count)</th>
+<th align="center">保留链确认</th>
+<th align="center">反事实验证</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>LISTENERS 注册表</strong> (line 23)</td>
+<td align="center">11.742</td>
+<td align="center">52.1%</td>
+<td align="center"><strong>645</strong></td>
+<td align="center">method +600, LargeTenant +600</td>
+<td align="center">100% 采样指向</td>
+<td align="center">100% 回收 ✅</td>
+</tr>
+<tr>
+<td><strong>tenant_lookup 缓存</strong> (line 13)</td>
+<td align="center">10.570</td>
+<td align="center">46.9%</td>
+<td align="center"><strong>600</strong></td>
+<td align="center">currsize 0→600</td>
+<td align="center">独立第二来源</td>
+<td align="center">N/A</td>
+</tr>
+<tr>
+<td><strong>其他</strong></td>
+<td align="center">0.231</td>
+<td align="center">1.0%</td>
+<td align="center">—</td>
+<td align="center">—</td>
+<td align="center">—</td>
+<td align="center">—</td>
+</tr>
+<tr>
+<td><strong>合计</strong></td>
+<td align="center"><strong>22.543</strong></td>
+<td align="center"><strong>100%</strong></td>
+<td align="center">—</td>
+<td align="center">—</td>
+<td align="center">—</td>
+<td align="center">—</td>
+</tr>
+</tbody></table></div>
+<h3 id="h-42-g2-干扰项排除smallglobal-验证结论">4.2 G2 干扰项排除：SMALL_GLOBAL 验证结论</h3>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>对比维度</th>
+<th align="center">LISTENERS</th>
+<th align="center">tenant_lookup</th>
+<th align="center">SMALL_GLOBAL</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>语义 Score</td>
+<td align="center">645</td>
+<td align="center">600</td>
+<td align="center"><strong>30</strong>（21.5x 差距）</td>
+</tr>
+<tr>
+<td>元素数量</td>
+<td align="center">600</td>
+<td align="center">600</td>
+<td align="center"><strong>30</strong>（20x 差距）</td>
+</tr>
+<tr>
+<td>占总量比</td>
+<td align="center">~52.5%</td>
+<td align="center">~46.9%</td>
+<td align="center"><strong>&lt;0.01%</strong>（75,000x 差距）</td>
+</tr>
+<tr>
+<td>Tracemalloc 可见性</td>
+<td align="center">✅ 行23, 11.742 MiB</td>
+<td align="center">✅ 行13, 10.570 MiB</td>
+<td align="center">❌ 不可见</td>
+</tr>
+<tr>
+<td>保留链</td>
+<td align="center">✅ 100%</td>
+<td align="center">N/A</td>
+<td align="center">❌ 未命中</td>
+</tr>
+<tr>
+<td><strong>结论</strong></td>
+<td align="center"><strong>主泄漏源</strong></td>
+<td align="center"><strong>主泄漏源</strong></td>
+<td align="center"><strong>干扰项</strong></td>
+</tr>
+</tbody></table></div>
+<h3 id="h-43-g3-证据链一致性矩阵">4.3 G3 证据链一致性矩阵</h3>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>证据维度</th>
+<th>文件</th>
+<th>Verdic</th>
+<th align="center">LISTENERS</th>
+<th align="center">tenant_lookup</th>
+<th align="center">SMALL_GLOBAL</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>对象增长</strong></td>
+<td><code>object_growth.json</code></td>
+<td>growth_observed</td>
+<td align="center">+600 method, +600 Tenant</td>
+<td align="center">缓存内部增长</td>
+<td align="center">+30 dict, 312 bytes</td>
+</tr>
+<tr>
+<td><strong>语义信号</strong></td>
+<td><code>semantic.json</code></td>
+<td>leak_signals_observed</td>
+<td align="center">score=645, global_registry</td>
+<td align="center">score=600, unbounded_cache</td>
+<td align="center">score=30, global_container</td>
+</tr>
+<tr>
+<td><strong>分配热点</strong></td>
+<td><code>tracemalloc.json</code></td>
+<td>allocation_growth_observed</td>
+<td align="center">line 23, 11.742 MiB</td>
+<td align="center">line 13, 10.570 MiB</td>
+<td align="center">不可见</td>
+</tr>
+<tr>
+<td><strong>保留链</strong></td>
+<td><code>retention.json</code></td>
+<td>chain_observed</td>
+<td align="center">3/3 采样</td>
+<td align="center">N/A</td>
+<td align="center">0/3 采样</td>
+</tr>
+<tr>
+<td><strong>反事实</strong></td>
+<td><code>reachability_counterfactual.json</code></td>
+<td>counterfactual_confirmed</td>
+<td align="center">100% 回收 (strong)</td>
+<td align="center">N/A</td>
+<td align="center">未测试</td>
+</tr>
+</tbody></table></div>
+<h3 id="h-44-t1t2t3-报告验证门汇总">4.4 T1、T2、T3 报告验证门汇总</h3>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>验证门</th>
+<th align="center">T1 判定</th>
+<th align="center">T2 判定</th>
+<th align="center">T3 判定</th>
+<th align="center">综合判定</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>G1 量化对账</strong> (&gt;80%)</td>
+<td align="center">✅ PASS (99%)</td>
+<td align="center">✅ PASS (99.5%)</td>
+<td align="center">✅ 隐式确认</td>
+<td align="center">✅ <strong>PASS</strong></td>
+</tr>
+<tr>
+<td><strong>G2 竞争假设排除</strong></td>
+<td align="center">✅ PASS</td>
+<td align="center">✅ PASS</td>
+<td align="center">✅ PASS strong</td>
+<td align="center">✅ <strong>PASS</strong></td>
+</tr>
+<tr>
+<td><strong>G3 可达性/反事实</strong></td>
+<td align="center">✅ PASS(100%回收)</td>
+<td align="center">✅ PASS(100%回收)</td>
+<td align="center">✅ PASS(100%回收)</td>
+<td align="center">✅ <strong>PASS</strong></td>
+</tr>
+<tr>
+<td><strong>G4 双来源报告</strong></td>
+<td align="center">—</td>
+<td align="center">✅ PASS</td>
+<td align="center">—</td>
+<td align="center">✅ <strong>PASS</strong></td>
+</tr>
+<tr>
+<td><strong>整体置信度</strong></td>
+<td align="center"><strong>高（可确认）</strong></td>
+<td align="center"><strong>高（可确认）</strong></td>
+<td align="center"><strong>strong</strong></td>
+<td align="center"><strong>🟢 高置信</strong></td>
+</tr>
+</tbody></table></div>
+<hr>
+<h2 id="h-五修复方案">五、修复方案</h2>
+<h3 id="h-51-应急处置">5.1 应急处置</h3>
+<p>当前为沙箱复现环境，无线上生产影响。若需立即释放内存：</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>步骤</th>
+<th>操作</th>
+<th>执行人</th>
+<th>效果</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>1</td>
+<td>终止运行中的 Python 进程</td>
+<td>人工</td>
+<td>立即释放所有内存</td>
+</tr>
+<tr>
+<td>2</td>
+<td>清除 <code>LISTENERS</code> 列表：<code>LISTENERS.clear()</code></td>
+<td>代码</td>
+<td>释放 600 个 bound method 及相关实例</td>
+</tr>
+<tr>
+<td>3</td>
+<td>清除 <code>tenant_lookup</code> 缓存：<code>tenant_lookup.cache_clear()</code></td>
+<td>代码</td>
+<td>释放 600 条缓存条目</td>
+</tr>
+</tbody></table></div>
+<h3 id="h-52-永久修复计划">5.2 永久修复计划</h3>
+<h4 id="h-修复-alisteners-全局注册表-增加上限或按生命周期清理">修复 A：LISTENERS 全局注册表 — 增加上限或按生命周期清理</h4>
+<div class="code-block">
+  <span class="code-lang">python</span>
+  <button class="copy-btn" onclick="copyCode(this)" title="复制">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
+  </button>
+  <pre><code># 方案 A1: 改用 WeakSet（不阻止 GC 回收）
+import weakref
+LISTENERS = weakref.WeakSet()
+
+# 方案 A2: 设置固定上限 + FIFO 淘汰
+from collections import deque
+MAX_LISTENERS = 1000
+LISTENERS = deque(maxlen=MAX_LISTENERS)
+
+# 方案 A3: 绑定 tenant 生命周期，显式注销
+LISTENERS = {}  # tenant_id → callback
+def register(tenant_id, cb):
+    LISTENERS[tenant_id] = cb
+def unregister(tenant_id):
+    LISTENERS.pop(tenant_id, None)</code></pre>
+</div>
+<h4 id="h-修复-btenantlookup-缓存-设置上限">修复 B：tenant_lookup 缓存 — 设置上限</h4>
+<div class="code-block">
+  <span class="code-lang">python</span>
+  <button class="copy-btn" onclick="copyCode(this)" title="复制">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
+  </button>
+  <pre><code># 方案 B1: 设置 maxsize
+@lru_cache(maxsize=1000)  # 根据实际租户数设定
+def tenant_lookup(tenant_id):
+    ...
+
+# 方案 B2: 使用带 TTL 的缓存
+from cachetools import TTLCache, cached
+cache = TTLCache(maxsize=1000, ttl=300)  # 5分钟过期
+@cached(cache)
+def tenant_lookup(tenant_id):
+    ...</code></pre>
+</div>
+<h4 id="h-修复-c综合修复推荐">修复 C：综合修复（推荐）</h4>
+<p>同时应用<strong>修复 A</strong> + <strong>修复 B</strong> 以彻底消除两路泄漏源。</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>修复措施</th>
+<th>负责人</th>
+<th>完成时间</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>LISTENERS 注册表增加上限或改用 WeakSet</td>
+<td>开发团队</td>
+<td>待定</td>
+</tr>
+<tr>
+<td>tenant_lookup 设置缓存 maxsize 或改用 TTL 淘汰</td>
+<td>开发团队</td>
+<td>待定</td>
+</tr>
+<tr>
+<td>SMALL_GLOBAL 设置上限（可选，当前非阻塞）</td>
+<td>开发团队</td>
+<td>待定</td>
+</tr>
+</tbody></table></div>
+<hr>
+<h2 id="h-六复测方案">六、复测方案</h2>
+<div class="code-block">
+  <span class="code-lang">bash</span>
+  <button class="copy-btn" onclick="copyCode(this)" title="复制">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
+  </button>
+  <pre><code># 修复后运行相同 workload
+cd test/python-memory-leak-analyzer
+bash ./run.sh run-stress multi_source_mismatch
+
+# 验证指标
+# 1. listener_count 不再超过 MAX_LISTENERS
+# 2. tenant_lookup 缓存 currsize 不超过设定 maxsize
+# 3. RSS 增长趋平（plateau），不再线性上涨
+# 4. tracemalloc diff 不再持续增长（预期从 22.543 MiB 降至 &lt; 1 MiB）
+
+# 长期观测
+# 扩大迭代次数至 10000+，确认增长曲线趋于水平</code></pre>
+</div>
+<hr>
+<h2 id="h-七未验证项与下一步">七、未验证项与下一步</h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>项目</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>tenant_lookup</code> 保留链</td>
+<td>retention 分析以 method 为入口，未独立追踪 cache dict；语义+分配线已提供充分证据</td>
+</tr>
+<tr>
+<td>native/allocator 方向</td>
+<td>RSS 增长 ≈ 22.543 MiB ≈ tracemalloc 总量，Python 层已能解释主要增长，不需要追踪 native</td>
+</tr>
+<tr>
+<td>生产环境差异</td>
+<td>本例使用沙箱复现脚本；生产环境需确认 LISTENERS 和 tenant_lookup 的使用模式是否一致</td>
+</tr>
+<tr>
+<td><strong>下一步</strong></td>
+<td>应用修复后运行复测，验证修复有效性；确认 SMALL_GLOBAL 在长期运行下不会成为新泄漏源</td>
+</tr>
+</tbody></table></div>
+<hr>
+<h2 id="h-诊断质量自查">诊断质量自查</h2>
+<ul>
+<li>✅ <strong>领域透传</strong>：三份 Kuafu 报告证据已完整交叉验证并结构化展示</li>
+<li>✅ <strong>标题对齐</strong>：章节标题对应分析任务场景</li>
+<li>✅ <strong>路径溯源</strong>：所有核心结论均附带了 <code>[证据来源]</code></li>
+<li>✅ <strong>逻辑闭环</strong>：故障传导链路逻辑自洽，可解释所有观测到的证据</li>
+</ul>
+<hr>
+<p><strong>报告引用证据文件</strong>：</p>
+<ul>
+<li><code>C:\Users\duanz\.witty-diagnosis-agent\dayu\report\kuafu_T1_20260604_092102.md</code></li>
+<li><code>C:\Users\duanz\.witty-diagnosis-agent\dayu\report\kuafu_T2_20260604_172515.md</code></li>
+<li><code>C:\Users\duanz\.witty-diagnosis-agent\dayu\report\kuafu_T3_20260604_092102.md</code></li>
+</ul>
+
+    <div class="meta">
+      <span class="meta-source">Python应用内存持续上涨_multi_source_mismatch_20260604_183000_report.md</span>
+      <span>生成于 2026/06/04 17:28</span>
+    </div>
+  </article>
+</div>
+
+<script>
+  /* ── 滚动进度条 ── */
+  window.addEventListener("scroll", () => {
+    const el  = document.documentElement;
+    const pct = el.scrollTop / (el.scrollHeight - el.clientHeight) * 100;
+    document.getElementById("progress").style.width = Math.min(pct, 100) + "%";
+  });
+
+  /* ── TOC 高亮当前章节 ── */
+  (function () {
+    const headings = Array.from(document.querySelectorAll("article h1,article h2,article h3"));
+    const links    = Array.from(document.querySelectorAll(".toc a"));
+    if (!links.length) return;
+    const obs = new IntersectionObserver(entries => {
+      entries.forEach(e => {
+        if (!e.isIntersecting) return;
+        links.forEach(l => l.classList.remove("active"));
+        const a = links.find(l => l.getAttribute("href") === "#" + e.target.id);
+        if (a) a.classList.add("active");
+      });
+    }, { rootMargin: "-10% 0px -80% 0px" });
+    headings.forEach(h => obs.observe(h));
+  })();
+
+  /* ── h2 章节序号自动计数 ── */
+  (function () {
+    let idx = 0;
+    document.querySelectorAll("article h2").forEach(el => {
+      idx++;
+      el.setAttribute("data-index", String(idx).padStart(2, "0"));
+    });
+  })();
+
+  /* ── 代码块一键复制 ── */
+  function copyCode(btn) {
+    const code = btn.closest(".code-block").querySelector("code").innerText;
+    navigator.clipboard.writeText(code).then(() => {
+      btn.classList.add("copied");
+      btn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>';
+      setTimeout(() => {
+        btn.classList.remove("copied");
+        btn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>';
+      }, 2000);
+    });
+  }
+
+  /* ── 目录树收缩/展开 ── */
+  function toggleToc(btn) {
+    const expanded = btn.getAttribute("aria-expanded") === "true";
+    btn.setAttribute("aria-expanded", String(!expanded));
+    const parentItem = btn.closest(".toc-item");
+    let nextEl = parentItem.nextElementSibling;
+    if (nextEl && nextEl.classList.contains("toc-group")) {
+      if (expanded) {
+        nextEl.style.maxHeight = nextEl.scrollHeight + "px";
+        void nextEl.offsetHeight;
+        nextEl.classList.add("collapsed");
+      } else {
+        nextEl.classList.remove("collapsed");
+        nextEl.style.maxHeight = nextEl.scrollHeight + "px";
+        setTimeout(() => {
+          if (!nextEl.classList.contains("collapsed")) {
+            nextEl.style.maxHeight = "none";
+          }
+        }, 300);
+      }
+    }
+  }
+</script>
+</body>
+</html>

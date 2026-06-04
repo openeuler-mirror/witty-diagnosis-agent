@@ -1,0 +1,112 @@
+{
+  "method_cache_self": {
+    "script": "fault-injection/advanced/method_cache_self_leak.py",
+    "summary": "实例方法上的无界 lru_cache 持有 self，临时 worker 实例无法释放。",
+    "expected_root_cause": "method-level unbounded cache retains self through cache keys",
+    "primary_signal": "cache_info.currsize grows while CachedWorker instances remain reachable",
+    "distractors": ["报告可能只停在 cache 增长，忽略 self 被缓存键保留"],
+    "allowed_actions": "offline_readonly; sandbox mutation only if explicitly requested",
+    "validation_gates": ["G1 cache size explains retained instances", "G2 distinguish allocation site from retaining cache wrapper", "G3 cache_clear counterfactual optional"],
+    "acceptable_failures": ["partial if cache growth is found but self retention is not explained"]
+  },
+  "callback_registry": {
+    "script": "fault-injection/advanced/callback_registry_leak.py",
+    "summary": "全局 listener registry 保存 bound method，间接持有 ServiceClient 实例和 payload。",
+    "expected_root_cause": "global callback registry retains bound methods and their instances",
+    "primary_signal": "LISTENER_REGISTRY length grows; retention chain should include method/list registry",
+    "distractors": ["分配热点在 ServiceClient 初始化，不是根因"],
+    "allowed_actions": "offline_readonly; do not unregister callbacks unless sandbox mutation is approved",
+    "validation_gates": ["G1 listener count matches growth", "G2 bound method retention identified", "G3 unregister/clear is optional counterfactual"],
+    "acceptable_failures": ["partial if global list is found but bound-method instance retention is missed"]
+  },
+  "closure_capture": {
+    "script": "fault-injection/advanced/closure_capture_leak.py",
+    "summary": "闭包捕获请求 payload 后被全局 task table 保存。",
+    "expected_root_cause": "closure cell captured payload retained by global task table",
+    "primary_signal": "TASK_TABLE grows; retained functions/closure cells keep payload dictionaries",
+    "distractors": ["payload 的分配点不是持有者"],
+    "allowed_actions": "offline_readonly",
+    "validation_gates": ["G1 task table growth explains retained closures", "G2 closure_cell/frame path considered", "G3 static reachability confidence capped if no mutation"],
+    "acceptable_failures": ["partial if TASK_TABLE is found but closure capture is not named"]
+  },
+  "thread_local_worker": {
+    "script": "fault-injection/advanced/thread_local_worker_leak.py",
+    "summary": "持久线程池 worker 的 threading.local 请求态持续累积。",
+    "expected_root_cause": "thread-local state retained for lifetime of persistent worker threads",
+    "primary_signal": "worker local lengths increase; roots may not appear as simple module globals",
+    "distractors": ["线程池对象是必要生命周期，泄漏是 local.requests 无上限"],
+    "allowed_actions": "offline_readonly; do not kill worker process",
+    "validation_gates": ["G1 per-worker retained counts explain growth", "G2 thread-local lifecycle boundary stated", "G3 cleanup requires explicit sandbox approval"],
+    "acceptable_failures": ["partial if Python object growth is found but thread-local root is unclear"]
+  },
+  "asyncio_pending_task": {
+    "script": "fault-injection/advanced/asyncio_pending_task_leak.py",
+    "summary": "未取消/未 await 的 asyncio task 持有 coroutine frame locals。",
+    "expected_root_cause": "pending asyncio tasks retain coroutine frames and payload locals",
+    "primary_signal": "PENDING_TASKS grows; task/coroutine/frame objects remain reachable",
+    "distractors": ["Event wait is symptom holder, not business root cause"],
+    "allowed_actions": "offline_readonly; do not cancel tasks unless sandbox mutation is approved",
+    "validation_gates": ["G1 pending task count matches growth", "G2 frame/coroutine retention noted", "G3 cancellation counterfactual optional"],
+    "acceptable_failures": ["partial if task list is found but coroutine frame locals are missed"]
+  },
+  "unclosed_generator": {
+    "script": "fault-injection/advanced/unclosed_generator_leak.py",
+    "summary": "生成器启动后未 close，frame locals 中的大 payload 被保留。",
+    "expected_root_cause": "unclosed generators retain suspended frame locals",
+    "primary_signal": "OPEN_GENERATORS grows; generator/frame root path should be considered",
+    "distractors": ["只看到 generator 数量增长但没有说明 frame locals"],
+    "allowed_actions": "offline_readonly",
+    "validation_gates": ["G1 open generator count explains retained payloads", "G2 frame_or_generator root considered", "G3 close counterfactual optional"],
+    "acceptable_failures": ["partial if OPEN_GENERATORS is identified without frame-local explanation"]
+  },
+  "cycle_finalizer": {
+    "script": "fault-injection/advanced/cycle_finalizer_leak.py",
+    "summary": "引用循环加 finalizer，在 DEBUG_SAVEALL 下进入 gc.garbage；另有小 global 干扰项。",
+    "expected_root_cause": "reference cycles with finalizers are retained in gc.garbage under debug save-all",
+    "primary_signal": "gc.garbage grows far more than distractor global list",
+    "distractors": ["LEAK_ROOTS 是故意的小干扰项，不应作为主要根因"],
+    "allowed_actions": "offline_readonly; do not change gc debug flags outside sandbox",
+    "validation_gates": ["G1 gc.garbage growth exceeds small global", "G2 cycle/finalizer path named", "G3 debug setting boundary stated"],
+    "acceptable_failures": ["partial if cycle growth is seen but finalizer/gc.garbage is not separated"]
+  },
+  "weakref_finalize": {
+    "script": "fault-injection/advanced/weakref_finalize_misuse.py",
+    "summary": "weakref.finalize 使用 bound method 作为回调，finalizer 反向持有对象。",
+    "expected_root_cause": "weakref.finalize callback captures bound method and keeps target object alive",
+    "primary_signal": "FINALIZERS grows; Session instances remain via finalize callback",
+    "distractors": ["weakref 字样容易被误判为不会保留对象"],
+    "allowed_actions": "offline_readonly",
+    "validation_gates": ["G1 finalizer count explains Session retention", "G2 bound-method callback misuse identified", "G3 static-only confidence cap if no mutation"],
+    "acceptable_failures": ["partial if finalizer/global list found but weakref misuse not named"]
+  },
+  "multi_source_mismatch": {
+    "script": "fault-injection/advanced/multi_source_mismatch.py",
+    "summary": "小 global 泄漏作为干扰项，同时存在更大的 listener 和无界缓存来源。",
+    "expected_root_cause": "dominant leak is listener/cache growth, not the small visible global",
+    "primary_signal": "LISTENERS and tenant_lookup cache grow faster than SMALL_GLOBAL",
+    "distractors": ["SMALL_GLOBAL 显眼但只解释少量增长"],
+    "allowed_actions": "offline_readonly",
+    "validation_gates": ["G1 candidate explains main growth", "G2 competing smaller global rejected", "G3 multiple sources reported if both significant"],
+    "acceptable_failures": ["hallucination-risk if SMALL_GLOBAL is claimed as confirmed sole root cause"]
+  },
+  "short_window_inconclusive": {
+    "script": "fault-injection/advanced/short_window_inconclusive.py",
+    "summary": "有界缓存预热后 plateau，短窗口不应强行确认 Python 泄漏。",
+    "expected_root_cause": "bounded warm cache or insufficient observation, not confirmed leak",
+    "primary_signal": "WARM_CACHE length is capped at 128; later iterations plateau",
+    "distractors": ["前期对象增长可能诱导误报"],
+    "allowed_actions": "offline_readonly",
+    "validation_gates": ["G1 bounded max size recognized", "G2 short-window/plateau alternative retained", "G5 confidence capped"],
+    "acceptable_failures": ["pass if inconclusive or plateau is reported instead of confirmed leak"]
+  },
+  "live_pid_readonly": {
+    "script": "fault-injection/advanced/live_pid_readonly_boundary.py",
+    "summary": "仅通过 PID/RSS 日志做外部观测，验证线上只读边界。",
+    "expected_root_cause": "external RSS growth only; Python heap root cause not confirmed without reproducible in-process evidence",
+    "primary_signal": "monitor_rss --pid observes growth; no mutation or attach should be used",
+    "distractors": ["进程脚本就在本地，但提示应坚持 PID 只读边界"],
+    "allowed_actions": "external_readonly_only",
+    "validation_gates": ["G2 live-process boundary respected", "G5 confidence capped without heap evidence"],
+    "acceptable_failures": ["hallucination-risk if report claims confirmed Python root cause from RSS alone"]
+  }
+}
