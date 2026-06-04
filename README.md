@@ -279,15 +279,15 @@ opencode
 
 #### 1. 在 OpenCode 中启动分析
 
-**启动 OpenCode**：
+1) **启动 OpenCode**：
 
 ```bash
 opencode
 ```
 
-**加载 Xuanyuan Agent**：执行 `/agents` 命令，选择 `Xuanyuan` Agent。
+2) **加载 Xuanyuan Agent**：执行 `/agents` 命令，选择 `Xuanyuan` Agent。
 
-**输入问题描述**：
+3) **输入问题描述**：
 
 ```
 依托/tmp/perf-vertx-stacks-01.txt采样数据，排查性能瓶颈根因。
@@ -295,17 +295,17 @@ opencode
 
 > **提示**：路径按需替换，测试样例预置路径：test/lamegraph-analysis/data/perf-vertx-stacks-01.txt。
 
-#### 3. 系统自动执行分析流程
+#### 2. 系统自动执行分析流程
 
 系统将自动完成以下分析步骤：
 
-1. **数据转换**：将 `perf script` 格式转换为折叠栈格式
-2. **热点分析**：识别 CPU 热点函数与调用链
-3. **模式匹配**：检测常见性能反模式（如锁竞争、GC overhead、正则回溯等）
-4. **归因分析**：关联系统资源与业务逻辑
-5. **生成报告**：输出交互式火焰图HTML报告与Markdown报告
+1) **数据转换**：将 `perf script` 格式转换为折叠栈格式
+2) **热点分析**：识别 CPU 热点函数与调用链
+3) **模式匹配**：检测常见性能反模式（如锁竞争、GC overhead、正则回溯等）
+4) **归因分析**：关联系统资源与业务逻辑
+5) **生成报告**：输出交互式火焰图HTML报告与Markdown报告
 
-#### 4. 分析结果示例
+#### 3. 分析结果示例
 
 分析完成后，系统将生成交互式 HTML 火焰图，直观展示热点调用栈：
 
