@@ -215,11 +215,9 @@ def classify(
     peak_minus_final = trace_info["peak_minus_final_bytes"] or object_info["checkpoint_peak_minus_final_bytes"] or 0
     net_trace = trace_info["net_size_diff_bytes"] or 0
     checkpoint_verdict = object_info.get("checkpoint_verdict")
-    if peak_minus_final >= min_peak and net_trace < min_peak and checkpoint_verdict != "monotonic_growth":
-        verdict = "transient_peak_not_retained"
-        reason = "Peak memory is materially higher than final retained memory."
-        confidence_cap = "medium_without_fix_retest"
-    elif monitor_verdict in {"cgroup_growth_not_target", "worker_skew_growth"}:
+    live_scope_observed = bool(nested(monitor, "summary")) or bool(nested(snapshot, "readonly_verdict"))
+    peak_released = peak_minus_final >= min_peak and net_trace < min_peak and checkpoint_verdict != "monotonic_growth"
+    if monitor_verdict in {"cgroup_growth_not_target", "worker_skew_growth"}:
         verdict = "readonly_insufficient"
         reason = "Observed memory growth is outside the selected target PID scope."
         confidence_cap = "weak_scope_mismatch"
@@ -227,6 +225,14 @@ def classify(
         verdict = "allocator_reuse_or_fragmentation_possible"
         reason = "RSS reached a high-water plateau without sustained final retained growth evidence."
         confidence_cap = "direction_only_without_longer_window"
+    elif peak_released and live_scope_observed and not has_semantic_evidence(semantic):
+        verdict = "allocator_reuse_or_fragmentation_possible"
+        reason = "Live PID evidence is stable after a material peak and no semantic retained Python owner was found."
+        confidence_cap = "direction_only_without_longer_window"
+    elif peak_released:
+        verdict = "transient_peak_not_retained"
+        reason = "Peak memory is materially higher than final retained memory."
+        confidence_cap = "medium_without_fix_retest"
     elif monitor_verdict == "file_or_shmem_growth" or mapping_file_shmem_dominant(snapshot):
         verdict = "mmap_or_file_backed_growth"
         reason = "RSS growth or snapshot is dominated by file/shmem-backed mappings."
@@ -242,6 +248,10 @@ def classify(
         verdict = "python_retained_leak_likely"
         reason = "Reproducible workload shows Python object/allocation growth with semantic or retention evidence, but no process RSS denominator was provided."
         confidence_cap = "medium_workload_only_without_live_rss_scope"
+    elif denominator and denominator > 0 and not heap_evidence and not (trace_growth_seen or object_growth_seen):
+        verdict = "readonly_insufficient"
+        reason = "External RSS growth was observed, but no Python heap, semantic, or retention evidence was provided."
+        confidence_cap = "weak_without_reproducible_heap_evidence"
     elif denominator and denominator > 0 and (
         (python_heap_ratio is not None and python_heap_ratio <= native_ratio)
         and (tracked_ratio is None or tracked_ratio <= native_ratio)

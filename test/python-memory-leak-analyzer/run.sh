@@ -423,6 +423,10 @@ run_stress_one() {
     if [ "$scenario" = "live_pid_readonly" ]; then
       run_live_pid_monitor "$scenario_dir" "$script"
       echo ""
+      run_json_step "correlate_evidence_readonly" python "$SKILL_DIR/scripts/correlate_evidence.py" \
+        --monitor "$scenario_dir/monitor_rss_pid.json" \
+        --output "$scenario_dir/correlation.json"
+      echo ""
       run_json_step "discover_evidence_after_monitor" python "$SKILL_DIR/scripts/discover_evidence.py" "$scenario_dir" --output "$scenario_dir/discovery.json"
       echo ""
       echo "== live_process_boundary =="

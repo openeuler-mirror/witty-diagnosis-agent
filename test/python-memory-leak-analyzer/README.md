@@ -200,7 +200,18 @@ ptrace、清缓存、`malloc_trim`、重启服务或生产 PID 进程内注入�
 - HTML 必须通过官方 `report_visualization` 特征校验；不能只用手写 Markdown 或日志输出替代。
 - `live_pid_readonly` 场景只允许 PID/RSS 外部只读证据；报告不得从复现脚本反推确认的 Python 根因。
 
-本轮分析层补强后只要求抽样端到端验证：`global`、`multi_source_mismatch` 和一个 native/allocator production 场景即可。stress 与 production 全量运行保留为后续回归，不作为本轮合入前置条件。
+正式 Xuanyuan 端到端验证覆盖 6 个代表场景：`global`、`multi_source_mismatch`、`closure_capture`、`live_pid_readonly`、`native_ctypes_malloc_growth`、`allocator_fragmentation_plateau`。
+
+已归档的正式 Xuanyuan 报告位于 `reports/` 根层：
+
+| 场景 | 报告文件 |
+| --- | --- |
+| `global` | `Python内存全局容器泄漏分析_20260604_114200_report.{md,html}` |
+| `multi_source_mismatch` | `Python多源竞争内存泄漏RCA_ses_20260604_20260604143000_report.{md,html}` |
+| `closure_capture` | `Python服务闭包捕获内存泄漏_capture_20260604_205500_report.{md,html}` |
+| `live_pid_readonly` | `Python进程内存持续上涨_20260604_205220_report.{md,html}` |
+| `native_ctypes_malloc_growth` | `Python服务内存持续上涨_RCA_native_ctypes_malloc_growth_20260604_212000_report.{md,html}` |
+| `allocator_fragmentation_plateau` | `allocator_fragmentation_plateau_20260604_210950_report.{md,html}` |
 
 低输入验证时，正式提示词不应逐个指定 `semantic.json`、`object_growth.json` 等文件。使用中性故障描述和粗故障范围即可，例如：
 

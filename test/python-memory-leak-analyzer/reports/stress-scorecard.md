@@ -1,195 +1,115 @@
-# python-memory-leak-analyzer stress scorecard
+# python-memory-leak-analyzer verification scorecard
 
-本文件记录 complex stress suite 的可复现性和 Xuanyuan 低提示词验证结果。stress suite 的目标是暴露 skill 上限，不要求所有场景一次性通过。
+本文件记录 `python-memory-leak-analyzer` 测试套件的脚本级证据生成、正式 Xuanyuan 端到端报告和清理结果。stress 与 production 套件用于覆盖复杂诊断边界；当前 PR 前置端到端验证采用 6 个代表场景。
 
-## 脚本级证据生成
+## 测试材料
 
-验证命令：
-
-```bash
-cd test/python-memory-leak-analyzer
-bash ./run.sh run-stress all
-```
-
-结果：11 个 stress 场景均生成核心证据包，`out/stress/<scenario>/` 下包含 `capabilities.json`、`object_growth.json`、`tracemalloc.json`、`retention.json`、`reachability_static.json`、`metadata.json` 和三档 prompt 文件。
-
-2026-06-04 增强轮新增 `semantic_probe.py` 后，复杂可复现场景还会生成 `semantic.json`，用于直接暴露模块全局容器、无界 cache、bound method registry、闭包 cell、generator/task frame 等语义信号。`live_pid_readonly` 保持只读 PID/RSS 边界，不生成进程内语义归因。
-
-2026-06-04 低输入增强轮新增并强化 `discover_evidence.py`，用于从范围目录、PID、服务名或日志包自动发现证据入口。测试 runner 每轮清理旧 `discovery.json` 和临时 `discovery.manual.json`，避免复用上一轮发现结果。
-
-2026-06-04 本轮修复 discovery 自污染：`discovery.initial.json` 仅标记为初始扫描记录，不参与最终推荐评分；当 `discover_evidence.py --output <scope>/discovery.json` 重新写出发现结果时，本轮输出文件会从扫描结果中排除，避免旧 `discovery.json` 的推荐影响新判断。
-
-| 场景 | 目标压力点 | 脚本结果 |
+| 类型 | 路径 | 用途 |
 | --- | --- | --- |
-| `method_cache_self` | 方法级无界缓存通过 key 保留 `self` | generated |
-| `callback_registry` | 全局 listener registry 保留 bound method 和实例 | generated |
-| `closure_capture` | 闭包 cell 捕获 payload，被全局任务表保留 | generated |
-| `thread_local_worker` | 持久 worker 的 `threading.local` 请求态累积 | generated |
-| `asyncio_pending_task` | pending task 保留 coroutine frame locals | generated |
-| `unclosed_generator` | 未关闭 generator 保留 frame locals | generated |
-| `cycle_finalizer` | 引用循环、finalizer 与 `gc.garbage` 边界 | generated |
-| `weakref_finalize` | `weakref.finalize` bound method 回调反向保留对象 | generated |
-| `multi_source_mismatch` | 小 global 与更大 listener/cache 泄漏竞争 | generated |
-| `short_window_inconclusive` | 有界缓存预热/短窗口，避免强行确认泄漏 | generated, expected inconclusive |
-| `live_pid_readonly` | 仅 PID/RSS 外部观测，只读边界和置信度封顶 | generated |
+| 基础故障注入 | `test/python-memory-leak-analyzer/fault-injection/*.py` | 全局容器、无界缓存、RSS/碎片化对照 |
+| stress 故障注入 | `test/python-memory-leak-analyzer/fault-injection/advanced/*.py` | 闭包、回调、任务、线程局部、短窗口、多源竞争等复杂 Python 保留链 |
+| production 故障注入 | `test/python-memory-leak-analyzer/fault-injection/production/*.py` | native/allocator、mmap/shmem、prefork、cgroup、瞬态峰值等线上边界 |
+| 运行入口 | `test/python-memory-leak-analyzer/run.sh` | `run`、`run-stress`、`run-prod`、`status`、`clean` |
+| 清理入口 | `test/python-memory-leak-analyzer/cleanup.sh` | 清理 `out/`、临时 PID 和运行态 |
 
-## 低输入自动发现验证
+## 脚本级验证
 
 验证命令：
 
 ```bash
+python -m compileall -q skills/python-memory-leak-analyzer test/python-memory-leak-analyzer
+bash -n test/python-memory-leak-analyzer/run.sh test/python-memory-leak-analyzer/cleanup.sh
+
 cd test/python-memory-leak-analyzer
+bash ./run.sh clean
+bash ./run.sh run global
 bash ./run.sh run-stress multi_source_mismatch
 bash ./run.sh run-stress closure_capture
 bash ./run.sh run-stress live_pid_readonly
-python skills/python-memory-leak-analyzer/scripts/discover_evidence.py <out/stress/<scenario>>
+bash ./run.sh run-prod native_ctypes_malloc_growth
+bash ./run.sh run-prod allocator_fragmentation_plateau
 ```
 
 结果：
 
-| 场景 | 输入形态 | 自动发现结论 | 关键边界 |
+| 场景 | 证据目录 | `correlation.json` verdict | 置信度边界 |
 | --- | --- | --- | --- |
-| `multi_source_mismatch` | 仅范围目录 | `offline_evidence_bundle`，发现 `semantic.json`、`object_growth.json`、`retention.json`、`tracemalloc.json` 和日志 | 无需用户列出 JSON；应优先比较 `LISTENERS`、`tenant_lookup` 和 `SMALL_GLOBAL` |
-| `closure_capture` | 仅范围目录 | `offline_evidence_bundle`，发现 `semantic.json`、`object_growth.json`、`retention.json`、`tracemalloc.json` 和日志 | 无需用户列出 JSON；应定位 `TASK_TABLE` 保存闭包函数 |
-| `live_pid_readonly` | 仅范围目录/PID 外部证据 | 初始只发现日志和 metadata；采样后发现 `monitor_rss_pid.json` 并推荐 `logs_only_or_external_rss` | 不生成 `semantic.json`、`object_growth.json`、`tracemalloc.json`、`retention.json`；仅凭 RSS 不确认 Python 根因 |
+| `global` | `out/global/` | `python_retained_leak_likely` | `medium_workload_only_without_live_rss_scope` |
+| `multi_source_mismatch` | `out/stress/multi_source_mismatch/` | `python_retained_leak_likely` | `medium_workload_only_without_live_rss_scope` |
+| `closure_capture` | `out/stress/closure_capture/` | `python_retained_leak_likely` | `medium_workload_only_without_live_rss_scope` |
+| `live_pid_readonly` | `out/stress/live_pid_readonly/` | `readonly_insufficient` | `weak_without_reproducible_heap_evidence` |
+| `native_ctypes_malloc_growth` | `out/production/native_ctypes_malloc_growth/` | `native_or_allocator_suspect` | `direction_only_without_native_allocator_stack` |
+| `allocator_fragmentation_plateau` | `out/production/allocator_fragmentation_plateau/` | `allocator_reuse_or_fragmentation_possible` | `direction_only_without_longer_window` |
 
-该验证只证明 skill 脚本和文档路由支持低输入自动发现。完整 Agent 智能验证仍需逐场景启动 Xuanyuan，并归档 Markdown 与 HTML 两份 Witty 原流程报告。
+`live_pid_readonly` 会在 PID/RSS 监控后生成 `correlation.json`，用于报告引用只读证据边界；没有 Python heap、semantic 或 retention 证据时不得确认 Python 对象根因。`allocator_fragmentation_plateau` 在 live PID/snapshot 存在、瞬态峰值已释放且无语义保留者时输出 allocator/high-water 方向结论。
 
-本轮复核命令还覆盖了直接重写最终发现文件：
+## Xuanyuan 端到端验证
 
-```bash
-python skills/python-memory-leak-analyzer/scripts/discover_evidence.py test/python-memory-leak-analyzer/out/stress/multi_source_mismatch --output test/python-memory-leak-analyzer/out/stress/multi_source_mismatch/discovery.json
-python skills/python-memory-leak-analyzer/scripts/discover_evidence.py test/python-memory-leak-analyzer/out/stress/closure_capture --output test/python-memory-leak-analyzer/out/stress/closure_capture/discovery.json
-python skills/python-memory-leak-analyzer/scripts/discover_evidence.py test/python-memory-leak-analyzer/out/stress/live_pid_readonly --output test/python-memory-leak-analyzer/out/stress/live_pid_readonly/discovery.json
-```
+正式验证使用 `challenge + codex-mediated`。启动提示只包含中性故障现象、粗故障范围和只读边界；`--skill-name`、`--scenario`、`--reproduce` 仅用于脚本侧输入生成、清理、归档和校验。
 
-复核结果：两个离线复杂场景推荐保持 `offline_evidence_bundle`，只读 PID 场景推荐保持 `logs_only_or_external_rss`；三者的 `discovery_recommendations` 均为空，说明没有复用旧发现文件的推荐。
-
-## 低提示词验证
-
-> 注意：本节记录的是修复 OpenCode agent 暴露问题之前的历史运行结果。当前环境已经通过
-> `witty-xuanyuan-test doctor --json` 确认 `opencode agent list` 可直接选择
-> `Xuanyuan (Controller)`；因此下方 “agent not found / fallback to default agent” 只作为历史问题记录，
-> 不能作为当前 Xuanyuan/Baize E2E 结论。stress suite 的 post-fix 官方报告尚未重跑。
-
-已执行：
+统一命令形态：
 
 ```powershell
 python .agents\skills\witty-xuanyuan-test\scripts\xuanyuan_report_archive.py run `
+  --mode challenge `
+  --question-mode codex-mediated `
   --skill-name python-memory-leak-analyzer `
-  --scenario method_cache_self `
-  --summary "stress sparse prompt: method cache self retention" `
-  --log-file "D:\develop\Trae\OpenEuler\witty-diagnosis-agent\test\python-memory-leak-analyzer\out\stress\method_cache_self\method_cache_self.log" `
-  --reproduce "bash ./run.sh run-stress method_cache_self" `
-  --prompt "这个 Python 进程内存一直涨，日志在 D:\develop\Trae\OpenEuler\witty-diagnosis-agent\test\python-memory-leak-analyzer\out\stress\method_cache_self\method_cache_self.log" `
-  --timeout 900
-```
-
-历史结果：OpenCode CLI 当时提示 `agent "Xuanyuan (Controller)" not found. Falling back to default agent`，但默认 agent 仍触发 `python-memory-leak-analyzer`，并正确定位 `@lru_cache(maxsize=None)` 实例方法缓存持有 `self` 的根因。该轮没有生成 Witty 官方 Baize Markdown/HTML，因此不计为完整 Xuanyuan E2E pass。当前环境已修复 agent 暴露问题，需要重跑后才能更新评分。
-
-已执行：
-
-```powershell
-python .agents\skills\witty-xuanyuan-test\scripts\xuanyuan_report_archive.py run `
-  --agent xuanyuan `
-  --skill-name python-memory-leak-analyzer `
-  --scenario callback_registry `
-  --summary "stress sparse prompt: callback registry retention" `
-  --log-file "D:\develop\Trae\OpenEuler\witty-diagnosis-agent\test\python-memory-leak-analyzer\out\stress\callback_registry\callback_registry.log" `
-  --reproduce "bash ./run.sh run-stress callback_registry" `
-  --prompt "这个 Python 进程内存一直涨，日志在 D:\develop\Trae\OpenEuler\witty-diagnosis-agent\test\python-memory-leak-analyzer\out\stress\callback_registry\callback_registry.log" `
-  --timeout 300
-```
-
-历史结果：OpenCode CLI 当时同样提示 `agent "xuanyuan" not found. Falling back to default agent`，随后进入 `Xuanyuan (Controller)` 编排流程并生成 Dayu 计划：
-
-```text
-C:\Users\duanz\.witty-diagnosis-agent\dayu\plans\20260604_101208_python_memory_leak.md
-```
-
-该轮在 300 秒内停留在计划阶段，未产出 Baize 最终 Markdown/HTML 报告。结论记为 `partial/fail-for-e2e`: 低提示词能触发编排和 Fuxi 计划，但旧环境的 OpenCode CLI agent 暴露/回退行为与短超时导致完整 Xuanyuan 报告未完成。当前不再把该记录视为 agent 暴露限制的现状。
-
-2026-06-04 低输入 `multi_source_mismatch` 正式重跑使用单句范围提示：
-
-```powershell
-python .agents\skills\witty-xuanyuan-test\scripts\xuanyuan_report_archive.py run `
-  --skill-name python-memory-leak-analyzer `
-  --scenario multi_source_mismatch-low-input `
-  --summary "low-input scope-only multi-source Python memory leak" `
-  --prompt "分析 Python 泄漏问题，范围在 D:\develop\Trae\OpenEuler\witty-diagnosis-agent\test\python-memory-leak-analyzer\out\stress\multi_source_mismatch" `
-  --timeout 5400
-```
-
-结果：Xuanyuan 能直接读取范围目录、`discovery.json`、`capabilities.json` 和 `metadata.json`，证明低输入自动发现入口已生效；但随后 Fuxi 将“故障时间窗口”作为阻塞问题并尝试调用当前 OpenCode 工具集中不可用的 `question` 工具，导致未生成 Baize Markdown/HTML。该轮记为 `partial`: 自动发现成功，流程继续性失败。已据此补充规则：离线证据包已有 discovery/metadata/log/结构化证据时，缺少故障时间窗口不得中断分析，只能在报告中标注“未提供/按证据时间近似”。
-
-修正规则后再次以范围目录低输入运行，并关闭 question bridge 以避免当前 OpenCode 工具集缺少 `question` 时中断：
-
-```powershell
-python .agents\skills\witty-xuanyuan-test\scripts\xuanyuan_report_archive.py run `
-  --skill-name python-memory-leak-analyzer `
-  --scenario multi_source_mismatch-low-input-v2 `
-  --summary "low-input scope-only multi-source Python memory leak" `
-  --prompt "分析 Python 泄漏问题，范围在 D:\develop\Trae\OpenEuler\witty-diagnosis-agent\test\python-memory-leak-analyzer\out\stress\multi_source_mismatch。若未提供故障时间窗口，请按范围目录内 discovery、metadata、日志和结构化证据继续分析，不要中断追问时间窗口；只读诊断，不执行修复、重启、远程登录、attach、ptrace 或配置写入。" `
+  --scenario <scenario> `
+  --phenomenon "<中性故障现象>" `
+  --scope "<workspace-root>\witty-diagnosis-agent\test\python-memory-leak-analyzer\out\<scenario-dir>" `
+  --reproduce "<input-generation-command>" `
   --timeout 5400 `
-  --no-question-bridge `
   --json
 ```
 
-结果：完整 Xuanyuan 流程通过，Fuxi/Dayu/Kuafu/Baize 均执行完成，Baize 生成 Witty 原流程 Markdown 和 `report_visualization` HTML：
+| 场景 | run id | 输入生成命令 | 关键验收 | 结果 |
+| --- | --- | --- | --- | --- |
+| `global` | 已归档报告复核 | `bash ./run.sh run global` | `LEAK_BUCKET`、`module_global`、`python_retained_leak_likely` | pass |
+| `multi_source_mismatch` | 已归档报告复核 | `bash ./run.sh run-stress multi_source_mismatch` | `LISTENERS`、`tenant_lookup`、`SMALL_GLOBAL`，小 global 不能作为唯一主因 | pass |
+| `closure_capture` | `20260604_204035_97c1461c` | `bash ./run.sh run-stress closure_capture` | `TASK_TABLE`、closure、payload；不得引用 multi-source 术语 | pass |
+| `live_pid_readonly` | `20260604_204804_0c1d223e` | `bash ./run.sh run-stress live_pid_readonly` | `readonly_insufficient`、`Private_Dirty`、direction-only 边界；不得仅凭 RSS 确认 Python 根因 | pass |
+| `native_ctypes_malloc_growth` | `20260604_205528_7411a399` | `bash ./run.sh run-prod native_ctypes_malloc_growth` | `native_or_allocator_suspect`、`ctypes`、`Python heap / Private_Dirty ratio`；不得误报 Python retained root cause | pass |
+| `allocator_fragmentation_plateau` | `20260604_210429_1bd0a8a3` | `bash ./run.sh run-prod allocator_fragmentation_plateau` | `allocator_reuse_or_fragmentation_possible`、`High-Water`、`非泄漏` | pass |
 
-```text
-D:\develop\Trae\OpenEuler\witty-diagnosis-agent\test\python-memory-leak-analyzer\reports\Python内存泄漏分析_multi_source_mismatch_20260604_123057_report.md
-D:\develop\Trae\OpenEuler\witty-diagnosis-agent\test\python-memory-leak-analyzer\reports\Python内存泄漏分析_multi_source_mismatch_20260604_123057_report.html
-```
+OpenCode 修复确认问题均按只读边界回复为不执行修复。每轮 `watch` 完成后执行 `bash ./run.sh clean`，随后 `bash ./run.sh status` 返回 `no output directory`。
 
-归档校验：
+## 归档报告
+
+下列报告均位于 `test/python-memory-leak-analyzer/reports/` 根层，并通过 `--require-official-html` 校验：
+
+| 场景 | Markdown/HTML |
+| --- | --- |
+| `global` | `Python内存全局容器泄漏分析_20260604_114200_report.{md,html}` |
+| `multi_source_mismatch` | `Python多源竞争内存泄漏RCA_ses_20260604_20260604143000_report.{md,html}` |
+| `closure_capture` | `Python服务闭包捕获内存泄漏_capture_20260604_205500_report.{md,html}` |
+| `live_pid_readonly` | `Python进程内存持续上涨_20260604_205220_report.{md,html}` |
+| `native_ctypes_malloc_growth` | `Python服务内存持续上涨_RCA_native_ctypes_malloc_growth_20260604_212000_report.{md,html}` |
+| `allocator_fragmentation_plateau` | `allocator_fragmentation_plateau_20260604_210950_report.{md,html}` |
+
+校验命令示例：
 
 ```powershell
 python .agents\skills\witty-xuanyuan-test\scripts\xuanyuan_report_archive.py verify `
   --skill-name python-memory-leak-analyzer `
-  --report-dir "D:\develop\Trae\OpenEuler\witty-diagnosis-agent\test\python-memory-leak-analyzer\reports" `
-  --contains "Python内存泄漏分析" `
-  --term LISTENERS `
-  --term tenant_lookup `
-  --term SMALL_GLOBAL `
+  --contains allocator_fragmentation_plateau `
+  --term allocator_reuse_or_fragmentation_possible `
+  --term High-Water `
+  --term "非泄漏" `
   --require-official-html `
   --json
 ```
 
-验证结论：`has_markdown=true`、`has_html=true`、`official_html_reports` 非空、`missing_terms=[]`。报告正确识别 `LISTENERS` bound method registry 与 `tenant_lookup` 无界缓存为双主因，并排除 `SMALL_GLOBAL` 干扰项。报告尾部仍包含“是否执行故障修复”的交互提示，但本轮未执行修复；已补充 skill 规则，低输入/只读验证场景默认只输出诊断结论、修复建议和复测方案，不发起自动修复交互。
+全部 6 个场景校验结果均为 `has_markdown=true`、`has_html=true`、`official_html_reports` 非空、`missing_terms=[]`。
 
-随后启动 `closure_capture` 低输入单场景验证时，Xuanyuan 未生成新的 closure 报告，而是复用了历史 `multi_source_mismatch` 报告并重新可视化。运行痕迹显示它读取了历史输出：
+## 负例边界
 
-```text
-C:\Users\duanz\.witty-diagnosis-agent\dayu\report\kuafu_T1_20260604_122605.md
-C:\Users\duanz\.witty-diagnosis-agent\baize\reports\Python内存泄漏分析_multi_source_mismatch_20260604_123057_report.md
-```
+| 场景 | 检查项 | 结果 |
+| --- | --- | --- |
+| `closure_capture` | 报告不得包含 `multi_source_mismatch`、`LISTENERS`、`tenant_lookup`、`SMALL_GLOBAL` | pass |
+| `live_pid_readonly` | 结论不得仅凭 RSS 写成已确认 Python retained leak | pass |
+| `native_ctypes_malloc_growth` | 结论不得输出 `python_retained_leak_likely` | pass |
+| `allocator_fragmentation_plateau` | 结论应排除 Python 保留泄漏并使用 allocator/high-water 边界 | pass |
 
-该轮记为 `fail-for-e2e`: 自动发现能力本身可用，但 Agent 发生跨场景历史报告污染。已据此补充当前范围隔离规则：本轮诊断只能使用用户给出的范围目录、PID 或服务名发现到的证据；历史 Dayu/Baize 报告只用于归档和校验，不能作为本轮根因输入。评分脚本也新增跨场景术语拦截：按 `closure_capture` 评分时，包含 `multi_source_mismatch`、`LISTENERS`、`tenant_lookup` 或 `SMALL_GLOBAL` 的报告直接判为无效。
+## 已知限制
 
-## 端到端报告验收规则
-
-后续 Xuanyuan/Baize 验证按场景拆分：
-
-- 一个 stress 场景对应一个独立 Xuanyuan 会话。
-- 每个场景分别执行 `run`、`archive`、`verify`。
-- 每个场景必须归档两份 Witty 原流程报告：Markdown `*.md` 和 HTML `*.html`。
-- `verify` 默认使用 `--require-official-html`；没有官方 HTML 时，该场景不能记为完整 E2E pass。
-- 多个场景不得合并为一次总诊断，也不得用脚本日志或单份 Markdown 替代最终报告。
-- 每个场景的报告标题、正文关键术语和根因必须匹配当前范围；历史 Dayu/Baize 报告、归档目录旧报告和上一个 stress 场景报告不能作为本轮诊断输入。
-- 若当前场景是 `closure_capture`，报告必须包含 `TASK_TABLE`、`global_table_retains_closures` 或 closure/payload 证据；若报告引用 `multi_source_mismatch`、`LISTENERS`、`tenant_lookup` 或 `SMALL_GLOBAL`，该场景判为无效。
-
-首轮小测场景：
-
-| 场景 | 小测目标 | 当前脚本级结果 | E2E 状态 |
-| --- | --- | --- | --- |
-| `multi_source_mismatch` | 多源竞争，避免把小 `SMALL_GLOBAL` 误判为唯一根因 | `semantic.json` 同时列出 `LISTENERS` bound method registry、`tenant_lookup` 无界 cache 和小 global 干扰项；范围目录 discovery 推荐 `offline_evidence_bundle` | `pass`，已归档 `Python内存泄漏分析_multi_source_mismatch_20260604_123057_report.{md,html}` |
-| `closure_capture` | 分配点和保留点分离，识别闭包 cell 捕获 payload | `semantic.json` 列出 `TASK_TABLE` 增长和 `function_with_closure`，并展示 closure cell 中的 payload dict；范围目录 discovery 推荐 `offline_evidence_bundle` | `fail-for-e2e`，首轮复用历史 `multi_source_mismatch` 报告；已补范围隔离规则，待 v2 重跑 |
-| `live_pid_readonly` | 线上/PID 外部只读边界，避免仅凭 RSS 确认 Python 根因 | 仅保留 `monitor_rss_pid.json` 和弱置信度边界，不生成进程内语义归因；采样后 discovery 推荐 `logs_only_or_external_rss` | 待单独低输入 Xuanyuan 会话生成 Markdown/HTML |
-
-## 后续优化点
-
-- `minimal` 提示 `python 泄露，请你分析找出原因` 不携带范围，适合测试 skill 触发；根因定位验证应使用一句话故障描述加范围目录、PID 或服务名。
-- `sparse` 提示已改为“分析 Python 泄漏问题，范围在 <目录>”，不再直接给日志路径；正式低输入 E2E 使用 `--phenomenon` 加 `--scope`，不使用 `--prompt` 覆盖正式输入。
-- stress 日志不写入标准答案；标准答案只保存在 `metadata.json` 和 `stress_manifest.json`，用于人工复核和评分。
-- 下一轮 skill 优化应重点减少低提示词下的澄清需求：当日志已包含完整证据包、复现命令和只读边界时，Xuanyuan/Fuxi 应直接进入离线本地证据分析。
+- 未执行 ptrace/attach、memray native stack 实采、线上进程内注入或修复动作。
