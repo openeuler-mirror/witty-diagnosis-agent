@@ -138,7 +138,7 @@ maxsize:  None (无界!)
 
 **分配点 ≠ 保留点**：tracemalloc 准确捕获了分配热点（`:23` 缓存 value、`:13` 对象实例），但根因在 **为什么这些对象不被回收**，而不是在哪里分配。
 
-**对账**: 
+**对账**:
 - `tenant_lookup` 的 value 分配 + LargeTenant 实例分配 = ~22.31 MiB，占全部增长的 99%
 - 分配热点与语义信号的 **LISTENERS + tenant_lookup** 完美吻合
 - SMALL_GLOBAL 的分配增量 < 0.05 MiB，可忽略

@@ -126,7 +126,7 @@
   .toc-spacer { width: 20px; flex-shrink: 0; }
   .toc-group { overflow: hidden; transition: max-height 0.3s ease-in-out; }
   .toc-group.collapsed { max-height: 0 !important; }
-  
+
   .toc a {
     display: block;
     font-size: 13px;
@@ -203,11 +203,11 @@
   }
 
   /* ── Body text ─────────────────────────────────────────────────────────── */
-  .article p, .plain { 
-    font-size: 15px; 
-    line-height: 1.85; 
-    color: var(--text); 
-    margin: 0 0 12px; 
+  .article p, .plain {
+    font-size: 15px;
+    line-height: 1.85;
+    color: var(--text);
+    margin: 0 0 12px;
     font-family: var(--font-body);
   }
   .article strong { font-weight: 600; }
@@ -705,7 +705,7 @@
 </tbody></table></div>
 <h3 id="h-listeners-详情">LISTENERS 详情</h3>
 <div class="code-block">
-  
+
   <button class="copy-btn" onclick="copyCode(this)" title="复制">
     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
   </button>
@@ -725,7 +725,7 @@
 <p><strong>结论</strong>: 全局 LISTENERS 列表用于注册回调，但 never cleaned up —— 600 个 LargeTenant 实例各有一个 bound method 被 LISTENERS 持有，形成一个 <code>global → list → bound_method → LargeTenant</code> 的强可达保留链。</p>
 <h3 id="h-tenantlookup-缓存详情">tenant_lookup 缓存详情</h3>
 <div class="code-block">
-  
+
   <button class="copy-btn" onclick="copyCode(this)" title="复制">
     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
   </button>
@@ -740,7 +740,7 @@ maxsize:  None (无界!)
 <p><strong>结论</strong>: <code>@lru_cache(maxsize=None)</code> 的无界缓存。600 次调用全部 miss，缓存永远不会淘汰，所有 key-value 永久保留。</p>
 <h3 id="h-smallglobal-详情">SMALL_GLOBAL 详情</h3>
 <div class="code-block">
-  
+
   <button class="copy-btn" onclick="copyCode(this)" title="复制">
     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
   </button>
@@ -834,7 +834,7 @@ maxsize:  None (无界!)
 <h2 id="h-6-保留链证据retentionchain">6. 保留链证据（retention_chain）</h2>
 <p>对 3 个 LargeTenant 候选的保留链采样：</p>
 <div class="code-block">
-  
+
   <button class="copy-btn" onclick="copyCode(this)" title="复制">
     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
   </button>
@@ -843,7 +843,7 @@ maxsize:  None (无界!)
     → LISTENERS (builtins.list) ←  module_global:LISTENERS</code></pre>
 </div>
 <div class="code-block">
-  
+
   <button class="copy-btn" onclick="copyCode(this)" title="复制">
     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
   </button>
@@ -852,7 +852,7 @@ maxsize:  None (无界!)
     → LISTENERS (builtins.list) ←  module_global:LISTENERS</code></pre>
 </div>
 <div class="code-block">
-  
+
   <button class="copy-btn" onclick="copyCode(this)" title="复制">
     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
   </button>
@@ -941,7 +941,7 @@ maxsize:  None (无界!)
 </ol>
 <h3 id="h-诊断结论">诊断结论</h3>
 <div class="code-block">
-  
+
   <button class="copy-btn" onclick="copyCode(this)" title="复制">
     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
   </button>
