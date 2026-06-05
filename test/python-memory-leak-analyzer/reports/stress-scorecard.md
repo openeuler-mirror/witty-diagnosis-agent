@@ -1,6 +1,6 @@
 # python-memory-leak-analyzer verification scorecard
 
-本文件记录 `python-memory-leak-analyzer` 测试套件的脚本级证据生成、正式 Xuanyuan 端到端报告和清理结果。stress 与 production 套件用于覆盖复杂诊断边界；当前 PR 前置端到端验证采用 6 个代表场景。
+本文件记录 `python-memory-leak-analyzer` 测试套件的脚本级证据生成、正式 Xuanyuan 端到端报告和清理结果。stress 与 production 套件用于覆盖复杂诊断边界；端到端验证记录 6 个代表场景。
 
 ## 测试材料
 

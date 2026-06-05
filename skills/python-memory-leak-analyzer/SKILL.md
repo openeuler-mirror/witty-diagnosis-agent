@@ -6,7 +6,7 @@ description: >
   gc/objgraph/memray 诊断、C 扩展或 native 内存增长时，必须使用本技能。覆盖 Python
   托管对象泄漏、全局容器/无界缓存、闭包/回调/线程局部保留、引用循环、分配点与保留点分离、
   RSS 与 Python 堆背离、碎片化或缓存预热伪泄漏。支持从目录、PID、服务名或日志包自动发现证据。
-  首版默认只读和可复现路径，不默认 attach 线上进程或执行副作用干预。
+  默认采用只读和可复现路径，不默认 attach 线上进程或执行副作用干预。
 ---
 
 # Python 内存泄漏根因分析 Skill
@@ -41,7 +41,7 @@ scripts/
 
 ## 第二节：核心原则
 
-- **范围先行**：先确认当前范围、PID、worker、cgroup 和 mapping 口径；历史报告不能替代本轮结构化证据。
+- **范围先行**：先确认当前诊断范围、PID、worker、cgroup 和 mapping 口径；历史报告不能替代当前范围内的结构化证据。
 - **先证伪再归因**：RSS 高水位、短窗口、缓存预热、allocator high-water、mmap/file/shmem 或 worker skew 都可能不是 Python retained leak。
 - **分配点不等于根因**：tracemalloc 只回答“在哪里分配”，根因通常在保留者和生命周期缺陷。
 - **报告前必须对账**：最终结论先读 `correlation.json`，再按 `references/evidence-analysis.md` 和 `references/validation-gates.md` 控制措辞。
@@ -153,7 +153,7 @@ python scripts/correlate_evidence.py \
 - 未验证项。
 - 因权限、依赖、线上风险或证据缺失导致的置信度上限。
 
-低输入或只读验证场景中，不要在报告尾部发起“是否执行修复”的交互选择；自动源码修复和修复后验证属于后续独立流程。
+低输入或只读验证场景中，不要在报告尾部发起“是否执行修复”的交互选择；自动源码修复和修复后验证需要独立授权。
 
 ## 第五节：安全边界
 

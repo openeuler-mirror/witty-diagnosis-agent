@@ -14,7 +14,7 @@
 - 可复现可重启：优先用 `--script` 跑完整 Python 堆路径。
 - 低输入但有范围目录、PID、服务名或日志包：先运行 `discover_evidence.py <scope>`，再按 `recommendation.recommended_path` 路由；不得首轮要求用户列出全部日志和 JSON。
 - 低输入且没有明确路径：在当前目录运行 `discover_evidence.py .`，同时检查 `logs/`、`out/`、`reports/`、`snapshots/`、`test/`；仍无发现时才追问故障范围。
-- 已运行线上 PID：先用 `live_process_snapshot.py --pid` 只读定界，再用 `monitor_rss.py --pid` 外部观测；后续 attach 需要单独审批。
+- 已运行线上 PID：先用 `live_process_snapshot.py --pid` 只读定界，再用 `monitor_rss.py --pid` 外部观测；attach 需要单独审批。
 - 报告前：运行或读取 `correlate_evidence.py` 产物，把 `verdict`、`confidence_cap` 和 `missing_evidence` 作为根因措辞总闸门。
 - 依赖状态为 unknown 时按缺失处理，避免误判能力。
 
@@ -29,8 +29,8 @@
 - `guppy3/heapy` 可作为 CPython heap 深挖工具，但接口复杂、依赖和解释成本较高；只有 stdlib、`objgraph`、`pympler` 仍无法解释复杂 heap 时再列为人工增强项。
 - `Fil` 更适合批处理、科学计算或数据处理程序的峰值内存归因；对长生命周期服务的“对象为什么不释放”仍需要保留链验证。
 
-当前依赖结论：
+依赖结论：
 
 - 默认工具链仍保持 stdlib + `/proc` + `discover_evidence.py` + `live_process_snapshot.py` + `monitor_rss.py` + `correlate_evidence.py` + 结构化证据分析。
-- 本轮不引入 Memray、Scalene、py-spy、BCC memleak、Fil、memory_profiler 等第三方工具依赖；只吸收它们背后的诊断思想：先确认目标范围、记录时间序列趋势、区分 Python/native/mmap、比较 peak 与 final、看 outstanding/retained 增长。
+- 默认不引入 Memray、Scalene、py-spy、BCC memleak、Fil、memory_profiler 等第三方工具依赖；只吸收它们背后的诊断思想：先确认目标范围、记录时间序列趋势、区分 Python/native/mmap、比较 peak 与 final、看 outstanding/retained 增长。
 - 任何外部 profiler 输出只能增强“分配线”或“运行栈线”；最终 Python 泄漏根因仍按 `evidence-analysis.md` 和 `validation-gates.md` 判定。

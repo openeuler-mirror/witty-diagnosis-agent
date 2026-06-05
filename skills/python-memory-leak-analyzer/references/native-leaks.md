@@ -20,7 +20,7 @@
 
 ## 可选外部证据
 
-Memray、gdb、allocator stats、BCC memleak 等只作为用户已提供或后续采集建议，不作为本 skill 默认依赖。本轮不引入这些工具，也不复制其代码。
+Memray、gdb、allocator stats、BCC memleak 等只作为已有证据或单独审批后的采集建议，不作为本 skill 默认依赖，也不复制其代码。
 
 - 若已有 memray capture/report，可用 `parse_memray.py` 解析或人工读取 outstanding/native allocation 线索。
 - 若可复现且用户允许额外工具，才建议全生命周期 native allocation 采集；attach 只能覆盖 attach 之后的分配，不能证明历史增长。

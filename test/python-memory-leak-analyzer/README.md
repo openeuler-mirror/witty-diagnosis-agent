@@ -84,7 +84,7 @@ cd test/python-memory-leak-analyzer
 ## 极限压力场景
 
 stress suite 用于测试 skill 在低提示词、复杂保留链和竞争假设下的上限。本组测试允许出现
-`partial` 或失败，重点是记录误报、漏报、越界操作和置信度控制问题，方便继续优化 skill。
+`partial` 或失败，重点记录误报、漏报、越界操作和置信度控制问题。
 
 ```bash
 # 运行单个复杂场景
@@ -142,7 +142,7 @@ stress suite 用于测试 skill 在低提示词、复杂保留链和竞争假设
 
 ## 生产化思路场景
 
-production suite 用于把 skill 从离线小样例推进到真实复杂场景可用的诊断编排。它不引入
+production suite 覆盖接近真实服务形态的复杂诊断边界。它不引入
 Memray、Scalene、py-spy、BCC、Fil、memory_profiler 等第三方依赖，也不执行 attach、
 ptrace、清缓存、`malloc_trim`、重启服务或生产 PID 进程内注入；只用 stdlib 和 `/proc`
 验证目标范围、趋势、mapping、cgroup 与 Python heap 证据对账。
@@ -194,7 +194,7 @@ ptrace、清缓存、`malloc_trim`、重启服务或生产 PID 进程内注入�
 
 - 一个 stress 场景启动一个独立 Xuanyuan 会话。
 - 不使用一次总诊断替代多个场景。
-- 每个场景只能使用本轮范围目录、PID 或服务名发现到的证据；不得把历史 Dayu/Baize 报告或上一个 stress 场景报告作为本轮诊断输入。
+- 每个场景只能使用当前场景范围目录、PID 或服务名发现到的证据；不得把历史 Dayu/Baize 报告或上一个 stress 场景报告作为当前诊断输入。
 - 报告标题、场景名和关键术语必须匹配当前场景；如果当前场景是 `closure_capture`，报告却引用 `multi_source_mismatch`、`LISTENERS` 或 `tenant_lookup`，该报告无效。
 - 每个场景完成后归档两份 Witty 原流程报告：Markdown `*.md` 和 HTML `*.html`。
 - HTML 必须通过官方 `report_visualization` 特征校验；不能只用手写 Markdown 或日志输出替代。

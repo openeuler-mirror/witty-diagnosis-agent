@@ -4,7 +4,7 @@
 
 | 门 | 输入 | 通过条件 | 失败回退 | 报告措辞 |
 | --- | --- | --- | --- | --- |
-| G0 目标范围和口径确认 | `discovery.json`、`live_process_snapshot.json`、`monitor_rss_pid.json` | PID、process tree、cgroup、worker、mapping 与本轮目标一致 | 只做 scope 定界，切换 worker/cgroup 或补充范围 | “当前证据只能说明范围/口径问题” |
+| G0 目标范围和口径确认 | `discovery.json`、`live_process_snapshot.json`、`monitor_rss_pid.json` | PID、process tree、cgroup、worker、mapping 与当前目标一致 | 只做 scope 定界，切换 worker/cgroup 或补充范围 | “当前证据只能说明范围/口径问题” |
 | G1 量化对账 | `object_growth.json`、`tracemalloc.json`、`correlation.json` | 主候选解释主要增长，或 correlation 给出方向级边界 | 回对象/分配/语义证据找更大来源 | “候选解释了主要增长”或“候选不足” |
 | G2 竞争假设 | `evidence-analysis.md` 假设矩阵 | 相关替代假设均有支持/反证记录 | 保留多假设或降级置信度 | “已排除/尚未排除的替代解释” |
 | G3 可达性 | `retention.json`、`reachability_*.json` | 反事实回收成功，或静态保留链充分且声明封顶 | 回保留链找其他路径 | “confirmed/partial/static-only” |

@@ -2,7 +2,7 @@
 
 ## 0. 先证伪和定界
 
-RSS 单次高水位不是泄漏证据。先确认本轮范围、PID/worker/cgroup/mapping 口径和增长形态。短窗口、缓存预热、allocator high-water、mmap/file/shmem、worker skew 或 scope mismatch 都可能解释现象。
+RSS 单次高水位不是泄漏证据。先确认当前诊断范围、PID/worker/cgroup/mapping 口径和增长形态。短窗口、缓存预热、allocator high-water、mmap/file/shmem、worker skew 或 scope mismatch 都可能解释现象。
 
 低输入离线证据包不因缺少故障时间窗口中断；时间只作为报告上下文和残余缺口。历史 Witty 报告只能作背景，不能替代当前范围内结构化证据。
 
