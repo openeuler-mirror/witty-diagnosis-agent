@@ -263,9 +263,9 @@ feature 支持：优先信任运行时 probe，不只看 header
 - **低**：关键参数、线程状态、错误日志或复现结果缺失。
 - **需进一步排查**：症状疑似 io_uring，但无法定位异常阶段或 errno。
 
-### Step 6：最终输出（按第九节模板落盘）
+### Step 6：最终输出（按通用 RCA 模板落盘）
 
-将 Step 3/4/5 的输出填入第九节报告结构，并显式写清：故障分类、证据链、
+将 Step 3/4/5 的输出填入通用 RCA 报告结构，并显式写清：故障分类、证据链、
 排除项、风险、修复建议和验证建议。
 
 ---
@@ -335,4 +335,3 @@ feature 支持：优先信任运行时 probe，不只看 header
 - `references/io_uring_fault_patterns.md`：io_uring 故障模式、证据和分支判断。
 - `references/io_uring_commands.md`：常用采集、strace、线程、日志和 O_DIRECT 检查命令。
 - `references/io_uring_kernel_features.md`：内核 feature、runtime probe 和兼容性判断规则。
-- `examples/report_template.md`：通用 RCA 内的 io_uring 领域细节示例；最终版式仍以通用 RCA 模板为准。
