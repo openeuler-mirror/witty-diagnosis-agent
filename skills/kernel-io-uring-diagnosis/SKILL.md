@@ -309,56 +309,24 @@ feature 支持：优先信任运行时 probe，不只看 header
 
 ## 第九节：最终报告结构
 
-```
-## 故障概要
-  故障模式：<资源限制 / ring容量 / worker阻塞 / SQPOLL异常 / fixed buffer / O_DIRECT对齐 / feature兼容>
-  置信度：<高/中/低/需进一步排查>
-  分析轨道：[双轨（运行证据 + 内核语义）| 单轨（仅运行证据）]
-  内核版本：<版本号>
-  目标对象：PID=<pid>  服务=<service>  时间窗口=<time window>
+最终报告默认采用 `skills/fault-rca-report-generation/SKILL.md` 的通用 RCA 模板。H1 状态图标、`故障概览`、`根因速览`、`排查过程` 等通用大板块由通用 RCA 决定；本 skill 只规定这些大板块里必须补充的 io_uring 领域细节。
 
-## 运行证据轨道结论
-  异常阶段：<setup/register/enter/submit/complete/worker/SQPOLL/O_DIRECT>
-  关键 errno：<errno>  含义：<strerror>
-  关键日志：<日志行或摘要>
-  资源状态：memlock=<value>  nofile=<value>  cgroup=<summary>
-  线程状态：iou-wrk=<summary>  iou-sqp=<summary>
-  运行证据归因假设：<一句话>
+| 通用 RCA 大板块 | io_uring 必须补充的领域细节 |
+| --- | --- |
+| 故障概览 | 故障模式（资源限制、ring 容量、worker 阻塞、SQPOLL、fixed buffer、O_DIRECT 对齐、feature 兼容等）、目标对象、内核版本、证据范围、当前状态和置信度边界。 |
+| 根因速览 | 触发条件、异常发生阶段（setup/register/enter/submit/complete/worker/SQPOLL/O_DIRECT）、关键 errno 或延迟表现、完整因果链和决定性证据出处。 |
+| 排查过程 | 候选假设、执行过的采集脚本或命令、支持证据、排除依据、未取得证据及其对置信度的影响。 |
+| io_uring 领域深度分析 | 运行证据轨道、内核语义轨道、资源/feature/队列/线程口径、两轨交叉验证和矛盾解释；若不单独成章，可并入“排查过程”。 |
+| 风险与影响 | 数据一致性风险、性能风险、受影响 workload、继续运行风险和降级路径。 |
+| 修复方案 | 只读建议、需要审批的操作、参数或配置变更风险、回滚方式；未获授权时不得写成已执行。 |
+| 验证建议 | 复现或确认命令、期望现象、通过条件、未验证项和后续采集建议。 |
+| 诊断质量自查 | 运行证据和内核语义均有来源；结论没有越过证据强度；诊断与修复状态已区分；HTML 来自本轮同名 Markdown。 |
 
-## 内核语义轨道结论（有源码、参数或 feature 证据时填写）
-  根因类型：[资源限制 | 参数错误 | ring容量 | worker阻塞 | SQPOLL调度 | O_DIRECT对齐 | feature兼容]
-  语义解释：<为什么当前参数、资源或 feature 状态会触发该现象>
-  触发条件：<需要什么前置状态>
-  因果链：[触发事件] → [内核/应用行为] → [errno/延迟] → [系统表现]
+诊断质量自查至少确认：
 
-## 交叉验证结果
-  异常阶段吻合：    □ 是  □ 否（差异说明：<...>）
-  关键 errno 吻合： □ 是  □ 否（差异说明：<...>）
-  资源状态吻合：    □ 是  □ 否（差异说明：<...>）
-  时间序列吻合：    □ 是  □ 否（差异说明：<...>）
-  综合判断：<两轨结论是否一致，若有矛盾如何解释>
-
-## 完整因果链（双轨收敛后）
-  [触发条件] → [根因] → [io_uring 阶段]
-  → [errno/延迟/队列异常] → [系统表现]
-
-## 排除的替代假设
-  - <假设X>：排除原因 <...>
-
-## 风险与影响
-  数据一致性风险：<...>
-  性能风险：<...>
-  影响范围：<...>
-
-## 修复建议
-  只读建议：
-    <进一步采集或确认方式>
-  需要审批的操作：
-    <调整限制、复现压力、修改配置、重启服务等>
-
-## 验证建议
-  <如何确认根因 + 如何验证修复有效>
-```
+- [ ] 运行证据与内核语义均有对应来源；缺失证据已标注置信度影响。
+- [ ] 结论没有越过当前证据强度。
+- [ ] 修复建议与已执行动作已明确区分。
 
 ---
 
@@ -367,4 +335,4 @@ feature 支持：优先信任运行时 probe，不只看 header
 - `references/io_uring_fault_patterns.md`：io_uring 故障模式、证据和分支判断。
 - `references/io_uring_commands.md`：常用采集、strace、线程、日志和 O_DIRECT 检查命令。
 - `references/io_uring_kernel_features.md`：内核 feature、runtime probe 和兼容性判断规则。
-- `examples/report_template.md`：最终诊断报告模板。
+- `examples/report_template.md`：通用 RCA 内的 io_uring 领域细节示例；最终版式仍以通用 RCA 模板为准。
