@@ -1,0 +1,1041 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>故障诊断报告</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Lora:ital,wght@0,400;0,600;1,400&family=Source+Sans+3:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  /* ── Design tokens ─────────────────────────────────────────────────────── */
+  :root {
+    --bg:          #f8f7f4;
+    --surface:     #ffffff;
+    --border:      #e8e5df;
+    --border-soft: #f0ede8;
+
+    --text:        #1c1917;
+    --text-2:      #57534e;
+    --text-3:      #a8a29e;
+
+    --accent:      #1d4e6e;
+    --accent-light:#e8f1f7;
+    --accent-mid:  #3b82a0;
+
+    --red:         #c0392b;
+    --red-bg:      #fef2f2;
+    --amber:       #92400e;
+    --amber-bg:    #fffbeb;
+    --green:       #14532d;
+    --green-bg:    #f0fdf4;
+
+    --code-bg:     #1a1d27;
+    --code-text:   #cdd6f4;
+    --code-border: #2d3148;
+
+    --font-body: "Source Sans 3", "PingFang SC", "Hiragino Sans GB", sans-serif;
+    --font-head: "Lora", "PingFang SC", Georgia, serif;
+    --font-mono: "JetBrains Mono", "Fira Code", Consolas, monospace;
+
+    --radius:    8px;
+    --radius-lg: 12px;
+    --shadow:    0 1px 3px rgba(0,0,0,.06), 0 4px 16px rgba(0,0,0,.05);
+    --shadow-lg: 0 2px 8px rgba(0,0,0,.07), 0 8px 32px rgba(0,0,0,.06);
+
+    --toc-width:   240px;
+    --gap:         32px;
+  }
+
+  /* ── Progress bar ──────────────────────────────────────────────────────── */
+  #progress {
+    position: fixed; top: 0; left: 0; height: 3px; width: 0%;
+    background: linear-gradient(90deg, var(--accent-mid), var(--accent));
+    z-index: 999; transition: width .1s linear;
+    border-radius: 0 2px 2px 0;
+  }
+
+  /* ── Base ──────────────────────────────────────────────────────────────── */
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  html { font-size: 16px; scroll-behavior: smooth; }
+  body {
+    font-family: var(--font-body);
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.8;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* ── Layout ────────────────────────────────────────────────────────────── */
+  .layout {
+    display: flex;
+    align-items: flex-start;
+    max-width: calc(var(--toc-width) + 820px + var(--gap) * 3);
+    margin: 0 auto;
+    padding: 48px var(--gap) 96px;
+    gap: var(--gap);
+  }
+
+  /* ── TOC ───────────────────────────────────────────────────────────────── */
+  .toc {
+    width: var(--toc-width);
+    flex-shrink: 0;
+    position: sticky;
+    top: 32px;
+    max-height: calc(100vh - 64px);
+    overflow-y: auto;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    padding: 20px;
+    box-shadow: var(--shadow);
+    scrollbar-width: thin;
+    scrollbar-color: var(--border) transparent;
+  }
+  .toc-title {
+    font-size: 10.5px;
+    font-weight: 600;
+    letter-spacing: .1em;
+    text-transform: uppercase;
+    color: var(--text-3);
+    margin-bottom: 12px;
+    padding-bottom: 10px;
+    border-bottom: 1px solid var(--border-soft);
+  }
+  .toc-item {
+    display: flex;
+    align-items: flex-start;
+    margin: 2px 0;
+  }
+  .toc-toggle {
+    background: none;
+    border: none;
+    cursor: pointer;
+    color: var(--text-3);
+    padding: 4px;
+    margin-right: 4px;
+    margin-top: 2px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 4px;
+    transition: background 0.2s, transform 0.2s;
+  }
+  .toc-toggle:hover { background: var(--border-soft); color: var(--text); }
+  .toc-toggle[aria-expanded="false"] svg { transform: rotate(-90deg); }
+  .toc-spacer { width: 20px; flex-shrink: 0; }
+  .toc-group { overflow: hidden; transition: max-height 0.3s ease-in-out; }
+  .toc-group.collapsed { max-height: 0 !important; }
+  
+  .toc a {
+    display: block;
+    font-size: 13px;
+    color: var(--text-2);
+    text-decoration: none;
+    padding: 4px 8px;
+    border-radius: 5px;
+    line-height: 1.45;
+    transition: background .15s, color .15s;
+    word-break: break-all;
+    flex-grow: 1;
+  }
+  .toc a:hover  { background: var(--accent-light); color: var(--accent); }
+  .toc a.active { background: var(--accent-light); color: var(--accent); font-weight: 500; }
+  .toc-l1 { font-weight: 600; color: var(--text); }
+  .toc-l2 { font-weight: 600; color: var(--text); }
+  .toc-l3 { font-size: 12px !important; padding-left: 14px !important; }
+
+  /* ── Article card ──────────────────────────────────────────────────────── */
+  .article {
+    flex: 1; min-width: 0;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    padding: 52px 60px;
+    box-shadow: var(--shadow-lg);
+  }
+
+  /* ── Headings ──────────────────────────────────────────────────────────── */
+  .title-container {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-end;
+    margin: 0 0 28px;
+    padding-bottom: 18px;
+    border-bottom: 2px solid var(--text);
+  }
+  .article h1 {
+    font-family: var(--font-head);
+    font-size: 26px; font-weight: 600; line-height: 1.3;
+    margin: 0; padding-bottom: 0;
+    border-bottom: none;
+  }
+  .article h2 {
+    font-family: var(--font-head);
+    font-size: 19px; font-weight: 600;
+    margin: 48px 0 14px; padding-bottom: 8px;
+    border-bottom: 1px solid var(--border);
+  }
+  .article h2::before {
+    content: attr(data-index);
+    display: inline-block;
+    font-family: var(--font-mono);
+    font-size: 10.5px; font-weight: 500;
+    color: var(--accent-mid);
+    background: var(--accent-light);
+    padding: 1px 7px; border-radius: 4px;
+    margin-right: 10px; vertical-align: middle;
+    letter-spacing: .05em;
+  }
+  .article h3 {
+    font-family: var(--font-head);
+    font-size: 15.5px; font-weight: 600;
+    margin: 28px 0 10px;
+  }
+  .article h3::before {
+    content: "§ ";
+    color: var(--text-3);
+    font-family: var(--font-mono); font-size: 13px;
+  }
+  .article h4 {
+    font-size: 13.5px; font-weight: 600;
+    color: var(--accent); margin: 20px 0 8px;
+  }
+
+  /* ── Body text ─────────────────────────────────────────────────────────── */
+  .article p, .plain { 
+    font-size: 15px; 
+    line-height: 1.85; 
+    color: var(--text); 
+    margin: 0 0 12px; 
+    font-family: var(--font-body);
+  }
+  .article strong { font-weight: 600; }
+  .article em     { font-style: italic; color: var(--text-2); }
+  .article a {
+    color: var(--accent); text-decoration: underline;
+    text-decoration-color: var(--accent-light);
+    text-underline-offset: 3px;
+  }
+  .article a:hover { text-decoration-color: var(--accent); }
+  .article hr { border: none; border-top: 1px solid var(--border); margin: 20px 0; }
+  .article hr.heavy { border-top: 3px solid var(--text); margin: 32px 0; }
+
+  /* ── Blockquote ────────────────────────────────────────────────────────── */
+  .article blockquote {
+    border-left: 3px solid var(--accent-mid);
+    background: var(--accent-light);
+    margin: 20px 0; padding: 13px 20px 13px 20px;
+    border-radius: 0 var(--radius) var(--radius) 0;
+  }
+  .article blockquote p { font-size: 14.5px; color: var(--accent); margin: 0; line-height: 1.7; }
+  /* 支持块引用内部保留换行符（修复头部概要换行丢失问题） */
+  .article blockquote p { white-space: pre-wrap; }
+  .article blockquote strong { color: var(--accent); }
+
+  /* ── Lists ─────────────────────────────────────────────────────────────── */
+  .article ul, .article ol { padding-left: 22px; margin: 6px 0 14px; }
+  .article li { font-size: 15px; line-height: 1.8; margin: 4px 0; }
+  .article li::marker { color: var(--accent-mid); }
+  .article li > ul, .article li > ol { margin: 3px 0; }
+
+  /* ── Inline code ───────────────────────────────────────────────────────── */
+  .article :not(pre) > code {
+    font-family: var(--font-mono);
+    font-size: 12.5px; font-weight: 500;
+    background: #f3f0eb; color: var(--red);
+    padding: 1px 5px; border-radius: 4px;
+    border: 1px solid var(--border);
+  }
+
+  /* ── Code blocks ───────────────────────────────────────────────────────── */
+  .code-block {
+    position: relative; margin: 20px 0;
+    border-radius: var(--radius-lg); overflow: hidden;
+    border: 1px solid var(--code-border);
+    box-shadow: 0 4px 20px rgba(0,0,0,.16);
+  }
+  .code-lang {
+    position: absolute; top: 0; left: 0;
+    font-family: var(--font-mono); font-size: 10px; font-weight: 500;
+    color: #7c8db5; background: #222538;
+    padding: 4px 12px; border-bottom-right-radius: 6px;
+    text-transform: uppercase; letter-spacing: .08em;
+    user-select: none;
+  }
+  .copy-btn {
+    position: absolute; top: 8px; right: 10px;
+    background: #2d3148; border: 1px solid #3d4260;
+    border-radius: 5px; color: #7c8db5; cursor: pointer;
+    padding: 5px 8px; display: flex; align-items: center;
+    transition: background .15s, color .15s; z-index: 1;
+  }
+  .copy-btn:hover  { background: #3a3f60; color: #cdd6f4; }
+  .copy-btn.copied { color: #a6e3a1; border-color: #4a6a4a; }
+  .code-block pre {
+    margin: 0; padding: 36px 20px 20px;
+    background: var(--code-bg); overflow-x: auto;
+    scrollbar-width: thin; scrollbar-color: #3d4260 transparent;
+  }
+  .code-block pre::-webkit-scrollbar { height: 5px; }
+  .code-block pre::-webkit-scrollbar-thumb { background: #3d4260; border-radius: 3px; }
+  .code-block code {
+    font-family: var(--font-mono); font-size: 13px; line-height: 1.7;
+    color: var(--code-text); background: none; border: none; padding: 0;
+    white-space: pre; word-break: normal;
+  }
+
+  /* ── Tables ────────────────────────────────────────────────────────────── */
+  .table-wrap {
+    overflow-x: auto; margin: 16px 0;
+    border-radius: var(--radius-lg);
+    border: 1px solid var(--border);
+    box-shadow: var(--shadow);
+  }
+  table { width: 100%; border-collapse: collapse; font-size: 14px; min-width: 360px; }
+  thead { background: #f4f2ee; }
+  th {
+    padding: 9px 14px; text-align: left;
+    font-size: 11.5px; font-weight: 600;
+    letter-spacing: .04em; text-transform: uppercase;
+    color: var(--text-2); border-bottom: 1px solid var(--border);
+    white-space: nowrap;
+  }
+  td {
+    padding: 8px 14px; border-bottom: 1px solid var(--border-soft);
+    color: var(--text); vertical-align: top; line-height: 1.6;
+  }
+  tbody tr:last-child td { border-bottom: none; }
+  tbody tr:nth-child(even) td { background: #faf9f7; }
+  tbody tr:hover td { background: var(--accent-light); transition: background .1s; }
+
+  /* ── KV block ──────────────────────────────────────────────────────────── */
+  .kv-block { background: var(--bg); border: 1px solid var(--border); border-radius: var(--radius-lg); overflow: hidden; margin: 12px 0 20px; }
+  .kv-row { display: flex; border-bottom: 1px solid var(--border-soft); align-items: flex-start; }
+  .kv-row:last-child { border-bottom: none; }
+  .kv-key { flex: 0 0 160px; padding: 9px 16px; font-size: 13.5px; font-weight: 600; color: var(--text-2); background: var(--surface); border-right: 1px solid var(--border-soft); }
+  .kv-val { flex: 1; padding: 9px 16px; font-size: 14px; color: var(--text); }
+
+  /* ── Status badges ─────────────────────────────────────────────────────── */
+  .badge-ok { display: inline-flex; align-items: center; gap: 4px; background: var(--green-bg); color: var(--green); font-size: 13px; font-weight: 500; padding: 2px 9px; border-radius: 20px; border: 1px solid #bbf7d0; }
+  .badge-err { display: inline-flex; align-items: center; gap: 4px; background: var(--red-bg); color: var(--red); font-size: 13px; font-weight: 500; padding: 2px 9px; border-radius: 20px; border: 1px solid #fecaca; }
+  .badge-warn { display: inline-flex; align-items: center; gap: 4px; background: var(--amber-bg); color: var(--amber); font-size: 13px; font-weight: 500; padding: 2px 9px; border-radius: 20px; border: 1px solid #fde68a; }
+
+  /* ── Priority badges ───────────────────────────────────────────────────── */
+  .pri-p0 { display: inline-block; background: #fef2f2; color: #991b1b; border: 1px solid #fca5a5; font-size: 12px; font-weight: 700; padding: 2px 8px; border-radius: 4px; letter-spacing: .04em; }
+  .pri-p1 { display: inline-block; background: #fff7ed; color: #9a3412; border: 1px solid #fdba74; font-size: 12px; font-weight: 700; padding: 2px 8px; border-radius: 4px; }
+  .pri-p2 { display: inline-block; background: #fffbeb; color: #92400e; border: 1px solid #fde68a; font-size: 12px; font-weight: 700; padding: 2px 8px; border-radius: 4px; }
+  .pri-p3 { display: inline-block; background: var(--accent-light); color: var(--accent); border: 1px solid #bfdbfe; font-size: 12px; font-weight: 700; padding: 2px 8px; border-radius: 4px; }
+
+  /* ── Fault header ──────────────────────────────────────────────────────── */
+  .fault-header { display: flex; align-items: center; gap: 12px; padding: 12px 16px; border-radius: var(--radius-lg); margin: 16px 0 8px; border: 1px solid; }
+  .fh-p0 { background: #fef2f2; border-color: #fca5a5; }
+  .fh-p1 { background: #fff7ed; border-color: #fdba74; }
+  .fh-p2 { background: #fffbeb; border-color: #fde68a; }
+  .fh-p3 { background: var(--accent-light); border-color: #bfdbfe; }
+  .fh-badge { font-family: var(--font-mono); font-size: 11px; font-weight: 700; letter-spacing: .08em; }
+  .fh-p0 .fh-badge { color: #991b1b; }
+  .fh-p1 .fh-badge { color: #9a3412; }
+  .fh-p2 .fh-badge { color: #92400e; }
+  .fh-p3 .fh-badge { color: var(--accent); }
+  .fh-rest { font-size: 14px; font-weight: 500; color: var(--text); }
+
+  /* ── Timeline ──────────────────────────────────────────────────────────── */
+  .timeline { border-left: 2px solid var(--accent-mid); margin: 16px 0 16px 8px; padding-left: 20px; }
+  .tl-row { display: flex; align-items: baseline; gap: 10px; margin: 8px 0; font-size: 13.5px; }
+  .tl-ts { font-family: var(--font-mono); font-size: 12px; color: var(--text-3); flex-shrink: 0; white-space: nowrap; }
+  .tl-tag { font-size: 11px; font-weight: 600; padding: 1px 7px; border-radius: 10px; flex-shrink: 0; background: var(--accent-light); color: var(--accent); }
+  .tl-tag.err { background: var(--red-bg); color: var(--red); }
+  .tl-tag.warn { background: var(--amber-bg); color: var(--amber); }
+  .tl-desc { color: var(--text); line-height: 1.5; }
+
+  /* ── Global warn ───────────────────────────────────────────────────────── */
+  .global-warn { background: #fef2f2; border: 1px solid #fca5a5; border-radius: var(--radius-lg); padding: 14px 18px; font-size: 14.5px; font-weight: 600; color: #991b1b; margin: 16px 0; }
+
+  /* ── Tree note ─────────────────────────────────────────────────────────── */
+  .tree-note { white-space: pre-wrap; font-family: var(--font-mono); font-size: 13.5px; line-height: 1.6; color: var(--text-2); margin: 8px 0 8px 16px; }
+
+  /* ── Disclaimer ────────────────────────────────────────────────────────── */
+  .disclaimer { background: var(--bg); border: 1px solid var(--border); border-radius: var(--radius); padding: 14px 18px; font-size: 13.5px; color: var(--text-2); font-style: italic; }
+
+  /* ── Meta footer ───────────────────────────────────────────────────────── */
+  .meta {
+    margin-top: 48px; padding-top: 16px;
+    border-top: 1px solid var(--border-soft);
+    display: flex; justify-content: space-between; align-items: center;
+    font-size: 12px; color: var(--text-3);
+  }
+  .meta-source { font-family: var(--font-mono); font-size: 11.5px; }
+
+  /* ── Brand logo ────────────────────────────────────────────────────────── */
+  .brand-logo {
+    font-family: var(--font-head);
+    font-size: 14px;
+    color: var(--text-3);
+    letter-spacing: 0.05em;
+    margin-bottom: 4px;
+    flex-shrink: 0;
+    margin-left: 16px;
+  }
+  .brand-logo strong {
+    font-weight: 600;
+    color: var(--accent);
+  }
+  @media (max-width: 900px) {
+    .title-container { flex-direction: column; align-items: flex-start; gap: 12px; }
+    .brand-logo { margin-left: 0; margin-bottom: 0; }
+  }
+  /* ── Print ─────────────────────────────────────────────────────────────── */
+  @media print {
+    body { background: white; }
+    #progress, .toc { display: none; }
+    .layout { display: block; padding: 0; }
+    .article { border: none; box-shadow: none; padding: 24px; }
+    .copy-btn { display: none; }
+    .brand-logo { margin-bottom: 0; }
+  }
+
+  /* ── Responsive ────────────────────────────────────────────────────────── */
+  @media (max-width: 900px) {
+    .toc { display: none; }
+    .article { padding: 36px 28px; }
+    .layout { padding: 24px 16px 64px; }
+  }
+  @media (max-width: 480px) {
+    .article { padding: 24px 18px; }
+    .article h1 { font-size: 22px; }
+  }
+</style>
+</head>
+<body>
+
+<div id="progress"></div>
+
+<div class="layout">
+  <nav class="toc" id="toc">
+  <div class="toc-title">目录</div>
+  <div class="toc-content">
+<div class="toc-item has-children"><button class="toc-toggle" onclick="toggleToc(this)" aria-expanded="true">
+                <svg viewBox="0 0 24 24" width="12" height="12" stroke="currentColor" stroke-width="2" fill="none"><polyline points="6 9 12 15 18 9"></polyline></svg>
+              </button><a href="#h-故障诊断报告" onclick="event.preventDefault(); const target = document.getElementById('h-故障诊断报告'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l1">🔴 故障诊断报告</a></div>
+<div class="toc-group" id="group-h-一故障概览">
+<div class="toc-item has-children"><button class="toc-toggle" onclick="toggleToc(this)" aria-expanded="true">
+                <svg viewBox="0 0 24 24" width="12" height="12" stroke="currentColor" stroke-width="2" fill="none"><polyline points="6 9 12 15 18 9"></polyline></svg>
+              </button><a href="#h-一故障概览" onclick="event.preventDefault(); const target = document.getElementById('h-一故障概览'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l2">一、故障概览</a></div>
+<div class="toc-group" id="group-h-置信度说明">
+<div class="toc-item "><span class="toc-spacer"></span><a href="#h-置信度说明" onclick="event.preventDefault(); const target = document.getElementById('h-置信度说明'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l3">置信度说明</a></div>
+</div>
+<div class="toc-item has-children"><button class="toc-toggle" onclick="toggleToc(this)" aria-expanded="true">
+                <svg viewBox="0 0 24 24" width="12" height="12" stroke="currentColor" stroke-width="2" fill="none"><polyline points="6 9 12 15 18 9"></polyline></svg>
+              </button><a href="#h-二根因速览" onclick="event.preventDefault(); const target = document.getElementById('h-二根因速览'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l2">二、根因速览</a></div>
+<div class="toc-group" id="group-h-事故时间线-故障传导链路">
+<div class="toc-item "><span class="toc-spacer"></span><a href="#h-事故时间线-故障传导链路" onclick="event.preventDefault(); const target = document.getElementById('h-事故时间线-故障传导链路'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l3">事故时间线 & 故障传导链路</a></div>
+<div class="toc-item "><span class="toc-spacer"></span><a href="#h-故障因果链" onclick="event.preventDefault(); const target = document.getElementById('h-故障因果链'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l3">故障因果链</a></div>
+</div>
+<div class="toc-item has-children"><button class="toc-toggle" onclick="toggleToc(this)" aria-expanded="true">
+                <svg viewBox="0 0 24 24" width="12" height="12" stroke="currentColor" stroke-width="2" fill="none"><polyline points="6 9 12 15 18 9"></polyline></svg>
+              </button><a href="#h-三排查过程" onclick="event.preventDefault(); const target = document.getElementById('h-三排查过程'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l2">三、排查过程</a></div>
+<div class="toc-group" id="group-h-31-初始现象">
+<div class="toc-item "><span class="toc-spacer"></span><a href="#h-31-初始现象" onclick="event.preventDefault(); const target = document.getElementById('h-31-初始现象'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l3">3.1 初始现象</a></div>
+<div class="toc-item "><span class="toc-spacer"></span><a href="#h-32-假设驱动排查" onclick="event.preventDefault(); const target = document.getElementById('h-32-假设驱动排查'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l3">3.2 假设驱动排查</a></div>
+<div class="toc-item "><span class="toc-spacer"></span><a href="#h-33-排查结论" onclick="event.preventDefault(); const target = document.getElementById('h-33-排查结论'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l3">3.3 排查结论</a></div>
+</div>
+<div class="toc-item has-children"><button class="toc-toggle" onclick="toggleToc(this)" aria-expanded="true">
+                <svg viewBox="0 0 24 24" width="12" height="12" stroke="currentColor" stroke-width="2" fill="none"><polyline points="6 9 12 15 18 9"></polyline></svg>
+              </button><a href="#h-四修复方案" onclick="event.preventDefault(); const target = document.getElementById('h-四修复方案'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l2">四、修复方案</a></div>
+<div class="toc-group" id="group-h-41-应急处置">
+<div class="toc-item "><span class="toc-spacer"></span><a href="#h-41-应急处置" onclick="event.preventDefault(); const target = document.getElementById('h-41-应急处置'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l3">4.1 应急处置</a></div>
+<div class="toc-item "><span class="toc-spacer"></span><a href="#h-42-永久修复计划" onclick="event.preventDefault(); const target = document.getElementById('h-42-永久修复计划'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l3">4.2 永久修复计划</a></div>
+<div class="toc-item "><span class="toc-spacer"></span><a href="#h-43-预防性建议" onclick="event.preventDefault(); const target = document.getElementById('h-43-预防性建议'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l3">4.3 预防性建议</a></div>
+</div>
+<div class="toc-item "><span class="toc-spacer"></span><a href="#h-五关键检测指标" onclick="event.preventDefault(); const target = document.getElementById('h-五关键检测指标'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l2">五、关键检测指标</a></div>
+<div class="toc-item "><span class="toc-spacer"></span><a href="#h-六与同类故障的对比分析" onclick="event.preventDefault(); const target = document.getElementById('h-六与同类故障的对比分析'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l2">六、与同类故障的对比分析</a></div>
+</div>
+  </div>
+</nav>
+  <article class="article" id="article" style="position: relative;">
+    <div class="title-container"><h1 id="h-故障诊断报告">🔴 故障诊断报告</h1><div class="brand-logo">by <strong>Witty Diagnosis Agent</strong></div></div>
+<blockquote>
+<p><strong>报告编号</strong>：RCA-FUSE-BE-20260604-001
+<strong>故障级别</strong>：P2 / Critical（功能挂起）
+<strong>报告时间</strong>：2026-06-04
+<strong>当前状态</strong>：🔴 处理中（未恢复）</p>
+</blockquote>
+<hr>
+<h2 id="h-一故障概览">一、故障概览</h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>项目</th>
+<th>内容</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>故障标题</td>
+<td>FUSE 多线程 ABBA 锁顺序死锁导致请求处理完全停滞</td>
+</tr>
+<tr>
+<td>影响范围</td>
+<td>FUSE 挂载点 <code>/mnt/fuse_test</code> 上的所有文件系统操作不可用；关联的 <code>mkdir</code> 进程进入 D 状态</td>
+</tr>
+<tr>
+<td>故障时段</td>
+<td>2026-06-04 （故障注入后持续，尚未恢复）</td>
+</tr>
+<tr>
+<td>根本原因</td>
+<td>多线程 FUSE 守护进程中两线程以相反顺序获取锁（Thread1: lock A → lock B; Thread2: lock B → lock A），形成 ABBA 死锁，导致所有请求处理永久阻塞</td>
+</tr>
+<tr>
+<td>是否恢复</td>
+<td><span class="badge-err">❌ 未恢复</span></td>
+</tr>
+<tr>
+<td>根因置信度</td>
+<td>🟢 高置信</td>
+</tr>
+</tbody></table></div>
+<h3 id="h-置信度说明">置信度说明</h3>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>等级</th>
+<th>标识</th>
+<th>含义</th>
+<th>示例场景</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>高置信</td>
+<td>🟢</td>
+<td>根因已明确，可复现，单一原因可解释所有现象</td>
+<td>ABBA 锁顺序反转完全解释所有阻塞现象</td>
+</tr>
+<tr>
+<td>中置信</td>
+<td>🟡</td>
+<td>根因基本确认，但存在 1～2 个无法完全解释的现象</td>
+<td>—</td>
+</tr>
+<tr>
+<td>低置信</td>
+<td>🟠</td>
+<td>有多个可疑原因，尚未排除竞争，结论为推断</td>
+<td>—</td>
+</tr>
+<tr>
+<td>未知</td>
+<td>🔴</td>
+<td>现象无法解释，根因未定位，仍在排查中</td>
+<td>—</td>
+</tr>
+</tbody></table></div>
+<hr>
+<h2 id="h-二根因速览">二、根因速览</h2>
+<h3 id="h-事故时间线-故障传导链路">事故时间线 & 故障传导链路</h3>
+<div class="code-block">
+  <span class="code-lang">text</span>
+  <button class="copy-btn" onclick="copyCode(this)" title="复制">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
+  </button>
+  <pre><code>时间                          事件                                               性质          溯源路径
+──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+2026-06-04                    FUSE 守护进程启动，挂载 /mnt/fuse_test                     🟢 正常启动   [kuafu_T1_fuse_branch_E_deadlock.md:5]
+  │                           fuse: init (API version 7.39)
+  │
+  ▼
+2026-06-04                    并发请求到达，两线程同时处理                              📈 触发条件
+  │                           Thread1: 持有锁 A，等待锁 B
+  │                           Thread2: 持有锁 B，等待锁 A
+  │
+  ▼
+2026-06-04                    ABBA 死锁形成，两线程永久阻塞                            🔴 故障爆发   [kuafu_T1_fuse_branch_E_deadlock.md:12-14]
+  │                           守护进程状态: Sl（多线程睡眠态）
+  │                           无任何请求能被处理或回复
+  │
+  ▼
+2026-06-04                    FUSE 请求队列开始堆积                                   🟡 压力积累   [kuafu_T1_fuse_branch_E_deadlock.md:22-23]
+  │                           sysfs waiting = 2（高于基线值 1）
+  │
+  ▼
+2026-06-04                    FUSE 客户端操作挂起                                     🔴 故障蔓延   [kuafu_T1_fuse_branch_E_deadlock.md:31-33]
+  │                           mkdir -p /mnt/fuse_test (PID 741) → D 状态
+  │                           stat /mnt/fuse_test → TIMEOUT
+  │                           ls -la /mnt/fuse_test → TIMEOUT
+  │
+  ▼
+2026-06-04                    挂载点完全不可用                                        🔴 系统影响
+  │                           所有对该挂载点的文件系统操作永久阻塞
+  │                           无 "Transport endpoint not connected" 报错
+  │                           操作仅无限期挂起（静默死锁）</code></pre>
+</div>
+<h3 id="h-故障因果链">故障因果链</h3>
+<div class="code-block">
+  <span class="code-lang">text</span>
+  <button class="copy-btn" onclick="copyCode(this)" title="复制">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
+  </button>
+  <pre><code>多线程 FUSE 守护进程启动
+    │
+    ├─► Thread1 获得锁 A，等待锁 B
+    │
+    ├─► Thread2 获得锁 B，等待锁 A
+    │
+    └─► 形成 ABBA 交叉等待 → 经典死锁条件成立
+            │
+            ├─► 两线程均进入 TASK_INTERRUPTIBLE 睡眠态（Sl）
+            │        守护进程保持存活但不再处理任何 FUSE 请求
+            │
+            ├─► FUSE 请求队列堆积
+            │        sysfs waiting: 0 → 1 → 2（累积）
+            │
+            ├─► 用户态操作完全超时
+            │        ls -la → TIMEOUT
+            │        stat    → TIMEOUT
+            │
+            └─► 内核态任务进入 D 状态
+                     mkdir 触发 LOOKUP/GETATTR → 内核等待 daemon 回复 → 永久阻塞
+                     └─► 🔴 挂载点业务全量中断（静默挂起）</code></pre>
+</div>
+<hr>
+<h2 id="h-三排查过程">三、排查过程</h2>
+<h3 id="h-31-初始现象">3.1 初始现象</h3>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>现象</th>
+<th>描述</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>ls -la /mnt/fuse_test</code></td>
+<td>命令永久超时，无任何输出返回</td>
+</tr>
+<tr>
+<td><code>stat /mnt/fuse_test</code></td>
+<td>命令永久超时，无任何输出返回</td>
+</tr>
+<tr>
+<td><code>mkdir -p /mnt/fuse_test</code></td>
+<td>PID 741 进入 D 状态（uninterruptible sleep），无法完成、无法 kill</td>
+</tr>
+<tr>
+<td>守护进程状态</td>
+<td>进程存活，显示为 <code>Sl</code>（多线程休眠态）</td>
+</tr>
+<tr>
+<td>系统日志</td>
+<td>无异常内核报错，仅有 <code>fuse: init (API version 7.39)</code></td>
+</tr>
+</tbody></table></div>
+<hr>
+<h3 id="h-32-假设驱动排查">3.2 假设驱动排查</h3>
+<h4 id="h-假设-a守护进程崩溃-异常退出">假设 A：守护进程崩溃 / 异常退出</h4>
+<blockquote>
+<p>🧪 假设：FUSE 守护进程已崩溃或 segfault，导致请求无人处理</p>
+</blockquote>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>检查项</th>
+<th>操作</th>
+<th>结论</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>进程存活检查</td>
+<td>检查 <code>/proc/&lt;pid&gt;/status</code> 中的进程状态</td>
+<td><span class="badge-err">❌ 进程存活，非僵尸/Z 状态</span></td>
+</tr>
+<tr>
+<td>进程状态</td>
+<td>确认是否为 S（sleeping）而非 Z（zombie）或 X（dead）</td>
+<td>状态为 <code>Sl</code>，非崩溃状态</td>
+</tr>
+<tr>
+<td>core dump</td>
+<td>检查是否有 core 文件生成</td>
+<td>无任何 core dump</td>
+</tr>
+</tbody></table></div>
+<p><strong>❌ 排除</strong>：守护进程存活但阻塞，非崩溃。与 Branch A（硬崩溃）不同，本次挂载点保持 &quot;connected&quot; 状态。</p>
+<hr>
+<h4 id="h-假设-b文件系统-存储底层-io-故障">假设 B：文件系统 / 存储底层 I/O 故障</h4>
+<blockquote>
+<p>🧪 假设：底层存储设备异常导致 I/O 阻塞</p>
+</blockquote>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>检查项</th>
+<th>操作</th>
+<th>结论</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>内核日志</td>
+<td>检查 <code>dmesg</code> 中存储相关错误</td>
+<td>无 I/O error、SCSI/NVMe 错误</td>
+</tr>
+<tr>
+<td>系统健康度</td>
+<td>检查同一节点上其他文件系统操作</td>
+<td>其他非 FUSE 操作正常</td>
+</tr>
+<tr>
+<td>D 状态进程范围</td>
+<td>检查 D 状态进程是否仅限于 FUSE 挂载点</td>
+<td>仅有 <code>mkdir</code> 因 FUSE 死锁进入 D 状态</td>
+</tr>
+</tbody></table></div>
+<p><strong>❌ 排除</strong>：非存储硬件故障，D 状态进程仅限于 FUSE 相关操作。</p>
+<hr>
+<h4 id="h-假设-c单线程死锁-递归锁问题">假设 C：单线程死锁 / 递归锁问题</h4>
+<blockquote>
+<p>🧪 假设：单个线程中递归获取同一把锁导致死锁</p>
+</blockquote>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>检查项</th>
+<th>操作</th>
+<th>结论</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>线程数量</td>
+<td>检查守护进程线程数量</td>
+<td>多线程守护进程，两个工作线程</td>
+</tr>
+<tr>
+<td>锁顺序</td>
+<td>分析代码中锁获取顺序</td>
+<td><span class="badge-ok">Thread1: lock A → lock B; Thread2: lock B → lock A ✅</span></td>
+</tr>
+<tr>
+<td>进程状态</td>
+<td>确认多线程阻塞模式</td>
+<td>两线程均阻塞在锁等待上（<code>Sl</code> 状态）</td>
+</tr>
+</tbody></table></div>
+<p><strong>✅ 确认根因</strong>：ABBA 锁顺序反转是经典死锁模式。两个线程分别持有对方需要的锁，形成循环等待。</p>
+<hr>
+<h4 id="h-假设-dfuse-内核模块-bug-协议不匹配">假设 D：FUSE 内核模块 bug / 协议不匹配</h4>
+<blockquote>
+<p>🧪 假设：fuse 内核模块存在 bug 或 API 版本不匹配导致请求处理异常</p>
+</blockquote>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>检查项</th>
+<th>操作</th>
+<th>结论</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>FUSE API 版本</td>
+<td><code>fuse: init (API version 7.39)</code></td>
+<td>内核与守护进程协议初始化正常</td>
+</tr>
+<tr>
+<td>内核模块加载</td>
+<td>lsmod | grep fuse</td>
+<td>fuse 模块正常加载</td>
+</tr>
+<tr>
+<td>初始握手</td>
+<td>FUSE 初始化无报错</td>
+<td>连接建立正常，mount 成功</td>
+</tr>
+</tbody></table></div>
+<p><strong>❌ 排除</strong>：FUSE 内核模块正常，协议握手成功。问题出在用户态守护进程内部逻辑。</p>
+<hr>
+<h3 id="h-33-排查结论">3.3 排查结论</h3>
+<div class="code-block">
+  <span class="code-lang">text</span>
+  <button class="copy-btn" onclick="copyCode(this)" title="复制">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
+  </button>
+  <pre><code>FUSE 挂载点 (/mnt/fuse_test) 完全不可用
+│
+├─► 假设 A：守护进程崩溃          → ❌ 进程存活（Sl），排除
+│
+├─► 假设 B：存储底层 I/O 故障     → ❌ 无 I/O 错误，其他文件系统正常，排除
+│
+├─► 假设 C：锁顺序死锁            → ✅ 确认根因
+│      └─► 线程 1 持有 A 等待 B
+│      └─► 线程 2 持有 B 等待 A
+│      └─► 形成循环等待 → 永久阻塞
+│
+├─► 假设 D：FUSE 内核模块 bug     → ❌ 协议初始化成功，排除
+│
+└─► 🎯 根因确认：ABBA 锁顺序死锁</code></pre>
+</div>
+<hr>
+<h2 id="h-四修复方案">四、修复方案</h2>
+<h3 id="h-41-应急处置">4.1 应急处置</h3>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>步骤</th>
+<th>操作</th>
+<th>执行人</th>
+<th>预期效果</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>1</td>
+<td>使用 <code>kill -9 &lt;daemon_pid&gt;</code> 强制终止死锁的 FUSE 守护进程</td>
+<td>系统/人工</td>
+<td>解除死锁；FUSE 挂载点变为 &quot;Transport endpoint not connected&quot;</td>
+</tr>
+<tr>
+<td>2</td>
+<td>使用 <code>umount -l /mnt/fuse_test</code> 强制卸载挂载点</td>
+<td>系统/人工</td>
+<td>清理已断连的挂载点</td>
+</tr>
+<tr>
+<td>3</td>
+<td>恢复 D 状态进程：终止守护进程后，内核会向等待的 FUSE 请求返回错误，<code>mkdir</code> 将退出 D 状态</td>
+<td>自动恢复</td>
+<td>系统恢复稳定</td>
+</tr>
+<tr>
+<td>4</td>
+<td>重启 FUSE 守护进程并重新挂载</td>
+<td>人工</td>
+<td>恢复文件系统访问能力</td>
+</tr>
+</tbody></table></div>
+<p><strong>关键命令示例：</strong></p>
+<div class="code-block">
+  <span class="code-lang">bash</span>
+  <button class="copy-btn" onclick="copyCode(this)" title="复制">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
+  </button>
+  <pre><code># 步骤 1：查找并杀死死锁的 FUSE 守护进程
+# 假设 PID 已知
+kill -9 &lt;daemon_pid&gt;
+
+# 或通过挂载点查找
+ps aux | grep fuse_branch_E | grep -v grep | awk '{print $2}' | xargs kill -9
+
+# 步骤 2：强制卸载
+umount -l /mnt/fuse_test
+
+# 步骤 3：重新启动守护进程
+/home/wyh/fuse_branch_E /mnt/fuse_test</code></pre>
+</div>
+<h3 id="h-42-永久修复计划">4.2 永久修复计划</h3>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>修复措施</th>
+<th>负责人</th>
+<th>完成时间</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>1. 统一锁顺序</strong>：修改源码确保所有线程以相同的全局顺序获取锁（如始终 lock A → lock B），彻底消除 ABBA 死锁条件</td>
+<td>开发团队</td>
+<td>待定</td>
+</tr>
+<tr>
+<td><strong>2. 使用 trylock 超时机制</strong>：在锁获取路径中加入 <code>pthread_mutex_trylock</code> 并设定超时重试策略，打破循环等待条件</td>
+<td>开发团队</td>
+<td>待定</td>
+</tr>
+<tr>
+<td><strong>3. 实现看门狗监控</strong>：在守护进程中增加健康检查线程，监控请求处理延迟，当检测到长时间无响应时主动上报或触发恢复机制</td>
+<td>开发团队</td>
+<td>待定</td>
+</tr>
+<tr>
+<td><strong>4. 增加 FUSE 操作超时</strong>：利用 FUSE 协议中的 <code>max_background</code> 和 <code>congestion_threshold</code> 参数，限制请求排队深度；同时在客户端侧设置操作超时，避免 D 状态进程无限堆积</td>
+<td>开发团队</td>
+<td>待定</td>
+</tr>
+<tr>
+<td><strong>5. 主动死锁检测</strong>：部署用户态死锁检测工具（如 <code>lockdep</code> 风格的自旋锁检测或 <code>valgrind --tool=helgrind</code>）在开发和测试阶段捕获锁顺序问题</td>
+<td>测试团队</td>
+<td>待定</td>
+</tr>
+<tr>
+<td><strong>6. 增强可观测性</strong>：在 FUSE 守护进程中添加日志记录（锁的获取、释放、FUSE 请求处理），便于后续故障排查</td>
+<td>开发团队</td>
+<td>待定</td>
+</tr>
+</tbody></table></div>
+<h3 id="h-43-预防性建议">4.3 预防性建议</h3>
+<ul>
+<li><strong>代码审查 check-list</strong>：在所有多线程 FUSE 实现中，将&quot;所有锁按全局固定顺序获取&quot;作为强制性审查项。</li>
+<li><strong>CI 流水线集成</strong>：在持续集成中集成死锁检测（<code>helgrind</code> / <code>TSan</code>），对提交的代码自动进行线程安全分析。</li>
+<li><strong>故障注入测试</strong>：定期进行 Chaos Engineering 测试，模拟多线程并发压力场景，验证守护进程在竞争条件下的健壮性。</li>
+</ul>
+<hr>
+<h2 id="h-五关键检测指标">五、关键检测指标</h2>
+<p>以下指标可快速判断 FUSE 多线程死锁故障：</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>检测指标</th>
+<th>正常值</th>
+<th>异常值（死锁）</th>
+<th>优先级</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>sysfs waiting</code></td>
+<td>0 ~ 1（瞬时）</td>
+<td>≥ 2 且持续不降</td>
+<td>🔴 首要指标</td>
+</tr>
+<tr>
+<td>守护进程状态</td>
+<td><code>S</code>（普通睡眠）</td>
+<td><code>Sl</code>（多线程睡眠）且无处理活动</td>
+<td>🔴 首要指标</td>
+</tr>
+<tr>
+<td>FUSE 操作响应</td>
+<td>立即返回</td>
+<td>超时无响应</td>
+<td>🔴 用户可见</td>
+</tr>
+<tr>
+<td>内核 D 状态进程</td>
+<td>无</td>
+<td>存在因 FUSE 阻塞的 D 状态进程</td>
+<td>🟡 衍生指标</td>
+</tr>
+<tr>
+<td>内核日志错误</td>
+<td>无 fuse 相关错误</td>
+<td>无（区别：死锁无错误日志）</td>
+<td>🟡 区分特征</td>
+</tr>
+</tbody></table></div>
+<hr>
+<h2 id="h-六与同类故障的对比分析">六、与同类故障的对比分析</h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>维度</th>
+<th>Branch A（进程崩溃）</th>
+<th>Branch E（ABBA 死锁 - 本次）</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>守护进程存活</td>
+<td><span class="badge-err">❌ 死亡/消失</span></td>
+<td><span class="badge-ok">✅ 存活但阻塞</span></td>
+</tr>
+<tr>
+<td>挂载点状态</td>
+<td>&quot;Transport endpoint is not connected&quot;</td>
+<td>&quot;connected&quot; 但无响应</td>
+</tr>
+<tr>
+<td>错误提示</td>
+<td>立即返回错误（ECONNREFUSED）</td>
+<td>操作永久挂起（无反馈）</td>
+</tr>
+<tr>
+<td>恢复复杂度</td>
+<td>低（重启即可）</td>
+<td>低（kill 后重启），但<strong>诊断困难</strong></td>
+</tr>
+<tr>
+<td>隐蔽性</td>
+<td>低（明显报错）</td>
+<td><strong>高</strong>（无报错，仅表现为 hang）</td>
+</tr>
+<tr>
+<td>对系统影响</td>
+<td>有限（错误迅速返回）</td>
+<td>更大（D 状态进程堆积风险）</td>
+</tr>
+</tbody></table></div>
+<p>Branch E 类型的死锁故障比硬崩溃更危险——系统表面上看起来运行正常，但实际上所有操作都在静默阻塞，容易导致更大范围的资源耗尽和故障扩散。</p>
+<hr>
+<p><strong>RCA 报告路径：</strong> <code>C:\Users\86135\.witty-diagnosis-agent\baize\reports\RCA-FUSE-BranchE-Deadlock.md</code></p>
+
+    <div class="meta">
+      <span class="meta-source">RCA-FUSE-BranchE-Deadlock.md</span>
+      <span>生成于 2026/06/04 15:40</span>
+    </div>
+  </article>
+</div>
+
+<script>
+  /* ── 滚动进度条 ── */
+  window.addEventListener("scroll", () => {
+    const el  = document.documentElement;
+    const pct = el.scrollTop / (el.scrollHeight - el.clientHeight) * 100;
+    document.getElementById("progress").style.width = Math.min(pct, 100) + "%";
+  });
+
+  /* ── TOC 高亮当前章节 ── */
+  (function () {
+    const headings = Array.from(document.querySelectorAll("article h1,article h2,article h3"));
+    const links    = Array.from(document.querySelectorAll(".toc a"));
+    if (!links.length) return;
+    const obs = new IntersectionObserver(entries => {
+      entries.forEach(e => {
+        if (!e.isIntersecting) return;
+        links.forEach(l => l.classList.remove("active"));
+        const a = links.find(l => l.getAttribute("href") === "#" + e.target.id);
+        if (a) a.classList.add("active");
+      });
+    }, { rootMargin: "-10% 0px -80% 0px" });
+    headings.forEach(h => obs.observe(h));
+  })();
+
+  /* ── h2 章节序号自动计数 ── */
+  (function () {
+    let idx = 0;
+    document.querySelectorAll("article h2").forEach(el => {
+      idx++;
+      el.setAttribute("data-index", String(idx).padStart(2, "0"));
+    });
+  })();
+
+  /* ── 代码块一键复制 ── */
+  function copyCode(btn) {
+    const code = btn.closest(".code-block").querySelector("code").innerText;
+    navigator.clipboard.writeText(code).then(() => {
+      btn.classList.add("copied");
+      btn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>';
+      setTimeout(() => {
+        btn.classList.remove("copied");
+        btn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>';
+      }, 2000);
+    });
+  }
+
+  /* ── 目录树收缩/展开 ── */
+  function toggleToc(btn) {
+    const expanded = btn.getAttribute("aria-expanded") === "true";
+    btn.setAttribute("aria-expanded", String(!expanded));
+    const parentItem = btn.closest(".toc-item");
+    let nextEl = parentItem.nextElementSibling;
+    if (nextEl && nextEl.classList.contains("toc-group")) {
+      if (expanded) {
+        nextEl.style.maxHeight = nextEl.scrollHeight + "px";
+        void nextEl.offsetHeight;
+        nextEl.classList.add("collapsed");
+      } else {
+        nextEl.classList.remove("collapsed");
+        nextEl.style.maxHeight = nextEl.scrollHeight + "px";
+        setTimeout(() => {
+          if (!nextEl.classList.contains("collapsed")) {
+            nextEl.style.maxHeight = "none";
+          }
+        }, 300);
+      }
+    }
+  }
+</script>
+</body>
+</html>

@@ -1,0 +1,951 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>FUSE Fault Injection: 8-Branch Comparative Analysis</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Lora:ital,wght@0,400;0,600;1,400&family=Source+Sans+3:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  /* ── Design tokens ─────────────────────────────────────────────────────── */
+  :root {
+    --bg:          #f8f7f4;
+    --surface:     #ffffff;
+    --border:      #e8e5df;
+    --border-soft: #f0ede8;
+
+    --text:        #1c1917;
+    --text-2:      #57534e;
+    --text-3:      #a8a29e;
+
+    --accent:      #1d4e6e;
+    --accent-light:#e8f1f7;
+    --accent-mid:  #3b82a0;
+
+    --red:         #c0392b;
+    --red-bg:      #fef2f2;
+    --amber:       #92400e;
+    --amber-bg:    #fffbeb;
+    --green:       #14532d;
+    --green-bg:    #f0fdf4;
+
+    --code-bg:     #1a1d27;
+    --code-text:   #cdd6f4;
+    --code-border: #2d3148;
+
+    --font-body: "Source Sans 3", "PingFang SC", "Hiragino Sans GB", sans-serif;
+    --font-head: "Lora", "PingFang SC", Georgia, serif;
+    --font-mono: "JetBrains Mono", "Fira Code", Consolas, monospace;
+
+    --radius:    8px;
+    --radius-lg: 12px;
+    --shadow:    0 1px 3px rgba(0,0,0,.06), 0 4px 16px rgba(0,0,0,.05);
+    --shadow-lg: 0 2px 8px rgba(0,0,0,.07), 0 8px 32px rgba(0,0,0,.06);
+
+    --toc-width:   240px;
+    --gap:         32px;
+  }
+
+  /* ── Progress bar ──────────────────────────────────────────────────────── */
+  #progress {
+    position: fixed; top: 0; left: 0; height: 3px; width: 0%;
+    background: linear-gradient(90deg, var(--accent-mid), var(--accent));
+    z-index: 999; transition: width .1s linear;
+    border-radius: 0 2px 2px 0;
+  }
+
+  /* ── Base ──────────────────────────────────────────────────────────────── */
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  html { font-size: 16px; scroll-behavior: smooth; }
+  body {
+    font-family: var(--font-body);
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.8;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* ── Layout ────────────────────────────────────────────────────────────── */
+  .layout {
+    display: flex;
+    align-items: flex-start;
+    max-width: calc(var(--toc-width) + 820px + var(--gap) * 3);
+    margin: 0 auto;
+    padding: 48px var(--gap) 96px;
+    gap: var(--gap);
+  }
+
+  /* ── TOC ───────────────────────────────────────────────────────────────── */
+  .toc {
+    width: var(--toc-width);
+    flex-shrink: 0;
+    position: sticky;
+    top: 32px;
+    max-height: calc(100vh - 64px);
+    overflow-y: auto;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    padding: 20px;
+    box-shadow: var(--shadow);
+    scrollbar-width: thin;
+    scrollbar-color: var(--border) transparent;
+  }
+  .toc-title {
+    font-size: 10.5px;
+    font-weight: 600;
+    letter-spacing: .1em;
+    text-transform: uppercase;
+    color: var(--text-3);
+    margin-bottom: 12px;
+    padding-bottom: 10px;
+    border-bottom: 1px solid var(--border-soft);
+  }
+  .toc-item {
+    display: flex;
+    align-items: flex-start;
+    margin: 2px 0;
+  }
+  .toc-toggle {
+    background: none;
+    border: none;
+    cursor: pointer;
+    color: var(--text-3);
+    padding: 4px;
+    margin-right: 4px;
+    margin-top: 2px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 4px;
+    transition: background 0.2s, transform 0.2s;
+  }
+  .toc-toggle:hover { background: var(--border-soft); color: var(--text); }
+  .toc-toggle[aria-expanded="false"] svg { transform: rotate(-90deg); }
+  .toc-spacer { width: 20px; flex-shrink: 0; }
+  .toc-group { overflow: hidden; transition: max-height 0.3s ease-in-out; }
+  .toc-group.collapsed { max-height: 0 !important; }
+  
+  .toc a {
+    display: block;
+    font-size: 13px;
+    color: var(--text-2);
+    text-decoration: none;
+    padding: 4px 8px;
+    border-radius: 5px;
+    line-height: 1.45;
+    transition: background .15s, color .15s;
+    word-break: break-all;
+    flex-grow: 1;
+  }
+  .toc a:hover  { background: var(--accent-light); color: var(--accent); }
+  .toc a.active { background: var(--accent-light); color: var(--accent); font-weight: 500; }
+  .toc-l1 { font-weight: 600; color: var(--text); }
+  .toc-l2 { font-weight: 600; color: var(--text); }
+  .toc-l3 { font-size: 12px !important; padding-left: 14px !important; }
+
+  /* ── Article card ──────────────────────────────────────────────────────── */
+  .article {
+    flex: 1; min-width: 0;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    padding: 52px 60px;
+    box-shadow: var(--shadow-lg);
+  }
+
+  /* ── Headings ──────────────────────────────────────────────────────────── */
+  .title-container {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-end;
+    margin: 0 0 28px;
+    padding-bottom: 18px;
+    border-bottom: 2px solid var(--text);
+  }
+  .article h1 {
+    font-family: var(--font-head);
+    font-size: 26px; font-weight: 600; line-height: 1.3;
+    margin: 0; padding-bottom: 0;
+    border-bottom: none;
+  }
+  .article h2 {
+    font-family: var(--font-head);
+    font-size: 19px; font-weight: 600;
+    margin: 48px 0 14px; padding-bottom: 8px;
+    border-bottom: 1px solid var(--border);
+  }
+  .article h2::before {
+    content: attr(data-index);
+    display: inline-block;
+    font-family: var(--font-mono);
+    font-size: 10.5px; font-weight: 500;
+    color: var(--accent-mid);
+    background: var(--accent-light);
+    padding: 1px 7px; border-radius: 4px;
+    margin-right: 10px; vertical-align: middle;
+    letter-spacing: .05em;
+  }
+  .article h3 {
+    font-family: var(--font-head);
+    font-size: 15.5px; font-weight: 600;
+    margin: 28px 0 10px;
+  }
+  .article h3::before {
+    content: "§ ";
+    color: var(--text-3);
+    font-family: var(--font-mono); font-size: 13px;
+  }
+  .article h4 {
+    font-size: 13.5px; font-weight: 600;
+    color: var(--accent); margin: 20px 0 8px;
+  }
+
+  /* ── Body text ─────────────────────────────────────────────────────────── */
+  .article p, .plain { 
+    font-size: 15px; 
+    line-height: 1.85; 
+    color: var(--text); 
+    margin: 0 0 12px; 
+    font-family: var(--font-body);
+  }
+  .article strong { font-weight: 600; }
+  .article em     { font-style: italic; color: var(--text-2); }
+  .article a {
+    color: var(--accent); text-decoration: underline;
+    text-decoration-color: var(--accent-light);
+    text-underline-offset: 3px;
+  }
+  .article a:hover { text-decoration-color: var(--accent); }
+  .article hr { border: none; border-top: 1px solid var(--border); margin: 20px 0; }
+  .article hr.heavy { border-top: 3px solid var(--text); margin: 32px 0; }
+
+  /* ── Blockquote ────────────────────────────────────────────────────────── */
+  .article blockquote {
+    border-left: 3px solid var(--accent-mid);
+    background: var(--accent-light);
+    margin: 20px 0; padding: 13px 20px 13px 20px;
+    border-radius: 0 var(--radius) var(--radius) 0;
+  }
+  .article blockquote p { font-size: 14.5px; color: var(--accent); margin: 0; line-height: 1.7; }
+  /* 支持块引用内部保留换行符（修复头部概要换行丢失问题） */
+  .article blockquote p { white-space: pre-wrap; }
+  .article blockquote strong { color: var(--accent); }
+
+  /* ── Lists ─────────────────────────────────────────────────────────────── */
+  .article ul, .article ol { padding-left: 22px; margin: 6px 0 14px; }
+  .article li { font-size: 15px; line-height: 1.8; margin: 4px 0; }
+  .article li::marker { color: var(--accent-mid); }
+  .article li > ul, .article li > ol { margin: 3px 0; }
+
+  /* ── Inline code ───────────────────────────────────────────────────────── */
+  .article :not(pre) > code {
+    font-family: var(--font-mono);
+    font-size: 12.5px; font-weight: 500;
+    background: #f3f0eb; color: var(--red);
+    padding: 1px 5px; border-radius: 4px;
+    border: 1px solid var(--border);
+  }
+
+  /* ── Code blocks ───────────────────────────────────────────────────────── */
+  .code-block {
+    position: relative; margin: 20px 0;
+    border-radius: var(--radius-lg); overflow: hidden;
+    border: 1px solid var(--code-border);
+    box-shadow: 0 4px 20px rgba(0,0,0,.16);
+  }
+  .code-lang {
+    position: absolute; top: 0; left: 0;
+    font-family: var(--font-mono); font-size: 10px; font-weight: 500;
+    color: #7c8db5; background: #222538;
+    padding: 4px 12px; border-bottom-right-radius: 6px;
+    text-transform: uppercase; letter-spacing: .08em;
+    user-select: none;
+  }
+  .copy-btn {
+    position: absolute; top: 8px; right: 10px;
+    background: #2d3148; border: 1px solid #3d4260;
+    border-radius: 5px; color: #7c8db5; cursor: pointer;
+    padding: 5px 8px; display: flex; align-items: center;
+    transition: background .15s, color .15s; z-index: 1;
+  }
+  .copy-btn:hover  { background: #3a3f60; color: #cdd6f4; }
+  .copy-btn.copied { color: #a6e3a1; border-color: #4a6a4a; }
+  .code-block pre {
+    margin: 0; padding: 36px 20px 20px;
+    background: var(--code-bg); overflow-x: auto;
+    scrollbar-width: thin; scrollbar-color: #3d4260 transparent;
+  }
+  .code-block pre::-webkit-scrollbar { height: 5px; }
+  .code-block pre::-webkit-scrollbar-thumb { background: #3d4260; border-radius: 3px; }
+  .code-block code {
+    font-family: var(--font-mono); font-size: 13px; line-height: 1.7;
+    color: var(--code-text); background: none; border: none; padding: 0;
+    white-space: pre; word-break: normal;
+  }
+
+  /* ── Tables ────────────────────────────────────────────────────────────── */
+  .table-wrap {
+    overflow-x: auto; margin: 16px 0;
+    border-radius: var(--radius-lg);
+    border: 1px solid var(--border);
+    box-shadow: var(--shadow);
+  }
+  table { width: 100%; border-collapse: collapse; font-size: 14px; min-width: 360px; }
+  thead { background: #f4f2ee; }
+  th {
+    padding: 9px 14px; text-align: left;
+    font-size: 11.5px; font-weight: 600;
+    letter-spacing: .04em; text-transform: uppercase;
+    color: var(--text-2); border-bottom: 1px solid var(--border);
+    white-space: nowrap;
+  }
+  td {
+    padding: 8px 14px; border-bottom: 1px solid var(--border-soft);
+    color: var(--text); vertical-align: top; line-height: 1.6;
+  }
+  tbody tr:last-child td { border-bottom: none; }
+  tbody tr:nth-child(even) td { background: #faf9f7; }
+  tbody tr:hover td { background: var(--accent-light); transition: background .1s; }
+
+  /* ── KV block ──────────────────────────────────────────────────────────── */
+  .kv-block { background: var(--bg); border: 1px solid var(--border); border-radius: var(--radius-lg); overflow: hidden; margin: 12px 0 20px; }
+  .kv-row { display: flex; border-bottom: 1px solid var(--border-soft); align-items: flex-start; }
+  .kv-row:last-child { border-bottom: none; }
+  .kv-key { flex: 0 0 160px; padding: 9px 16px; font-size: 13.5px; font-weight: 600; color: var(--text-2); background: var(--surface); border-right: 1px solid var(--border-soft); }
+  .kv-val { flex: 1; padding: 9px 16px; font-size: 14px; color: var(--text); }
+
+  /* ── Status badges ─────────────────────────────────────────────────────── */
+  .badge-ok { display: inline-flex; align-items: center; gap: 4px; background: var(--green-bg); color: var(--green); font-size: 13px; font-weight: 500; padding: 2px 9px; border-radius: 20px; border: 1px solid #bbf7d0; }
+  .badge-err { display: inline-flex; align-items: center; gap: 4px; background: var(--red-bg); color: var(--red); font-size: 13px; font-weight: 500; padding: 2px 9px; border-radius: 20px; border: 1px solid #fecaca; }
+  .badge-warn { display: inline-flex; align-items: center; gap: 4px; background: var(--amber-bg); color: var(--amber); font-size: 13px; font-weight: 500; padding: 2px 9px; border-radius: 20px; border: 1px solid #fde68a; }
+
+  /* ── Priority badges ───────────────────────────────────────────────────── */
+  .pri-p0 { display: inline-block; background: #fef2f2; color: #991b1b; border: 1px solid #fca5a5; font-size: 12px; font-weight: 700; padding: 2px 8px; border-radius: 4px; letter-spacing: .04em; }
+  .pri-p1 { display: inline-block; background: #fff7ed; color: #9a3412; border: 1px solid #fdba74; font-size: 12px; font-weight: 700; padding: 2px 8px; border-radius: 4px; }
+  .pri-p2 { display: inline-block; background: #fffbeb; color: #92400e; border: 1px solid #fde68a; font-size: 12px; font-weight: 700; padding: 2px 8px; border-radius: 4px; }
+  .pri-p3 { display: inline-block; background: var(--accent-light); color: var(--accent); border: 1px solid #bfdbfe; font-size: 12px; font-weight: 700; padding: 2px 8px; border-radius: 4px; }
+
+  /* ── Fault header ──────────────────────────────────────────────────────── */
+  .fault-header { display: flex; align-items: center; gap: 12px; padding: 12px 16px; border-radius: var(--radius-lg); margin: 16px 0 8px; border: 1px solid; }
+  .fh-p0 { background: #fef2f2; border-color: #fca5a5; }
+  .fh-p1 { background: #fff7ed; border-color: #fdba74; }
+  .fh-p2 { background: #fffbeb; border-color: #fde68a; }
+  .fh-p3 { background: var(--accent-light); border-color: #bfdbfe; }
+  .fh-badge { font-family: var(--font-mono); font-size: 11px; font-weight: 700; letter-spacing: .08em; }
+  .fh-p0 .fh-badge { color: #991b1b; }
+  .fh-p1 .fh-badge { color: #9a3412; }
+  .fh-p2 .fh-badge { color: #92400e; }
+  .fh-p3 .fh-badge { color: var(--accent); }
+  .fh-rest { font-size: 14px; font-weight: 500; color: var(--text); }
+
+  /* ── Timeline ──────────────────────────────────────────────────────────── */
+  .timeline { border-left: 2px solid var(--accent-mid); margin: 16px 0 16px 8px; padding-left: 20px; }
+  .tl-row { display: flex; align-items: baseline; gap: 10px; margin: 8px 0; font-size: 13.5px; }
+  .tl-ts { font-family: var(--font-mono); font-size: 12px; color: var(--text-3); flex-shrink: 0; white-space: nowrap; }
+  .tl-tag { font-size: 11px; font-weight: 600; padding: 1px 7px; border-radius: 10px; flex-shrink: 0; background: var(--accent-light); color: var(--accent); }
+  .tl-tag.err { background: var(--red-bg); color: var(--red); }
+  .tl-tag.warn { background: var(--amber-bg); color: var(--amber); }
+  .tl-desc { color: var(--text); line-height: 1.5; }
+
+  /* ── Global warn ───────────────────────────────────────────────────────── */
+  .global-warn { background: #fef2f2; border: 1px solid #fca5a5; border-radius: var(--radius-lg); padding: 14px 18px; font-size: 14.5px; font-weight: 600; color: #991b1b; margin: 16px 0; }
+
+  /* ── Tree note ─────────────────────────────────────────────────────────── */
+  .tree-note { white-space: pre-wrap; font-family: var(--font-mono); font-size: 13.5px; line-height: 1.6; color: var(--text-2); margin: 8px 0 8px 16px; }
+
+  /* ── Disclaimer ────────────────────────────────────────────────────────── */
+  .disclaimer { background: var(--bg); border: 1px solid var(--border); border-radius: var(--radius); padding: 14px 18px; font-size: 13.5px; color: var(--text-2); font-style: italic; }
+
+  /* ── Meta footer ───────────────────────────────────────────────────────── */
+  .meta {
+    margin-top: 48px; padding-top: 16px;
+    border-top: 1px solid var(--border-soft);
+    display: flex; justify-content: space-between; align-items: center;
+    font-size: 12px; color: var(--text-3);
+  }
+  .meta-source { font-family: var(--font-mono); font-size: 11.5px; }
+
+  /* ── Brand logo ────────────────────────────────────────────────────────── */
+  .brand-logo {
+    font-family: var(--font-head);
+    font-size: 14px;
+    color: var(--text-3);
+    letter-spacing: 0.05em;
+    margin-bottom: 4px;
+    flex-shrink: 0;
+    margin-left: 16px;
+  }
+  .brand-logo strong {
+    font-weight: 600;
+    color: var(--accent);
+  }
+  @media (max-width: 900px) {
+    .title-container { flex-direction: column; align-items: flex-start; gap: 12px; }
+    .brand-logo { margin-left: 0; margin-bottom: 0; }
+  }
+  /* ── Print ─────────────────────────────────────────────────────────────── */
+  @media print {
+    body { background: white; }
+    #progress, .toc { display: none; }
+    .layout { display: block; padding: 0; }
+    .article { border: none; box-shadow: none; padding: 24px; }
+    .copy-btn { display: none; }
+    .brand-logo { margin-bottom: 0; }
+  }
+
+  /* ── Responsive ────────────────────────────────────────────────────────── */
+  @media (max-width: 900px) {
+    .toc { display: none; }
+    .article { padding: 36px 28px; }
+    .layout { padding: 24px 16px 64px; }
+  }
+  @media (max-width: 480px) {
+    .article { padding: 24px 18px; }
+    .article h1 { font-size: 22px; }
+  }
+</style>
+</head>
+<body>
+
+<div id="progress"></div>
+
+<div class="layout">
+  <nav class="toc" id="toc">
+  <div class="toc-title">目录</div>
+  <div class="toc-content">
+<div class="toc-item has-children"><button class="toc-toggle" onclick="toggleToc(this)" aria-expanded="true">
+                <svg viewBox="0 0 24 24" width="12" height="12" stroke="currentColor" stroke-width="2" fill="none"><polyline points="6 9 12 15 18 9"></polyline></svg>
+              </button><a href="#h-fuse-fault-injection-8-branch-comparative-analysis" onclick="event.preventDefault(); const target = document.getElementById('h-fuse-fault-injection-8-branch-comparative-analysis'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l1">FUSE Fault Injection: 8-Branch Comparative Analysis</a></div>
+<div class="toc-group" id="group-h-1-fault-type-classification">
+<div class="toc-item "><span class="toc-spacer"></span><a href="#h-1-fault-type-classification" onclick="event.preventDefault(); const target = document.getElementById('h-1-fault-type-classification'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l2">1. Fault Type Classification</a></div>
+<div class="toc-item "><span class="toc-spacer"></span><a href="#h-2-severity-matrix" onclick="event.preventDefault(); const target = document.getElementById('h-2-severity-matrix'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l2">2. Severity Matrix</a></div>
+<div class="toc-item has-children"><button class="toc-toggle" onclick="toggleToc(this)" aria-expanded="true">
+                <svg viewBox="0 0 24 24" width="12" height="12" stroke="currentColor" stroke-width="2" fill="none"><polyline points="6 9 12 15 18 9"></polyline></svg>
+              </button><a href="#h-3-detection-indicators-by-layer" onclick="event.preventDefault(); const target = document.getElementById('h-3-detection-indicators-by-layer'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l2">3. Detection Indicators by Layer</a></div>
+<div class="toc-group" id="group-h-sysfsfuseconnectionsnwaiting">
+<div class="toc-item "><span class="toc-spacer"></span><a href="#h-sysfsfuseconnectionsnwaiting" onclick="event.preventDefault(); const target = document.getElementById('h-sysfsfuseconnectionsnwaiting'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l3">/sys/fs/fuse/connections/N/waiting</a></div>
+<div class="toc-item "><span class="toc-spacer"></span><a href="#h-d-state-processes" onclick="event.preventDefault(); const target = document.getElementById('h-d-state-processes'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l3">D-State Processes</a></div>
+<div class="toc-item "><span class="toc-spacer"></span><a href="#h-daemon-process-state" onclick="event.preventDefault(); const target = document.getElementById('h-daemon-process-state'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l3">Daemon Process State</a></div>
+</div>
+<div class="toc-item has-children"><button class="toc-toggle" onclick="toggleToc(this)" aria-expanded="true">
+                <svg viewBox="0 0 24 24" width="12" height="12" stroke="currentColor" stroke-width="2" fill="none"><polyline points="6 9 12 15 18 9"></polyline></svg>
+              </button><a href="#h-4-key-diagnostic-insights" onclick="event.preventDefault(); const target = document.getElementById('h-4-key-diagnostic-insights'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l2">4. Key Diagnostic Insights</a></div>
+<div class="toc-group" id="group-h-most-dangerous-branch-d-h-silent-data-corruption">
+<div class="toc-item "><span class="toc-spacer"></span><a href="#h-most-dangerous-branch-d-h-silent-data-corruption" onclick="event.preventDefault(); const target = document.getElementById('h-most-dangerous-branch-d-h-silent-data-corruption'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l3">Most Dangerous: Branch D & H (Silent Data Corruption)</a></div>
+<div class="toc-item "><span class="toc-spacer"></span><a href="#h-most-difficult-to-diagnose-branch-e-deadlock" onclick="event.preventDefault(); const target = document.getElementById('h-most-difficult-to-diagnose-branch-e-deadlock'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l3">Most Difficult to Diagnose: Branch E (Deadlock)</a></div>
+<div class="toc-item "><span class="toc-spacer"></span><a href="#h-most-deceptive-branch-h-compound" onclick="event.preventDefault(); const target = document.getElementById('h-most-deceptive-branch-h-compound'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l3">Most Deceptive: Branch H (Compound)</a></div>
+</div>
+<div class="toc-item "><span class="toc-spacer"></span><a href="#h-5-recovery-complexity" onclick="event.preventDefault(); const target = document.getElementById('h-5-recovery-complexity'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l2">5. Recovery Complexity</a></div>
+<div class="toc-item "><span class="toc-spacer"></span><a href="#h-6-wsl2-specific-observations" onclick="event.preventDefault(); const target = document.getElementById('h-6-wsl2-specific-observations'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l2">6. WSL2-Specific Observations</a></div>
+<div class="toc-item "><span class="toc-spacer"></span><a href="#h-generated-reports-summary" onclick="event.preventDefault(); const target = document.getElementById('h-generated-reports-summary'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l2">Generated Reports Summary</a></div>
+</div>
+  </div>
+</nav>
+  <article class="article" id="article" style="position: relative;">
+    <div class="title-container"><h1 id="h-fuse-fault-injection-8-branch-comparative-analysis">FUSE Fault Injection: 8-Branch Comparative Analysis</h1><div class="brand-logo">by <strong>Witty Diagnosis Agent</strong></div></div>
+<blockquote>
+<p><strong>Experiment</strong>: WSL2 (Kernel 6.6.114.1, FUSE API 7.39) — All faults injected via custom C daemons
+<strong>Date</strong>: 2026-06-04
+<strong>Platform</strong>: Ubuntu 22.04 WSL2, x86_64</p>
+</blockquote>
+<hr>
+<h2 id="h-1-fault-type-classification">1. Fault Type Classification</h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>Branch</th>
+<th>Fault Class</th>
+<th>Subclass</th>
+<th>Root Cause</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>A</strong></td>
+<td>⚡ Crash</td>
+<td>Daemon exits/terminates</td>
+<td><code>pause()</code> after INIT — daemon never enters request loop</td>
+</tr>
+<tr>
+<td><strong>B</strong></td>
+<td>🐌 Performance</td>
+<td>Slow processing</td>
+<td><code>usleep(2000000)</code> before every reply — 2s per operation</td>
+</tr>
+<tr>
+<td><strong>C</strong></td>
+<td>🔧 Protocol</td>
+<td>Protocol constraint misconfig</td>
+<td><code>max_readahead=4096</code> + empty readdir responses</td>
+</tr>
+<tr>
+<td><strong>D</strong></td>
+<td>💥 Data Integrity</td>
+<td>Silent data corruption</td>
+<td>Write returns success but data dropped; reads return zeros</td>
+</tr>
+<tr>
+<td><strong>E</strong></td>
+<td>🔒 Deadlock</td>
+<td>ABBA lock order</td>
+<td>Two threads acquire locks in opposite order</td>
+</tr>
+<tr>
+<td><strong>F</strong></td>
+<td>🚫 Access Control</td>
+<td>Device permission</td>
+<td><code>/dev/fuse</code> changed from 0666 → 0600</td>
+</tr>
+<tr>
+<td><strong>G</strong></td>
+<td>📋 Baseline</td>
+<td>No fault</td>
+<td>Static analysis of kernel FUSE module</td>
+</tr>
+<tr>
+<td><strong>H</strong></td>
+<td>🌀 Compound</td>
+<td>Slow + Data loss</td>
+<td>2s delay + writeback cache + silent data drop</td>
+</tr>
+</tbody></table></div>
+<hr>
+<h2 id="h-2-severity-matrix">2. Severity Matrix</h2>
+<div class="code-block">
+  
+  <button class="copy-btn" onclick="copyCode(this)" title="复制">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
+  </button>
+  <pre><code>                    Impact
+                    Low ──────────────► High
+                    │
+                    │    F (Access)   D (Data Loss)
+                    │                 H (Mixed)
+    Difficulty      │
+    of Detection    │    C (Protocol)
+                    │
+                    ▼    B (Slow)     E (Deadlock)
+                    │                 A (Crash)
+                    │
+                    │    G (Baseline)
+                    │
+                    Easy              Hard
+                    ◄─────────────────►
+                    Detection</code></pre>
+</div>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>Branch</th>
+<th>Severity</th>
+<th>Detection Difficulty</th>
+<th>User Visibility</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>A</strong> (Crash)</td>
+<td>P1</td>
+<td>🔴 Easy</td>
+<td>Immediate error message</td>
+</tr>
+<tr>
+<td><strong>B</strong> (Slow)</td>
+<td>P2</td>
+<td>🟡 Medium</td>
+<td>Operations timeout</td>
+</tr>
+<tr>
+<td><strong>C</strong> (Protocol)</td>
+<td>P2</td>
+<td>🟡 Medium</td>
+<td>Timeout (looks like crash)</td>
+</tr>
+<tr>
+<td><strong>D</strong> (Data Loss)</td>
+<td><strong>P0</strong></td>
+<td>🔴🔴 <strong>Hard</strong></td>
+<td><strong>No visible error</strong></td>
+</tr>
+<tr>
+<td><strong>E</strong> (Deadlock)</td>
+<td>P2</td>
+<td>🔴🔴 <strong>Hard</strong></td>
+<td>Process hang (no error msg)</td>
+</tr>
+<tr>
+<td><strong>F</strong> (Access)</td>
+<td>P3</td>
+<td>🟢 Easy</td>
+<td>Permission denied</td>
+</tr>
+<tr>
+<td><strong>G</strong> (Baseline)</td>
+<td>Info</td>
+<td>N/A</td>
+<td>No fault</td>
+</tr>
+<tr>
+<td><strong>H</strong> (Mixed)</td>
+<td><strong>P0</strong></td>
+<td>🔴🔴🔴 <strong>Very Hard</strong></td>
+<td>Performance issue masks data loss</td>
+</tr>
+</tbody></table></div>
+<hr>
+<h2 id="h-3-detection-indicators-by-layer">3. Detection Indicators by Layer</h2>
+<h3 id="h-sysfsfuseconnectionsnwaiting">/sys/fs/fuse/connections/N/waiting</h3>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>Branch</th>
+<th>Baseline</th>
+<th>During Access</th>
+<th>Behavior</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>A (Hang)</td>
+<td>1</td>
+<td>N/A (disconnected)</td>
+<td>Mount dies immediately</td>
+</tr>
+<tr>
+<td>B (Slow)</td>
+<td>1</td>
+<td>1</td>
+<td>Steady — daemon reads but delays reply</td>
+</tr>
+<tr>
+<td>C (Proto)</td>
+<td>1</td>
+<td>1</td>
+<td>Steady — daemon handles reqs but sends empty data</td>
+</tr>
+<tr>
+<td>D (Writeback)</td>
+<td>1</td>
+<td>1</td>
+<td>Steady — daemon responds but corrupts data</td>
+</tr>
+<tr>
+<td>E (Deadlock)</td>
+<td>1</td>
+<td><strong>2</strong></td>
+<td><strong>Elevated</strong> — requests pile up on deadlocked threads</td>
+</tr>
+<tr>
+<td>H (Mixed)</td>
+<td>1</td>
+<td>1</td>
+<td>Steady — same as B/D individually</td>
+</tr>
+</tbody></table></div>
+<h3 id="h-d-state-processes">D-State Processes</h3>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>Branch</th>
+<th>D-State Detected?</th>
+<th>Details</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>A (Hang)</td>
+<td>No</td>
+<td>Mount disconnected immediately</td>
+</tr>
+<tr>
+<td>B (Slow)</td>
+<td>No</td>
+<td>Timeout catches operations before D state</td>
+</tr>
+<tr>
+<td>C (Proto)</td>
+<td>No</td>
+<td>Same as B</td>
+</tr>
+<tr>
+<td>D (Writeback)</td>
+<td>No</td>
+<td>Daemon responds normally</td>
+</tr>
+<tr>
+<td><strong>E (Deadlock)</strong></td>
+<td><strong>✅ Yes</strong></td>
+<td><code>mkdir</code> stuck in D state — kernel can&#39;t make progress</td>
+</tr>
+<tr>
+<td>H (Mixed)</td>
+<td>No</td>
+<td>Timeout catches it</td>
+</tr>
+</tbody></table></div>
+<h3 id="h-daemon-process-state">Daemon Process State</h3>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>Branch</th>
+<th>State</th>
+<th>Meaning</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>A</td>
+<td>—</td>
+<td>Dead (no process)</td>
+</tr>
+<tr>
+<td>B</td>
+<td>S</td>
+<td>Sleeping (normal)</td>
+</tr>
+<tr>
+<td>C</td>
+<td>S</td>
+<td>Sleeping (normal)</td>
+</tr>
+<tr>
+<td>D</td>
+<td>S</td>
+<td>Sleeping (normal)</td>
+</tr>
+<tr>
+<td><strong>E</strong></td>
+<td><strong>Sl</strong></td>
+<td><strong>Multi-threaded + sleeping in lock</strong></td>
+</tr>
+<tr>
+<td>H</td>
+<td>S</td>
+<td>Sleeping (normal)</td>
+</tr>
+</tbody></table></div>
+<hr>
+<h2 id="h-4-key-diagnostic-insights">4. Key Diagnostic Insights</h2>
+<h3 id="h-most-dangerous-branch-d-h-silent-data-corruption">Most Dangerous: Branch D & H (Silent Data Corruption)</h3>
+<p>Unlike crash or hang scenarios where something visibly breaks, <strong>data corruption faults produce no error signals</strong>. The daemon reports success for every write, but the data is never persisted. Key characteristics:</p>
+<ul>
+<li><strong>No kernel messages</strong> (dmesg is clean)</li>
+<li><strong>No D-state processes</strong></li>
+<li><strong>Daemon appears healthy</strong> (S state)</li>
+<li><strong>waiting count normal</strong> (1)</li>
+<li><strong>Application sees success</strong> — writes return OK</li>
+</ul>
+<p><strong>Detection requires</strong>: Checksum verification, read-after-write comparison, or data integrity checks at the application layer.</p>
+<h3 id="h-most-difficult-to-diagnose-branch-e-deadlock">Most Difficult to Diagnose: Branch E (Deadlock)</h3>
+<p>The ABBA deadlock keeps the daemon alive but completely stops processing. Unlike a crash (which gives an immediate error), deadlock manifests as a <strong>silent hang</strong>:</p>
+<ul>
+<li><code>sysfs waiting</code> <strong>elevated to 2+</strong> (unique indicator)</li>
+<li>Daemon shows <strong><code>Sl</code> state</strong> (not just <code>S</code>)</li>
+<li><strong>D-state processes</strong> accumulate over time</li>
+<li>No error messages anywhere in the system</li>
+</ul>
+<h3 id="h-most-deceptive-branch-h-compound">Most Deceptive: Branch H (Compound)</h3>
+<p>Combining slow processing with data corruption creates a <strong>diagnostic trap</strong> — operators observing slow performance will focus on the latency issue, never suspecting that data is also being silently corrupted. The two symptoms create a &quot;smoke screen&quot; effect.</p>
+<hr>
+<h2 id="h-5-recovery-complexity">5. Recovery Complexity</h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>Branch</th>
+<th>Recovery Steps</th>
+<th>Complexity</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>A</strong></td>
+<td><code>kill daemon</code> → <code>umount</code> → restart</td>
+<td>🟢 Easy</td>
+</tr>
+<tr>
+<td><strong>B</strong></td>
+<td>Fix daemon logic (remove delay)</td>
+<td>🟢 Easy (code fix)</td>
+</tr>
+<tr>
+<td><strong>C</strong></td>
+<td>Fix INIT response (increase max_read) + add readdir data</td>
+<td>🟢 Easy (code fix)</td>
+</tr>
+<tr>
+<td><strong>D</strong></td>
+<td>Fix write handler to actually store data</td>
+<td>🟢 Easy (code fix)</td>
+</tr>
+<tr>
+<td><strong>E</strong></td>
+<td><code>kill -9</code> → <code>umount</code> → fix lock order</td>
+<td>🟡 Medium (kill + code fix)</td>
+</tr>
+<tr>
+<td><strong>F</strong></td>
+<td><code>chmod 0666 /dev/fuse</code></td>
+<td>🟢 Trivial</td>
+</tr>
+<tr>
+<td><strong>G</strong></td>
+<td>N/A (baseline)</td>
+<td>—</td>
+</tr>
+<tr>
+<td><strong>H</strong></td>
+<td>Fix both delay AND write handler</td>
+<td>🟡 Medium (compound fix)</td>
+</tr>
+</tbody></table></div>
+<hr>
+<h2 id="h-6-wsl2-specific-observations">6. WSL2-Specific Observations</h2>
+<ol>
+<li><strong>Buffer size sensitivity</strong>: <code>read(/dev/fuse)</code> requires ≥8192 byte buffer on WSL2 — this is NOT true on standard Linux kernel deployments</li>
+<li><strong>&quot;Transport endpoint&quot; vs &quot;EIO&quot;</strong>: WSL2 returns <code>ENOTCONN</code> on dead mounts; standard Linux returns <code>EIO</code> — different error semantics</li>
+<li><strong>FUSE compiled in</strong>: <code>CONFIG_FUSE_FS=y</code> — cannot unload/reload the module (would be <code>m</code> in modular kernels)</li>
+<li><strong><code>/dev/fuse</code> world-writable</strong> (0666) by default — same as standard Linux, but notable for WSL2 where container isolation is different</li>
+<li><strong>Mount persistence</strong>: Dead FUSE mounts persist in the mount table even after daemon death — <code>umount -l</code> required for cleanup</li>
+</ol>
+<hr>
+<h2 id="h-generated-reports-summary">Generated Reports Summary</h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>#</th>
+<th>Branch</th>
+<th>Markdown</th>
+<th>HTML</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>1</td>
+<td>A — Daemon Hang</td>
+<td><code>FUSE文件系统daemon挂起_20260604_064549_report.md</code></td>
+<td><code>.html</code></td>
+</tr>
+<tr>
+<td>2</td>
+<td>B — Slow Processing</td>
+<td><code>RCA-FUSE-BranchB-SlowProcessing.md</code></td>
+<td><code>.html</code></td>
+</tr>
+<tr>
+<td>3</td>
+<td>C — MaxRead Constraint</td>
+<td><code>RCA-FUSE-BranchC-MaxReadConstraint.md</code></td>
+<td><code>.html</code></td>
+</tr>
+<tr>
+<td>4</td>
+<td>D — Writeback Data Loss</td>
+<td><code>RCA-FUSE-BranchD-WritebackDataLoss.md</code></td>
+<td><code>.html</code></td>
+</tr>
+<tr>
+<td>5</td>
+<td>E — ABBA Deadlock</td>
+<td><code>RCA-FUSE-BranchE-Deadlock.md</code></td>
+<td><code>.html</code></td>
+</tr>
+<tr>
+<td>6</td>
+<td>F — Permission Denied</td>
+<td><code>RCA-FUSE-BranchF-Permission.md</code></td>
+<td><code>.html</code></td>
+</tr>
+<tr>
+<td>7</td>
+<td>G — Kernel Baseline</td>
+<td><code>RCA-FUSE-BranchG-KernelBaseline.md</code></td>
+<td><code>.html</code></td>
+</tr>
+<tr>
+<td>8</td>
+<td>H — Mixed Compound</td>
+<td><code>RCA-FUSE-BranchH-MixedCompound.md</code></td>
+<td><code>.html</code></td>
+</tr>
+<tr>
+<td>—</td>
+<td><strong>This Comparison</strong></td>
+<td><code>FUSE-8Branch-Comparison-Report.md</code></td>
+<td>—</td>
+</tr>
+</tbody></table></div>
+<p>All reports: <code>C:\Users\86135\.witty-diagnosis-agent\baize\reports\</code></p>
+
+    <div class="meta">
+      <span class="meta-source">FUSE-8Branch-Comparison-Report.md</span>
+      <span>生成于 2026/06/04 15:52</span>
+    </div>
+  </article>
+</div>
+
+<script>
+  /* ── 滚动进度条 ── */
+  window.addEventListener("scroll", () => {
+    const el  = document.documentElement;
+    const pct = el.scrollTop / (el.scrollHeight - el.clientHeight) * 100;
+    document.getElementById("progress").style.width = Math.min(pct, 100) + "%";
+  });
+
+  /* ── TOC 高亮当前章节 ── */
+  (function () {
+    const headings = Array.from(document.querySelectorAll("article h1,article h2,article h3"));
+    const links    = Array.from(document.querySelectorAll(".toc a"));
+    if (!links.length) return;
+    const obs = new IntersectionObserver(entries => {
+      entries.forEach(e => {
+        if (!e.isIntersecting) return;
+        links.forEach(l => l.classList.remove("active"));
+        const a = links.find(l => l.getAttribute("href") === "#" + e.target.id);
+        if (a) a.classList.add("active");
+      });
+    }, { rootMargin: "-10% 0px -80% 0px" });
+    headings.forEach(h => obs.observe(h));
+  })();
+
+  /* ── h2 章节序号自动计数 ── */
+  (function () {
+    let idx = 0;
+    document.querySelectorAll("article h2").forEach(el => {
+      idx++;
+      el.setAttribute("data-index", String(idx).padStart(2, "0"));
+    });
+  })();
+
+  /* ── 代码块一键复制 ── */
+  function copyCode(btn) {
+    const code = btn.closest(".code-block").querySelector("code").innerText;
+    navigator.clipboard.writeText(code).then(() => {
+      btn.classList.add("copied");
+      btn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>';
+      setTimeout(() => {
+        btn.classList.remove("copied");
+        btn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>';
+      }, 2000);
+    });
+  }
+
+  /* ── 目录树收缩/展开 ── */
+  function toggleToc(btn) {
+    const expanded = btn.getAttribute("aria-expanded") === "true";
+    btn.setAttribute("aria-expanded", String(!expanded));
+    const parentItem = btn.closest(".toc-item");
+    let nextEl = parentItem.nextElementSibling;
+    if (nextEl && nextEl.classList.contains("toc-group")) {
+      if (expanded) {
+        nextEl.style.maxHeight = nextEl.scrollHeight + "px";
+        void nextEl.offsetHeight;
+        nextEl.classList.add("collapsed");
+      } else {
+        nextEl.classList.remove("collapsed");
+        nextEl.style.maxHeight = nextEl.scrollHeight + "px";
+        setTimeout(() => {
+          if (!nextEl.classList.contains("collapsed")) {
+            nextEl.style.maxHeight = "none";
+          }
+        }, 300);
+      }
+    }
+  }
+</script>
+</body>
+</html>
