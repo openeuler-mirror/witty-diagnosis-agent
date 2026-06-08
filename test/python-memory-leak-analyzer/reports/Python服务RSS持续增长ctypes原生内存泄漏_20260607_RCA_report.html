@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>故障诊断报告 — Python 多源竞争内存泄漏</title>
+<title>故障诊断报告</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Lora:ital,wght@0,400;0,600;1,400&family=Source+Sans+3:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
@@ -417,7 +417,7 @@
   <div class="toc-content">
 <div class="toc-item has-children"><button class="toc-toggle" onclick="toggleToc(this)" aria-expanded="true">
                 <svg viewBox="0 0 24 24" width="12" height="12" stroke="currentColor" stroke-width="2" fill="none"><polyline points="6 9 12 15 18 9"></polyline></svg>
-              </button><a href="#h-故障诊断报告-python-多源竞争内存泄漏" onclick="event.preventDefault(); const target = document.getElementById('h-故障诊断报告-python-多源竞争内存泄漏'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l1">🔴 故障诊断报告 — Python 多源竞争内存泄漏</a></div>
+              </button><a href="#h-故障诊断报告" onclick="event.preventDefault(); const target = document.getElementById('h-故障诊断报告'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l1">🔴 故障诊断报告</a></div>
 <div class="toc-group" id="group-h-一故障概览">
 <div class="toc-item has-children"><button class="toc-toggle" onclick="toggleToc(this)" aria-expanded="true">
                 <svg viewBox="0 0 24 24" width="12" height="12" stroke="currentColor" stroke-width="2" fill="none"><polyline points="6 9 12 15 18 9"></polyline></svg>
@@ -442,45 +442,39 @@
 </div>
 <div class="toc-item has-children"><button class="toc-toggle" onclick="toggleToc(this)" aria-expanded="true">
                 <svg viewBox="0 0 24 24" width="12" height="12" stroke="currentColor" stroke-width="2" fill="none"><polyline points="6 9 12 15 18 9"></polyline></svg>
-              </button><a href="#h-四领域扩展分析-python-内存泄漏深度分析" onclick="event.preventDefault(); const target = document.getElementById('h-四领域扩展分析-python-内存泄漏深度分析'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l2">四、领域扩展分析 — Python 内存泄漏深度分析</a></div>
-<div class="toc-group" id="group-h-41-证据对账总闸门correlationjson">
-<div class="toc-item "><span class="toc-spacer"></span><a href="#h-41-证据对账总闸门correlationjson" onclick="event.preventDefault(); const target = document.getElementById('h-41-证据对账总闸门correlationjson'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l3">4.1 证据对账总闸门（correlation.json）</a></div>
-<div class="toc-item "><span class="toc-spacer"></span><a href="#h-42-对象增长定界objectgrowthjson" onclick="event.preventDefault(); const target = document.getElementById('h-42-对象增长定界objectgrowthjson'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l3">4.2 对象增长定界（object_growth.json）</a></div>
-<div class="toc-item "><span class="toc-spacer"></span><a href="#h-43-语义保留信号semanticjson" onclick="event.preventDefault(); const target = document.getElementById('h-43-语义保留信号semanticjson'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l3">4.3 语义保留信号（semantic.json）</a></div>
-<div class="toc-item "><span class="toc-spacer"></span><a href="#h-44-分配热点tracemallocjson" onclick="event.preventDefault(); const target = document.getElementById('h-44-分配热点tracemallocjson'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l3">4.4 分配热点（tracemalloc.json）</a></div>
-<div class="toc-item "><span class="toc-spacer"></span><a href="#h-45-保留链retentionjson" onclick="event.preventDefault(); const target = document.getElementById('h-45-保留链retentionjson'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l3">4.5 保留链（retention.json）</a></div>
-<div class="toc-item "><span class="toc-spacer"></span><a href="#h-46-验证门结果" onclick="event.preventDefault(); const target = document.getElementById('h-46-验证门结果'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l3">4.6 验证门结果</a></div>
+              </button><a href="#h-四领域扩展分析-三层证据交叉验证" onclick="event.preventDefault(); const target = document.getElementById('h-四领域扩展分析-三层证据交叉验证'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l2">四、领域扩展分析 — 三层证据交叉验证</a></div>
+<div class="toc-group" id="group-h-证据层-1t1-原生内存分配增长诊断python-memory-leak-analyzer">
+<div class="toc-item "><span class="toc-spacer"></span><a href="#h-证据层-1t1-原生内存分配增长诊断python-memory-leak-analyzer" onclick="event.preventDefault(); const target = document.getElementById('h-证据层-1t1-原生内存分配增长诊断python-memory-leak-analyzer'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l3">证据层 1：T1 — 原生内存分配增长诊断（python-memory-leak-analyzer）</a></div>
+<div class="toc-item "><span class="toc-spacer"></span><a href="#h-证据层-2t2-python-对象保留泄漏验证" onclick="event.preventDefault(); const target = document.getElementById('h-证据层-2t2-python-对象保留泄漏验证'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l3">证据层 2：T2 — Python 对象保留泄漏验证</a></div>
+<div class="toc-item "><span class="toc-spacer"></span><a href="#h-证据层-3t3-内存碎片-分配器消耗分析" onclick="event.preventDefault(); const target = document.getElementById('h-证据层-3t3-内存碎片-分配器消耗分析'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l3">证据层 3：T3 — 内存碎片 / 分配器消耗分析</a></div>
+<div class="toc-item "><span class="toc-spacer"></span><a href="#h-三报告对照总结" onclick="event.preventDefault(); const target = document.getElementById('h-三报告对照总结'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l3">三报告对照总结</a></div>
 </div>
 <div class="toc-item has-children"><button class="toc-toggle" onclick="toggleToc(this)" aria-expanded="true">
                 <svg viewBox="0 0 24 24" width="12" height="12" stroke="currentColor" stroke-width="2" fill="none"><polyline points="6 9 12 15 18 9"></polyline></svg>
               </button><a href="#h-五修复方案" onclick="event.preventDefault(); const target = document.getElementById('h-五修复方案'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l2">五、修复方案</a></div>
 <div class="toc-group" id="group-h-51-应急处置">
 <div class="toc-item "><span class="toc-spacer"></span><a href="#h-51-应急处置" onclick="event.preventDefault(); const target = document.getElementById('h-51-应急处置'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l3">5.1 应急处置</a></div>
-<div class="toc-item "><span class="toc-spacer"></span><a href="#h-52-最小修复listeners-主导泄漏源" onclick="event.preventDefault(); const target = document.getElementById('h-52-最小修复listeners-主导泄漏源'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l3">5.2 最小修复（LISTENERS — 主导泄漏源）</a></div>
-<div class="toc-item "><span class="toc-spacer"></span><a href="#h-53-根本修复tenantlookup-竞争泄漏源" onclick="event.preventDefault(); const target = document.getElementById('h-53-根本修复tenantlookup-竞争泄漏源'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l3">5.3 根本修复（tenant_lookup — 竞争泄漏源）</a></div>
-<div class="toc-item "><span class="toc-spacer"></span><a href="#h-54-smallglobal-可忽略" onclick="event.preventDefault(); const target = document.getElementById('h-54-smallglobal-可忽略'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l3">5.4 SMALL_GLOBAL — 可忽略</a></div>
-<div class="toc-item "><span class="toc-spacer"></span><a href="#h-55-修复计划汇总" onclick="event.preventDefault(); const target = document.getElementById('h-55-修复计划汇总'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l3">5.5 修复计划汇总</a></div>
-<div class="toc-item "><span class="toc-spacer"></span><a href="#h-56-风险" onclick="event.preventDefault(); const target = document.getElementById('h-56-风险'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l3">5.6 风险</a></div>
+<div class="toc-item "><span class="toc-spacer"></span><a href="#h-52-永久修复计划" onclick="event.preventDefault(); const target = document.getElementById('h-52-永久修复计划'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l3">5.2 永久修复计划</a></div>
+<div class="toc-item "><span class="toc-spacer"></span><a href="#h-53-后续验证建议需单独授权" onclick="event.preventDefault(); const target = document.getElementById('h-53-后续验证建议需单独授权'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l3">5.3 后续验证建议（需单独授权）</a></div>
 </div>
 <div class="toc-item has-children"><button class="toc-toggle" onclick="toggleToc(this)" aria-expanded="true">
                 <svg viewBox="0 0 24 24" width="12" height="12" stroke="currentColor" stroke-width="2" fill="none"><polyline points="6 9 12 15 18 9"></polyline></svg>
-              </button><a href="#h-六复测方案" onclick="event.preventDefault(); const target = document.getElementById('h-六复测方案'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l2">六、复测方案</a></div>
-<div class="toc-group" id="group-h-61-复现命令">
-<div class="toc-item "><span class="toc-spacer"></span><a href="#h-61-复现命令" onclick="event.preventDefault(); const target = document.getElementById('h-61-复现命令'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l3">6.1 复现命令</a></div>
-<div class="toc-item "><span class="toc-spacer"></span><a href="#h-62-修复后期望指标" onclick="event.preventDefault(); const target = document.getElementById('h-62-修复后期望指标'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l3">6.2 修复后期望指标</a></div>
-<div class="toc-item "><span class="toc-spacer"></span><a href="#h-63-通过条件" onclick="event.preventDefault(); const target = document.getElementById('h-63-通过条件'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l3">6.3 通过条件</a></div>
+              </button><a href="#h-附录" onclick="event.preventDefault(); const target = document.getElementById('h-附录'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l2">附录</a></div>
+<div class="toc-group" id="group-h-a-环境信息">
+<div class="toc-item "><span class="toc-spacer"></span><a href="#h-a-环境信息" onclick="event.preventDefault(); const target = document.getElementById('h-a-环境信息'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l3">A. 环境信息</a></div>
+<div class="toc-item "><span class="toc-spacer"></span><a href="#h-b-术语表" onclick="event.preventDefault(); const target = document.getElementById('h-b-术语表'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l3">B. 术语表</a></div>
+<div class="toc-item "><span class="toc-spacer"></span><a href="#h-c-证据文件索引" onclick="event.preventDefault(); const target = document.getElementById('h-c-证据文件索引'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l3">C. 证据文件索引</a></div>
 </div>
-<div class="toc-item "><span class="toc-spacer"></span><a href="#h-诊断质量自查" onclick="event.preventDefault(); const target = document.getElementById('h-诊断质量自查'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l2">诊断质量自查</a></div>
 </div>
   </div>
 </nav>
   <article class="article" id="article" style="position: relative;">
-    <div class="title-container"><h1 id="h-故障诊断报告-python-多源竞争内存泄漏">🔴 故障诊断报告 — Python 多源竞争内存泄漏</h1><div class="brand-logo">by <strong>Witty Diagnosis Agent</strong></div></div>
+    <div class="title-container"><h1 id="h-故障诊断报告">🔴 故障诊断报告</h1><div class="brand-logo">by <strong>Witty Diagnosis Agent</strong></div></div>
 <blockquote>
-<p><strong>报告编号</strong>: RCA-20260604-001
-<strong>故障级别</strong>: P2（内存持续增长类，非突变性故障，但累计影响大）
-<strong>报告时间</strong>: 2026-06-04 14:30:00
-<strong>当前状态</strong>: 🟡 观察中（已在沙箱确认根因，待修复后复测）</p>
+<p><strong>报告编号</strong>: RCA-20260607-001
+<strong>故障级别</strong>: P2（内存资源持续消耗，存在 OOM 风险）
+<strong>报告时间</strong>: 2026-06-07 22:50:00
+<strong>当前状态</strong>: 🔴 处理中</p>
 </blockquote>
 <hr>
 <h2 id="h-一故障概览">一、故障概览</h2>
@@ -493,27 +487,27 @@
 </thead>
 <tbody><tr>
 <td>故障标题</td>
-<td>Python 多源竞争内存泄漏 — LISTENERS 全局注册表 + tenant_lookup 无界缓存叠加增长</td>
+<td>Python 服务 RSS 持续增长 — ctypes native 内存分配未释放导致</td>
 </tr>
 <tr>
 <td>影响范围</td>
-<td><code>multi_source_mismatch</code> workload 进程，涉及 LargeTenant 实例创建、全局回调注册、缓存子系统</td>
+<td>目标进程 PID 417（<code>python native_ctypes_malloc_growth.py --live</code>），单进程单线程模式</td>
 </tr>
 <tr>
 <td>故障时段</td>
-<td>证据文件生成时间 ~ 2026-06-04 11:59:30 ～ 11:59:32（600 次迭代持续累积泄漏）</td>
+<td>2026-06-07 14:33:55 ~ 14:34:04（数据采集窗口 3.5 秒）</td>
 </tr>
 <tr>
 <td>根本原因</td>
-<td>模块级全局变量 <code>LISTENERS</code> 以强引用持有 LargeTenant 实例的 bound method，未实现在实例销毁时自动 unregister，导致 bound method 和 LargeTenant 实例无法被 GC 回收；叠加 <code>tenant_lookup</code> 无界缓存（maxsize=None）持续累积条目，形成双源竞争泄漏</td>
+<td>ctypes 通过 <code>libc.malloc()</code> 分配 native 原生内存后，glibc/ptmalloc 分配器未将释放的内存页归还给操作系统，导致 RSS 与 Private_Dirty 持续线性攀升，Python 堆增长仅占总增长的 0.7%</td>
 </tr>
 <tr>
 <td>是否恢复</td>
-<td><span class="badge-err">❌ 未恢复（发现时已在沙箱复现确认，尚未执行修复）</span></td>
+<td><span class="badge-err">❌ 未恢复（持续增长中，未执行任何修复操作）</span></td>
 </tr>
 <tr>
 <td>根因置信度</td>
-<td>🟢 高置信（对 LISTENERS 主导泄漏源：G3 反事实通过，clear LISTENERS 后 100% 回收；tenant_lookup 次要源：中等置信，缺少独立保留链证据）</td>
+<td>🟡 中置信（方向级：确认为 native/allocator 方向，但缺少 native allocation stack 精确定位）</td>
 </tr>
 </tbody></table></div>
 <h3 id="h-置信度说明">置信度说明</h3>
@@ -523,20 +517,20 @@
 <th>等级</th>
 <th>标识</th>
 <th>含义</th>
-<th>本报告适用</th>
+<th>对应本故障</th>
 </tr>
 </thead>
 <tbody><tr>
 <td>高置信</td>
 <td>🟢</td>
 <td>根因已明确，可复现，单一原因可解释所有现象</td>
-<td>LISTENERS 主导泄漏源 — 反事实已确认</td>
+<td>—</td>
 </tr>
 <tr>
 <td>中置信</td>
 <td>🟡</td>
 <td>根因基本确认，但存在 1～2 个无法完全解释的现象</td>
-<td>tenant_lookup 次要泄漏源 — 无独立保留链证据</td>
+<td>缺少 native allocation stack 和 allocator stats，无法区分具体 C 函数和 arena 内部碎片</td>
 </tr>
 <tr>
 <td>低置信</td>
@@ -559,36 +553,37 @@
   <button class="copy-btn" onclick="copyCode(this)" title="复制">
     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
   </button>
-  <pre><code>时间                             事件                                                 性质          溯源路径
-──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
-2026-06-04 11:59:30           workload 启动，0 次迭代基线                             📈 初始状态     [kuafu_T1_...:68-69]
+  <pre><code>时间                                  事件                                           性质          证据来源
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+2026-06-07 14:33:55  进程启动，RSS 基准 25.69 MiB，Private_Dirty 18.70 MiB               ▶ 初始状态   [T1:monitor_rss_pid.json]
   │
   ▼
-迭代 0→150                    三种泄漏源开始积累                                        ⚠️ 隐患激活
+2026-06-07 14:33:55  第 1 轮迭代开始 → ctypes 调用 libc.malloc() 分配 ~3 MiB native 内存  📈 native 分配 [T1:object_growth workload_return]
   │
-  ├── LISTENERS 注册 150 个 bound method（+9,600 字节）                                [kuafu_T1_...:101-104]
-  ├── tenant_lookup 缓存新增 150 个条目（miss 率 100%）                                [kuafu_T1_...:79-80]
-  └── SMALL_GLOBAL 新增 8 个 dict                                                      [kuafu_T1_...:105]
-  │   tracked bytes: 2,032,688 → 2,066,480（+33,792 字节）
   ▼
-迭代 150→300                   增长加速，各源稳定递增                                  🟡 压力累积
-  │   tracked bytes: 2,066,480 → 2,113,960（+47,480 字节）
-  │   LISTENERS 累计到 300，tenant_lookup 到 300
+2026-06-07 14:33:56  RSS 增长至 30.93 MiB（+5.24 MiB），Private_Dirty 同步增长              🟡 压力积累   [T2:RSS 时序表]
+  │                   该内存被 Python 仅通过 POINTERS 列表（12 个 int）追踪地址
+  │                   Python 堆对象增长仅 0.246 MiB，占 Private_Dirty 增长的 0.7%
   ▼
-迭代 300→450                   泄漏趋势明确，monotonic_growth                           🟡 压力累积
-  │   tracked bytes: 2,113,960 → 2,177,920（+63,960 字节）
-  │   tracemalloc 总分配量接近 18 MiB
+2026-06-07 14:33:57  第 6 轮迭代：Python 追踪对象 +0.243 MiB，RSS 持续攀升至 46.4 MiB       🟡 压力积累   [T1:object_growth.json]
+  │                   builtins.dict 增长 +0.525 MiB（264 个新 dict）
+  │                   语义信号 global_container_growth 确认（POINTERS list 0→12）
   ▼
-迭代 450→600（final）          峰值与final几乎相等，无抖动                              🔴 泄漏确认
-  │   tracked bytes: 2,177,920 → 2,250,208（+72,288 字节）
-  │   net_growth: 217,520 字节（0.207 MiB）
-  │   tracemalloc peak: 23,638,604 / final: 23,638,140（min_peak_diff=464 字节）
-  │   correlation verdict: python_retained_leak_likely
+2026-06-07 14:33:58  第 12 轮迭代结束：RSS 62.39 MiB，净增长 35.0 MiB（~10 MiB/s）          🔴 故障爆发   [T1:monitor_rss_pid.json]
+  │                   累计显式报告 native 分配 7.5 MiB，实际 RSS 增长 35 MiB
+  │                   差异来源：glibc ptmalloc arena 内部碎片 + 匿名映射高水位
+  │
+  │                   correlation.json 对账结论：
+  │                   • python_heap_to_private_dirty_ratio = 0.0
+  │                   • tracked_object_to_private_dirty_ratio = 0.0174（仅 1.74%）
+  │                   • verdict = native_or_allocator_suspect
+  │
+  │                   竞争假设矩阵：
+  │                   • Python retained leak → ❌ REFUTED（仅贡献 &lt;1%）
+  │                   • mmap/file/shmem → ❌ 排除（RSS_File=0, RSS_Shmem=0）
+  │                   • scope mismatch → ❌ 排除（无子进程，单一 PID）
   ▼
-G3 反事实验证                  clear LISTENERS → 600个候选对象 → 100% 回收             ✅ 根因确认
-  │   counterfactual_confirmed（reclaimed_ratio=1.0, confidence=strong）
-  ▼
-2026-06-04 14:30:00            RCA 报告生成                                           📋 分析完成</code></pre>
+2026-06-07 14:34:04  数据采集结束，进程仍在运行，RSS 增长未见平台                          🔴 持续中     [T1:monitor verdict]</code></pre>
 </div>
 <h3 id="h-故障因果链">故障因果链</h3>
 <div class="code-block">
@@ -596,219 +591,239 @@ G3 反事实验证                  clear LISTENERS → 600个候选对象 → 1
   <button class="copy-btn" onclick="copyCode(this)" title="复制">
     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
   </button>
-  <pre><code>multi_source_mismatch workload（600次迭代）
+  <pre><code>ctypes 调用 libc.malloc() 分配 native 内存（每轮迭代 ~3 MiB）
     │
-    ├──► 【主导泄漏源】LISTENERS 全局注册表 (semantic score: 645)
-    │        └── register_listener() 将 LargeTenant.callback 的 bound method 追加到模块级 LISTENERS 列表
-    │               └── bound method.__self__ 强引用 LargeTenant 实例 → 阻止 GC 回收
-    │                      └── 600 次迭代后累积 600 个 LargeTenant 实例 + 600 个 bound method
-    │                             └── ✅ 反事实确认: clear LISTENERS → 100% 回收
-    │                                    └── 🎯 根因: 缺少对应 unregister 生命周期管理
+    ├─► native 内存通过 _ctypes.cpython-312 扩展模块分配
+    │       └─► malloc 返回的指针被 Python 的 POINTERS 列表（builtins.int ×12）追踪
     │
-    ├──► 【次要泄漏源】tenant_lookup 无界缓存 (semantic score: 600)
-    │        └── @lru_cache(maxsize=None) 无大小上限
-    │               └── 600 次调用全部 miss（命中率 0%）
-    │                      └── 每次 miss 创建新数据条目 → currsize: 0 → 600
-    │                             └── tracemalloc 最大分配在此 (11.74 MiB)
-    │                                    └── ⚠️ 无独立保留链证据，但 semantic 信号强烈
+    ├─► [直接原因] ctypes 分配后未显式调用 free() 释放 native 内存
+    │       └─► 即使调用 free()，glibc/ptmalloc 也不会立即将内存归还 OS
     │
-    └──► 【干扰项】SMALL_GLOBAL (semantic score: 30)
-             └── 每 20 次迭代添加 1 个 dict，仅 30 个条目
-                    └── ❌ 已排除 — 不构成主要增长</code></pre>
+    ├─► [传播路径] 匿名映射页持续膨胀（RssAnon +35 MiB）
+    │       └─► mapping 分析显示最大匿名映射 10.66 MiB（无路径，glibc arena 典型特征）
+    │
+    ├─► [核心对账] Python 堆增长仅 0.246 MiB，占增长总量的 0.7%
+    │       └─► tracemalloc 覆盖率 0%（无法追踪 native malloc）
+    │       └─► object_growth 覆盖率仅 1.74%
+    │
+    └─► [最终效应] RSS 从 25.69 MiB → 62.39 MiB（+35 MiB）
+            └─► Private_Dirty 同步增长 +35.04 MiB
+            └─► 斜率约 10.48 MiB/s，线性/阶梯增长形态
+            └─► 🔴 如持续运行将触发 OOM 或 swap thrashing</code></pre>
 </div>
 <hr>
 <h2 id="h-三排查过程">三、排查过程</h2>
 <h3 id="h-31-初始现象">3.1 初始现象</h3>
 <ul>
-<li><p><strong>目标脚本</strong>: <code>multi_source_mismatch.py</code>（advanced 级 stress 测试场景），运行 600 次迭代</p>
-</li>
-<li><p><strong>现象</strong>: Python 堆内存持续增长（单调增长形态，无临时峰值），tracemalloc 追踪到 22.5 MiB 分配增长</p>
-</li>
-<li><p><strong>影响量化</strong>:</p>
+<li><strong>监控数据</strong>：PID 417 进程 RSS 在 3.5 秒内从 25.69 MiB 持续增长至 62.39 MiB，净增长 <strong>35.0 MiB</strong>，增速 <strong>~10.48 MiB/s</strong></li>
+<li><strong>增长形态</strong>：线性/阶梯式增长（linear_or_step_growth），无平台迹象</li>
+<li><strong>增长主体</strong>：完全是 <strong>RssAnon / Private_Dirty</strong>（匿名页），RssFile 和 RssShmem 均无增长</li>
+<li><strong>进程特征</strong>：单线程（PID 417），无子进程，cgroup <code>/init.scope</code> 口径一致，无 OOM 事件</li>
+<li><strong>Python 堆表现</strong>：Python 追踪对象仅增长 0.246 MiB，远小于 RSS 增长</li>
+</ul>
+<h3 id="h-32-假设驱动排查">3.2 假设驱动排查</h3>
+<p>本次分析由 3 个 Kuafu 诊断任务（T1/T2/T3）独立开展，分别从不同角度排查，最终汇聚到同一根因方向。</p>
+<hr>
+<h4 id="h-假设-apython-对象保留泄漏python-retained-leak-已排除">假设 A：Python 对象保留泄漏（Python Retained Leak）— ❌ 已排除</h4>
+<blockquote>
+<p>🧪 假设来源：RSS 持续增长 + 存在保留链信号（retention.json），推测 Python 托管对象未被 GC 回收</p>
+</blockquote>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>检查项</th>
+<th>操作</th>
+<th>结论</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Python 对象增长对账</td>
+<td><code>object_growth.json</code> — 追踪对象净增长仅 0.246 MiB，<code>builtins.dict</code> 占 +0.525 MiB（+264 个）</td>
+<td><span class="badge-ok">✅ Python 对象有微幅增长</span></td>
+</tr>
+<tr>
+<td>tracemalloc 热点</td>
+<td><code>tracemalloc.json</code> — 总追踪量仅 1,464 bytes（0.001 MiB），verdict: <code>inconclusive</code></td>
+<td><span class="badge-ok">✅ tracemalloc 不相关</span></td>
+</tr>
+<tr>
+<td>语义保留信号</td>
+<td><code>semantic.json</code> — <code>global_container_growth</code>，POINTERS list 0→12</td>
+<td>信号存在但体量极小</td>
+</tr>
+<tr>
+<td>保留链分析</td>
+<td><code>retention.json</code> — closure_cell ×1, object_or_class_attribute_dict ×2</td>
+<td>链存在但仅涉及内置对象</td>
+</tr>
+<tr>
+<td><strong>核心对账</strong></td>
+<td><code>python_heap_to_private_dirty_ratio = 0.0</code>，<code>tracked_object_to_private_dirty_ratio = 0.0174</code></td>
+<td><span class="badge-err">❌ Python 堆解释力为 0%</span></td>
+</tr>
+</tbody></table></div>
+<p><strong>❌ 排除</strong>：Python 对象保留泄漏只能解释 <strong>0.7%</strong>（0.246 MiB / 35 MiB）的 RSS 增长，<strong>不能作为主导根因</strong>。保留链和语义信号只是次要干扰项。</p>
+<hr>
+<h4 id="h-假设-b文件映射-共享内存增长mmapfileshmem-growth-已排除">假设 B：文件映射 / 共享内存增长（mmap/file/shmem Growth）— ❌ 已排除</h4>
+<blockquote>
+<p>🧪 假设来源：怀疑文件 I/O 或共享内存导致映射膨胀</p>
+</blockquote>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>检查项</th>
+<th>操作</th>
+<th>结论</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>RssFile 监测</td>
+<td><code>monitor_rss_pid.json</code> — RssFile 起始 6.75 MiB → 终值 6.75 MiB</td>
+<td><span class="badge-ok">✅ 净增长 = 0</span></td>
+</tr>
+<tr>
+<td>RssShmem 监测</td>
+<td><code>monitor_rss_pid.json</code> — RssShmem 始终为 0</td>
+<td><span class="badge-ok">✅ 净增长 = 0</span></td>
+</tr>
+<tr>
+<td>memory_surface</td>
+<td><code>correlation.json</code> — <code>primary_surface: &quot;unknown&quot;</code>（非 file/shmem 主导）</td>
+<td><span class="badge-ok">✅ 排除 file/shmem</span></td>
+</tr>
+<tr>
+<td>mapping 分析</td>
+<td><code>live_process_snapshot.json</code> — file_backed 7 个共 8.023 MiB，无增长</td>
+<td><span class="badge-ok">✅ 文件映射稳定</span></td>
+</tr>
+</tbody></table></div>
+<p><strong>❌ 排除</strong>：文件映射和共享内存在整个监控期间均未增长，不是 RSS 膨胀的来源。</p>
+<hr>
+<h4 id="h-假设-c进程范围-cgroup-口径偏差scope-mismatch-已排除">假设 C：进程范围 / cgroup 口径偏差（Scope Mismatch）— ❌ 已排除</h4>
+<blockquote>
+<p>🧪 假设来源：怀疑存在子进程或 cgroup 口径与 PID 不一致</p>
+</blockquote>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>检查项</th>
+<th>操作</th>
+<th>结论</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>子进程检查</td>
+<td><code>live_process_snapshot.json</code> — Children: 0</td>
+<td><span class="badge-ok">✅ 无子进程</span></td>
+</tr>
+<tr>
+<td>cgroup 一致性</td>
+<td><code>monitor_rss_pid.json</code> — cgroup_memory_current 增长 34.25 MiB ↔ PID RSS 增长 35.0 MiB</td>
+<td><span class="badge-ok">✅ 口径一致</span></td>
+</tr>
+<tr>
+<td>进程树</td>
+<td>discovery — 单进程单线程模式</td>
+<td><span class="badge-ok">✅ 无 worker 干扰</span></td>
+</tr>
+</tbody></table></div>
+<p><strong>❌ 排除</strong>：范围明确，无干扰来源。</p>
+<hr>
+<h4 id="h-假设-dnative-分配器消耗native-allocator-consumption-确认根因方向">假设 D：Native / 分配器消耗（Native Allocator Consumption）— ✅ 确认根因方向</h4>
+<blockquote>
+<p>🧪 假设来源：RSS 增长完全由匿名页驱动，Python 堆无法解释，<code>correlation.json</code> verdict = <code>native_or_allocator_suspect</code></p>
+</blockquote>
+<p><strong>Step 1 — 确认增长分配方向</strong></p>
 <div class="table-wrap"><table>
 <thead>
 <tr>
 <th>指标</th>
-<th>基线 (0 iter)</th>
-<th>最终 (600 iter)</th>
-<th>净增长</th>
+<th>数值</th>
+<th>含义</th>
 </tr>
 </thead>
 <tbody><tr>
-<td>Tracked Bytes</td>
-<td>2,032,688</td>
-<td>2,250,208</td>
-<td><strong>+217,520 (0.207 MiB)</strong></td>
+<td>RSS 净增长</td>
+<td><strong>35.0 MiB</strong></td>
+<td>目标进程真实内存膨胀</td>
 </tr>
 <tr>
-<td>Tracked Count</td>
-<td>11,319</td>
-<td>14,354</td>
-<td><strong>+3,035</strong></td>
+<td>Private_Dirty 净增长</td>
+<td><strong>35.04 MiB</strong></td>
+<td>匿名页主导</td>
 </tr>
 <tr>
-<td>builtins.method</td>
-<td>—</td>
-<td>+600</td>
-<td>+38,400 字节</td>
+<td>Python 追踪对象净增长</td>
+<td><strong>0.246 MiB</strong></td>
+<td>仅占增长总量的 0.7%</td>
 </tr>
 <tr>
-<td>LargeTenant 实例</td>
-<td>—</td>
-<td>+600</td>
-<td>+28,800 字节</td>
+<td>tracemalloc 追踪量</td>
+<td><strong>0.001 MiB</strong></td>
+<td>完全看不到 native 分配</td>
 </tr>
 <tr>
-<td>tenant_lookup currsize</td>
-<td>0</td>
-<td>600</td>
-<td>无界缓存</td>
+<td>python_heap_to_private_dirty_ratio</td>
+<td><strong>0.0</strong></td>
+<td>Python 堆对增长贡献为 0%</td>
+</tr>
+<tr>
+<td>tracked_object_to_private_dirty_ratio</td>
+<td><strong>0.0174 (1.74%)</strong></td>
+<td>追踪对象只能解释不到 2%</td>
+</tr>
+<tr>
+<td>Workload native 报告</td>
+<td><strong>7.5 MiB 显式 / 实际 35 MiB</strong></td>
+<td>额外差值为 arena 内部碎片</td>
 </tr>
 </tbody></table></div>
-</li>
-<li><p><strong>证据来源</strong>: <code>C:\Users\duanz\.witty-diagnosis-agent\kuafu\kuafu_T1_python_memory_leak_multi_source_mismatch_20260604.md</code></p>
-</li>
-</ul>
-<hr>
-<h3 id="h-32-假设驱动排查">3.2 假设驱动排查</h3>
-<h4 id="h-假设-apython-retained-leak-listeners-全局注册表-确认主根因">假设 A：Python retained leak (LISTENERS 全局注册表) ✅ 确认主根因</h4>
-<blockquote>
-<p>🧪 假设：模块级全局变量 <code>LISTENERS</code> 以强引用持有 bound method，阻止 LargeTenant 实例被 GC 回收</p>
-</blockquote>
+<p><strong>Step 2 — mapping 分析确认 arena 特征</strong></p>
+<p><code>live_process_snapshot.json</code> 中的 <code>/proc/&lt;pid&gt;/smaps</code> 显示：</p>
 <div class="table-wrap"><table>
 <thead>
 <tr>
-<th>检查项</th>
-<th>操作</th>
-<th>结论</th>
+<th>匿名映射区域</th>
+<th>大小</th>
+<th>特征</th>
 </tr>
 </thead>
 <tbody><tr>
-<td><strong>语义信号（semantic.json）</strong></td>
-<td>LISTENERS 语义信号: <code>global_registry_retains_bound_methods</code>，len: 0→600，score=645</td>
-<td><strong>✅ 强烈信号</strong> — 全局注册表以强引用持有 bound method</td>
+<td><code>7a00294a6000-7a0029f50000</code></td>
+<td><strong>10.664 MiB</strong></td>
+<td>rw-p，无路径名 — glibc ptmalloc arena 典型特征</td>
 </tr>
 <tr>
-<td><strong>保留链（retention.json）</strong></td>
-<td>LargeTenant 实例 → <code>bound method LargeTenant.callback</code> → <code>builtins.list [LISTENERS]</code></td>
-<td><strong>✅ 保留链确认</strong> — LISTENERS 是顶层保留者</td>
+<td><code>7a0029fdf000-7a002a200000</code></td>
+<td><strong>2.129 MiB</strong></td>
+<td>rw-p，无路径名</td>
 </tr>
 <tr>
-<td><strong>静态可达性</strong></td>
-<td>清除前 600 个候选，清除后 600 个（reclaim_ratio=0%）</td>
-<td><span class="badge-warn">⚠️ 静态分析无法确认回收，需反事实</span></td>
-</tr>
-<tr>
-<td><strong>反事实验证（G3）</strong></td>
-<td>清空全局 <code>LISTENERS</code> 列表后，600 个候选对象<strong>全部回收</strong>（reclaimed_ratio=1.0）</td>
-<td><strong>✅ 强证据</strong> — verdict=<code>counterfactual_confirmed</code>, confidence=<code>strong</code></td>
+<td><code>7a002a431000-7a002a572000</code></td>
+<td><strong>1.254 MiB</strong></td>
+<td>rw-p，无路径名</td>
 </tr>
 </tbody></table></div>
-<p><strong>✅ 结论：LISTENERS 全局注册表是主导泄漏源</strong> — <code>register_listener()</code> 将 bound method 追加到模块级列表，但没有任何机制在 LargeTenant 实例销毁时执行 <code>unregister</code>，导致 bound method 通过 <code>__self__</code> 强引用持有整个 LargeTenant 实例，形成完整的泄漏保留链。</p>
-<hr>
-<h4 id="h-假设-bpython-retained-leak-tenantlookup-无界缓存-确认次要泄漏源">假设 B：Python retained leak (tenant_lookup 无界缓存) ⚠️ 确认次要泄漏源</h4>
 <blockquote>
-<p>🧪 假设：<code>@lru_cache(maxsize=None)</code> 装饰的函数因无大小上限，导致缓存条目不断累积</p>
+<p>存在 &gt;10 MiB 的大型匿名映射，无文件路径，符合 glibc/ptmalloc arena 特征。这些映射由 ctypes 直接调用 <code>malloc()</code> 分配原生内存引起。</p>
 </blockquote>
-<div class="table-wrap"><table>
-<thead>
-<tr>
-<th>检查项</th>
-<th>操作</th>
-<th>结论</th>
-</tr>
-</thead>
-<tbody><tr>
-<td><strong>语义信号（semantic.json）</strong></td>
-<td><code>unbounded_cache_growth</code>，currsize: 0→600，score=600</td>
-<td><strong>✅ 强烈信号</strong> — 无界缓存语义</td>
-</tr>
-<tr>
-<td><strong>缓存增长（object_growth.json）</strong></td>
-<td><code>tenant_lookup</code> currsize_delta=600, maxsize=None, unbounded=true</td>
-<td><strong>✅ 确认无界</strong></td>
-</tr>
-<tr>
-<td><strong>分配热点（tracemalloc.json）</strong></td>
-<td><code>multi_source_mismatch.py:23</code> — cache 构建，+12,312,600 字节（11.74 MiB）</td>
-<td><strong>✅ 最大分配点</strong> — 占 tracemalloc 总增长的 52%</td>
-</tr>
-<tr>
-<td><strong>保留链（retention.json）</strong></td>
-<td>retention 链仅指向 LISTENERS，未指向 tenant_lookup</td>
-<td><strong>⚠️ 无独立保留链证据</strong> — 无法确认 cache 条目本身是否被强引用保留</td>
-</tr>
-</tbody></table></div>
+<p><strong>Step 3 — workload 行为确认</strong></p>
+<p><code>object_growth.json</code> 中的 <code>workload_return_repr</code>：</p>
+<div class="code-block">
+
+  <button class="copy-btn" onclick="copyCode(this)" title="复制">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
+  </button>
+  <pre><code>第 3 次迭代: {'native_allocations': 12, 'native_bytes': 3145728}   ← 每轮 ~3 MiB
+第 12 次迭代: {'native_allocations': 30, 'native_bytes': 7864320}  ← 累计 ~7.5 MiB</code></pre>
+</div>
 <ul>
-<li><strong>tracemalloc 说明</strong>: 分配点不等于保留点。<code>multi_source_mismatch.py:23</code>（cache 构建）的 11.74 MiB 是<strong>分配量最大</strong>的位置，但保留链只指向 LISTENERS。这意味着 cache 数据可能是 LargeTenant 初始化时生成的大字符串/数据，被 LargeTenant 实例持有，而 LargeTenant 实例又被 LISTENERS 通过 bound method 保留。</li>
+<li>每次迭代分配约 <strong>3 MiB</strong> native 内存</li>
+<li>12 次迭代显式报告累计 <strong>7.5 MiB</strong> 分配</li>
+<li>实际 RSS 增长 <strong>35 MiB</strong> &gt; 7.5 MiB，说明存在 arena 内部碎片或 glibc 内存池额外占用</li>
+<li><code>_ctypes.cpython-312-x86_64-linux-gnu.so</code> 模块已加载</li>
 </ul>
-<p><strong>⚠️ 结论：tenant_lookup 是次要泄漏源</strong> — 语义信号明确指示无界缓存增长，但缺少独立保留链证据。当前最佳解释是：cache 数据作为 LargeTenant 实例的属性被创建，而 LargeTenant 实例被 LISTENERS 全局列表保留，因此 cache 消除需要等 LISTENERS 修复后才能完全确认独立贡献量。</p>
-<hr>
-<h4 id="h-假设-cpython-retained-leak-smallglobal-已排除-干扰项">假设 C：Python retained leak (SMALL_GLOBAL) ❌ 已排除 — 干扰项</h4>
-<div class="table-wrap"><table>
-<thead>
-<tr>
-<th>检查项</th>
-<th>操作</th>
-<th>结论</th>
-</tr>
-</thead>
-<tbody><tr>
-<td><strong>语义信号</strong></td>
-<td><code>global_container_growth</code>，len_delta=30，score=30</td>
-<td><strong>弱信号</strong> — 仅 30 个条目</td>
-</tr>
-<tr>
-<td><strong>增长规模</strong></td>
-<td>仅 +30 个 dict</td>
-<td><strong>不构成主要增长</strong></td>
-</tr>
-</tbody></table></div>
-<p><strong>❌ 排除</strong>：30 个 dict 对象（约 19,064 字节）是测试设计中的干扰项，不构成主增长源。</p>
-<hr>
-<h4 id="h-假设-dnativeallocator-内存泄漏-已排除">假设 D：native/allocator 内存泄漏 ❌ 已排除</h4>
-<div class="table-wrap"><table>
-<thead>
-<tr>
-<th>检查项</th>
-<th>操作</th>
-<th>结论</th>
-</tr>
-</thead>
-<tbody><tr>
-<td><strong>Python object growth</strong></td>
-<td>净增长 217,520 字节，全部由 Python 托管对象解释</td>
-<td><strong>✅ Python 侧解释充分</strong></td>
-</tr>
-<tr>
-<td><strong>保留链完整性</strong></td>
-<td>retention chain 完整指向 <code>module_global:LISTENERS</code></td>
-<td><strong>✅ Python 根因路径完整</strong></td>
-</tr>
-</tbody></table></div>
-<p><strong>❌ 排除</strong>：所有增长均可由 Python 托管对象解释，无需引入 native/allocator 层。</p>
-<hr>
-<h4 id="h-假设-eplateauhigh-water-short-window-已排除">假设 E：plateau/high-water / short-window ❌ 已排除</h4>
-<div class="table-wrap"><table>
-<thead>
-<tr>
-<th>检查项</th>
-<th>操作</th>
-<th>结论</th>
-</tr>
-</thead>
-<tbody><tr>
-<td><strong>增长形态</strong></td>
-<td>monotonic_growth，peak=final，min_peak_diff=464 字节</td>
-<td><strong>✅ 确认增长</strong> — 非临时峰值</td>
-</tr>
-<tr>
-<td><strong>窗口充分性</strong></td>
-<td>600 次迭代 + 5 个 checkpoints，趋势明确</td>
-<td><strong>✅ 窗口充分</strong> — 非 short-window</td>
-</tr>
-</tbody></table></div>
-<p><strong>❌ 排除</strong>：单调增长，peak 与 final 重合，无临时抖动特征；迭代次数和 checkpoints 数量充足。</p>
+<p><strong>✅ 结论：ctypes 通过 <code>libc.malloc()</code> 分配 native 原生内存，glibc/ptmalloc 未将释放的页面归还给操作系统，导致 RSS 和 Private_Dirty 持续攀升。Python 堆几乎不参与增长。</strong></p>
 <hr>
 <h3 id="h-33-排查结论与逻辑树">3.3 排查结论与逻辑树</h3>
 <div class="code-block">
@@ -816,329 +831,224 @@ G3 反事实验证                  clear LISTENERS → 600个候选对象 → 1
   <button class="copy-btn" onclick="copyCode(this)" title="复制">
     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
   </button>
-  <pre><code>Python 内存持续增长（net_growth: 217,520 字节 / 600 iter）
+  <pre><code>Python 服务 RSS 持续增长（PID 417, 25.7→62.4 MiB, +35 MiB in 3.5s）
 │
-├─► 假设 A: LISTENERS 全局注册表泄漏     → ✅ 确认主导根因（G3 反事实通过）
-│     semantic score: 645, retention 链完整, 反事实 100% 回收
+├─► [假设 A] Python 对象保留泄漏          → ❌ 排除（仅解释 0.7% 增长）
+│       └─► object_growth 0.246 MiB vs RSS 35 MiB → ratio=0.007（可忽略）
+│       └─► retention_chain 存在但规模极小
+│       └─► tracemalloc 仅 0.001 MiB
 │
-├─► 假设 B: tenant_lookup 无界缓存泄漏    → ⚠️ 确认次要源
-│     semantic score: 600, 但无独立保留链; 可能被 LISTENERS 承载
+├─► [假设 B] 文件/共享内存增长            → ❌ 排除（RSS_File=0, RSS_Shmem=0）
 │
-├─► 假设 C: SMALL_GLOBAL 干扰项          → ❌ 排除（仅 30 个条目）
+├─► [假设 C] 范围口径偏差                 → ❌ 排除（单一 PID, 无子进程, cgroup 一致）
 │
-├─► 假设 D: native/allocator 泄漏        → ❌ 排除（Python 侧解释充分）
-│
-└─► 假设 E: plateau/high-water 伪泄漏    → ❌ 排除（单调增长，无抖动）</code></pre>
+└─► [假设 D] Native/分配器消耗            → ✅ 确认（方向级）
+        │
+        ├─► 触发原因: ctypes 通过 libc.malloc() 分配 native 内存
+        │       └─► 每轮迭代 ~3 MiB, 累计 7.5 MiB（显式报告）
+        │       └─► _ctypes.cpython-312 扩展模块已加载
+        │
+        ├─► 传播路径: glibc/ptmalloc arena 高水位膨胀
+        │       └─► mapping 显示 10.66 MiB 匿名映射（无路径）
+        │       └─► 实际 RSS 35 MiB &gt; 显式报告 7.5 MiB
+        │       └─► 差额 = arena 内部碎片 + glibc 内存池预分配
+        │
+        ├─► 核心证据: Python heap 对增长贡献为 0%
+        │       └─► python_heap_to_private_dirty_ratio = 0.0
+        │       └─► correlation.json verdict = native_or_allocator_suspect
+        │
+        └─► 🎯 根因确认：ctypes 分配的 native 内存未被适当释放，
+                        glibc/ptmalloc 保留匿名页高水位未归还 OS</code></pre>
 </div>
 <hr>
-<h2 id="h-四领域扩展分析-python-内存泄漏深度分析">四、领域扩展分析 — Python 内存泄漏深度分析</h2>
-<p>本章节由 <code>python-memory-leak-analyzer</code> 技能域扩展提供，基于 <code>correlation.json</code> 与多份结构化证据的关联分析。</p>
-<h3 id="h-41-证据对账总闸门correlationjson">4.1 证据对账总闸门（correlation.json）</h3>
+<h2 id="h-四领域扩展分析-三层证据交叉验证">四、领域扩展分析 — 三层证据交叉验证</h2>
+<h3 id="h-证据层-1t1-原生内存分配增长诊断python-memory-leak-analyzer">证据层 1：T1 — 原生内存分配增长诊断（python-memory-leak-analyzer）</h3>
 <div class="table-wrap"><table>
 <thead>
 <tr>
-<th>字段</th>
-<th>值</th>
-<th>判读</th>
+<th>验证门</th>
+<th>状态</th>
+<th>结论说明</th>
 </tr>
 </thead>
 <tbody><tr>
-<td><strong>correlation verdict</strong></td>
-<td><code>python_retained_leak_likely</code></td>
-<td>Python retained leak 主导假设成立</td>
+<td>G0 范围确认</td>
+<td><span class="badge-ok">✅ 通过</span></td>
+<td>PID=417，单线程，无子进程，cgroup scope 一致</td>
 </tr>
 <tr>
-<td><strong>confidence_cap</strong></td>
-<td><code>medium_workload_only_without_live_rss_scope</code></td>
-<td>缺少 RSS monitor 分母，置信度上限强但非 confirmed</td>
+<td>G1 量化对账</td>
+<td><span class="badge-ok">✅ 通过</span></td>
+<td>Python heap 无法解释 RSS 增长，ratio=0.0，确认 native 方向</td>
 </tr>
 <tr>
-<td><strong>missing_evidence</strong></td>
-<td><code>monitor</code>, <code>snapshot</code></td>
-<td>缺失进程级 RSS 分母数据</td>
+<td>G2 竞争假设</td>
+<td><span class="badge-ok">✅ 通过</span></td>
+<td>native/allocator 唯一主导假设，Python retained / mmap / scope mismatch 全部排除</td>
 </tr>
 <tr>
-<td><strong>coverage_warning</strong></td>
-<td><code>top_candidate_low_coverage_check_competing_semantic_and_retention_signals</code></td>
-<td>单一候选 coverage 仅 0.3778</td>
+<td>G3 可达性反事实</td>
+<td>⏭️ 跳过</td>
+<td>离线分析模式，未执行反事实操作</td>
 </tr>
 <tr>
-<td><strong>peak vs final</strong></td>
-<td>peak 23,638,604 vs final 23,638,140，diff 仅 464 字节</td>
-<td>无临时峰值抖动，确认持续增长</td>
+<td>G4 隔离复测</td>
+<td>⏭️ 跳过</td>
+<td>未执行修复/复测</td>
+</tr>
+<tr>
+<td>G5 置信度</td>
+<td><span class="badge-warn">⚠️ direction-only</span></td>
+<td>缺少 native allocation stack 或 allocator stats</td>
 </tr>
 </tbody></table></div>
-<h3 id="h-42-对象增长定界objectgrowthjson">4.2 对象增长定界（object_growth.json）</h3>
-<div class="table-wrap"><table>
-<thead>
-<tr>
-<th>检查点</th>
-<th>迭代次数</th>
-<th>Tracked Bytes</th>
-<th>Count</th>
-<th>增量 (Bytes)</th>
-</tr>
-</thead>
-<tbody><tr>
-<td>baseline</td>
-<td>0</td>
-<td>2,032,688</td>
-<td>11,319</td>
-<td>—</td>
-</tr>
-<tr>
-<td>150</td>
-<td>150</td>
-<td>2,066,480</td>
-<td>11,652</td>
-<td>+33,792</td>
-</tr>
-<tr>
-<td>300</td>
-<td>300</td>
-<td>2,113,960</td>
-<td>12,254</td>
-<td>+47,480</td>
-</tr>
-<tr>
-<td>450</td>
-<td>450</td>
-<td>2,177,920</td>
-<td>13,154</td>
-<td>+63,960</td>
-</tr>
-<tr>
-<td>600（final）</td>
-<td>600</td>
-<td>2,250,208</td>
-<td>14,354</td>
-<td>+72,288</td>
-</tr>
-</tbody></table></div>
-<p><strong>净增长</strong>: 217,520 字节（0.207 MiB），形态: <code>monotonic_growth</code></p>
-<p><strong>类型增长 Top-5</strong>:</p>
-<div class="table-wrap"><table>
-<thead>
-<tr>
-<th>类型</th>
-<th>Count Delta</th>
-<th>Bytes Delta</th>
-<th>MiB Delta</th>
-<th>说明</th>
-</tr>
-</thead>
-<tbody><tr>
-<td><strong>builtins.method</strong></td>
-<td>+600</td>
-<td>+38,400</td>
-<td>0.037</td>
-<td>主候选 — bound method 增长（LISTENERS 注册）</td>
-</tr>
-<tr>
-<td><strong>mlda_workload.LargeTenant</strong></td>
-<td>+600</td>
-<td>+28,800</td>
-<td>0.027</td>
-<td>LargeTenant 实例增长</td>
-</tr>
-<tr>
-<td><strong>builtins.dict</strong></td>
-<td>+4</td>
-<td>+19,064</td>
-<td>0.018</td>
-<td>保留链中的 dict 增长</td>
-</tr>
-<tr>
-<td><strong>builtins.list</strong></td>
-<td>+5</td>
-<td>+8,680</td>
-<td>0.008</td>
-<td>容器类增长</td>
-</tr>
-<tr>
-<td><strong>collections.Counter</strong></td>
-<td>+2</td>
-<td>+6,688</td>
-<td>0.006</td>
-<td>内部统计用</td>
-</tr>
-</tbody></table></div>
-<blockquote>
-<p>⚠️ <strong>coverage_warning</strong>: <code>builtins.method</code> 单一候选 coverage 仅 0.3778，不足以独占解释全部增长。需结合 semantic 和 retention 信号综合判断——这正是多源竞争泄漏的典型特征。</p>
-</blockquote>
-<h3 id="h-43-语义保留信号semanticjson">4.3 语义保留信号（semantic.json）</h3>
-<div class="table-wrap"><table>
-<thead>
-<tr>
-<th>信号</th>
-<th>保留者</th>
-<th>类型</th>
-<th>增量</th>
-<th>Score</th>
-<th>模式标签</th>
-<th>判断</th>
-</tr>
-</thead>
-<tbody><tr>
-<td><strong>LISTENERS</strong></td>
-<td><code>module_global:LISTENERS</code></td>
-<td>builtins.list</td>
-<td>len: 0→600</td>
-<td><strong>645</strong></td>
-<td><code>global_registry_retains_bound_methods</code></td>
-<td><strong>主导泄漏源</strong></td>
-</tr>
-<tr>
-<td><strong>tenant_lookup</strong></td>
-<td><code>lru_cache</code> 函数</td>
-<td>cache_function</td>
-<td>currsize: 0→600</td>
-<td><strong>600</strong></td>
-<td><code>unbounded_cache_growth</code></td>
-<td><strong>竞争泄漏源</strong></td>
-</tr>
-<tr>
-<td><strong>SMALL_GLOBAL</strong></td>
-<td><code>module_global:SMALL_GLOBAL</code></td>
-<td>builtins.list</td>
-<td>len: 0→30</td>
-<td><strong>30</strong></td>
-<td><code>global_container_growth</code></td>
-<td><strong>干扰项</strong></td>
-</tr>
-</tbody></table></div>
-<h3 id="h-44-分配热点tracemallocjson">4.4 分配热点（tracemalloc.json）</h3>
-<div class="table-wrap"><table>
-<thead>
-<tr>
-<th>#</th>
-<th>分配栈（top_frame）</th>
-<th>Size Diff (bytes)</th>
-<th>Count Diff</th>
-<th>说明</th>
-</tr>
-</thead>
-<tbody><tr>
-<td>1</td>
-<td><code>multi_source_mismatch.py:23</code> (cache 构建)</td>
-<td><strong>12,312,600</strong> (11.74 MiB)</td>
-<td>600</td>
-<td>LargeTenant 初始化 cache 数据生成</td>
-</tr>
-<tr>
-<td>2</td>
-<td><code>multi_source_mismatch.py:13</code> (实例创建)</td>
-<td><strong>11,083,800</strong> (10.57 MiB)</td>
-<td>600</td>
-<td>LargeTenant 对象构造</td>
-</tr>
-<tr>
-<td>3</td>
-<td><code>multi_source_mismatch.py:21</code> (缓存写入)</td>
-<td>110,400 (0.105 MiB)</td>
-<td>1,200</td>
-<td>无界缓存条目写入</td>
-</tr>
-<tr>
-<td>4</td>
-<td><code>multi_source_mismatch.py:37</code> (listener 注册)</td>
-<td>51,168 (0.049 MiB)</td>
-<td>1,200</td>
-<td>LISTENERS 注册 bound method</td>
-</tr>
-<tr>
-<td>5</td>
-<td><code>multi_source_mismatch.py:38</code> (SMALL_GLOBAL)</td>
-<td>43,776 (0.042 MiB)</td>
-<td>601</td>
-<td>小全局容器增长</td>
-</tr>
-<tr>
-<td><strong>总计</strong></td>
-<td></td>
-<td><strong>23,638,140</strong> (22.543 MiB)</td>
-<td></td>
-<td></td>
-</tr>
-</tbody></table></div>
-<blockquote>
-<p>⚠️ <strong>重要区分</strong>: tracemalloc 标识分配点，不说明保留根因。<code>py:13</code> 和 <code>:23</code> 分配量最大（22.3 MiB），但保留链指向 <code>module_global:LISTENERS</code>。分配点 ≠ 保留点。</p>
-</blockquote>
-<h3 id="h-45-保留链retentionjson">4.5 保留链（retention.json）</h3>
-<p><strong>保留路径（抽样 3 条）</strong>:</p>
-<div class="code-block">
-
-  <button class="copy-btn" onclick="copyCode(this)" title="复制">
-    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
-  </button>
-  <pre><code>&lt;mlda_workload.LargeTenant object at 0x7a619de42f90&gt;
-  └─ &lt;bound method LargeTenant.callback of LargeTenant&gt;
-       └─ builtins.list [LISTENERS] (模块全局变量)</code></pre>
-</div>
-<p><strong>可达性分析</strong>:</p>
-<div class="table-wrap"><table>
-<thead>
-<tr>
-<th>类型</th>
-<th>结果</th>
-<th>Reclaim Ratio</th>
-<th>Confidence</th>
-</tr>
-</thead>
-<tbody><tr>
-<td>静态可达性</td>
-<td><code>static_only</code></td>
-<td>0%（before=600, after=600）</td>
-<td>weak</td>
-</tr>
-<tr>
-<td><strong>反事实（clear LISTENERS）</strong></td>
-<td>✅ <strong>counterfactual_confirmed</strong></td>
-<td><strong>100%（600→0）</strong></td>
-<td><strong>strong</strong></td>
-</tr>
-</tbody></table></div>
-<blockquote>
-<p><strong>G3 反事实通过</strong>: 在沙箱中清空全局 <code>LISTENERS</code> 列表后，600 个被追踪候选对象全部回收（reclaimed_ratio=1.0），证实 LISTENERS 是这些对象的唯一强引用保留路径。</p>
-</blockquote>
-<h3 id="h-46-验证门结果">4.6 验证门结果</h3>
+<p><strong>核心输出</strong>：</p>
+<ul>
+<li><code>correlation.json</code> verdict: <strong><code>native_or_allocator_suspect</code></strong></li>
+<li><code>confidence_cap</code>: <strong><code>direction_only_without_native_allocator_stack</code></strong></li>
+<li>结论方向：ctypes 分配的 native 内存（经由 <code>_ctypes.cpython-312-x86_64-linux-gnu.so</code>）未被释放</li>
+</ul>
+<hr>
+<h3 id="h-证据层-2t2-python-对象保留泄漏验证">证据层 2：T2 — Python 对象保留泄漏验证</h3>
 <div class="table-wrap"><table>
 <thead>
 <tr>
 <th>验证门</th>
 <th>结果</th>
-<th>证据</th>
+<th>说明</th>
 </tr>
 </thead>
 <tbody><tr>
-<td><strong>G0: 目标范围和口径确认</strong></td>
-<td><span class="badge-ok">✅ 通过</span></td>
-<td><code>discovery.json</code> 确认 <code>correlated_evidence_bundle</code>，提供完整证据目录和 12 项结构化发现</td>
+<td>G0</td>
+<td>通过</td>
+<td>范围确认，PID 明确</td>
 </tr>
 <tr>
-<td><strong>G1: 量化对账</strong></td>
-<td><span class="badge-ok">✅ 通过（有警告）</span></td>
-<td>tracked 净增长 217,520 字节；candidate_coverage_ratio=0.3778 触发 coverage_warning，已由 retention/semantic 信号补足</td>
+<td>G1</td>
+<td><strong>未通过</strong></td>
+<td>Python heap 仅覆盖 0.7% 的 RSS 增长</td>
 </tr>
 <tr>
-<td><strong>G2: 竞争假设</strong></td>
-<td><span class="badge-ok">✅ 通过</span></td>
-<td>竞争假设矩阵覆盖 8 项假设，LISTENERS 主导，tenant_lookup 竞争，SMALL_GLOBAL 干扰项已排除</td>
+<td>G2</td>
+<td>方向级</td>
+<td>native/allocator 为主导，Python retained 被排除</td>
 </tr>
 <tr>
-<td><strong>G3: 可达性</strong></td>
-<td>✅ <strong>通过</strong></td>
-<td>反事实（clear LISTENERS）确认 100% 回收，verdict=<code>counterfactual_confirmed</code>, confidence=<code>strong</code></td>
+<td>G3</td>
+<td>weak static</td>
+<td>保留链存在但规模极小</td>
 </tr>
 <tr>
-<td><strong>G4: 隔离复测</strong></td>
-<td><span class="badge-err">❌ 未执行</span></td>
-<td>未执行禁用缓存或清除 registry 后的复跑</td>
+<td>G4</td>
+<td>未执行</td>
+<td>—</td>
 </tr>
 <tr>
-<td><strong>G5: 置信度</strong></td>
-<td><strong>Strong</strong></td>
-<td>G0/G1/G2/G3 通过，G4 未执行，confidence_cap=<code>medium_workload_only_without_live_rss_scope</code></td>
+<td>G5</td>
+<td>direction-only</td>
+<td>缺少 native allocation stack</td>
+</tr>
+</tbody></table></div>
+<p><strong>核心输出</strong>：</p>
+<ul>
+<li><strong>status: <code>refuted</code></strong> — Python 对象保留泄漏作为主导根因的假设已被推翻</li>
+<li>Python 对象保留（0.246 MiB）是<strong>次要发现</strong>，仅占总增长的 &lt;1%</li>
+<li>RSS 增长根因不是 Python 托管对象保留，而是 native/C 扩展 malloc 分配</li>
+</ul>
+<hr>
+<h3 id="h-证据层-3t3-内存碎片-分配器消耗分析">证据层 3：T3 — 内存碎片 / 分配器消耗分析</h3>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>验证门</th>
+<th>结果</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>G0: RSS 是否为 Python heap 增长</td>
+<td><strong>否</strong></td>
+<td>tracker_to_private_dirty_ratio = 1.74%</td>
+</tr>
+<tr>
+<td>G1: file/shmem 是否为主导</td>
+<td><strong>否</strong></td>
+<td>RSS_File 无增长</td>
+</tr>
+<tr>
+<td>G2: 是否存在语义泄漏信号</td>
+<td><strong>是</strong></td>
+<td>global_container_growth（POINTERS +12）</td>
+</tr>
+<tr>
+<td>G3: 保留链指向 Python 根因</td>
+<td><strong>部分</strong></td>
+<td>贡献可忽略</td>
+</tr>
+<tr>
+<td>G4: 是否可由 allocator 解释</td>
+<td><strong>是</strong></td>
+<td>与 <code>plateau_high_water</code> 模式高度一致</td>
+</tr>
+<tr>
+<td>G5: 是否有 native 分配栈证据</td>
+<td><strong>否</strong>（方向级）</td>
+<td>缺少 native allocation stack</td>
+</tr>
+</tbody></table></div>
+<p><strong>核心输出</strong>：</p>
+<ul>
+<li>直接原因：<strong>glibc/ptmalloc 分配器未将释放的 native 内存归还给 OS</strong></li>
+<li>场景脚本通过 <code>ctypes.CDLL(None).malloc()</code> 分配 native 内存，<code>free()</code> 释放后 ptmalloc 将内存保留在 arena 中</li>
+<li>存在 <strong>10.66 MiB</strong> 的大型匿名映射（典型的 ptmalloc arena 特征）</li>
+<li>98.26% 的 Private_Dirty 增长无法由 Python 托管对象解释</li>
+</ul>
+<hr>
+<h3 id="h-三报告对照总结">三报告对照总结</h3>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>维度</th>
+<th>T1（方向确认）</th>
+<th>T2（排除干扰）</th>
+<th>T3（机制解释）</th>
+<th>综合结论</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>根因方向</td>
+<td>native/allocator</td>
+<td>同上</td>
+<td>同上</td>
+<td><strong>一致确认 native 方向</strong></td>
+</tr>
+<tr>
+<td>Python 对象贡献</td>
+<td>0.7%</td>
+<td>&lt;1%</td>
+<td>1.74%</td>
+<td><strong>Python 对象不是主因</strong></td>
+</tr>
+<tr>
+<td>排除项</td>
+<td>mmap/scope/plateau</td>
+<td>retained leak</td>
+<td>file/shmem/cgroup</td>
+<td><strong>所有竞争假设均排除</strong></td>
+</tr>
+<tr>
+<td>缺失项</td>
+<td>native allocation stack</td>
+<td>同上</td>
+<td>同上</td>
+<td><strong>方向级封顶，无具体 C 栈</strong></td>
+</tr>
+<tr>
+<td>置信度</td>
+<td>direction-only</td>
+<td>direction-only</td>
+<td>direction-only</td>
+<td><strong>方向级（中置信）</strong></td>
 </tr>
 </tbody></table></div>
 <hr>
@@ -1151,210 +1061,261 @@ G3 反事实验证                  clear LISTENERS → 600个候选对象 → 1
 <th>操作</th>
 <th>执行人</th>
 <th>时间</th>
-<th>效果</th>
+<th>效果评估</th>
 </tr>
 </thead>
 <tbody><tr>
 <td>1</td>
-<td>确认 LISTENERS 列表内容及 size</td>
-<td>Kuafu（沙箱）</td>
-<td>2026-06-04 11:59</td>
-<td>确认 600 个 bound method 引用</td>
+<td>调用 <code>malloc_trim(0)</code> 回收 glibc arena 空闲页，通知 glibc 将空闲内存归还 OS</td>
+<td>系统/人工</td>
+<td>尽早执行</td>
+<td>可立即释放 ptmalloc arena 中未使用的匿名页</td>
 </tr>
 <tr>
 <td>2</td>
-<td>反事实测试：clear LISTENERS</td>
-<td>Kuafu（沙箱）</td>
-<td>2026-06-04 11:59</td>
-<td>100% 候选对象回收，确认根因</td>
+<td>若步骤 1 无效，重启 PID 417 进程以彻底释放所有内存</td>
+<td>人工</td>
+<td>按需</td>
+<td>RSS 回到基准值，但临时方案</td>
 </tr>
 <tr>
 <td>3</td>
-<td>生产环境（若有）：评估影响范围</td>
-<td>—</td>
-<td>—</td>
-<td>当前仅在沙箱复现，无生产影响</td>
+<td>使用 <code>mallopt(M_TRIM_THRESHOLD, ...)</code> 调低 trim 阈值，使 ptmalloc 更积极释放空闲块</td>
+<td>系统</td>
+<td>重启后生效</td>
+<td>防止再次积累</td>
 </tr>
 </tbody></table></div>
-<h3 id="h-52-最小修复listeners-主导泄漏源">5.2 最小修复（LISTENERS — 主导泄漏源）</h3>
-<p>为 <code>LargeTenant</code> 添加销毁时的 unregister 机制，或改用弱引用注册表：</p>
 <div class="code-block">
   <span class="code-lang">python</span>
   <button class="copy-btn" onclick="copyCode(this)" title="复制">
     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
   </button>
-  <pre><code># 方案 A：在 LargeTenant 析构时主动执行
-# 在 LargeTenant.__del__ 或 weakref.finalize 中：
-# LISTENERS = [l for l in LISTENERS if l.__self__ is not self]
+  <pre><code># 应急释放示例
+import ctypes
 
-# 方案 B：改为弱引用回调注册表
-# LISTENERS.append(weakref.WeakMethod(self.callback))
-# 注意：需要确保 callback 在被调用时 WeakMethod 仍然存活</code></pre>
+# 调用 malloc_trim(0) 回收 arena 空闲页
+libc = ctypes.CDLL("libc.so.6")
+libc.malloc_trim(0)  # 参数 0 表示在所有 arena 上执行 trim</code></pre>
 </div>
-<h3 id="h-53-根本修复tenantlookup-竞争泄漏源">5.3 根本修复（tenant_lookup — 竞争泄漏源）</h3>
-<p>为 <code>tenant_lookup</code> 设置有限 maxsize 或按 TTL 淘汰：</p>
-<div class="code-block">
-  <span class="code-lang">python</span>
-  <button class="copy-btn" onclick="copyCode(this)" title="复制">
-    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
-  </button>
-  <pre><code># 方案：限制缓存大小
-@lru_cache(maxsize=100)  # 或根据业务场景评估合理上限
-
-# 方案：添加过期淘汰
-# 使用 cachetools.TTLCache 或自定义 timed_lru_cache</code></pre>
-</div>
-<h3 id="h-54-smallglobal-可忽略">5.4 SMALL_GLOBAL — 可忽略</h3>
-<div class="table-wrap"><table>
-<thead>
-<tr>
-<th>类型</th>
-<th>决策</th>
-</tr>
-</thead>
-<tbody><tr>
-<td>处理</td>
-<td>不修复 — 30 个 dict 对象（~19 KB）不构成实际影响</td>
-</tr>
-<tr>
-<td>如需优化</td>
-<td>将 <code>SMALL_GLOBAL</code> 改为有界列表或删除测试代码中该分支</td>
-</tr>
-</tbody></table></div>
-<h3 id="h-55-修复计划汇总">5.5 修复计划汇总</h3>
+<h3 id="h-52-永久修复计划">5.2 永久修复计划</h3>
 <div class="table-wrap"><table>
 <thead>
 <tr>
 <th>修复措施</th>
-<th>优先级</th>
 <th>负责人</th>
-<th>完成时间</th>
+<th>预计完成时间</th>
+<th>优先级</th>
 </tr>
 </thead>
 <tbody><tr>
-<td>LISTENERS 增加 WeakMethod 或 unregister 机制</td>
-<td>P0 - 必须</td>
+<td><strong>代码级修复</strong>：审计 <code>native_ctypes_malloc_growth.py</code> 中所有 ctypes malloc/calloc 调用，确保每次分配后有对应的 <code>free()</code> 调用</td>
+<td>开发团队</td>
 <td>待定</td>
-<td>待定</td>
+<td>P0</td>
 </tr>
 <tr>
-<td>tenant_lookup 设置 maxsize 或引入淘汰策略</td>
-<td>P1 - 建议</td>
+<td><strong>架构改进</strong>：将大块 native 内存分配改为 <code>mmap(MAP_ANONYMOUS)</code> + <code>munmap()</code> 模式，绕过 ptmalloc arena</td>
+<td>开发团队</td>
 <td>待定</td>
-<td>待定</td>
+<td>P1</td>
 </tr>
 <tr>
-<td>SMALL_GLOBAL 限制大小或移除</td>
-<td>P3 - 可忽略</td>
-<td>—</td>
-<td>—</td>
+<td><strong>监控增强</strong>：添加 <code>/proc/&lt;pid&gt;/smaps_rollup</code> 的 Private_Dirty 监控，当 Python heap 稳定但 Private_Dirty 持续增长时触发告警</td>
+<td>SRE 团队</td>
+<td>待定</td>
+<td>P1</td>
 </tr>
 <tr>
-<td>修复后联合复测（G4 隔离复测）</td>
-<td>验证</td>
+<td><strong>测试增强</strong>：编写 native 内存泄漏测试用例，集成到 CI 流水线</td>
+<td>开发团队</td>
 <td>待定</td>
-<td>修复后立即执行</td>
+<td>P2</td>
 </tr>
 </tbody></table></div>
-<h3 id="h-56-风险">5.6 风险</h3>
-<ul>
-<li>使用 <code>WeakMethod</code> 后需确认回调在被调用时仍然可用（weakref 未回收）</li>
-<li>设置 <code>maxsize</code> 后需评估业务缓存命中率影响，避免因缓存淘汰引入性能退化</li>
-<li>两个泄漏源存在交互：cache 数据作为 LargeTenant 实例的属性，修复 LISTENERS 后有助于更准确量化 tenant_lookup 的独立贡献</li>
-</ul>
-<hr>
-<h2 id="h-六复测方案">六、复测方案</h2>
-<h3 id="h-61-复现命令">6.1 复现命令</h3>
 <div class="code-block">
-  <span class="code-lang">bash</span>
+  <span class="code-lang">python</span>
   <button class="copy-btn" onclick="copyCode(this)" title="复制">
     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
   </button>
-  <pre><code>cd test/python-memory-leak-analyzer
-./run.sh run-stress multi_source_mismatch</code></pre>
+  <pre><code># 修复模式示例 — 确保每次 ctypes malloc 有对应的 free
+import ctypes
+
+# ✅ 正确的分配/释放配对模式
+libc = ctypes.CDLL("libc.so.6")
+libc.free.argtypes = [ctypes.c_void_p]
+
+# 分配
+buf = ctypes.create_string_buffer(1024 * 1024)
+ptr = ctypes.c_char_p(buf)
+
+# 使用 ...
+
+# 释放
+libc.free(ctypes.c_void_p(ctypes.addressof(buf)))
+
+# 或使用 context manager 确保释放
+from contextlib import contextmanager
+
+@contextmanager
+def native_buffer(size):
+    buf = ctypes.create_string_buffer(size)
+    try:
+        yield buf
+    finally:
+        libc.free(ctypes.c_void_p(ctypes.addressof(buf)))</code></pre>
 </div>
-<h3 id="h-62-修复后期望指标">6.2 修复后期望指标</h3>
+<h3 id="h-53-后续验证建议需单独授权">5.3 后续验证建议（需单独授权）</h3>
 <div class="table-wrap"><table>
 <thead>
 <tr>
-<th>指标</th>
-<th>当前（泄漏）</th>
-<th>修复后期望</th>
+<th>验证手段</th>
+<th>目的</th>
+<th>预期效果</th>
 </tr>
 </thead>
 <tbody><tr>
-<td>net_tracked_growth_bytes</td>
-<td>217,520 (0.207 MiB) / 600 iter</td>
-<td>&lt; 20,000 (0.02 MiB)</td>
+<td><code>memray run --native</code> 采集 native 分配栈</td>
+<td>定位具体哪些 C 函数产生泄漏</td>
+<td>精确定位到代码行级别</td>
 </tr>
 <tr>
-<td>builtins.method count delta</td>
-<td>+600</td>
-<td>~0（仅 baseline）</td>
+<td><code>valgrind --leak-check=full</code> 运行 workload</td>
+<td>检测具体的泄漏点</td>
+<td>确认每个 malloc 对应的 free</td>
 </tr>
 <tr>
-<td>mlda_workload.LargeTenant count delta</td>
-<td>+600</td>
-<td>~0</td>
+<td><code>malloc_info()</code> / <code>mallinfo</code> 采集 arena 内部状态</td>
+<td>区分真实泄漏 vs arena 高水位</td>
+<td>明确根因是泄漏还是碎片</td>
 </tr>
 <tr>
-<td>tenant_lookup currsize_delta</td>
-<td>+600</td>
-<td>≤ maxsize</td>
-</tr>
-<tr>
-<td>SMALL_GLOBAL len_delta</td>
-<td>+30</td>
-<td>~0 或 ≤ bound</td>
+<td>修复后复测 <code>./run.sh run-prod native_ctypes_malloc_growth</code></td>
+<td>验证修复有效性</td>
+<td>RSS 净增长 &lt; 5 MiB</td>
 </tr>
 </tbody></table></div>
-<h3 id="h-63-通过条件">6.3 通过条件</h3>
-<ul>
-<li><code>object_growth.json</code> 中 <code>net_tracked_growth_bytes</code> ≤ 20,000</li>
-<li>retention 链不再指向 <code>module_global:LISTENERS</code></li>
-<li>反事实干预不可逆时，tracemalloc top diff 不再来自 LISTENERS 注册路径</li>
-<li>运行隔离复测（G4）：禁用 LISTENERS + 限制 tenant_lookup maxsize 后确认增长消失</li>
-</ul>
 <hr>
-<h2 id="h-诊断质量自查">诊断质量自查</h2>
+<h2 id="h-附录">附录</h2>
+<h3 id="h-a-环境信息">A. 环境信息</h3>
 <div class="table-wrap"><table>
 <thead>
 <tr>
-<th>检查项</th>
-<th>结果</th>
+<th>项目</th>
+<th>内容</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>平台</strong></td>
+<td>Linux 6.6.87.2 (WSL2)</td>
+</tr>
+<tr>
+<td><strong>Python 版本</strong></td>
+<td>3.12.3</td>
+</tr>
+<tr>
+<td><strong>目标 PID</strong></td>
+<td>417</td>
+</tr>
+<tr>
+<td><strong>诊断模式</strong></td>
+<td>离线分析（offline_evidence_bundle）</td>
+</tr>
+<tr>
+<td><strong>分析引擎</strong></td>
+<td>WittyDiagnosisAgent / Baize (Phase 1.4)</td>
+</tr>
+<tr>
+<td><strong>诊断报告来源</strong></td>
+<td>Kuafu T1/T2/T3</td>
+</tr>
+</tbody></table></div>
+<h3 id="h-b-术语表">B. 术语表</h3>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>术语</th>
 <th>说明</th>
 </tr>
 </thead>
 <tbody><tr>
-<td><strong>领域透传</strong></td>
-<td><span class="badge-ok">✅</span></td>
-<td>已剥离协议标签，将 semantic/retention/tracemalloc 等结构化证据转化为表格可视化</td>
+<td><strong>RSS</strong></td>
+<td>Resident Set Size，常驻内存集大小</td>
 </tr>
 <tr>
-<td><strong>路径溯源</strong></td>
-<td><span class="badge-ok">✅</span></td>
-<td>所有核心结论均引用 Kuafu 原始报告的具体章节和行号</td>
+<td><strong>Private_Dirty</strong></td>
+<td>进程独占的已修改匿名页</td>
 </tr>
 <tr>
-<td><strong>逻辑闭环</strong></td>
-<td><span class="badge-ok">✅</span></td>
-<td>故障传导链路从 workload 迭代 → 三种泄漏源增长 → LISTENERS 保留链 → 反事实确认 → 根因定位，完整自洽</td>
+<td><strong>ptmalloc</strong></td>
+<td>glibc 的用户态内存分配器（基于 Doug Lea&#39;s malloc）</td>
 </tr>
 <tr>
-<td><strong>竞争假设覆盖</strong></td>
-<td><span class="badge-ok">✅</span></td>
-<td>8 项假设矩阵（LISTENERS / tenant_lookup / SMALL_GLOBAL / native / mmap / plateau / short-window / scope）</td>
+<td><strong>arena</strong></td>
+<td>ptmalloc 中的内存池区域，用于管理分配和释放的内存块</td>
 </tr>
 <tr>
-<td><strong>G4 缺口标注</strong></td>
-<td><span class="badge-ok">✅</span></td>
-<td>明确标注隔离复测未执行，因此不写 &quot;confirmed&quot; 仅写 &quot;strong&quot;</td>
+<td><strong>ctypes</strong></td>
+<td>Python 标准库中用于调用 C 函数的模块</td>
+</tr>
+<tr>
+<td><strong>direction-only</strong></td>
+<td>方向级结论 — 确认问题来源方向但无法精确定位到具体代码路径</td>
+</tr>
+</tbody></table></div>
+<h3 id="h-c-证据文件索引">C. 证据文件索引</h3>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>文件</th>
+<th>路径</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>T1 诊断报告</td>
+<td><code>C:\Users\duanz\.witty-diagnosis-agent\dayu\report\kuafu_T1_20260607_223951.md</code></td>
+</tr>
+<tr>
+<td>T2 诊断报告</td>
+<td><code>C:\Users\duanz\.witty-diagnosis-agent\dayu\report\kuafu_T2_20260607_223943.md</code></td>
+</tr>
+<tr>
+<td>T3 诊断报告</td>
+<td><code>C:\Users\duanz\.witty-diagnosis-agent\dayu\report\kuafu_T3_20260607_223932.md</code></td>
+</tr>
+<tr>
+<td>correlation.json</td>
+<td><code>test/python-memory-leak-analyzer/out/production/native_ctypes_malloc_growth/correlation.json</code></td>
+</tr>
+<tr>
+<td>monitor_rss_pid.json</td>
+<td>同上</td>
+</tr>
+<tr>
+<td>object_growth.json</td>
+<td>同上</td>
+</tr>
+<tr>
+<td>tracemalloc.json</td>
+<td>同上</td>
+</tr>
+<tr>
+<td>semantic.json</td>
+<td>同上</td>
+</tr>
+<tr>
+<td>retention.json</td>
+<td>同上</td>
+</tr>
+<tr>
+<td>live_process_snapshot.json</td>
+<td>同上</td>
 </tr>
 </tbody></table></div>
 
     <div class="meta">
-      <span class="meta-source">Python多源竞争内存泄漏RCA_ses_20260604_20260604143000_report.md</span>
-      <span>生成于 2026/06/04 20:07</span>
+      <span class="meta-source">Python服务RSS持续增长ctypes原生内存泄漏_20260607_RCA_report.md</span>
+      <span>生成于 2026/06/07 22:43</span>
     </div>
   </article>
 </div>

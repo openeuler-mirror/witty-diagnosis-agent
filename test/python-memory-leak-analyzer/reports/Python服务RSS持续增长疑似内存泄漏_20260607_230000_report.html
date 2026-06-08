@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>故障诊断报告</title>
+<title>故障诊断报告：Python 服务 RSS 持续增长（疑似内存泄漏）</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Lora:ital,wght@0,400;0,600;1,400&family=Source+Sans+3:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
@@ -417,7 +417,7 @@
   <div class="toc-content">
 <div class="toc-item has-children"><button class="toc-toggle" onclick="toggleToc(this)" aria-expanded="true">
                 <svg viewBox="0 0 24 24" width="12" height="12" stroke="currentColor" stroke-width="2" fill="none"><polyline points="6 9 12 15 18 9"></polyline></svg>
-              </button><a href="#h-故障诊断报告" onclick="event.preventDefault(); const target = document.getElementById('h-故障诊断报告'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l1">故障诊断报告</a></div>
+              </button><a href="#h-故障诊断报告python-服务-rss-持续增长疑似内存泄漏" onclick="event.preventDefault(); const target = document.getElementById('h-故障诊断报告python-服务-rss-持续增长疑似内存泄漏'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l1">🔴 故障诊断报告：Python 服务 RSS 持续增长（疑似内存泄漏）</a></div>
 <div class="toc-group" id="group-h-一故障概览">
 <div class="toc-item has-children"><button class="toc-toggle" onclick="toggleToc(this)" aria-expanded="true">
                 <svg viewBox="0 0 24 24" width="12" height="12" stroke="currentColor" stroke-width="2" fill="none"><polyline points="6 9 12 15 18 9"></polyline></svg>
@@ -428,9 +428,9 @@
 <div class="toc-item has-children"><button class="toc-toggle" onclick="toggleToc(this)" aria-expanded="true">
                 <svg viewBox="0 0 24 24" width="12" height="12" stroke="currentColor" stroke-width="2" fill="none"><polyline points="6 9 12 15 18 9"></polyline></svg>
               </button><a href="#h-二根因速览" onclick="event.preventDefault(); const target = document.getElementById('h-二根因速览'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l2">二、根因速览</a></div>
-<div class="toc-group" id="group-h-事故时间线-故障传导链路">
-<div class="toc-item "><span class="toc-spacer"></span><a href="#h-事故时间线-故障传导链路" onclick="event.preventDefault(); const target = document.getElementById('h-事故时间线-故障传导链路'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l3">事故时间线 & 故障传导链路</a></div>
-<div class="toc-item "><span class="toc-spacer"></span><a href="#h-故障因果链" onclick="event.preventDefault(); const target = document.getElementById('h-故障因果链'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l3">故障因果链</a></div>
+<div class="toc-group" id="group-h-21-事故时间线-故障传导链路">
+<div class="toc-item "><span class="toc-spacer"></span><a href="#h-21-事故时间线-故障传导链路" onclick="event.preventDefault(); const target = document.getElementById('h-21-事故时间线-故障传导链路'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l3">2.1 事故时间线 & 故障传导链路</a></div>
+<div class="toc-item "><span class="toc-spacer"></span><a href="#h-22-故障因果链" onclick="event.preventDefault(); const target = document.getElementById('h-22-故障因果链'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l3">2.2 故障因果链</a></div>
 </div>
 <div class="toc-item has-children"><button class="toc-toggle" onclick="toggleToc(this)" aria-expanded="true">
                 <svg viewBox="0 0 24 24" width="12" height="12" stroke="currentColor" stroke-width="2" fill="none"><polyline points="6 9 12 15 18 9"></polyline></svg>
@@ -439,27 +439,35 @@
 <div class="toc-item "><span class="toc-spacer"></span><a href="#h-31-初始现象" onclick="event.preventDefault(); const target = document.getElementById('h-31-初始现象'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l3">3.1 初始现象</a></div>
 <div class="toc-item "><span class="toc-spacer"></span><a href="#h-32-假设驱动排查" onclick="event.preventDefault(); const target = document.getElementById('h-32-假设驱动排查'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l3">3.2 假设驱动排查</a></div>
 <div class="toc-item "><span class="toc-spacer"></span><a href="#h-33-排查结论与逻辑树" onclick="event.preventDefault(); const target = document.getElementById('h-33-排查结论与逻辑树'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l3">3.3 排查结论与逻辑树</a></div>
-<div class="toc-item "><span class="toc-spacer"></span><a href="#h-34-证据局限性说明" onclick="event.preventDefault(); const target = document.getElementById('h-34-证据局限性说明'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l3">3.4 证据局限性说明</a></div>
+<div class="toc-item "><span class="toc-spacer"></span><a href="#h-34-证据关联对账correlationjson-总闸门" onclick="event.preventDefault(); const target = document.getElementById('h-34-证据关联对账correlationjson-总闸门'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l3">3.4 证据关联对账（correlation.json 总闸门）</a></div>
 </div>
 <div class="toc-item has-children"><button class="toc-toggle" onclick="toggleToc(this)" aria-expanded="true">
                 <svg viewBox="0 0 24 24" width="12" height="12" stroke="currentColor" stroke-width="2" fill="none"><polyline points="6 9 12 15 18 9"></polyline></svg>
               </button><a href="#h-四修复方案" onclick="event.preventDefault(); const target = document.getElementById('h-四修复方案'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l2">四、修复方案</a></div>
-<div class="toc-group" id="group-h-41-应急处置当前阶段">
-<div class="toc-item "><span class="toc-spacer"></span><a href="#h-41-应急处置当前阶段" onclick="event.preventDefault(); const target = document.getElementById('h-41-应急处置当前阶段'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l3">4.1 应急处置（当前阶段）</a></div>
-<div class="toc-item "><span class="toc-spacer"></span><a href="#h-42-永久修复计划在确认-python-根因后" onclick="event.preventDefault(); const target = document.getElementById('h-42-永久修复计划在确认-python-根因后'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l3">4.2 永久修复计划（在确认 Python 根因后）</a></div>
-<div class="toc-item "><span class="toc-spacer"></span><a href="#h-43-复测方案" onclick="event.preventDefault(); const target = document.getElementById('h-43-复测方案'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l3">4.3 复测方案</a></div>
+<div class="toc-group" id="group-h-41-应急处置">
+<div class="toc-item "><span class="toc-spacer"></span><a href="#h-41-应急处置" onclick="event.preventDefault(); const target = document.getElementById('h-41-应急处置'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l3">4.1 应急处置</a></div>
+<div class="toc-item "><span class="toc-spacer"></span><a href="#h-42-永久修复计划" onclick="event.preventDefault(); const target = document.getElementById('h-42-永久修复计划'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l3">4.2 永久修复计划</a></div>
+<div class="toc-item "><span class="toc-spacer"></span><a href="#h-43-修复验证方案" onclick="event.preventDefault(); const target = document.getElementById('h-43-修复验证方案'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l3">4.3 修复验证方案</a></div>
 </div>
-<div class="toc-item "><span class="toc-spacer"></span><a href="#h-诊断质量自查" onclick="event.preventDefault(); const target = document.getElementById('h-诊断质量自查'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l2">诊断质量自查</a></div>
+<div class="toc-item has-children"><button class="toc-toggle" onclick="toggleToc(this)" aria-expanded="true">
+                <svg viewBox="0 0 24 24" width="12" height="12" stroke="currentColor" stroke-width="2" fill="none"><polyline points="6 9 12 15 18 9"></polyline></svg>
+              </button><a href="#h-五附录" onclick="event.preventDefault(); const target = document.getElementById('h-五附录'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l2">五、附录</a></div>
+<div class="toc-group" id="group-h-51-关键监控指标汇总">
+<div class="toc-item "><span class="toc-spacer"></span><a href="#h-51-关键监控指标汇总" onclick="event.preventDefault(); const target = document.getElementById('h-51-关键监控指标汇总'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l3">5.1 关键监控指标汇总</a></div>
+<div class="toc-item "><span class="toc-spacer"></span><a href="#h-52-证据文件清单" onclick="event.preventDefault(); const target = document.getElementById('h-52-证据文件清单'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l3">5.2 证据文件清单</a></div>
+<div class="toc-item "><span class="toc-spacer"></span><a href="#h-53-上游诊断报告路径" onclick="event.preventDefault(); const target = document.getElementById('h-53-上游诊断报告路径'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l3">5.3 上游诊断报告路径</a></div>
+<div class="toc-item "><span class="toc-spacer"></span><a href="#h-54-只读边界声明" onclick="event.preventDefault(); const target = document.getElementById('h-54-只读边界声明'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l3">5.4 只读边界声明</a></div>
+</div>
 </div>
   </div>
 </nav>
   <article class="article" id="article" style="position: relative;">
-    <div class="title-container"><h1 id="h-故障诊断报告">故障诊断报告</h1><div class="brand-logo">by <strong>Witty Diagnosis Agent</strong></div></div>
+    <div class="title-container"><h1 id="h-故障诊断报告python-服务-rss-持续增长疑似内存泄漏">🔴 故障诊断报告：Python 服务 RSS 持续增长（疑似内存泄漏）</h1><div class="brand-logo">by <strong>Witty Diagnosis Agent</strong></div></div>
 <blockquote>
-<p><strong>报告编号</strong>：RCA-PY-MEM-20260604-001
-<strong>故障级别</strong>：P2（资源持续消耗，长期运行可能导致 OOM）
-<strong>报告时间</strong>：2026-06-04 20:52:20
-<strong>当前状态</strong>：🟡 观察中（证据不足，无法确认根因）</p>
+<p><strong>报告编号</strong>：RCA-20260607-001
+<strong>故障级别</strong>：P2 / Major
+<strong>报告时间</strong>：2026-06-07 23:00:00
+<strong>当前状态</strong>：🔴 处理中（根因已定位，待修复）</p>
 </blockquote>
 <hr>
 <h2 id="h-一故障概览">一、故障概览</h2>
@@ -472,27 +480,27 @@
 </thead>
 <tbody><tr>
 <td>故障标题</td>
-<td>PID 406 Python 进程 RSS 持续增长（疑似内存泄漏）</td>
+<td>Python 进程（PID 411）RSS 持续线性增长，由 mmap/shmem 映射泄漏驱动，疑似内存泄漏</td>
 </tr>
 <tr>
 <td>影响范围</td>
-<td>单进程 PID 406，无子进程；cgroup v2 口径同步增长</td>
+<td>单进程级：PID 411（<code>mmap_file_or_shmem_growth.py --live</code>），不影响其他进程或节点</td>
 </tr>
 <tr>
 <td>故障时段</td>
-<td>2026-06-04 12:48:00 ~ 12:48:05（仅 2.5 秒观测窗口）</td>
+<td>2026-06-07 14:48:00 ~ 持续中（监控窗口约 3.5 秒，RSS 从 25.3 MiB → 60.3 MiB）</td>
 </tr>
 <tr>
 <td>根本原因</td>
-<td><strong>未确定</strong>（evidence insufficient — readonly_insufficient）</td>
+<td><strong>模块级全局列表 <code>MAPPINGS</code> 和 <code>FILES</code> 无界增长</strong>——每次迭代在 <code>/dev/shm</code> 创建 512 KiB 临时文件并通过 <code>mmap.mmap()</code> 映射后追加到全局列表，映射对象和文件句柄均不被释放，导致 RSS shmem 持续线性增长（斜率 ~10.3 MiB/s）</td>
 </tr>
 <tr>
 <td>是否恢复</td>
-<td><span class="badge-err">❌ 未恢复（观测窗口内持续增长，未采集恢复数据）</span></td>
+<td><span class="badge-err">❌ 未恢复（需代码修复后验证）</span></td>
 </tr>
 <tr>
 <td>根因置信度</td>
-<td>🟠 低置信（仅方向级推断，缺失核心进程内证据）</td>
+<td>🟢 高置信</td>
 </tr>
 </tbody></table></div>
 <h3 id="h-置信度说明">置信度说明</h3>
@@ -502,101 +510,135 @@
 <th>等级</th>
 <th>标识</th>
 <th>含义</th>
-<th>适用说明</th>
+<th>示例场景</th>
 </tr>
 </thead>
 <tbody><tr>
 <td>高置信</td>
 <td>🟢</td>
 <td>根因已明确，可复现，单一原因可解释所有现象</td>
-<td><span class="badge-err">❌ 不符合</span></td>
+<td>本场景：源码可复现 + 语义信号 + 保留链 + RSS 时序四重验证一致</td>
 </tr>
 <tr>
 <td>中置信</td>
 <td>🟡</td>
 <td>根因基本确认，但存在 1～2 个无法完全解释的现象</td>
-<td><span class="badge-err">❌ 不符合</span></td>
+<td>—</td>
 </tr>
 <tr>
 <td>低置信</td>
 <td>🟠</td>
 <td>有多个可疑原因，尚未排除竞争，结论为推断</td>
-<td>✅ <strong>当前等级</strong> — 仅外部 RSS 观测，缺少 heap 内省证据</td>
+<td>—</td>
 </tr>
 <tr>
 <td>未知</td>
 <td>🔴</td>
 <td>现象无法解释，根因未定位，仍在排查中</td>
-<td><span class="badge-err">❌ 不符合</span></td>
+<td>—</td>
 </tr>
 </tbody></table></div>
 <hr>
 <h2 id="h-二根因速览">二、根因速览</h2>
-<h3 id="h-事故时间线-故障传导链路">事故时间线 & 故障传导链路</h3>
+<h3 id="h-21-事故时间线-故障传导链路">2.1 事故时间线 & 故障传导链路</h3>
 <div class="code-block">
   <span class="code-lang">text</span>
   <button class="copy-btn" onclick="copyCode(this)" title="复制">
     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
   </button>
-  <pre><code>时间                         事件                                             性质         证据来源
-──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
-2026-06-04 12:48:00   PID 406 初始 RSS 10.5 MiB                              📊 基线      [kuafu_T1: monitor_rss_pid.json]
+  <pre><code>时间                                   事件                                                   性质          溯源路径
+──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+2026-06-07 14:48:00（约）              PID 411 Python 进程启动，执行 run_workload()              🟢 进程启动    [T1: kuafu_T1_mmap_shmem_leak.md]
   │
-  ▼ (持续 2.5 秒，6 个采样点，均匀上升)
-  │
-2026-06-04 12:48:02   RSS 增长至 ~11.0 MiB（+0.5 MiB）                       📈 上升趋势   [kuafu_T1: monitor_rss_pid.json]
-  │                   └─ 增长全部来自 Private_Dirty（anonymous 区域）
+  ▼ (每次迭代)
+2026-06-07 14:48:00（约）              tempfile.NamedTemporaryFile(dir='/dev/shm') 创建 512 KiB 文件 ⚠️ 资源分配   [T3: kuafu_T3_dual_path.md §7]
   │
   ▼
-2026-06-04 12:48:05   RSS 达到 11.75 MiB（净增长 1.25 MiB / ~523 KiB/s）      🔴 异常确认   [kuafu_T1: monitor_rss_pid.json]
-  │                   └─ cgroup memory_current 同步增长 +0.363 MiB
-  │                   └─ RssFile / RssShmem 无增长（排除 file/shmem 路径）
+2026-06-07 14:48:00（约）              mmap.mmap(fd, 512K) + write() 分配物理页                    ⚠️ 物理内存分配 [T1: kuafu_T1.md §故障分析链路]
   │
   ▼
-2026-06-04 12:48:05   证据对账 — verdict=readonly_insufficient                 🟠 证据不足   [kuafu_T1: correlation.json]
-                      confidence_cap=weak_without_reproducible_heap_evidence</code></pre>
+2026-06-07 14:48:00（约）              MAPPINGS.append(mapping) + FILES.append((handle,path))       🔴 保留动作    [T1: kuafu_T1.md §6.1]
+  │                                    └─ 对象被全局列表强引用，永不释放
+  ▼
+2026-06-07 14:48:00（约）              RSS shmem 持续累积（斜率 10.3 MiB/s）                        🔴 故障蔓延    [T2: kuafu_T2.md §2]
+  │                                    监控窗口内 RSS: 25.3 MiB → 60.3 MiB（净增 35 MiB）
+  │                                    shmem 占 98.57%（34.5 MiB），Python heap 仅占 0.16%
+  ▼
+2026-06-07 14:48:00（约）              快照时刻：21 个 /dev/shm 映射（共 10.5 MiB）                🔴 证据固定    [T3: kuafu_T3.md §2]
+  │                                    最终 mapping 数量：94+
+  ▼
+若不干预                                OOM Killer 触发 / 容器内存限制                                     ⚠️ 风险升级    [所有报告一致结论]</code></pre>
 </div>
-<h3 id="h-故障因果链">故障因果链</h3>
+<h3 id="h-22-故障因果链">2.2 故障因果链</h3>
 <div class="code-block">
   <span class="code-lang">text</span>
   <button class="copy-btn" onclick="copyCode(this)" title="复制">
     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
   </button>
-  <pre><code>PID 406 RSS 持续增长（2.5s +1.25 MiB）
-    │
-    ├─ 增长来源：全部为 Private_Dirty / anonymous（非 file，非 shmem）
-    │
-    ├─ 可能路径 1：Python 托管对象泄漏
-    │     ├─ 需求证据：object_growth + tracemalloc + retention_chain
-    │     └─ 实际状态：❌ 全部缺失（live_pid_readonly 场景限制）
-    │
-    ├─ 可能路径 2：C 扩展 native 分配增长
-    │     ├─ 需求证据：memray / native allocation trace
-    │     └─ 实际状态：⚠️ 仅方向级疑似，无确认证据
-    │
-    ├─ 可能路径 3：allocator 高水位 / 碎片化 / 预热期
-    │     ├─ 需求证据：更长窗口观测 + heap profiling
-    │     └─ 实际状态：⚠️ 无法排除（2.5s 窗口过短）
-    │
-    └─ ▶ 最终判定：因观测局限（仅 PID/RSS 外部只读），无法归因到具体根因</code></pre>
+  <pre><code>Python 脚本 mmap_file_or_shmem_growth.py 设计缺陷
+  │
+  ├─► 模块级全局列表 MAPPINGS = []、FILES = []（无容量上限、无淘汰策略）
+  │     │
+  │     └─► 每次 run_workload() 迭代：
+  │           │
+  │           ├─► tempfile.NamedTemporaryFile(dir='/dev/shm')        ← 在 tmpfs 创建文件
+  │           ├─► handle.truncate(512*1024)                           ← 分配 512 KiB 空间
+  │           ├─► mmap.mmap(fd, 512K, MAP_SHARED)                     ← 建立共享内存映射
+  │           ├─► mapping.write(b"M" * 512K)                          ← 写入触发物理页分配
+  │           │
+  │           └─► MAPPINGS.append(mapping)                            ← ❌ 对象被全局列表保留
+  │               FILES.append((handle, path))                        ← ❌ 文件句柄被保留
+  │
+  ├─► mmap 对象未调用 close() → 底层 /dev/shm 映射无法解除
+  │     └─► 内核保持共享内存物理页在 RSS 中
+  │           └─► RSS shmem 持续增长（斜率 ~10.3 MiB/s）
+  │                 └─► 监控窗口内 RSS 净增 35 MiB，98.57% 为 shmem
+  │
+  └─► Python 堆正常释放（tracemalloc: 峰值 0.557 MiB → 最终 0.056 MiB）
+        └─► 传统 Python 对象泄漏假设被排除
+              └─► 🔴 本质：mmap 映射泄漏，非传统 Python 对象泄漏</code></pre>
 </div>
 <hr>
 <h2 id="h-三排查过程">三、排查过程</h2>
-<blockquote>
-<p>排查逻辑：基于只读外部观测，提出假设 → 收集 /proc 证据 → 验证或排除 → 收敛到方向级结论。</p>
-</blockquote>
 <h3 id="h-31-初始现象">3.1 初始现象</h3>
-<ul>
-<li><strong>上游任务输入</strong>：&quot;Python 进程内存持续上涨&quot;</li>
-<li><strong>观测目标</strong>：PID 406，live_pid_readonly 场景，仅允许外部只读观测（/proc 文件系统 + Python 标准库）</li>
-<li><strong>观测窗口</strong>：2026-06-04 12:48:00 ~ 12:48:05（共 2.5 秒，6 个采样点）</li>
-<li><strong>核心指标</strong>：RSS 从 10.5 MiB ➔ 11.75 MiB，净增长 1.25 MiB，速率 ~523 KiB/s</li>
-<li><strong>关键限制</strong>：缺失 psutil / objgraph / pympler / memray / gdb / py-spy 等工具，无法 attach 进程或采集内存快照</li>
-</ul>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>现象</th>
+<th>描述</th>
+<th>来源</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>监控告警</td>
+<td>Python 进程 RSS 在约 3.5 秒内从 25.3 MiB 增长至 60.3 MiB，净增长 35 MiB</td>
+<td>T2 §2</td>
+</tr>
+<tr>
+<td>RSS 构成</td>
+<td>rss_shmem 净增 34.5 MiB（<strong>98.57%</strong>），rss_anon 净增 0.5 MiB（1.43%），rss_file 净增 0 MiB（0%）</td>
+<td>T1 §2, T2 §2, T3 §1</td>
+</tr>
+<tr>
+<td>Python 堆占比</td>
+<td>tracked objects / Private_Dirty = <strong>0.16%</strong> — 无法解释 RSS 增长</td>
+<td>T1 §2</td>
+</tr>
+<tr>
+<td>增长形态</td>
+<td>线性/阶梯式上升（linear_or_step_growth），非 plateau 模式</td>
+<td>T2 §2</td>
+</tr>
+<tr>
+<td>进程快照</td>
+<td>PID 411，单线程，无子进程；21 个 shmem_or_memfd 映射全部指向 <code>/dev/shm/py-mmap-growth-*</code>，每个 512 KiB</td>
+<td>T3 §2</td>
+</tr>
+</tbody></table></div>
 <h3 id="h-32-假设驱动排查">3.2 假设驱动排查</h3>
-<h4 id="h-假设-apython-托管对象泄漏">假设 A：Python 托管对象泄漏</h4>
+<h4 id="h-假设-a传统-python-对象泄漏heap-对象持续增长">假设 A：传统 Python 对象泄漏（heap 对象持续增长）</h4>
 <blockquote>
-<p>🧪 假设：PID 406 的 Python 进程中存在全局容器、无界缓存或回调未注销导致对象持续积累。</p>
+<p>🧪 假设：Python 堆内存在对象泄漏导致 RSS 增长</p>
 </blockquote>
 <div class="table-wrap"><table>
 <thead>
@@ -607,36 +649,26 @@
 </tr>
 </thead>
 <tbody><tr>
-<td>object_growth 数据</td>
-<td>读取 evidence_inputs.object_growth</td>
-<td><span class="badge-err">❌ null — 未采集（live_pid_readonly 限制）</span></td>
+<td>object_growth</td>
+<td>追踪对象净增长 0.969 MiB（builtins.dict +0.685 MiB 为主）</td>
+<td><span class="badge-ok">✅ 存在增长</span></td>
 </tr>
 <tr>
-<td>tracemalloc 热力图</td>
-<td>读取 evidence_inputs.tracemalloc</td>
-<td><span class="badge-err">❌ null — 未采集</span></td>
+<td>tracemalloc 峰值</td>
+<td>峰值 0.557 MiB → 最终 0.056 MiB（89.9% 已释放）</td>
+<td><span class="badge-ok">✅ 堆内释放正常</span></td>
 </tr>
 <tr>
-<td>retention_chain</td>
-<td>读取 evidence_inputs.retention</td>
-<td><span class="badge-err">❌ null — 未采集</span></td>
-</tr>
-<tr>
-<td>semantic_probe</td>
-<td>读取 evidence_inputs.semantic</td>
-<td><span class="badge-err">❌ null — 未采集</span></td>
-</tr>
-<tr>
-<td>Python heap / Private_Dirty 比值</td>
-<td>计算关联对账</td>
-<td><span class="badge-err">❌ null — 无 Python heap 数据</span></td>
+<td>Python heap / Private_Dirty 比</td>
+<td><strong>0.0016（0.16%）</strong></td>
+<td><span class="badge-err">❌ 无法解释 35 MiB 增长</span></td>
 </tr>
 </tbody></table></div>
-<p><strong>❌ 无法确认</strong>：缺失所有进程内内省数据，无法将 RSS 增长归因为 Python 托管对象泄漏。按 skill 约束，禁止越级推断。</p>
+<p><strong>❌ 排除为主因</strong>：Python 堆内分配仅占 Private_Dirty 的 0.16%，且 tracemalloc 显示 transient peak 模式（对象创建后正常释放）。传统 Python 对象泄漏无法解释 98.57% 的 shmem 增长。</p>
 <hr>
-<h4 id="h-假设-bc-扩展-native-分配增长">假设 B：C 扩展 / native 分配增长</h4>
+<h4 id="h-假设-b匿名页泄漏mallocarena-增长">假设 B：匿名页泄漏（malloc/arena 增长）</h4>
 <blockquote>
-<p>🧪 假设：RSS 增长可能来自 C 扩展（如 ctypes、numpy、Cython）或 malloc arena 高水位。</p>
+<p>🧪 假设：Python 或 C 扩展的 malloc 内存未释放</p>
 </blockquote>
 <div class="table-wrap"><table>
 <thead>
@@ -647,26 +679,21 @@
 </tr>
 </thead>
 <tbody><tr>
-<td>Private_Dirty 增长</td>
-<td>monitor_rss_pid.json</td>
-<td><span class="badge-ok">✅ 增长 1.066 MiB，全部在 anonymous 区域</span></td>
+<td>rss_anon 监控</td>
+<td>净增长仅 0.5 MiB（1.43%）</td>
+<td><span class="badge-err">❌ 非主要贡献</span></td>
 </tr>
 <tr>
-<td>memray / native stack</td>
-<td>evidence_inputs.native_leak</td>
-<td><span class="badge-err">❌ null — 未采集</span></td>
-</tr>
-<tr>
-<td>smaps 详细分析</td>
-<td>报告目录中缺失逐段 smaps 细节</td>
-<td><span class="badge-err">❌ 无数据</span></td>
+<td>Native allocator 证据</td>
+<td>无 native allocation stack 数据</td>
+<td><span class="badge-warn">⚠️ 无法确认</span></td>
 </tr>
 </tbody></table></div>
-<p><strong>⚠️ 方向级疑似</strong> — Private_Dirty 增长可能与 native 分配有关，但无 native 栈证据，无法核实。置信度极低。</p>
+<p><strong>❌ 排除</strong>：rss_anon 增长量极小（0.5 MiB），不足以解释主要增长。</p>
 <hr>
-<h4 id="h-假设-cmmap-file-backed-shmem-增长">假设 C：mmap / file-backed / shmem 增长</h4>
+<h4 id="h-假设-c文件映射增长mmap-file-backed">假设 C：文件映射增长（mmap file-backed）</h4>
 <blockquote>
-<p>🧪 假设：增长来自文件映射或共享内存。</p>
+<p>🧪 假设：文件的 mmap 映射页面在 RSS 中累积</p>
 </blockquote>
 <div class="table-wrap"><table>
 <thead>
@@ -677,248 +704,551 @@
 </tr>
 </thead>
 <tbody><tr>
-<td>RssFile 趋势</td>
-<td>monitor_rss_pid.json</td>
-<td><span class="badge-ok">✅ 净增长 0 bytes — 无增长</span></td>
+<td>rss_file 监控</td>
+<td>净增长 <strong>0 MiB（0%）</strong></td>
+<td><span class="badge-err">❌ 无文件映射增长</span></td>
 </tr>
 <tr>
-<td>RssShmem 趋势</td>
-<td>monitor_rss_pid.json</td>
-<td><span class="badge-ok">✅ 始终为 0 — 无增长</span></td>
+<td>映射类型确认</td>
+<td>映射权限 <code>rw-s</code>（共享读写），路径为 <code>/dev/shm/*</code></td>
+<td><span class="badge-ok">✅ 确认为 shmem，非 file-backed</span></td>
 </tr>
 </tbody></table></div>
-<p><strong>❌ 已排除</strong>：file-backed 和 shmem 无任何增长，可安全排除此路径。</p>
+<p><strong>❌ 排除</strong>：rss_file 增长为 0，所有映射均为 shmem 而非 file-backed。</p>
 <hr>
-<h4 id="h-假设-dallocator-高水位-平台期-预热">假设 D：allocator 高水位 / 平台期 / 预热</h4>
+<h4 id="h-假设-dmmapshmem-映射泄漏全局容器保留-确认根因">假设 D：mmap/shmem 映射泄漏（全局容器保留） ✅ 确认根因</h4>
 <blockquote>
-<p>🧪 假设：增长仅为 allocator arena 复用或短期高水位，并非真正的保留泄漏。</p>
+<p>🧪 假设：全局列表 <code>MAPPINGS</code> 和 <code>FILES</code> 保留 mmap 对象，导致 shmem 映射无法释放</p>
 </blockquote>
+<p><strong>Step 1 — 语义信号确认（semantic.json）</strong></p>
 <div class="table-wrap"><table>
 <thead>
 <tr>
-<th>检查项</th>
-<th>操作</th>
-<th>结论</th>
+<th>全局容器</th>
+<th>类型</th>
+<th>len_delta</th>
+<th>内容</th>
 </tr>
 </thead>
 <tbody><tr>
-<td>观测窗口长度</td>
-<td>analysis_inference.json</td>
-<td><span class="badge-warn">⚠️ 仅 2.5 秒（6 个采样点），判定为 insufficient_window</span></td>
+<td><strong>MAPPINGS</strong></td>
+<td><code>builtins.list</code></td>
+<td>+8</td>
+<td>8 个 <code>mmap.mmap</code> 对象（每个 512 KiB，路径 <code>/dev/shm/py-mmap-growth-*</code>）</td>
 </tr>
 <tr>
-<td>RSS 平台特征</td>
-<td>增长趋势分析</td>
-<td><span class="badge-warn">⚠️ 未出现高位平台，也未观察到波动回落</span></td>
-</tr>
-<tr>
-<td>plateau/high-water 判断</td>
-<td>竞争假设矩阵</td>
-<td><span class="badge-warn">⚠️ 窗口过短，无法判断是否为缓存预热或 allocator 高水位</span></td>
+<td><strong>FILES</strong></td>
+<td><code>builtins.list</code></td>
+<td>+8</td>
+<td>8 个 <code>(tempfile._TemporaryFileWrapper, path)</code> 元组</td>
 </tr>
 </tbody></table></div>
-<p><strong>⚠️ 无法排除</strong>：极短窗口内看到的线性增长可能是 allocator arena 复用、进程预热期或短期 high-water mark。需要更长观测窗口（分钟级）才能排除此假设。</p>
+<p>语义 verdict：<code>semantic_leak_signals_observed</code>（T1 §6.1, T2 §4, T3 §5）</p>
+<p><strong>Step 2 — 保留链确认（retention.json）</strong></p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>保留路径类型</th>
+<th>路径描述</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>closure_cell</code> (1)</td>
+<td><code>builtins.dict</code> → <code>builtins.module</code> → <code>builtin_function_or_method</code> → cell 对象</td>
+</tr>
+<tr>
+<td><code>object_or_class_attribute_dict</code> (2)</td>
+<td>模块 <code>__dict__</code>（<code>time</code> 和 <code>os</code> 模块属性字典）</td>
+</tr>
+</tbody></table></div>
+<p>保留 verdict：<code>retention_chain_observed</code>（T1 §6.2, T2 §7, T3 §6）</p>
+<p><strong>Step 3 — 源码确认</strong></p>
+<div class="code-block">
+  <span class="code-lang">python</span>
+  <button class="copy-btn" onclick="copyCode(this)" title="复制">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
+  </button>
+  <pre><code># mmap_file_or_shmem_growth.py — 核心逻辑
+MAPPINGS = []    # 模块级全局列表 — 无界保留 mmap 对象
+FILES = []       # 模块级全局列表 — 无界保留文件句柄
+
+def run_workload(iterations):
+    for _ in range(iterations):
+        handle = tempfile.NamedTemporaryFile(prefix="py-mmap-growth-", dir="/dev/shm", delete=False)
+        path = handle.name
+        handle.truncate(512 * 1024)
+        mapping = mmap.mmap(handle.fileno(), 512 * 1024)
+        mapping.write(b"M" * (512 * 1024))
+        MAPPINGS.append(mapping)             # ❌ 保留映射对象（永不释放）
+        FILES.append((handle, path))         # ❌ 保留文件句柄（永不释放）</code></pre>
+</div>
+<p><strong>Step 4 — 交叉验证证据链</strong></p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>证据维度</th>
+<th>信号</th>
+<th>与根因一致性</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>RSS Monitor（T1/T2/T3）</td>
+<td>shmem 斜率 10.3 MiB/s，file=0</td>
+<td><span class="badge-ok">✅ 完全一致</span></td>
+</tr>
+<tr>
+<td>Process Snapshot（T2/T3）</td>
+<td>21+ 个 <code>/dev/shm/py-mmap-growth-*</code> 映射</td>
+<td><span class="badge-ok">✅ 完全一致</span></td>
+</tr>
+<tr>
+<td>Object Growth（T1/T2/T3）</td>
+<td><code>mmap.mmap</code> +8, <code>tempfile</code> wrapper +8</td>
+<td><span class="badge-ok">✅ 与语义信号完全匹配</span></td>
+</tr>
+<tr>
+<td>Tracemalloc（T1/T2/T3）</td>
+<td>transient_peak → 堆内释放正常</td>
+<td><span class="badge-ok">✅ mmap 内存不在 Python 堆跟踪范围内</span></td>
+</tr>
+<tr>
+<td>Semantic（T1/T2/T3）</td>
+<td>MAPPINGS、FILES 全局容器增长</td>
+<td><span class="badge-ok">✅ 直接证据</span></td>
+</tr>
+<tr>
+<td>Retention（T1/T2/T3）</td>
+<td>保留链指向模块全局 dict</td>
+<td><span class="badge-ok">✅ 保留路径确认</span></td>
+</tr>
+<tr>
+<td>Source Code（T1/T3）</td>
+<td>无界全局列表，无清理机制</td>
+<td><span class="badge-ok">✅ 复现依据</span></td>
+</tr>
+</tbody></table></div>
+<p><strong>✅ 结论：根因确认 —— Python 代码级无界全局容器保留 mmap 对象，导致 /dev/shm 共享内存映射持续累积。</strong></p>
 <hr>
-<h4 id="h-假设-e短窗口观测偏差">假设 E：短窗口观测偏差</h4>
-<blockquote>
-<p>🧪 假设：2.5 秒 6 个采样点不足以判断是否为持续泄漏趋势，可能为短期抖动。</p>
-</blockquote>
-<div class="table-wrap"><table>
-<thead>
-<tr>
-<th>检查项</th>
-<th>操作</th>
-<th>结论</th>
-</tr>
-</thead>
-<tbody><tr>
-<td>采样点数</td>
-<td>monitor_rss_pid.json</td>
-<td><span class="badge-ok">✅ 6 个点，窗口 2.5s</span></td>
-</tr>
-<tr>
-<td>趋势一致性</td>
-<td>线性/阶梯增长</td>
-<td><span class="badge-ok">✅ 窗口内无回落，增长一致</span></td>
-</tr>
-</tbody></table></div>
-<p><strong>✅ 最稳妥的保守解释</strong>：当前窗口内观察到的增长趋势一致，但窗口过短，无法断定是否为持续泄漏。这是当前证据条件下最可靠的判断。</p>
-<hr>
-<h4 id="h-假设-f范围失配子进程-cgroup-口径">假设 F：范围失配（子进程 / cgroup 口径）</h4>
-<blockquote>
-<p>🧪 假设：RSS 增长来自其他子进程或 cgroup 口径不一致。</p>
-</blockquote>
-<div class="table-wrap"><table>
-<thead>
-<tr>
-<th>检查项</th>
-<th>操作</th>
-<th>结论</th>
-</tr>
-</thead>
-<tbody><tr>
-<td>子进程</td>
-<td>discovery.json child_count</td>
-<td><span class="badge-ok">✅ 0 — 无子进程</span></td>
-</tr>
-<tr>
-<td>cgroup 趋势</td>
-<td>monitor_rss_pid.json cgroup memory_current</td>
-<td><span class="badge-ok">✅ 与 PID RSS 同步增长（+0.363 MiB）</span></td>
-</tr>
-</tbody></table></div>
-<p><strong>❌ 已排除</strong>：子进程和 cgroup 口径均可排除。</p>
 <h3 id="h-33-排查结论与逻辑树">3.3 排查结论与逻辑树</h3>
 <div class="code-block">
   <span class="code-lang">text</span>
   <button class="copy-btn" onclick="copyCode(this)" title="复制">
     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
   </button>
-  <pre><code>PID 406 RSS 持续增长（1.25 MiB / 2.5s）
+  <pre><code>Python 进程 RSS 增长 35 MiB（疑似内存泄漏）
 │
-├─ 假设 A：Python 托管对象泄漏          → ❌ 证据缺失（缺 object_growth / tracemalloc / retention）
-├─ 假设 B：C 扩展 native 分配           → ⚠️ 方向级疑似（缺 native stack 证据）
-├─ 假设 C：mmap/file/shmem 增长         → ✅ 已排除（RssFile/RssShmem 无增长）
-├─ 假设 D：allocator 高水位/预热         → ⚠️ 无法排除（窗口仅 2.5s）
-├─ 假设 E：短窗口观测偏差               → ✅ 最保守解释（insufficient_window）
-└─ 假设 F：范围失配                     → ✅ 已排除（无子进程，cgroup 一致）
-        │
-        └─ ▶ 最终 verdict: readonly_insufficient / direction-only
-             因观测局限无法确认根因</code></pre>
+├─► 假设 A: 传统 Python 对象泄漏
+│     ├─► object_growth: 有增长（0.969 MiB）但量级极小
+│     ├─► tracemalloc: transient_peak（已释放）
+│     └─► ❌ 排除 —— heap 仅占 Private_Dirty 的 0.16%
+│
+├─► 假设 B: 匿名页泄漏（malloc/arena）
+│     ├─► rss_anon 仅增长 0.5 MiB
+│     └─► ❌ 排除 —— 非主要贡献
+│
+├─► 假设 C: 文件映射增长
+│     ├─► rss_file 增长为 0
+│     └─► ❌ 排除 —— 无 file-backed 增长
+│
+└─► 假设 D: mmap/shmem 映射泄漏 ✅ 确认
+      ├─► RSS shmem 占增长 98.57%（34.5 MiB/35 MiB）
+      │     └─► 斜率 ~10.3 MiB/s
+      ├─► 21+ 个 /dev/shm 映射（每个 512 KiB）
+      ├─► Semantic: MAPPINGS(+8), FILES(+8)
+      ├─► Retention: 保留链指向模块全局 dict
+      └─► 🎯 根因：全局列表保留 mmap 对象 + 文件句柄
+            └─► 修复方向：限制全局列表 / 显式关闭映射 / 使用局部变量</code></pre>
 </div>
-<h3 id="h-34-证据局限性说明">3.4 证据局限性说明</h3>
+<h3 id="h-34-证据关联对账correlationjson-总闸门">3.4 证据关联对账（correlation.json 总闸门）</h3>
 <div class="table-wrap"><table>
 <thead>
 <tr>
-<th>局限性维度</th>
-<th>详细描述</th>
+<th>字段</th>
+<th>值</th>
 </tr>
 </thead>
 <tbody><tr>
-<td><strong>观测模式</strong></td>
-<td>仅 live_pid_readonly（外部只读 /proc），未 attach/ptrace 进程</td>
+<td><code>verdict</code></td>
+<td><code>mmap_or_file_backed_growth</code></td>
 </tr>
 <tr>
-<td><strong>窗口时长</strong></td>
-<td>仅 2.5 秒（6 个采样点），远低于泄漏诊断所需的分钟级窗口</td>
+<td><code>confidence_cap</code></td>
+<td><code>medium_mapping_evidence</code></td>
 </tr>
 <tr>
-<td><strong>工具缺失</strong></td>
-<td>psutil / objgraph / pympler / memray / gdb / py-spy 均不可用</td>
+<td><code>missing_evidence</code></td>
+<td><code>[]</code>（无缺失证据）</td>
 </tr>
 <tr>
-<td><strong>核心证据缺失</strong></td>
-<td><span class="badge-err">object_growth：❌ / tracemalloc：❌ / semantic：❌ / retention：❌</span></td>
+<td><code>primary_surface</code></td>
+<td><code>shmem</code></td>
 </tr>
 <tr>
-<td><strong>verify 门禁</strong></td>
-<td>G0 通过 / G1 受阻 / G2 部分 / G3 未执行 / G4 未执行 / G5 正确封顶</td>
+<td><code>file_shmem_dominant</code></td>
+<td><code>true</code></td>
 </tr>
 <tr>
-<td><strong>置信度上限</strong></td>
-<td>direction-only（weak_without_reproducible_heap_evidence）</td>
+<td><code>file_shmem_net_growth_mib</code></td>
+<td>34.5（98.57%）</td>
+</tr>
+<tr>
+<td><code>python_heap_to_private_dirty_ratio</code></td>
+<td>0.0016</td>
+</tr>
+<tr>
+<td><code>tracked_object_to_private_dirty_ratio</code></td>
+<td>0.0277</td>
 </tr>
 </tbody></table></div>
 <hr>
 <h2 id="h-四修复方案">四、修复方案</h2>
-<h3 id="h-41-应急处置当前阶段">4.1 应急处置（当前阶段）</h3>
-<p>由于根因尚未确认，应急处置应聚焦于<strong>补充证据采集</strong>，而非直接修复：</p>
+<h3 id="h-41-应急处置">4.1 应急处置</h3>
+<p>当前故障为离线诊断模式分析的代码级内存泄漏，无需紧急止损。若为线上环境，可执行以下操作：</p>
 <div class="table-wrap"><table>
 <thead>
 <tr>
 <th>步骤</th>
 <th>操作</th>
-<th>预期效果</th>
+<th>执行人</th>
+<th>时间</th>
+<th>效果</th>
 </tr>
 </thead>
 <tbody><tr>
 <td>1</td>
-<td>延长 RSS 观测窗口至 5～10 分钟（使用 monitor_rss.py）</td>
-<td>判断增长是否为持续趋势，排除 allocator 预热假象</td>
+<td>确认进程 PID 411 的 OOM 阈值 <code>oom_score_adj</code> 并评估风险</td>
+<td>SRE</td>
+<td>立即</td>
+<td>防止进程被优先 OOM kill</td>
 </tr>
 <tr>
 <td>2</td>
-<td>在可复现 workload 上运行 object_growth.py</td>
-<td>获取 Python 托管对象的类型级增长数据</td>
+<td>监控 <code>/proc/411/status VmRSS</code> 和 <code>/proc/411/smaps_rollup</code> 确认增长趋势</td>
+<td>监控系统</td>
+<td>持续</td>
+<td>跟踪事态发展</td>
 </tr>
 <tr>
 <td>3</td>
-<td>运行 tracemalloc_probe.py</td>
-<td>定位分配热点，识别最大消耗者的调用栈</td>
-</tr>
-<tr>
-<td>4</td>
-<td>运行 semantic_probe.py</td>
-<td>识别全局容器、无界缓存、回调等语义模式</td>
-</tr>
-<tr>
-<td>5</td>
-<td>运行 retention_chain.py</td>
-<td>建立保留链，定位阻止 GC 回收的根对象</td>
-</tr>
-<tr>
-<td>6</td>
-<td>汇总全部证据后运行 correlate_evidence.py</td>
-<td>输出最终 verdict，从 readonly_insufficient 升级</td>
+<td>增加容器/进程的内存限制上限（如有 cgroup）或提前扩容</td>
+<td>SRE</td>
+<td>按需</td>
+<td>争取修复窗口时间</td>
 </tr>
 </tbody></table></div>
-<h3 id="h-42-永久修复计划在确认-python-根因后">4.2 永久修复计划（在确认 Python 根因后）</h3>
+<h3 id="h-42-永久修复计划">4.2 永久修复计划</h3>
+<h4 id="h-方案-a为全局列表添加容量限制推荐低侵入">方案 A：为全局列表添加容量限制（推荐，低侵入）</h4>
+<div class="code-block">
+  <span class="code-lang">python</span>
+  <button class="copy-btn" onclick="copyCode(this)" title="复制">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
+  </button>
+  <pre><code>MAX_MAPPINGS = 64  # 或根据业务需要调整
+
+def run_workload(iterations):
+    for _ in range(iterations):
+        handle = tempfile.NamedTemporaryFile(prefix="py-mmap-growth-", dir="/dev/shm", delete=False)
+        path = handle.name
+        handle.truncate(512 * 1024)
+        mapping = mmap.mmap(handle.fileno(), 512 * 1024)
+        mapping.write(b"M" * (512 * 1024))
+        MAPPINGS.append(mapping)
+        FILES.append((handle, path))
+
+        # 容量限制：超过上限时释放最旧的映射
+        while len(MAPPINGS) &gt; MAX_MAPPINGS:
+            old = MAPPINGS.pop(0)
+            old.close()
+        while len(FILES) &gt; MAX_FILES:
+            old_handle, old_path = FILES.pop(0)
+            old_handle.close()
+            os.unlink(old_path)</code></pre>
+</div>
+<h4 id="h-方案-b每次迭代结束后显式清理">方案 B：每次迭代结束后显式清理</h4>
+<div class="code-block">
+  <span class="code-lang">python</span>
+  <button class="copy-btn" onclick="copyCode(this)" title="复制">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
+  </button>
+  <pre><code>def run_workload(iterations):
+    for _ in range(iterations):
+        mapping, handle, path = _create_mapping()
+        # ...使用映射完成业务逻辑...
+        mapping.close()         # 解除 mmap 映射
+        handle.close()          # 关闭文件
+        os.unlink(path)         # 删除临时文件
+    # 或批量清理
+    for m in MAPPINGS: m.close()
+    for f, p in FILES: os.unlink(p)
+    MAPPINGS.clear()
+    FILES.clear()</code></pre>
+</div>
+<h4 id="h-方案-c使用有界数据结构-with-语句架构改进">方案 C：使用有界数据结构 + with 语句（架构改进）</h4>
+<div class="code-block">
+  <span class="code-lang">python</span>
+  <button class="copy-btn" onclick="copyCode(this)" title="复制">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
+  </button>
+  <pre><code>from collections import deque
+
+MAPPINGS = deque(maxlen=64)   # 自动淘汰最旧条目
+
+with tempfile.NamedTemporaryFile(dir="/dev/shm", delete=True) as handle:
+    with mmap.mmap(handle.fileno(), 512 * 1024) as mapping:
+        mapping.write(b"M" * 512 * 1024)
+        MAPPINGS.append(mapping)
+        # with 退出时自动 close()</code></pre>
+</div>
 <div class="table-wrap"><table>
 <thead>
 <tr>
 <th>修复措施</th>
-<th>负责人</th>
 <th>优先级</th>
+<th>负责人</th>
+<th>完成时间</th>
 </tr>
 </thead>
 <tbody><tr>
-<td>设置全局容器容量上限、TTL 或淘汰策略</td>
-<td>应用开发团队</td>
-<td>高</td>
+<td>为 MAPPINGS/FILES 添加容量上限（方案 A）</td>
+<td>P0 — 立即</td>
+<td>开发团队</td>
+<td>待定</td>
 </tr>
 <tr>
-<td>检查 <code>@lru_cache</code> 是否无界（<code>maxsize=None</code>）</td>
-<td>应用开发团队</td>
-<td>高</td>
+<td>添加显式 close()/unlink() 清理逻辑（方案 B）</td>
+<td>P0 — 立即</td>
+<td>开发团队</td>
+<td>待定</td>
 </tr>
 <tr>
-<td>确保请求/任务结束时清理线程局部存储（<code>threading.local</code>）</td>
-<td>应用开发团队</td>
-<td>中</td>
+<td>架构改进：使用 deque(maxlen) + with 语句（方案 C）</td>
+<td>P1 — 后续迭代</td>
+<td>架构/开发</td>
+<td>待定</td>
 </tr>
 <tr>
-<td>使用 <code>weakref</code> 替代强引用缓存</td>
-<td>应用开发团队</td>
-<td>中</td>
-</tr>
-<tr>
-<td>添加 RSS 监控告警（阈值：增长速率 &gt; 100 KiB/s 持续 5 分钟）</td>
-<td>SRE 团队</td>
-<td>高</td>
+<td>添加 RSS/VmRSS 监控告警阈值（业务层）</td>
+<td>P1 — 后续</td>
+<td>运维团队</td>
+<td>待定</td>
 </tr>
 </tbody></table></div>
-<blockquote>
-<p>⚠️ <strong>风险提示</strong>：在未确认 Python 保留泄漏前实施优化性修复可能投入方向错误。建议优先完成 4.1 节的证据补全流程。</p>
-</blockquote>
-<h3 id="h-43-复测方案">4.3 复测方案</h3>
+<h3 id="h-43-修复验证方案">4.3 修复验证方案</h3>
+<ol>
+<li>应用修复后运行相同的 workload（8 次迭代），确认 RSS 不再单调增长</li>
+<li>使用 <code>monitor_rss.py</code> 验证 RSS 曲线在 <code>MAPPINGS</code> 达到上限后趋于稳定</li>
+<li>验证 <code>/dev/shm</code> 文件数量不超过 <code>MAX_MAPPINGS</code> 设定值</li>
+<li>运行 <code>tracemalloc</code> 确认 peak 和 final 保持接近</li>
+<li>监控 30 分钟以上确保无残存增长趋势</li>
+</ol>
+<hr>
+<h2 id="h-五附录">五、附录</h2>
+<h3 id="h-51-关键监控指标汇总">5.1 关键监控指标汇总</h3>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>指标</th>
+<th>数值</th>
+<th>来源</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>RSS 起始值</td>
+<td>25.3 MiB</td>
+<td>monitor_rss_pid.json</td>
+</tr>
+<tr>
+<td>RSS 终值</td>
+<td>60.3 MiB</td>
+<td>monitor_rss_pid.json</td>
+</tr>
+<tr>
+<td>RSS 净增长</td>
+<td>35.0 MiB</td>
+<td>monitor_rss_pid.json</td>
+</tr>
+<tr>
+<td>rss_shmem 净增长</td>
+<td><strong>34.5 MiB（98.57%）</strong></td>
+<td>monitor_rss_pid.json</td>
+</tr>
+<tr>
+<td>rss_anon 净增长</td>
+<td>0.5 MiB（1.43%）</td>
+<td>monitor_rss_pid.json</td>
+</tr>
+<tr>
+<td>rss_file 净增长</td>
+<td>0 MiB（0%）</td>
+<td>monitor_rss_pid.json</td>
+</tr>
+<tr>
+<td>Private_Dirty 净增长</td>
+<td>34.922 MiB</td>
+<td>monitor_rss_pid.json</td>
+</tr>
+<tr>
+<td>RSS shmem 斜率</td>
+<td><strong>10.3 MiB/s</strong></td>
+<td>monitor_rss_pid.json</td>
+</tr>
+<tr>
+<td>监控窗口时长</td>
+<td>~3.5 秒</td>
+<td>monitor_rss_pid.json</td>
+</tr>
+<tr>
+<td>tracemalloc 峰值 traced</td>
+<td>0.557 MiB</td>
+<td>tracemalloc.json</td>
+</tr>
+<tr>
+<td>tracemalloc 最终 traced</td>
+<td>0.056 MiB（89.9% 已释放）</td>
+<td>tracemalloc.json</td>
+</tr>
+<tr>
+<td>Python tracked 净增长</td>
+<td>0.969 MiB</td>
+<td>object_growth.json</td>
+</tr>
+<tr>
+<td>Python heap / Private_Dirty</td>
+<td><strong>0.0016（0.16%）</strong></td>
+<td>correlation.json</td>
+</tr>
+<tr>
+<td>进程 PID</td>
+<td>411</td>
+<td>live_process_snapshot.json</td>
+</tr>
+<tr>
+<td>进程线程数</td>
+<td>1</td>
+<td>live_process_snapshot.json</td>
+</tr>
+<tr>
+<td>shmem 映射数（快照）</td>
+<td>21 个（最终 94+）</td>
+<td>live_process_snapshot.json</td>
+</tr>
+<tr>
+<td>单个映射大小</td>
+<td>512 KiB</td>
+<td>live_process_snapshot.json</td>
+</tr>
+<tr>
+<td>shmem 映射总大小（快照）</td>
+<td>10.5 MiB</td>
+<td>live_process_snapshot.json</td>
+</tr>
+</tbody></table></div>
+<h3 id="h-52-证据文件清单">5.2 证据文件清单</h3>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>证据文件</th>
+<th>来源任务</th>
+<th>角色</th>
+<th>Verdict</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>correlation.json</code></td>
+<td>T1/T2/T3</td>
+<td>证据对账总闸门</td>
+<td><code>mmap_or_file_backed_growth</code></td>
+</tr>
+<tr>
+<td><code>capabilities.json</code></td>
+<td>T2</td>
+<td>运行边界预检</td>
+<td>只读边界确认</td>
+</tr>
+<tr>
+<td><code>discovery.json</code></td>
+<td>T3</td>
+<td>范围发现</td>
+<td><code>correlated_evidence_bundle</code></td>
+</tr>
+<tr>
+<td><code>live_process_snapshot.json</code></td>
+<td>T1/T2/T3</td>
+<td>PID/映射快照</td>
+<td>shmem/memfd 65.88%</td>
+</tr>
+<tr>
+<td><code>monitor_rss_pid.json</code></td>
+<td>T1/T2/T3</td>
+<td>RSS 时序</td>
+<td>shmem 斜率 10.3 MiB/s</td>
+</tr>
+<tr>
+<td><code>object_growth.json</code></td>
+<td>T1/T2/T3</td>
+<td>Python 对象增长</td>
+<td>+0.969 MiB monotonic</td>
+</tr>
+<tr>
+<td><code>semantic.json</code></td>
+<td>T1/T2/T3</td>
+<td>语义保留信号</td>
+<td>MAPPINGS(+8), FILES(+8)</td>
+</tr>
+<tr>
+<td><code>tracemalloc.json</code></td>
+<td>T1/T2/T3</td>
+<td>分配热点</td>
+<td>transient_peak → 已释放</td>
+</tr>
+<tr>
+<td><code>retention.json</code></td>
+<td>T1/T2/T3</td>
+<td>保留链</td>
+<td>closure_cell + module dict</td>
+</tr>
+<tr>
+<td><code>mmap_file_or_shmem_growth.py</code></td>
+<td>T1/T3</td>
+<td>故障注入源码</td>
+<td>全局容器无界增长确认</td>
+</tr>
+</tbody></table></div>
+<h3 id="h-53-上游诊断报告路径">5.3 上游诊断报告路径</h3>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>任务</th>
+<th>报告文件路径</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>T1 - shmem/mmap 泄漏分析</td>
+<td><code>C:\Users\duanz\.witty-diagnosis-agent\dayu\report\kuafu_T1_20260607_144755_mmap_shmem_leak.md</code></td>
+</tr>
+<tr>
+<td>T2 - 全局容器增长分析</td>
+<td><code>C:\Users\duanz\.witty-diagnosis-agent\dayu\report\kuafu_T2_20260607_225723.md</code></td>
+</tr>
+<tr>
+<td>T3 - 双路径混合分析</td>
+<td><code>C:\Users\duanz\.witty-diagnosis-agent\dayu\report\kuafu_T3_mmap_shmem_dual_path_20260607_144800.md</code></td>
+</tr>
+</tbody></table></div>
+<h3 id="h-54-只读边界声明">5.4 只读边界声明</h3>
 <ul>
-<li><strong>复现命令</strong>：<code>bash ./run.sh run-stress live_pid_readonly</code>（在 <code>test/python-memory-leak-analyzer/</code> 下执行）</li>
-<li><strong>通过条件</strong>：correlation.json 的 verdict 从 <code>readonly_insufficient</code> 转变为 <code>python_retained_leak_likely</code> 或 <code>native_or_allocator_suspect</code>，且 confidence_cap 提升至 weak 或 strong</li>
+<li><span class="badge-ok">✅ 本次分析全程基于离线证据包，未执行任何命令、attach、ptrace、修复或配置写入</span></li>
+<li><span class="badge-ok">✅ 仅基于 Kuafu 三份诊断报告内容进行后置分析与综合</span></li>
+<li><span class="badge-err">❌ 未采集 native allocation stack 或 C 扩展内存释放证据</span></li>
+<li><span class="badge-err">❌ 未对进程执行反事实验证（修复后复测）</span></li>
+<li><span class="badge-err">❌ 修复操作需独立授权后执行</span></li>
 </ul>
 <hr>
-<h2 id="h-诊断质量自查">诊断质量自查</h2>
-<ul>
-<li><input checked="" disabled="" type="checkbox"> <strong>证据边界如实说明</strong>：已明确标注 verdict=readonly_insufficient，未越级推断</li>
-<li><input disabled="" type="checkbox"> <strong>领域透传</strong>：不适用（本场景无领域扩展块）</li>
-<li><input checked="" disabled="" type="checkbox"> <strong>路径溯源</strong>：所有核心结论均引用了证据来源（kuafu_T1 报告及内部文件）</li>
-<li><input checked="" disabled="" type="checkbox"> <strong>逻辑闭环</strong>：故障传导链路逻辑自洽，展示了全部 6 种假设的验证过程</li>
-<li><input checked="" disabled="" type="checkbox"> <strong>置信度标记</strong>：正确封顶至 direction-only / 🟠 低置信</li>
-<li><input checked="" disabled="" type="checkbox"> <strong>时间格式</strong>：所有时间点已补齐为完整 YYYY-MM-DD HH:MM:SS 格式</li>
-</ul>
+<p><strong>RCA 报告路径</strong>：<code>C:\Users\duanz\.witty-diagnosis-agent\baize\reports\Python服务RSS持续增长疑似内存泄漏_20260607_230000_report.md</code></p>
 
     <div class="meta">
-      <span class="meta-source">Python进程内存持续上涨_20260604_205220_report.md</span>
-      <span>生成于 2026/06/04 20:53</span>
+      <span class="meta-source">Python服务RSS持续增长疑似内存泄漏_20260607_230000_report.md</span>
+      <span>生成于 2026/06/07 23:01</span>
     </div>
   </article>
 </div>

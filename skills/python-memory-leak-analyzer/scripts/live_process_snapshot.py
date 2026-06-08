@@ -386,8 +386,10 @@ def readonly_verdict(status: dict[str, Any], smaps: dict[str, Any], maps: dict[s
     rss = status.get("VmRSS_bytes") or 0
     rss_file = status.get("RssFile_bytes") or 0
     rss_shmem = status.get("RssShmem_bytes") or 0
+    rss_anon = status.get("RssAnon_bytes") or smaps.get("Anonymous_bytes") or 0
     private_dirty = smaps.get("Private_Dirty_bytes") or 0
     child_rss = children.get("total_child_rss_bytes") or 0
+    file_shmem = rss_file + rss_shmem
     flags: list[str] = []
     verdict = "live_pid_scope_collected"
     confidence_cap = "readonly_scope_only"
@@ -397,7 +399,7 @@ def readonly_verdict(status: dict[str, Any], smaps: dict[str, Any], maps: dict[s
     if child_rss and rss and child_rss > rss:
         flags.append("children_memory_exceeds_target_pid")
         verdict = "process_tree_scope_required"
-    if rss and (rss_file + rss_shmem) > max(private_dirty, rss * 0.5):
+    if rss and file_shmem > rss * 0.65 and file_shmem > max(private_dirty, rss_anon) * 1.5:
         flags.append("file_or_shmem_dominant_rss")
         verdict = "file_or_shmem_mapping_possible"
     if maps.get("kind_counts", {}).get("deleted_file"):

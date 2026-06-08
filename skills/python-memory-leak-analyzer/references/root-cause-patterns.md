@@ -71,5 +71,5 @@
 - 触发信号：`native_or_allocator_suspect`、`mmap_or_file_backed_growth`、`allocator_reuse_or_fragmentation_possible`。
 - 必要证据：Python heap/tracked object ratio 低，或 RssFile/RssShmem/mapping/cgroup 指向非 Python heap。
 - 常见误判：仅凭 RSS 增长确认 Python 对象泄漏。
-- 修复方向：补 memray/native stack、检查 mmap/shmem 生命周期、allocator high-water 或 C 扩展释放路径。
+- 修复方向：补 native allocation stack、allocator stats、mmap/shmem owner 或 C 扩展释放路径证据；采集方式需单独授权。
 - 置信度边界：无 native allocator 栈时只能 direction-only。

@@ -51,7 +51,7 @@ def parse_with_memray(path: str, top: int) -> tuple[list[dict], str]:
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description="Parse optional memray native allocation evidence.")
+    parser = argparse.ArgumentParser(description="Parse optional native allocation capture or text evidence.")
     parser.add_argument("--capture", required=True, help="memray binary capture or text report.")
     parser.add_argument("--top", type=int, default=20)
     parser.add_argument("--output", help="Write JSON output to this path.")
@@ -68,10 +68,10 @@ def main() -> int:
         if memray_available:
             rows, backend = parse_with_memray(args.capture, args.top)
         else:
-            degraded.append("memray Python package missing; parsing text-like report only.")
+            degraded.append("binary capture reader not active; parsing text-like report only.")
             rows = parse_text(args.capture, args.top)
     except Exception as exc:
-        degraded.append(f"memray binary parse failed: {exc}; falling back to text scan.")
+        degraded.append(f"binary capture parse failed: {exc}; falling back to text scan.")
         rows = parse_text(args.capture, args.top)
         backend = "text-fallback"
 
@@ -89,7 +89,7 @@ def main() -> int:
         backend_used=backend,
         degraded_capabilities=degraded,
         next_steps=[
-            "将 memray 未释放热点与 monitor_rss 的 RSS 净增长对账。",
+            "将 native allocation 未释放热点与 monitor_rss 的 RSS 净增长对账。",
             "若 capture 是 attach 方式采集，说明只能覆盖 attach 之后的分配。",
             "符号缺失时安装 debug symbols 后重采，或保留 native 方向级结论。",
         ],

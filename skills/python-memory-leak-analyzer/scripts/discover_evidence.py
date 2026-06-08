@@ -52,6 +52,7 @@ PYTHON_PROJECT_FILES = {
 MEMRAY_SUFFIXES = {".bin", ".dat"}
 REPORT_SUFFIXES = {".md", ".html"}
 TEXT_SUFFIXES = {".log", ".txt", ".out", ".err", ".json", ".md", ".html", ".yaml", ".yml"}
+REPORT_CONTRACT_NAMES = {"report-contract.md", "report_contract.md", "final-report-contract.md"}
 
 
 def read_text(path: Path, limit: int = 16000) -> str:
@@ -228,6 +229,14 @@ def classify_report(path: Path) -> dict[str, Any] | None:
     if path.suffix.lower() not in REPORT_SUFFIXES:
         return None
     text = read_text(path)
+    if path.name in REPORT_CONTRACT_NAMES or "final_report_must_include" in text:
+        return {
+            "path": str(path.resolve()),
+            "role": "report_contract",
+            "evidence_use": "report_acceptance_gate",
+            "size_bytes": path.stat().st_size,
+            "contract_focus": "evidence_boundary_and_html_same_source",
+        }
     lower = text.lower()
     has_python = "python" in lower
     has_memory = "memory" in lower or "内存" in text or "rss" in lower
@@ -364,6 +373,8 @@ def group_by_dir(findings: list[dict[str, Any]]) -> list[dict[str, Any]]:
             score += 8
         if roles.get("memray_candidate"):
             score += 12
+        if roles.get("report_contract"):
+            score += 8
         # Existing diagnosis reports are useful context or archive targets, but
         # they must not outrank current-scope logs and structured evidence.
         role_summary = {role: len(items) for role, items in roles.items()}
@@ -381,7 +392,7 @@ def group_by_dir(findings: list[dict[str, Any]]) -> list[dict[str, Any]]:
                 "key_files": {
                     role: [item["path"] for item in items[:3]]
                     for role, items in roles.items()
-                    if role in {"discovery", "correlation", "live_process_snapshot", "semantic", "object_growth", "retention", "tracemalloc", "monitor_rss_pid", "log", "workload_script", "test_runner", "memray_candidate", "diagnosis_report"}
+                    if role in {"discovery", "correlation", "live_process_snapshot", "semantic", "object_growth", "retention", "tracemalloc", "monitor_rss_pid", "log", "workload_script", "test_runner", "memray_candidate", "diagnosis_report", "report_contract"}
                 },
             }
         )
@@ -435,6 +446,7 @@ def recommendation(groups: list[dict[str, Any]], pids: list[dict[str, Any]], pro
         "memray_candidate",
         "diagnostic_json",
         "metadata",
+        "report_contract",
     }
     if roles.get("diagnosis_report") and not any(roles.get(role) for role in current_evidence_roles):
         return {
@@ -450,6 +462,8 @@ def recommendation(groups: list[dict[str, Any]], pids: list[dict[str, Any]], pro
     if roles.get("correlation"):
         path = "correlated_evidence_bundle"
         actions.append("Read correlation.json first; final report must cite its verdict, confidence_cap, and missing_evidence before root-cause wording.")
+        if roles.get("report_contract"):
+            actions.append("Read report-contract.md before final reporting; verify evidence boundary wording and generate HTML from the same Markdown basename.")
         if roles.get("live_process_snapshot"):
             actions.append("Use live_process_snapshot.json to confirm PID, cgroup, child-process, and mapping scope.")
         if roles.get("object_growth") or roles.get("tracemalloc") or roles.get("retention") or roles.get("semantic"):
@@ -473,7 +487,7 @@ def recommendation(groups: list[dict[str, Any]], pids: list[dict[str, Any]], pro
     elif roles.get("live_process_snapshot") or roles.get("monitor_rss_pid") or roles.get("log"):
         path = "logs_only_or_external_rss"
         actions.append("Use live_process_snapshot and monitor_rss evidence to classify process/cgroup/mapping growth shape; keep confidence capped without heap/retention evidence.")
-        questions.append("是否允许提供可复现 workload 或 heap/tracemalloc/memray 快照？")
+        questions.append("是否允许提供可复现 workload、heap/tracemalloc 快照或 native allocation capture？")
     elif roles.get("memray_candidate"):
         path = "memray_capture"
         actions.append("Run parse_memray.py or inspect memray report before Python heap conclusions.")

@@ -149,7 +149,7 @@ def main() -> int:
             "chains": chains,
         },
         backend_used="stdlib:gc.get_referrers",
-        degraded_capabilities=["objgraph not required; output is textual and depth-limited."],
+        degraded_capabilities=["Textual retention-chain output is depth-limited."],
         next_steps=[
             "若 root_kind 指向 module_global:<name> 或 cache，查看 root-cause-patterns.md。",
             "生产环境默认不做反事实干预；沙箱中可运行 reachability_probe.py --allow-mutation。",

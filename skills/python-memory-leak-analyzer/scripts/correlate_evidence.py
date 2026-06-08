@@ -75,6 +75,12 @@ def monitor_net(monitor: dict[str, Any], key: str) -> int | None:
     return None
 
 
+def positive_int(value: Any) -> int:
+    if isinstance(value, (int, float)) and value > 0:
+        return int(value)
+    return 0
+
+
 def object_metrics(object_growth: dict[str, Any]) -> dict[str, Any]:
     rows = object_growth.get("type_growth")
     if not isinstance(rows, list):
@@ -166,14 +172,93 @@ def retention_metrics(retention: dict[str, Any]) -> dict[str, Any]:
     }
 
 
-def mapping_file_shmem_dominant(snapshot: dict[str, Any]) -> bool:
+def memory_surface_metrics(monitor: dict[str, Any], snapshot: dict[str, Any], rss_delta: int | None) -> dict[str, Any]:
+    summary = monitor.get("summary", {})
+    slopes = summary.get("slopes", {}) if isinstance(summary.get("slopes"), dict) else {}
+    rss_file_net = monitor_net(monitor, "rss_file_bytes")
+    rss_shmem_net = monitor_net(monitor, "rss_shmem_bytes")
+    file_shmem_net = positive_int(rss_file_net) + positive_int(rss_shmem_net)
+    denominator = abs(rss_delta) if isinstance(rss_delta, int) and rss_delta else None
+    file_shmem_ratio = safe_ratio(file_shmem_net, denominator)
+    shmem_ratio = safe_ratio(positive_int(rss_shmem_net), denominator)
+
     status = nested(snapshot, "memory_breakdown", "status") or {}
+    mapping_summary = snapshot.get("mapping_summary") if isinstance(snapshot.get("mapping_summary"), dict) else {}
+    kind_size = mapping_summary.get("kind_size_bytes") if isinstance(mapping_summary.get("kind_size_bytes"), dict) else {}
+    kind_counts = mapping_summary.get("kind_counts") if isinstance(mapping_summary.get("kind_counts"), dict) else {}
     rss = status.get("VmRSS_bytes") or 0
-    file_bytes = (status.get("RssFile_bytes") or 0) + (status.get("RssShmem_bytes") or 0)
-    if rss and file_bytes > rss * 0.5:
-        return True
-    flags = nested(snapshot, "readonly_verdict", "flags") or []
-    return "file_or_shmem_dominant_rss" in flags
+    snapshot_file_bytes = positive_int(status.get("RssFile_bytes")) + positive_int(status.get("RssShmem_bytes"))
+    mapping_file_bytes = (
+        positive_int(kind_size.get("file_backed"))
+        + positive_int(kind_size.get("shmem_or_memfd"))
+        + positive_int(kind_size.get("deleted_file"))
+    )
+    mapping_total = sum(positive_int(value) for value in kind_size.values()) if kind_size else 0
+    snapshot_ratio = safe_ratio(snapshot_file_bytes, rss)
+    mapping_ratio = safe_ratio(mapping_file_bytes, mapping_total)
+
+    growth_ratio_threshold = float(CONFIG["correlation"].get("file_shmem_growth_ratio", 0.6))
+    mapping_ratio_threshold = float(CONFIG["correlation"].get("mapping_surface_ratio", 0.5))
+    monitor_flags = summary.get("flags") if isinstance(summary.get("flags"), list) else []
+    snapshot_flags = nested(snapshot, "readonly_verdict", "flags") or []
+    evidence: list[str] = []
+    if summary.get("verdict") == "file_or_shmem_growth":
+        evidence.append("monitor_verdict:file_or_shmem_growth")
+    if "mmap_or_shared_memory_possible" in monitor_flags:
+        evidence.append("monitor_flag:mmap_or_shared_memory_possible")
+    if "file_or_shmem_dominant_rss" in snapshot_flags:
+        evidence.append("snapshot_flag:file_or_shmem_dominant_rss")
+    if file_shmem_ratio is not None and file_shmem_ratio >= growth_ratio_threshold:
+        evidence.append("monitor_file_shmem_net_growth_dominates")
+    if snapshot_ratio is not None and snapshot_ratio >= growth_ratio_threshold:
+        evidence.append("snapshot_file_shmem_rss_dominates")
+    if mapping_ratio is not None and mapping_ratio >= mapping_ratio_threshold:
+        evidence.append("mapping_size_file_shmem_dominates")
+    mapping_hints: list[str] = []
+    if kind_counts.get("shmem_or_memfd"):
+        mapping_hints.append("snapshot_has_shmem_or_memfd_mappings")
+    if kind_counts.get("deleted_file"):
+        mapping_hints.append("snapshot_has_deleted_file_mappings")
+
+    primary_surface = "unknown"
+    if evidence:
+        if positive_int(rss_shmem_net) >= positive_int(rss_file_net) and (
+            positive_int(rss_shmem_net) or kind_counts.get("shmem_or_memfd")
+        ):
+            primary_surface = "shmem"
+        elif positive_int(rss_file_net) or kind_counts.get("file_backed") or kind_counts.get("deleted_file"):
+            primary_surface = "file_backed"
+        else:
+            primary_surface = "mmap_or_file_backed"
+
+    return {
+        "primary_surface": primary_surface,
+        "evidence": evidence,
+        "hints": mapping_hints,
+        "file_shmem_dominant": bool(evidence),
+        "rss_file_net_growth_bytes": rss_file_net,
+        "rss_file_net_growth_mib": bytes_to_mib(rss_file_net),
+        "rss_shmem_net_growth_bytes": rss_shmem_net,
+        "rss_shmem_net_growth_mib": bytes_to_mib(rss_shmem_net),
+        "file_shmem_net_growth_bytes": file_shmem_net,
+        "file_shmem_net_growth_mib": bytes_to_mib(file_shmem_net),
+        "file_shmem_growth_ratio": file_shmem_ratio,
+        "shmem_growth_ratio": shmem_ratio,
+        "snapshot_file_shmem_rss_bytes": snapshot_file_bytes,
+        "snapshot_file_shmem_rss_mib": bytes_to_mib(snapshot_file_bytes),
+        "snapshot_file_shmem_rss_ratio": snapshot_ratio,
+        "mapping_file_shmem_bytes": mapping_file_bytes,
+        "mapping_file_shmem_mib": bytes_to_mib(mapping_file_bytes),
+        "mapping_file_shmem_ratio": mapping_ratio,
+        "thresholds": {
+            "file_shmem_growth_ratio": growth_ratio_threshold,
+            "mapping_surface_ratio": mapping_ratio_threshold,
+        },
+        "monitor_slopes": {
+            "rss_file_bytes": nested(slopes, "rss_file_bytes", "slope_bytes_per_second"),
+            "rss_shmem_bytes": nested(slopes, "rss_shmem_bytes", "slope_bytes_per_second"),
+        },
+    }
 
 
 def classify(
@@ -187,6 +272,7 @@ def classify(
 ) -> dict[str, Any]:
     private_delta = monitor_net(monitor, "private_dirty_bytes")
     rss_delta = monitor_net(monitor, "rss_bytes")
+    memory_surface = memory_surface_metrics(monitor, snapshot, rss_delta)
     object_info = object_metrics(object_data)
     trace_info = tracemalloc_metrics(tracemalloc_data)
     semantic_info = semantic_metrics(semantic)
@@ -216,7 +302,16 @@ def classify(
     net_trace = trace_info["net_size_diff_bytes"] or 0
     checkpoint_verdict = object_info.get("checkpoint_verdict")
     live_scope_observed = bool(nested(monitor, "summary")) or bool(nested(snapshot, "readonly_verdict"))
-    peak_released = peak_minus_final >= min_peak and net_trace < min_peak and checkpoint_verdict != "monotonic_growth"
+    no_live_growth = (
+        rss_delta is not None
+        and private_delta is not None
+        and abs(rss_delta) < min_peak
+        and abs(private_delta) < min_peak
+    )
+    trace_peak_released = trace_info.get("verdict") == "transient_peak_high_but_released"
+    peak_released = (peak_minus_final >= min_peak or trace_peak_released) and net_trace < min_peak and (
+        checkpoint_verdict != "monotonic_growth" or no_live_growth
+    )
     if monitor_verdict in {"cgroup_growth_not_target", "worker_skew_growth"}:
         verdict = "readonly_insufficient"
         reason = "Observed memory growth is outside the selected target PID scope."
@@ -233,9 +328,9 @@ def classify(
         verdict = "transient_peak_not_retained"
         reason = "Peak memory is materially higher than final retained memory."
         confidence_cap = "medium_without_fix_retest"
-    elif monitor_verdict == "file_or_shmem_growth" or mapping_file_shmem_dominant(snapshot):
+    elif memory_surface["file_shmem_dominant"]:
         verdict = "mmap_or_file_backed_growth"
-        reason = "RSS growth or snapshot is dominated by file/shmem-backed mappings."
+        reason = "RSS growth or snapshot is dominated by file/shmem-backed mappings before Python heap or native allocator attribution."
         confidence_cap = "medium_mapping_evidence"
     elif (
         (python_heap_ratio is not None and python_heap_ratio >= confirm_ratio)
@@ -288,6 +383,7 @@ def classify(
         "rss_net_growth_mib": bytes_to_mib(rss_delta),
         "python_heap_to_private_dirty_ratio": python_heap_ratio,
         "tracked_object_to_private_dirty_ratio": tracked_ratio,
+        "memory_surface": memory_surface,
         "tracemalloc_peak_vs_final": {
             "peak_traced_bytes": trace_info["peak_traced_bytes"],
             "current_traced_bytes": trace_info["current_traced_bytes"],
@@ -354,6 +450,8 @@ def main() -> int:
         degraded_capabilities=["Correlation is a confidence gate; it does not collect new heap or native stacks."],
         next_steps=[
             "Final report must cite correlation verdict and confidence_cap before claiming root cause.",
+            "Final report must list missing_evidence and keep read-only or native conclusions within confidence_cap.",
+            "If verdict=mmap_or_file_backed_growth, describe the file/shmem/mmap memory surface before any Python heap or native allocator attribution.",
             "If verdict=native_or_allocator_suspect, keep conclusion direction-level without native allocator stack evidence.",
             "If verdict=readonly_insufficient, request reproducible workload, heap snapshot, or broader process/cgroup scope.",
         ],

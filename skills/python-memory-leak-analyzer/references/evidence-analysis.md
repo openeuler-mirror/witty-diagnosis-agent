@@ -29,7 +29,7 @@
 - `target_pid_growth`：目标 PID 有增长，可以继续找 Python heap 或 native/mmap 解释。
 - `cgroup_growth_not_target`：目标 PID 不能解释 cgroup 增长，报告写 scope mismatch，不能确认目标 PID 的 Python 根因。
 - `worker_skew_growth`：master 稳定但 worker 增长，切换到增长 worker；不能只看 master。
-- `file_or_shmem_growth` 或 snapshot 的 file/shmem flags：优先 mmap/file/shmem 假设。
+- `file_or_shmem_growth`、snapshot 的 file/shmem flags，或 `correlation.json.summary.memory_surface.file_shmem_dominant=true`：优先 mmap/file/shmem 假设。
 - `plateau_high_water`：优先 allocator reuse、arena、cache warmup 或 fragmentation high-water；不写 retained leak。
 - `insufficient_window`：短窗口，置信度封顶；需要更长采样或 workload。
 
@@ -72,8 +72,8 @@
 | 假设 | 支持证据 | 反证或降级条件 | 结论边界 |
 | --- | --- | --- | --- |
 | Python retained leak | heap/tracked object ratio 高，且 semantic/retention 命中 | 无 retention、coverage 低、G3/G4 未做 | 主导假设或 confirmed |
-| native/allocator | RSS/Private_Dirty 增长但 Python heap ratio 低 | memray/native stack 缺失 | 方向级 |
-| mmap/file/shmem | RssFile/RssShmem 或 maps 指向 file/shmem | Private_Dirty/heap 能解释主要增长 | 方向级或 mixed |
+| native/allocator | RSS/Private_Dirty 增长但 Python heap ratio 低，且 memory_surface 未指向 file/shmem/mmap | 未提供 native allocation stack、allocator stats 或具体 C 扩展释放证据 | 方向级 |
+| mmap/file/shmem | RssFile/RssShmem 净增长主导、maps 指向 file/shmem，或 memory_surface 指向 file/shmem/mmap | Private_Dirty/heap 能解释主要增长 | 方向级或 mixed |
 | plateau/high-water | RSS 高位平台、peak-final 大、对象最终释放 | 谷值持续上移、retention 证据强 | 非 retained leak 或待观察 |
 | short-window | 样本少、duration 短、`insufficient_window` | 后续长窗口仍增长 | inconclusive |
 | scope mismatch | worker/cgroup/sibling 与目标 PID 不一致 | 已切到增长 PID 且证据对齐 | 只读定界，不下根因 |

@@ -10,7 +10,7 @@
 
 默认不允许执行：
 
-- ptrace attach、py-spy/pyrasite 注入、gdb attach。
+- ptrace/attach 或进程注入类线上观察。
 - 安装 pip 包或系统包。
 - 清缓存、置空全局、注销回调、重启服务。
 - 对生产进程运行 `reachability_probe.py --allow-mutation`。
@@ -22,5 +22,5 @@
 - Live PID 只读证据只能确认目标范围、增长形态和可疑内存表面，不能确认 Python 对象根因。
 - 只读 PID 场景没有 `object_growth.json`、`tracemalloc.json`、`semantic.json`、`retention.json` 时，最终结论必须封顶为 scope/trend/direction。
 - 父进程稳定但 child/cgroup 增长时，应先切换到增长 worker 或扩大到 cgroup 口径，不得只看 master PID 下结论。
-- RssFile/RssShmem 或 file/shmem mapping 主导时，应优先输出 mmap/file/shmem 方向，除非 Python heap/retention 对账能解释主要 Private_Dirty 增长。
+- RssFile/RssShmem 净增长或 file/shmem mapping 主导时，应优先输出 mmap/file/shmem 方向，除非 Python heap/retention 对账能解释主要 Private_Dirty 增长。最终报告先引用 `correlation.json.summary.memory_surface`，再讨论 Python heap 或 native allocator。
 - 报告前读取 `correlation.json`；若缺失，先运行 `correlate_evidence.py`，缺少某类证据时让它进入 `missing_evidence[]`，不要绕过总闸门。

@@ -19,6 +19,12 @@ SKILL_DIR="$REPO_ROOT/skills/python-memory-leak-analyzer"
 OUT_DIR="$ROOT_DIR/out"
 MANIFEST="$ROOT_DIR/stress_manifest.json"
 
+if [ -f "$REPO_ROOT/.venv/bin/activate" ]; then
+  # Use the repository-local environment when generating evidence.
+  # shellcheck source=/dev/null
+  . "$REPO_ROOT/.venv/bin/activate"
+fi
+
 STRESS_SCENARIOS="
 method_cache_self
 callback_registry
@@ -104,6 +110,36 @@ with open(output, "w", encoding="utf-8", newline="\n") as handle:
     json.dump(payload, handle, ensure_ascii=False, indent=2, sort_keys=True)
     handle.write("\n")
 PY
+}
+
+write_report_contract() {
+  local scenario="$1"
+  local scenario_dir="$2"
+  local mode="${3:-offline}"
+  cat > "$scenario_dir/report-contract.md" <<EOF
+# Python Memory Leak Analyzer Final Report Contract
+
+scenario: $scenario
+evidence_dir: $scenario_dir
+mode: $mode
+
+final_report_must_include:
+- Markdown and HTML generated from the same Markdown source.
+- Markdown and HTML share one basename and use a unique run timestamp or session id.
+- Evidence files read for this run.
+- correlation.json verdict, confidence_cap, and missing_evidence when correlation.json exists.
+- Read-only / side-effect boundary, including unexecuted attach, ptrace, repair, restart, mutation, or config writes.
+- Impact of missing evidence on conclusion and confidence.
+
+report_boundary_rules:
+- Evidence files not produced in this scenario are missing evidence, not missing tools.
+- Do not convert optional enhancement tools into report acceptance gates.
+- Do not write optional enhancement tool names as missing evidence or missing direct evidence.
+- Use evidence-type wording instead: missing native allocation stack, allocator stats, C-extension release evidence, Python heap snapshot, semantic retention signal, or retention chain.
+- Do not claim Python retained leak beyond correlation.json verdict and confidence_cap.
+- Do not reuse historical Markdown/HTML reports as the current run's final report.
+- Internal acceptance checks must not be copied into the final Markdown or HTML report.
+EOF
 }
 
 stress_script() {
@@ -222,6 +258,7 @@ write_prompt_files() {
   local summary
   summary=$(stress_summary "$scenario")
   mkdir -p "$scenario_dir/prompts"
+  write_report_contract "$scenario" "$scenario_dir" "stress"
   printf 'python 泄露，请你分析找出原因\n' > "$scenario_dir/prompts/minimal.txt"
   printf '分析 Python 泄漏问题，范围在 %s\n' "$scenario_dir" > "$scenario_dir/prompts/sparse.txt"
   {
@@ -259,6 +296,7 @@ run_one() {
     exit 2
   }
   mkdir -p "$OUT_DIR/$scenario"
+  write_report_contract "$scenario" "$OUT_DIR/$scenario" "basic"
   rm -f \
     "$OUT_DIR/$scenario/capabilities.json" \
     "$OUT_DIR/$scenario/discovery.json" \
@@ -385,6 +423,7 @@ run_stress_one() {
   global_name=$(reachability_global_name "$scenario")
 
   mkdir -p "$scenario_dir"
+  write_report_contract "$scenario" "$scenario_dir" "stress"
   rm -f \
     "$scenario_dir/capabilities.json" \
     "$scenario_dir/discovery.json" \
@@ -557,6 +596,7 @@ run_prod_one() {
   selector=$(prod_retention_selector_args "$scenario")
 
   mkdir -p "$scenario_dir"
+  write_report_contract "$scenario" "$scenario_dir" "production"
   rm -f \
     "$scenario_dir/capabilities.json" \
     "$scenario_dir/discovery.json" \

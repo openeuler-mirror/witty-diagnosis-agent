@@ -1,25 +1,15 @@
 #!/usr/bin/env python3
-"""Detect optional tools and safe analysis routes."""
+"""Detect lightweight runtime boundaries for Python memory leak analysis."""
 
 from __future__ import annotations
 
 import argparse
-import importlib.util
 import os
 import platform
-import shutil
 import sys
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from config import print_json, result
-
-
-OPTIONAL_MODULES = ["psutil", "objgraph", "pympler", "memray", "pyrasite"]
-OPTIONAL_BINARIES = ["py-spy", "gdb", "dot", "memray"]
-
-
-def module_available(name: str) -> bool:
-    return importlib.util.find_spec(name) is not None
 
 
 def read_file(path: str) -> str | None:
@@ -32,12 +22,14 @@ def read_file(path: str) -> str | None:
 
 def detect_proc() -> dict:
     proc_available = os.path.isdir("/proc")
-    ptrace_scope = read_file("/proc/sys/kernel/yama/ptrace_scope")
+    ptrace_scope = read_file("/proc/sys/kernel/yama/ptrace_scope") if proc_available else None
+    smaps_rollup_path = "/proc/self/smaps_rollup"
     return {
         "proc_available": proc_available,
-        "smaps_rollup_available": proc_available and os.path.exists("/proc/self/smaps_rollup"),
+        "smaps_rollup_available": proc_available and os.path.exists(smaps_rollup_path),
+        "smaps_rollup_path": smaps_rollup_path if proc_available and os.path.exists(smaps_rollup_path) else None,
         "ptrace_scope": ptrace_scope,
-        "ptrace_default_ok": ptrace_scope in {None, "0"},
+        "ptrace_default_ok": proc_available and ptrace_scope in {None, "0"},
     }
 
 
@@ -46,71 +38,64 @@ def detect_cgroup() -> dict:
         return {
             "version": "v2",
             "memory_current": os.path.exists("/sys/fs/cgroup/memory.current"),
+            "memory_current_path": "/sys/fs/cgroup/memory.current",
             "memory_max": os.path.exists("/sys/fs/cgroup/memory.max"),
+            "memory_max_path": "/sys/fs/cgroup/memory.max",
         }
     if os.path.isdir("/sys/fs/cgroup/memory"):
         return {
             "version": "v1",
             "memory_current": os.path.exists("/sys/fs/cgroup/memory/memory.usage_in_bytes"),
+            "memory_current_path": "/sys/fs/cgroup/memory/memory.usage_in_bytes",
             "memory_max": os.path.exists("/sys/fs/cgroup/memory/memory.limit_in_bytes"),
+            "memory_max_path": "/sys/fs/cgroup/memory/memory.limit_in_bytes",
         }
-    return {"version": "none", "memory_current": False, "memory_max": False}
+    return {
+        "version": "none",
+        "memory_current": False,
+        "memory_current_path": None,
+        "memory_max": False,
+        "memory_max_path": None,
+    }
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description="Detect python-memory-leak-analyzer capability tier.")
+    parser = argparse.ArgumentParser(description="Detect runtime boundaries for python-memory-leak-analyzer.")
     parser.add_argument("--output", help="Write JSON output to this path.")
     args = parser.parse_args()
 
-    modules = {name: module_available(name) for name in OPTIONAL_MODULES}
-    binaries = {name: shutil.which(name) is not None for name in OPTIONAL_BINARIES}
     proc = detect_proc()
     cgroup = detect_cgroup()
-    degraded = []
-    upgradable = []
-
-    if not modules["psutil"]:
-        degraded.append("psutil missing: monitor_rss uses /proc-only RSS collection")
-        upgradable.append({"tool": "psutil", "unlocks": "portable process memory sampling"})
-    if not modules["objgraph"]:
-        degraded.append("objgraph missing: retention_chain uses stdlib gc.get_referrers text chains")
-        upgradable.append({"tool": "objgraph", "unlocks": "richer backref graph rendering"})
-    if not modules["pympler"]:
-        degraded.append("pympler missing: object_growth uses sys.getsizeof shallow bytes")
-        upgradable.append({"tool": "pympler", "unlocks": "deep object size accounting"})
-    if not modules["memray"] and not binaries["memray"]:
-        degraded.append("memray missing: native leak path remains direction-level only")
-        upgradable.append({"tool": "memray", "unlocks": "native allocation capture parsing"})
-    if not binaries["py-spy"] and not modules["pyrasite"]:
-        degraded.append("online injection tools missing: live process analysis is external-observation only")
-
-    if proc["proc_available"]:
-        recommended_path = "可重启/可复现时使用 --script 进程内分析；线上 PID 先用 live_process_snapshot 定界，再用 monitor_rss 外部观测。"
-    else:
-        recommended_path = "当前环境缺少 /proc；仅可运行 workload 脚本级 Python 堆分析。"
-
+    recommended_path = (
+        "可重启/可复现时使用 --script 进程内分析；线上 PID 先用 live_process_snapshot 定界，再用 monitor_rss 外部观测。"
+        if proc["proc_available"]
+        else "当前环境缺少 /proc；只能使用离线证据或可复现 workload 的 Python 堆分析。"
+    )
     payload = result(
         "success",
         {
-            "capabilities": {
-                "modules": modules,
-                "binaries": binaries,
-                "proc": proc,
-                "cgroup": cgroup,
+            "runtime": {
                 "python_version": platform.python_version(),
                 "platform": platform.platform(),
+                "executable": sys.executable,
+            },
+            "proc": proc,
+            "cgroup": cgroup,
+            "readonly_boundary": {
+                "default_mode": "readonly",
+                "attach_or_ptrace_requires_approval": True,
+                "mutation_or_repair_requires_approval": True,
+                "ptrace_note": "ptrace_scope 只描述系统边界；本 skill 默认不 attach 线上进程。",
             },
             "recommended_path": recommended_path,
-            "upgradable": upgradable,
         },
-        backend_used="stdlib",
-        degraded_capabilities=degraded,
+        backend_used="stdlib:/proc-boundary",
+        degraded_capabilities=[] if proc["proc_available"] else ["No /proc filesystem; live PID RSS and mapping checks are unavailable."],
         next_steps=[
             "已有 PID 时先运行 live_process_snapshot.py 复核 PID、cgroup、mapping 和子进程范围。",
             "再运行 monitor_rss.py 判断 RSS/Private_Dirty/cgroup/worker 增长形态。",
-            "可重启复现时运行 object_growth.py 与 tracemalloc_probe.py。",
-            "候选对象明确后运行 retention_chain.py，再决定是否做 reachability_probe.py 反事实验证。",
-            "最终报告前运行 correlate_evidence.py，并引用 verdict、confidence_cap 和 missing_evidence。",
+            "可重启复现时运行 object_growth.py、semantic_probe.py、tracemalloc_probe.py 和 retention_chain.py。",
+            "最终报告前运行或读取 correlate_evidence.py，并引用 verdict、confidence_cap 和 missing_evidence。",
         ],
     )
     print_json(payload, args.output)

@@ -51,11 +51,11 @@ def resolve_size_backend(requested: str) -> tuple[str, Callable[[object], int], 
 
             return "pympler.asizeof", pympler_size, degraded
         except Exception as exc:
-            degraded.append(f"pympler.asizeof unavailable at runtime: {exc}; falling back to shallow sys.getsizeof.")
+            degraded.append(f"requested deep-size backend failed at runtime: {exc}; using shallow sys.getsizeof.")
     elif requested == "pympler":
-        degraded.append("pympler not installed; falling back to shallow sys.getsizeof.")
+        degraded.append("requested deep-size backend not active; using shallow sys.getsizeof.")
     else:
-        degraded.append("pympler deep size not used; shallow bytes may undercount nested containers.")
+        degraded.append("deep-size backend not used; shallow bytes may undercount nested containers.")
     return "stdlib:sys.getsizeof", shallow_size, degraded
 
 

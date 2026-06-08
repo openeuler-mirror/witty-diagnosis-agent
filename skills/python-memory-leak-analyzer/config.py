@@ -28,6 +28,8 @@ CONFIG: Dict[str, Any] = {
         "native_heap_ratio_suspect": 0.2,
         "candidate_coverage_ratio": 0.7,
         "transient_peak_bytes": 4 * 1024 * 1024,
+        "file_shmem_growth_ratio": 0.6,
+        "mapping_surface_ratio": 0.5,
     },
     "object_growth": {
         "iterations": 1000,

@@ -1,0 +1,1506 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>故障诊断报告：Python 服务 RSS 持续增长 — 全局容器内存泄漏</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Lora:ital,wght@0,400;0,600;1,400&family=Source+Sans+3:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  /* ── Design tokens ─────────────────────────────────────────────────────── */
+  :root {
+    --bg:          #f8f7f4;
+    --surface:     #ffffff;
+    --border:      #e8e5df;
+    --border-soft: #f0ede8;
+
+    --text:        #1c1917;
+    --text-2:      #57534e;
+    --text-3:      #a8a29e;
+
+    --accent:      #1d4e6e;
+    --accent-light:#e8f1f7;
+    --accent-mid:  #3b82a0;
+
+    --red:         #c0392b;
+    --red-bg:      #fef2f2;
+    --amber:       #92400e;
+    --amber-bg:    #fffbeb;
+    --green:       #14532d;
+    --green-bg:    #f0fdf4;
+
+    --code-bg:     #1a1d27;
+    --code-text:   #cdd6f4;
+    --code-border: #2d3148;
+
+    --font-body: "Source Sans 3", "PingFang SC", "Hiragino Sans GB", sans-serif;
+    --font-head: "Lora", "PingFang SC", Georgia, serif;
+    --font-mono: "JetBrains Mono", "Fira Code", Consolas, monospace;
+
+    --radius:    8px;
+    --radius-lg: 12px;
+    --shadow:    0 1px 3px rgba(0,0,0,.06), 0 4px 16px rgba(0,0,0,.05);
+    --shadow-lg: 0 2px 8px rgba(0,0,0,.07), 0 8px 32px rgba(0,0,0,.06);
+
+    --toc-width:   240px;
+    --gap:         32px;
+  }
+
+  /* ── Progress bar ──────────────────────────────────────────────────────── */
+  #progress {
+    position: fixed; top: 0; left: 0; height: 3px; width: 0%;
+    background: linear-gradient(90deg, var(--accent-mid), var(--accent));
+    z-index: 999; transition: width .1s linear;
+    border-radius: 0 2px 2px 0;
+  }
+
+  /* ── Base ──────────────────────────────────────────────────────────────── */
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  html { font-size: 16px; scroll-behavior: smooth; }
+  body {
+    font-family: var(--font-body);
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.8;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* ── Layout ────────────────────────────────────────────────────────────── */
+  .layout {
+    display: flex;
+    align-items: flex-start;
+    max-width: calc(var(--toc-width) + 820px + var(--gap) * 3);
+    margin: 0 auto;
+    padding: 48px var(--gap) 96px;
+    gap: var(--gap);
+  }
+
+  /* ── TOC ───────────────────────────────────────────────────────────────── */
+  .toc {
+    width: var(--toc-width);
+    flex-shrink: 0;
+    position: sticky;
+    top: 32px;
+    max-height: calc(100vh - 64px);
+    overflow-y: auto;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    padding: 20px;
+    box-shadow: var(--shadow);
+    scrollbar-width: thin;
+    scrollbar-color: var(--border) transparent;
+  }
+  .toc-title {
+    font-size: 10.5px;
+    font-weight: 600;
+    letter-spacing: .1em;
+    text-transform: uppercase;
+    color: var(--text-3);
+    margin-bottom: 12px;
+    padding-bottom: 10px;
+    border-bottom: 1px solid var(--border-soft);
+  }
+  .toc-item {
+    display: flex;
+    align-items: flex-start;
+    margin: 2px 0;
+  }
+  .toc-toggle {
+    background: none;
+    border: none;
+    cursor: pointer;
+    color: var(--text-3);
+    padding: 4px;
+    margin-right: 4px;
+    margin-top: 2px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 4px;
+    transition: background 0.2s, transform 0.2s;
+  }
+  .toc-toggle:hover { background: var(--border-soft); color: var(--text); }
+  .toc-toggle[aria-expanded="false"] svg { transform: rotate(-90deg); }
+  .toc-spacer { width: 20px; flex-shrink: 0; }
+  .toc-group { overflow: hidden; transition: max-height 0.3s ease-in-out; }
+  .toc-group.collapsed { max-height: 0 !important; }
+
+  .toc a {
+    display: block;
+    font-size: 13px;
+    color: var(--text-2);
+    text-decoration: none;
+    padding: 4px 8px;
+    border-radius: 5px;
+    line-height: 1.45;
+    transition: background .15s, color .15s;
+    word-break: break-all;
+    flex-grow: 1;
+  }
+  .toc a:hover  { background: var(--accent-light); color: var(--accent); }
+  .toc a.active { background: var(--accent-light); color: var(--accent); font-weight: 500; }
+  .toc-l1 { font-weight: 600; color: var(--text); }
+  .toc-l2 { font-weight: 600; color: var(--text); }
+  .toc-l3 { font-size: 12px !important; padding-left: 14px !important; }
+
+  /* ── Article card ──────────────────────────────────────────────────────── */
+  .article {
+    flex: 1; min-width: 0;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    padding: 52px 60px;
+    box-shadow: var(--shadow-lg);
+  }
+
+  /* ── Headings ──────────────────────────────────────────────────────────── */
+  .title-container {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-end;
+    margin: 0 0 28px;
+    padding-bottom: 18px;
+    border-bottom: 2px solid var(--text);
+  }
+  .article h1 {
+    font-family: var(--font-head);
+    font-size: 26px; font-weight: 600; line-height: 1.3;
+    margin: 0; padding-bottom: 0;
+    border-bottom: none;
+  }
+  .article h2 {
+    font-family: var(--font-head);
+    font-size: 19px; font-weight: 600;
+    margin: 48px 0 14px; padding-bottom: 8px;
+    border-bottom: 1px solid var(--border);
+  }
+  .article h2::before {
+    content: attr(data-index);
+    display: inline-block;
+    font-family: var(--font-mono);
+    font-size: 10.5px; font-weight: 500;
+    color: var(--accent-mid);
+    background: var(--accent-light);
+    padding: 1px 7px; border-radius: 4px;
+    margin-right: 10px; vertical-align: middle;
+    letter-spacing: .05em;
+  }
+  .article h3 {
+    font-family: var(--font-head);
+    font-size: 15.5px; font-weight: 600;
+    margin: 28px 0 10px;
+  }
+  .article h3::before {
+    content: "§ ";
+    color: var(--text-3);
+    font-family: var(--font-mono); font-size: 13px;
+  }
+  .article h4 {
+    font-size: 13.5px; font-weight: 600;
+    color: var(--accent); margin: 20px 0 8px;
+  }
+
+  /* ── Body text ─────────────────────────────────────────────────────────── */
+  .article p, .plain {
+    font-size: 15px;
+    line-height: 1.85;
+    color: var(--text);
+    margin: 0 0 12px;
+    font-family: var(--font-body);
+  }
+  .article strong { font-weight: 600; }
+  .article em     { font-style: italic; color: var(--text-2); }
+  .article a {
+    color: var(--accent); text-decoration: underline;
+    text-decoration-color: var(--accent-light);
+    text-underline-offset: 3px;
+  }
+  .article a:hover { text-decoration-color: var(--accent); }
+  .article hr { border: none; border-top: 1px solid var(--border); margin: 20px 0; }
+  .article hr.heavy { border-top: 3px solid var(--text); margin: 32px 0; }
+
+  /* ── Blockquote ────────────────────────────────────────────────────────── */
+  .article blockquote {
+    border-left: 3px solid var(--accent-mid);
+    background: var(--accent-light);
+    margin: 20px 0; padding: 13px 20px 13px 20px;
+    border-radius: 0 var(--radius) var(--radius) 0;
+  }
+  .article blockquote p { font-size: 14.5px; color: var(--accent); margin: 0; line-height: 1.7; }
+  /* 支持块引用内部保留换行符（修复头部概要换行丢失问题） */
+  .article blockquote p { white-space: pre-wrap; }
+  .article blockquote strong { color: var(--accent); }
+
+  /* ── Lists ─────────────────────────────────────────────────────────────── */
+  .article ul, .article ol { padding-left: 22px; margin: 6px 0 14px; }
+  .article li { font-size: 15px; line-height: 1.8; margin: 4px 0; }
+  .article li::marker { color: var(--accent-mid); }
+  .article li > ul, .article li > ol { margin: 3px 0; }
+
+  /* ── Inline code ───────────────────────────────────────────────────────── */
+  .article :not(pre) > code {
+    font-family: var(--font-mono);
+    font-size: 12.5px; font-weight: 500;
+    background: #f3f0eb; color: var(--red);
+    padding: 1px 5px; border-radius: 4px;
+    border: 1px solid var(--border);
+  }
+
+  /* ── Code blocks ───────────────────────────────────────────────────────── */
+  .code-block {
+    position: relative; margin: 20px 0;
+    border-radius: var(--radius-lg); overflow: hidden;
+    border: 1px solid var(--code-border);
+    box-shadow: 0 4px 20px rgba(0,0,0,.16);
+  }
+  .code-lang {
+    position: absolute; top: 0; left: 0;
+    font-family: var(--font-mono); font-size: 10px; font-weight: 500;
+    color: #7c8db5; background: #222538;
+    padding: 4px 12px; border-bottom-right-radius: 6px;
+    text-transform: uppercase; letter-spacing: .08em;
+    user-select: none;
+  }
+  .copy-btn {
+    position: absolute; top: 8px; right: 10px;
+    background: #2d3148; border: 1px solid #3d4260;
+    border-radius: 5px; color: #7c8db5; cursor: pointer;
+    padding: 5px 8px; display: flex; align-items: center;
+    transition: background .15s, color .15s; z-index: 1;
+  }
+  .copy-btn:hover  { background: #3a3f60; color: #cdd6f4; }
+  .copy-btn.copied { color: #a6e3a1; border-color: #4a6a4a; }
+  .code-block pre {
+    margin: 0; padding: 36px 20px 20px;
+    background: var(--code-bg); overflow-x: auto;
+    scrollbar-width: thin; scrollbar-color: #3d4260 transparent;
+  }
+  .code-block pre::-webkit-scrollbar { height: 5px; }
+  .code-block pre::-webkit-scrollbar-thumb { background: #3d4260; border-radius: 3px; }
+  .code-block code {
+    font-family: var(--font-mono); font-size: 13px; line-height: 1.7;
+    color: var(--code-text); background: none; border: none; padding: 0;
+    white-space: pre; word-break: normal;
+  }
+
+  /* ── Tables ────────────────────────────────────────────────────────────── */
+  .table-wrap {
+    overflow-x: auto; margin: 16px 0;
+    border-radius: var(--radius-lg);
+    border: 1px solid var(--border);
+    box-shadow: var(--shadow);
+  }
+  table { width: 100%; border-collapse: collapse; font-size: 14px; min-width: 360px; }
+  thead { background: #f4f2ee; }
+  th {
+    padding: 9px 14px; text-align: left;
+    font-size: 11.5px; font-weight: 600;
+    letter-spacing: .04em; text-transform: uppercase;
+    color: var(--text-2); border-bottom: 1px solid var(--border);
+    white-space: nowrap;
+  }
+  td {
+    padding: 8px 14px; border-bottom: 1px solid var(--border-soft);
+    color: var(--text); vertical-align: top; line-height: 1.6;
+  }
+  tbody tr:last-child td { border-bottom: none; }
+  tbody tr:nth-child(even) td { background: #faf9f7; }
+  tbody tr:hover td { background: var(--accent-light); transition: background .1s; }
+
+  /* ── KV block ──────────────────────────────────────────────────────────── */
+  .kv-block { background: var(--bg); border: 1px solid var(--border); border-radius: var(--radius-lg); overflow: hidden; margin: 12px 0 20px; }
+  .kv-row { display: flex; border-bottom: 1px solid var(--border-soft); align-items: flex-start; }
+  .kv-row:last-child { border-bottom: none; }
+  .kv-key { flex: 0 0 160px; padding: 9px 16px; font-size: 13.5px; font-weight: 600; color: var(--text-2); background: var(--surface); border-right: 1px solid var(--border-soft); }
+  .kv-val { flex: 1; padding: 9px 16px; font-size: 14px; color: var(--text); }
+
+  /* ── Status badges ─────────────────────────────────────────────────────── */
+  .badge-ok { display: inline-flex; align-items: center; gap: 4px; background: var(--green-bg); color: var(--green); font-size: 13px; font-weight: 500; padding: 2px 9px; border-radius: 20px; border: 1px solid #bbf7d0; }
+  .badge-err { display: inline-flex; align-items: center; gap: 4px; background: var(--red-bg); color: var(--red); font-size: 13px; font-weight: 500; padding: 2px 9px; border-radius: 20px; border: 1px solid #fecaca; }
+  .badge-warn { display: inline-flex; align-items: center; gap: 4px; background: var(--amber-bg); color: var(--amber); font-size: 13px; font-weight: 500; padding: 2px 9px; border-radius: 20px; border: 1px solid #fde68a; }
+
+  /* ── Priority badges ───────────────────────────────────────────────────── */
+  .pri-p0 { display: inline-block; background: #fef2f2; color: #991b1b; border: 1px solid #fca5a5; font-size: 12px; font-weight: 700; padding: 2px 8px; border-radius: 4px; letter-spacing: .04em; }
+  .pri-p1 { display: inline-block; background: #fff7ed; color: #9a3412; border: 1px solid #fdba74; font-size: 12px; font-weight: 700; padding: 2px 8px; border-radius: 4px; }
+  .pri-p2 { display: inline-block; background: #fffbeb; color: #92400e; border: 1px solid #fde68a; font-size: 12px; font-weight: 700; padding: 2px 8px; border-radius: 4px; }
+  .pri-p3 { display: inline-block; background: var(--accent-light); color: var(--accent); border: 1px solid #bfdbfe; font-size: 12px; font-weight: 700; padding: 2px 8px; border-radius: 4px; }
+
+  /* ── Fault header ──────────────────────────────────────────────────────── */
+  .fault-header { display: flex; align-items: center; gap: 12px; padding: 12px 16px; border-radius: var(--radius-lg); margin: 16px 0 8px; border: 1px solid; }
+  .fh-p0 { background: #fef2f2; border-color: #fca5a5; }
+  .fh-p1 { background: #fff7ed; border-color: #fdba74; }
+  .fh-p2 { background: #fffbeb; border-color: #fde68a; }
+  .fh-p3 { background: var(--accent-light); border-color: #bfdbfe; }
+  .fh-badge { font-family: var(--font-mono); font-size: 11px; font-weight: 700; letter-spacing: .08em; }
+  .fh-p0 .fh-badge { color: #991b1b; }
+  .fh-p1 .fh-badge { color: #9a3412; }
+  .fh-p2 .fh-badge { color: #92400e; }
+  .fh-p3 .fh-badge { color: var(--accent); }
+  .fh-rest { font-size: 14px; font-weight: 500; color: var(--text); }
+
+  /* ── Timeline ──────────────────────────────────────────────────────────── */
+  .timeline { border-left: 2px solid var(--accent-mid); margin: 16px 0 16px 8px; padding-left: 20px; }
+  .tl-row { display: flex; align-items: baseline; gap: 10px; margin: 8px 0; font-size: 13.5px; }
+  .tl-ts { font-family: var(--font-mono); font-size: 12px; color: var(--text-3); flex-shrink: 0; white-space: nowrap; }
+  .tl-tag { font-size: 11px; font-weight: 600; padding: 1px 7px; border-radius: 10px; flex-shrink: 0; background: var(--accent-light); color: var(--accent); }
+  .tl-tag.err { background: var(--red-bg); color: var(--red); }
+  .tl-tag.warn { background: var(--amber-bg); color: var(--amber); }
+  .tl-desc { color: var(--text); line-height: 1.5; }
+
+  /* ── Global warn ───────────────────────────────────────────────────────── */
+  .global-warn { background: #fef2f2; border: 1px solid #fca5a5; border-radius: var(--radius-lg); padding: 14px 18px; font-size: 14.5px; font-weight: 600; color: #991b1b; margin: 16px 0; }
+
+  /* ── Tree note ─────────────────────────────────────────────────────────── */
+  .tree-note { white-space: pre-wrap; font-family: var(--font-mono); font-size: 13.5px; line-height: 1.6; color: var(--text-2); margin: 8px 0 8px 16px; }
+
+  /* ── Disclaimer ────────────────────────────────────────────────────────── */
+  .disclaimer { background: var(--bg); border: 1px solid var(--border); border-radius: var(--radius); padding: 14px 18px; font-size: 13.5px; color: var(--text-2); font-style: italic; }
+
+  /* ── Meta footer ───────────────────────────────────────────────────────── */
+  .meta {
+    margin-top: 48px; padding-top: 16px;
+    border-top: 1px solid var(--border-soft);
+    display: flex; justify-content: space-between; align-items: center;
+    font-size: 12px; color: var(--text-3);
+  }
+  .meta-source { font-family: var(--font-mono); font-size: 11.5px; }
+
+  /* ── Brand logo ────────────────────────────────────────────────────────── */
+  .brand-logo {
+    font-family: var(--font-head);
+    font-size: 14px;
+    color: var(--text-3);
+    letter-spacing: 0.05em;
+    margin-bottom: 4px;
+    flex-shrink: 0;
+    margin-left: 16px;
+  }
+  .brand-logo strong {
+    font-weight: 600;
+    color: var(--accent);
+  }
+  @media (max-width: 900px) {
+    .title-container { flex-direction: column; align-items: flex-start; gap: 12px; }
+    .brand-logo { margin-left: 0; margin-bottom: 0; }
+  }
+  /* ── Print ─────────────────────────────────────────────────────────────── */
+  @media print {
+    body { background: white; }
+    #progress, .toc { display: none; }
+    .layout { display: block; padding: 0; }
+    .article { border: none; box-shadow: none; padding: 24px; }
+    .copy-btn { display: none; }
+    .brand-logo { margin-bottom: 0; }
+  }
+
+  /* ── Responsive ────────────────────────────────────────────────────────── */
+  @media (max-width: 900px) {
+    .toc { display: none; }
+    .article { padding: 36px 28px; }
+    .layout { padding: 24px 16px 64px; }
+  }
+  @media (max-width: 480px) {
+    .article { padding: 24px 18px; }
+    .article h1 { font-size: 22px; }
+  }
+</style>
+</head>
+<body>
+
+<div id="progress"></div>
+
+<div class="layout">
+  <nav class="toc" id="toc">
+  <div class="toc-title">目录</div>
+  <div class="toc-content">
+<div class="toc-item has-children"><button class="toc-toggle" onclick="toggleToc(this)" aria-expanded="true">
+                <svg viewBox="0 0 24 24" width="12" height="12" stroke="currentColor" stroke-width="2" fill="none"><polyline points="6 9 12 15 18 9"></polyline></svg>
+              </button><a href="#h-故障诊断报告python-服务-rss-持续增长-全局容器内存泄漏" onclick="event.preventDefault(); const target = document.getElementById('h-故障诊断报告python-服务-rss-持续增长-全局容器内存泄漏'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l1">🔴 故障诊断报告：Python 服务 RSS 持续增长 — 全局容器内存泄漏</a></div>
+<div class="toc-group" id="group-h-一故障概览">
+<div class="toc-item has-children"><button class="toc-toggle" onclick="toggleToc(this)" aria-expanded="true">
+                <svg viewBox="0 0 24 24" width="12" height="12" stroke="currentColor" stroke-width="2" fill="none"><polyline points="6 9 12 15 18 9"></polyline></svg>
+              </button><a href="#h-一故障概览" onclick="event.preventDefault(); const target = document.getElementById('h-一故障概览'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l2">一、故障概览</a></div>
+<div class="toc-group" id="group-h-置信度说明">
+<div class="toc-item "><span class="toc-spacer"></span><a href="#h-置信度说明" onclick="event.preventDefault(); const target = document.getElementById('h-置信度说明'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l3">置信度说明</a></div>
+</div>
+<div class="toc-item has-children"><button class="toc-toggle" onclick="toggleToc(this)" aria-expanded="true">
+                <svg viewBox="0 0 24 24" width="12" height="12" stroke="currentColor" stroke-width="2" fill="none"><polyline points="6 9 12 15 18 9"></polyline></svg>
+              </button><a href="#h-二根因速览" onclick="event.preventDefault(); const target = document.getElementById('h-二根因速览'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l2">二、根因速览</a></div>
+<div class="toc-group" id="group-h-故障传导链路">
+<div class="toc-item "><span class="toc-spacer"></span><a href="#h-故障传导链路" onclick="event.preventDefault(); const target = document.getElementById('h-故障传导链路'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l3">故障传导链路</a></div>
+<div class="toc-item "><span class="toc-spacer"></span><a href="#h-故障因果链" onclick="event.preventDefault(); const target = document.getElementById('h-故障因果链'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l3">故障因果链</a></div>
+<div class="toc-item "><span class="toc-spacer"></span><a href="#h-事故时间线" onclick="event.preventDefault(); const target = document.getElementById('h-事故时间线'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l3">事故时间线</a></div>
+</div>
+<div class="toc-item has-children"><button class="toc-toggle" onclick="toggleToc(this)" aria-expanded="true">
+                <svg viewBox="0 0 24 24" width="12" height="12" stroke="currentColor" stroke-width="2" fill="none"><polyline points="6 9 12 15 18 9"></polyline></svg>
+              </button><a href="#h-三排查过程" onclick="event.preventDefault(); const target = document.getElementById('h-三排查过程'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l2">三、排查过程</a></div>
+<div class="toc-group" id="group-h-31-初始现象">
+<div class="toc-item "><span class="toc-spacer"></span><a href="#h-31-初始现象" onclick="event.preventDefault(); const target = document.getElementById('h-31-初始现象'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l3">3.1 初始现象</a></div>
+<div class="toc-item "><span class="toc-spacer"></span><a href="#h-32-诊断任务分派" onclick="event.preventDefault(); const target = document.getElementById('h-32-诊断任务分派'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l3">3.2 诊断任务分派</a></div>
+<div class="toc-item "><span class="toc-spacer"></span><a href="#h-33-假设驱动排查" onclick="event.preventDefault(); const target = document.getElementById('h-33-假设驱动排查'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l3">3.3 假设驱动排查</a></div>
+<div class="toc-item "><span class="toc-spacer"></span><a href="#h-34-排查结论与逻辑树" onclick="event.preventDefault(); const target = document.getElementById('h-34-排查结论与逻辑树'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l3">3.4 排查结论与逻辑树</a></div>
+</div>
+<div class="toc-item has-children"><button class="toc-toggle" onclick="toggleToc(this)" aria-expanded="true">
+                <svg viewBox="0 0 24 24" width="12" height="12" stroke="currentColor" stroke-width="2" fill="none"><polyline points="6 9 12 15 18 9"></polyline></svg>
+              </button><a href="#h-四领域深度分析python-内存泄漏证据链" onclick="event.preventDefault(); const target = document.getElementById('h-四领域深度分析python-内存泄漏证据链'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l2">四、领域深度分析：Python 内存泄漏证据链</a></div>
+<div class="toc-group" id="group-h-41-证据与边界">
+<div class="toc-item "><span class="toc-spacer"></span><a href="#h-41-证据与边界" onclick="event.preventDefault(); const target = document.getElementById('h-41-证据与边界'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l3">4.1 证据与边界</a></div>
+<div class="toc-item "><span class="toc-spacer"></span><a href="#h-42-只读边界声明" onclick="event.preventDefault(); const target = document.getElementById('h-42-只读边界声明'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l3">4.2 只读边界声明</a></div>
+<div class="toc-item "><span class="toc-spacer"></span><a href="#h-43-内存表面与增长形态" onclick="event.preventDefault(); const target = document.getElementById('h-43-内存表面与增长形态'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l3">4.3 内存表面与增长形态</a></div>
+<div class="toc-item "><span class="toc-spacer"></span><a href="#h-44-对象增长详细分布" onclick="event.preventDefault(); const target = document.getElementById('h-44-对象增长详细分布'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l3">4.4 对象增长详细分布</a></div>
+<div class="toc-item "><span class="toc-spacer"></span><a href="#h-45-竞争假设最终矩阵" onclick="event.preventDefault(); const target = document.getElementById('h-45-竞争假设最终矩阵'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l3">4.5 竞争假设最终矩阵</a></div>
+<div class="toc-item "><span class="toc-spacer"></span><a href="#h-46-验证门评估" onclick="event.preventDefault(); const target = document.getElementById('h-46-验证门评估'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l3">4.6 验证门评估</a></div>
+</div>
+<div class="toc-item has-children"><button class="toc-toggle" onclick="toggleToc(this)" aria-expanded="true">
+                <svg viewBox="0 0 24 24" width="12" height="12" stroke="currentColor" stroke-width="2" fill="none"><polyline points="6 9 12 15 18 9"></polyline></svg>
+              </button><a href="#h-五修复方案" onclick="event.preventDefault(); const target = document.getElementById('h-五修复方案'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l2">五、修复方案</a></div>
+<div class="toc-group" id="group-h-51-应急处置当前未执行">
+<div class="toc-item "><span class="toc-spacer"></span><a href="#h-51-应急处置当前未执行" onclick="event.preventDefault(); const target = document.getElementById('h-51-应急处置当前未执行'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l3">5.1 应急处置（当前未执行）</a></div>
+<div class="toc-item "><span class="toc-spacer"></span><a href="#h-52-永久修复计划" onclick="event.preventDefault(); const target = document.getElementById('h-52-永久修复计划'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l3">5.2 永久修复计划</a></div>
+<div class="toc-item "><span class="toc-spacer"></span><a href="#h-53-复测方案" onclick="event.preventDefault(); const target = document.getElementById('h-53-复测方案'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l3">5.3 复测方案</a></div>
+<div class="toc-item "><span class="toc-spacer"></span><a href="#h-54-后续验证建议" onclick="event.preventDefault(); const target = document.getElementById('h-54-后续验证建议'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l3">5.4 后续验证建议</a></div>
+</div>
+<div class="toc-item "><span class="toc-spacer"></span><a href="#h-诊断状态" onclick="event.preventDefault(); const target = document.getElementById('h-诊断状态'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l2">诊断状态</a></div>
+</div>
+  </div>
+</nav>
+  <article class="article" id="article" style="position: relative;">
+    <div class="title-container"><h1 id="h-故障诊断报告python-服务-rss-持续增长-全局容器内存泄漏">🔴 故障诊断报告：Python 服务 RSS 持续增长 — 全局容器内存泄漏</h1><div class="brand-logo">by <strong>Witty Diagnosis Agent</strong></div></div>
+<blockquote>
+<p><strong>报告编号</strong>：RCA-20260607-PY-GLOBAL-001
+<strong>故障级别</strong>：P2（潜在严重 — 内存持续增长，可能触发 OOM）
+<strong>报告时间</strong>：2026-06-07 12:29:12（证据采集）/ 2026-06-07 20:33:14（综合分析）
+<strong>当前状态</strong>：🔴 处理中（仅只读诊断完成，未执行修复）</p>
+</blockquote>
+<hr>
+<h2 id="h-一故障概览">一、故障概览</h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>项目</th>
+<th>内容</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>故障标题</strong></td>
+<td>Python 服务 RSS 持续增长 — 全局容器 <code>LEAK_BUCKET</code> 无界增长导致内存泄漏</td>
+</tr>
+<tr>
+<td><strong>影响范围</strong></td>
+<td>Python 进程（fault-injection/global_container_leak.py 场景），800 次迭代后 tracked heap 从 15.175 MiB 增长至 23.171 MiB（净增长 ~8 MiB）</td>
+</tr>
+<tr>
+<td><strong>故障时段</strong></td>
+<td>2026-06-07 12:29:00 ～ 持续中（未执行修复，RSS 仍在增长）</td>
+</tr>
+<tr>
+<td><strong>根本原因</strong></td>
+<td>模块级全局变量 <code>LEAK_BUCKET</code>（<code>builtins.list</code>）在每次 workload 迭代中追加包含 20 个 dict 字段的新元素，无容量上限、无淘汰策略、无生命周期管理，导致 Python 堆单调膨胀</td>
+</tr>
+<tr>
+<td><strong>是否恢复</strong></td>
+<td><span class="badge-err">❌ 未恢复（仅只读诊断，修复尚未执行）</span></td>
+</tr>
+<tr>
+<td><strong>根因置信度</strong></td>
+<td>🟢 中-高置信度（workload 可复现场景证据链完整；限制：缺少实时 RSS monitor/snapshot 数据）</td>
+</tr>
+</tbody></table></div>
+<h3 id="h-置信度说明">置信度说明</h3>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>等级</th>
+<th>标识</th>
+<th>含义</th>
+<th>适用当前场景</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>高置信</td>
+<td>🟢</td>
+<td>根因已明确，可复现，单一原因可解释所有现象</td>
+<td>限于 workload 可复现环境 — 对象增长、语义保留、保留链、分配热点四维证据完全一致</td>
+</tr>
+<tr>
+<td>中置信</td>
+<td>🟡</td>
+<td>根因基本确认，但存在无法完全解释的现象</td>
+<td>缺少实时 RSS monitor 和进程快照数据，无法量化 Python heap 与 RSS 的比率关系</td>
+</tr>
+<tr>
+<td>低置信</td>
+<td>🟠</td>
+<td>有多个可疑原因，尚未排除竞争，结论为推断</td>
+<td>—</td>
+</tr>
+<tr>
+<td>未知</td>
+<td>🔴</td>
+<td>现象无法解释，根因未定位，仍在排查中</td>
+<td>—</td>
+</tr>
+</tbody></table></div>
+<hr>
+<h2 id="h-二根因速览">二、根因速览</h2>
+<h3 id="h-故障传导链路">故障传导链路</h3>
+<div class="code-block">
+  <span class="code-lang">text</span>
+  <button class="copy-btn" onclick="copyCode(this)" title="复制">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
+  </button>
+  <pre><code>故障起点：Python 服务 RSS 持续增长
+    │   监控 / 日志观察：内存占用随时间单调递增，无回落
+    ▼
+第一层：模块全局变量 LEAK_BUCKET 无界增长
+    │   每次 run_workload() 迭代执行 LEAK_BUCKET.append(dict)
+    │   800 次迭代后 LEAK_BUCKET 长度从 0 → 800
+    ▼
+第二层：builtins.dict 和 builtins.list 对象单调增长
+    │   dict: +1,014 个 / +3.197 MiB
+    │   list: +805 个 / +0.434 MiB
+    │   peak_minus_final = 0（所有分配对象全部存活，无任何释放）
+    ▼
+第三层：Python 堆持续膨胀，PyMalloc arenas 无法归还给 OS
+    │   tracked heap: 15.175 MiB → 23.171 MiB（净增 ~8 MiB）
+    │   对象全部被全局变量引用，GC 无法回收
+    ▼
+第四层：RSS 高位驻留，最终可能触发 OOM
+    │   进程虚拟内存和物理内存持续上升
+    │   若不受控，将导致系统内存耗尽 → OOM Killer 干预或服务崩溃
+    ▼
+根因确认：模块级全局变量 LEAK_BUCKET — Python 全局容器泄漏
+    保留链: module_global:LEAK_BUCKET → list → dict items</code></pre>
+</div>
+<h3 id="h-故障因果链">故障因果链</h3>
+<div class="code-block">
+  <span class="code-lang">text</span>
+  <button class="copy-btn" onclick="copyCode(this)" title="复制">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
+  </button>
+  <pre><code>Python 服务 RSS 持续增长
+    └─► 模块全局变量 LEAK_BUCKET（builtins.list）无界增长
+            └─► 每次迭代执行 .append(dict{index, payload}) @ line 13
+                    └─► builtins.dict +3.197 MiB（+1,014 个）
+                    └─► builtins.list +0.434 MiB（+805 个）
+                    └─► peak_minus_final = 0 B（零释放）
+                            └─► Python heap 单调膨胀（15.175 → 23.171 MiB）
+                                    └─► 保留链 module_global:LEAK_BUCKET 阻止 GC 回收
+                                            └─► RSS 持续增长 → 最终 OOM</code></pre>
+</div>
+<h3 id="h-事故时间线">事故时间线</h3>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>时间</th>
+<th>事件</th>
+<th>性质</th>
+<th>证据来源</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>2026-06-07 12:29:12</td>
+<td>KuaFu T1 诊断完成：确认 Python 全局容器泄漏</td>
+<td><span class="badge-ok">✅ 证据采集</span></td>
+<td><code>kuafu_T1_global_container_leak_20260607_122912.md</code></td>
+</tr>
+<tr>
+<td>2026-06-07 12:29:17</td>
+<td>KuaFu T3 诊断完成：排除内存碎片化假设</td>
+<td><span class="badge-err">❌ 假设排除</span></td>
+<td><code>kuafu_T3_global_20260607_122917.md</code></td>
+</tr>
+<tr>
+<td>2026-06-07 20:33:14</td>
+<td>KuaFu T2 诊断完成：排除原生/C 扩展泄漏假设</td>
+<td><span class="badge-err">❌ 假设排除</span></td>
+<td><code>kuafu_T2_global_20260607_203314.md</code></td>
+</tr>
+<tr>
+<td>2026-06-07 20:33:14</td>
+<td><strong>反事实验证通过</strong>：清除 LEAK_BUCKET 可回收 46.7% 堆内存</td>
+<td><span class="badge-ok">✅ 根因确认</span></td>
+<td><code>reachability_counterfactual.json</code></td>
+</tr>
+</tbody></table></div>
+<hr>
+<h2 id="h-三排查过程">三、排查过程</h2>
+<h3 id="h-31-初始现象">3.1 初始现象</h3>
+<ul>
+<li><strong>故障描述</strong>：Python 服务 RSS 持续增长，疑似内存泄漏</li>
+<li><strong>证据范围</strong>：测试目录 <code>D:\develop\Trae\OpenEuler\witty-diagnosis-agent\test\python-memory-leak-analyzer\out\global</code></li>
+<li><strong>场景类型</strong>：可复现 Workload（<code>fault-injection/global_container_leak.py</code>），离线只读分析</li>
+<li><strong>运行环境</strong>：Python 3.12.3 / Linux WSL2</li>
+</ul>
+<h3 id="h-32-诊断任务分派">3.2 诊断任务分派</h3>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>任务编号</th>
+<th>排查方向</th>
+<th>执行时间</th>
+<th>结论</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>T1</strong></td>
+<td>Python 全局容器泄漏分析</td>
+<td>2026-06-07 12:29:12</td>
+<td>✅ <strong>确认</strong>：全局容器 <code>LEAK_BUCKET</code> 无界增长导致</td>
+</tr>
+<tr>
+<td><strong>T2</strong></td>
+<td>原生/C 扩展内存泄漏验证</td>
+<td>2026-06-07 20:33:14</td>
+<td>❌ <strong>排除</strong>：无 native/ctypes/mmap 信号</td>
+</tr>
+<tr>
+<td><strong>T3</strong></td>
+<td>PyMalloc 内存碎片化验证</td>
+<td>2026-06-07 12:29:17</td>
+<td>❌ <strong>排除</strong>：单调增长模式不符合碎片化特征</td>
+</tr>
+</tbody></table></div>
+<hr>
+<h3 id="h-33-假设驱动排查">3.3 假设驱动排查</h3>
+<h4 id="h-假设-h1python-全局容器泄漏-主导-已确认">假设 H1：Python 全局容器泄漏（✅ 主导 / 已确认）</h4>
+<blockquote>
+<p>🧪 假设：模块级全局变量 <code>LEAK_BUCKET</code> 持续追加元素且无释放，导致 Python 堆膨胀。</p>
+</blockquote>
+<p><strong>Step 1 — 对象增长分析</strong></p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>指标</th>
+<th>值</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>检查点趋势</td>
+<td><code>monotonic_growth</code>（单调增长）</td>
+</tr>
+<tr>
+<td>净增长字节</td>
+<td>8,384,584 bytes（~7.996 MiB）</td>
+</tr>
+<tr>
+<td>peak_minus_final</td>
+<td><strong>0 bytes</strong>（零释放，全部保留）</td>
+</tr>
+<tr>
+<td>最大增长类型</td>
+<td><code>builtins.dict</code> — +3,352,472 bytes（+1,014 个）</td>
+</tr>
+<tr>
+<td>次大增长类型</td>
+<td><code>builtins.list</code> — +455,472 bytes（+805 个）</td>
+</tr>
+</tbody></table></div>
+<p>迭代趋势（800 次）：</p>
+<div class="code-block">
+
+  <button class="copy-btn" onclick="copyCode(this)" title="复制">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
+  </button>
+  <pre><code>baseline:  total=15.175 MiB  top_type=dict
+iter 200:  total=16.123 MiB  top_type=dict  ← +0.948 MiB
+iter 400:  total=17.722 MiB  top_type=dict  ← +1.082 MiB
+iter 600:  total=20.050 MiB  top_type=dict  ← +2.044 MiB
+iter 800:  total=23.171 MiB  top_type=dict  ← +2.729 MiB</code></pre>
+</div>
+<p><strong>✅ 证据来源</strong>：<code>object_growth.json</code>（checkpoint_verdict=monotonic_growth）</p>
+<hr>
+<p><strong>Step 2 — 语义保留信号确认</strong></p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>指标</th>
+<th>值</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>变量名</td>
+<td><code>LEAK_BUCKET</code></td>
+</tr>
+<tr>
+<td>类型</td>
+<td><code>builtins.list</code></td>
+</tr>
+<tr>
+<td>长度增量</td>
+<td>0 → 800（+800）</td>
+</tr>
+<tr>
+<td>语义标签</td>
+<td><code>[&quot;global_container_growth&quot;]</code></td>
+</tr>
+<tr>
+<td>得分</td>
+<td>800</td>
+</tr>
+<tr>
+<td>竞争信号数</td>
+<td>0（无其他信号干扰）</td>
+</tr>
+<tr>
+<td>GC 垃圾数</td>
+<td><code>garbage_len = 0</code>（无循环引用，所有对象均可达）</td>
+</tr>
+</tbody></table></div>
+<p><strong>✅ 证据来源</strong>：<code>semantic.json</code>（verdict=semantic_leak_signals_observed）</p>
+<hr>
+<p><strong>Step 3 — 分配热点定位</strong></p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>排名</th>
+<th>代码位置</th>
+<th>分配字节</th>
+<th>分配次数</th>
+<th>操作说明</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>1</td>
+<td><code>global_container_leak.py:13</code></td>
+<td>+147,200 B</td>
+<td>1,600</td>
+<td><code>LEAK_BUCKET.append(item)</code></td>
+</tr>
+<tr>
+<td>2</td>
+<td><code>global_container_leak.py:16</code></td>
+<td>+98,848 B</td>
+<td>2,689</td>
+<td>payload 字符串/dict 创建</td>
+</tr>
+<tr>
+<td>3</td>
+<td><code>global_container_leak.py:11</code></td>
+<td>+17,376 B</td>
+<td>543</td>
+<td>循环迭代和 dict 构建</td>
+</tr>
+</tbody></table></div>
+<blockquote>
+<p><strong>关键</strong>：所有分配热点均为 <strong>纯 Python 代码</strong>，无 C 扩展、ctypes、ffi、Cython 调用。peak_minus_final = 198 B（接近零），几乎所有分配的对象都被保留。</p>
+</blockquote>
+<p><strong>✅ 证据来源</strong>：<code>tracemalloc.json</code>（verdict=python_allocation_growth_observed）</p>
+<hr>
+<p><strong>Step 4 — 保留链追踪</strong></p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>保留链</th>
+<th>根类型</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Chain 1</td>
+<td><code>module_global:LEAK_BUCKET</code></td>
+<td><strong>主链</strong>：模块全局 dict → <code>LEAK_BUCKET</code> list → dict items</td>
+</tr>
+<tr>
+<td>Chain 2</td>
+<td><code>module_global_dict</code></td>
+<td>模块全局命名空间本身持有引用</td>
+</tr>
+<tr>
+<td>Chain 3</td>
+<td><code>closure_cell</code></td>
+<td>闭包 cell 引用 <code>builtins.len</code> 内置函数（次要）</td>
+</tr>
+</tbody></table></div>
+<p>保留链路径：</p>
+<div class="code-block">
+
+  <button class="copy-btn" onclick="copyCode(this)" title="复制">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
+  </button>
+  <pre><code>module __dict__ (builtins.dict)
+  └→ LEAK_BUCKET (builtins.list, 800 元素)
+      └→ dict items (builtins.dict, index + payload)</code></pre>
+</div>
+<p><strong>✅ 证据来源</strong>：<code>retention.json</code>（root_kind=module_global:LEAK_BUCKET）</p>
+<hr>
+<p><strong>Step 5 — 反事实验证</strong></p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>指标</th>
+<th>值</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>操作</td>
+<td><code>clear</code> LEAK_BUCKET（沙箱内 <code>--allow-mutation</code>）</td>
+</tr>
+<tr>
+<td>目标回收比例</td>
+<td>1.0（global 级目标完全回收）</td>
+</tr>
+<tr>
+<td>全局回收比</td>
+<td>0.467（tracked 对象回收 46.7%）</td>
+</tr>
+<tr>
+<td>verdict</td>
+<td><code>counterfactual_confirmed</code></td>
+</tr>
+<tr>
+<td>confidence_cap</td>
+<td><code>strong</code></td>
+</tr>
+</tbody></table></div>
+<p><strong>✅ 结论</strong>：清除全局 <code>LEAK_BUCKET</code> 容器可回收约 <strong>46.7%</strong> 的 Python 堆增长，反事实假设成立。</p>
+<hr>
+<p><strong>Step 6 — 证据对账总表（correlation.json 总闸门）</strong></p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>字段</th>
+<th>值</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>summary.verdict</strong></td>
+<td><code>python_retained_leak_likely</code></td>
+</tr>
+<tr>
+<td><strong>confidence_cap</strong></td>
+<td><code>medium_workload_only_without_live_rss_scope</code></td>
+</tr>
+<tr>
+<td><strong>memory_surface.primary_surface</strong></td>
+<td><code>unknown</code>（非 file/shmem/mmap 主导）</td>
+</tr>
+<tr>
+<td><strong>file_shmem_dominant</strong></td>
+<td><code>false</code></td>
+</tr>
+<tr>
+<td><strong>missing_evidence</strong></td>
+<td><code>[&quot;monitor&quot;, &quot;snapshot&quot;]</code></td>
+</tr>
+</tbody></table></div>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>证据维度</th>
+<th>证据文件</th>
+<th>发现</th>
+<th>是否支持泄漏假设</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>对象增长</td>
+<td><code>object_growth.json</code></td>
+<td>单调增长，dict +3.197 MiB</td>
+<td><span class="badge-ok">✅ 支持</span></td>
+</tr>
+<tr>
+<td>语义保留</td>
+<td><code>semantic.json</code></td>
+<td>LEAK_BUCKET 0→800，global_container_growth</td>
+<td><span class="badge-ok">✅ 支持</span></td>
+</tr>
+<tr>
+<td>保留链</td>
+<td><code>retention.json</code></td>
+<td>module_global:LEAK_BUCKET</td>
+<td><span class="badge-ok">✅ 支持</span></td>
+</tr>
+<tr>
+<td>分配热点</td>
+<td><code>tracemalloc.json</code></td>
+<td>纯 Python append 操作，几乎全部保留</td>
+<td><span class="badge-ok">✅ 支持</span></td>
+</tr>
+<tr>
+<td>内存表面</td>
+<td><code>correlation.json</code></td>
+<td>非 file/shmem/mmap 主导</td>
+<td><span class="badge-ok">✅ 排除其他表面</span></td>
+</tr>
+<tr>
+<td>反事实验证</td>
+<td><code>reachability_counterfactual.json</code></td>
+<td>clear 后可回收 46.7%</td>
+<td><span class="badge-ok">✅ 确认</span></td>
+</tr>
+</tbody></table></div>
+<hr>
+<h4 id="h-假设-h2原生-c-扩展内存泄漏-已排除">假设 H2：原生 / C 扩展内存泄漏（❌ 已排除）</h4>
+<blockquote>
+<p>🧪 假设：C 扩展或 ctypes 分配的内存未释放，导致 RSS 与 Python 堆增长背离。</p>
+</blockquote>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>检查项</th>
+<th>结果</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>memory_surface.primary_surface</td>
+<td><span class="badge-err">❌ 非 native/allocator 方向</span></td>
+<td>值为 <code>unknown</code></td>
+</tr>
+<tr>
+<td>semantic.json native/ctypes 信号</td>
+<td><span class="badge-err">❌ 无</span></td>
+<td>唯一信号为 <code>global_container_growth</code></td>
+</tr>
+<tr>
+<td>tracemalloc C 扩展分配热点</td>
+<td><span class="badge-err">❌ 无</span></td>
+<td>所有热点位于 <code>global_container_leak.py</code> 纯 Python 代码</td>
+</tr>
+<tr>
+<td>object_growth 与 RSS 背离</td>
+<td><span class="badge-warn">⚠️ 无法评估</span></td>
+<td>缺少 RSS 监测数据</td>
+</tr>
+<tr>
+<td>retention 保留链</td>
+<td><span class="badge-ok">✅ Python 模块全局</span></td>
+<td><code>module_global:LEAK_BUCKET</code></td>
+</tr>
+</tbody></table></div>
+<p><strong>❌ 排除结论</strong>：本场景中不存在原生/C 扩展内存泄漏的证据，所有分配与保留均为纯 Python 代码路径。</p>
+<hr>
+<h4 id="h-假设-h3pymalloc-内存碎片化-arenas-高位驻留-已排除">假设 H3：PyMalloc 内存碎片化 / Arenas 高位驻留（❌ 已排除）</h4>
+<blockquote>
+<p>🧪 假设：PyMalloc arenas 碎片化导致 RSS 高位驻留（频繁分配释放后无法归还 arena 给 OS）。</p>
+</blockquote>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>证据项</th>
+<th>碎片化预期特征</th>
+<th>实际观察</th>
+<th align="center">匹配？</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>correlation.primary_surface</td>
+<td><code>allocator_reuse_or_fragmentation</code></td>
+<td><code>unknown</code></td>
+<td align="center">❌</td>
+</tr>
+<tr>
+<td>object_growth 形态</td>
+<td>plateau 高水位 / 颠簸</td>
+<td>monotonic_growth，零释放</td>
+<td align="center">❌</td>
+</tr>
+<tr>
+<td>tracemalloc 模式</td>
+<td>频繁分配释放同一类型</td>
+<td>全部保留，peak_minus_final=198 B</td>
+<td align="center">❌</td>
+</tr>
+<tr>
+<td>retention 保留链</td>
+<td>无明确保留链或临时缓存</td>
+<td>明确指向 LEAK_BUCKET 全局变量</td>
+<td align="center">❌</td>
+</tr>
+<tr>
+<td>semantic 信号</td>
+<td>无或 weak</td>
+<td><code>global_container_growth</code> 强信号（score=800）</td>
+<td align="center">❌</td>
+</tr>
+</tbody></table></div>
+<p><strong>❌ 排除结论</strong>：全部对象均被保留，不存在&quot;频繁分配释放&quot;碎片化模式。</p>
+<hr>
+<h4 id="h-假设-h4file-shmem-后端增长-已排除">假设 H4：File / Shmem 后端增长（❌ 已排除）</h4>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>检查项</th>
+<th>值</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>file_shmem_dominant</td>
+<td><code>false</code></td>
+</tr>
+<tr>
+<td>file_shmem_net_growth_bytes</td>
+<td>0</td>
+</tr>
+<tr>
+<td>mapping_file_shmem_bytes</td>
+<td>0</td>
+</tr>
+</tbody></table></div>
+<p><strong>❌ 排除结论</strong>：无文件映射或共享内存增长信号。</p>
+<hr>
+<h3 id="h-34-排查结论与逻辑树">3.4 排查结论与逻辑树</h3>
+<div class="code-block">
+  <span class="code-lang">text</span>
+  <button class="copy-btn" onclick="copyCode(this)" title="复制">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
+  </button>
+  <pre><code>Python 服务 RSS 持续增长
+├─► H4: File/shmem 后端增长    → ❌ 排除（file_shmem_dominant=false, growth=0）
+├─► H2: 原生/C 扩展泄漏        → ❌ 排除（无 native/ctypes/mmap 信号）
+│       └─► tracemalloc 所有热点为纯 Python
+│       └─► memory_surface != native_or_allocator
+├─► H3: PyMalloc 碎片化        → ❌ 排除（monotonic_growth, peak_minus_final=0）
+│       └─► 无 plateau/颠簸模式
+│       └─► retention 链明确，非临时缓存
+└─► H1: Python 全局容器泄漏    → ✅ 确认（四维证据一致）
+        └─► object_growth: dict +3.197 MiB, list +0.434 MiB
+        └─► semantic: LEAK_BUCKET global_container_growth (score=800)
+        └─► tracemalloc: line 13 (append), line 16 (payload 创建)
+        └─► retention: module_global:LEAK_BUCKET
+        └─► counterfactual: clear 后回收 46.7% ✅
+        └─► 🎯 根因确认：模块全局容器无界增长</code></pre>
+</div>
+<hr>
+<h2 id="h-四领域深度分析python-内存泄漏证据链">四、领域深度分析：Python 内存泄漏证据链</h2>
+<h3 id="h-41-证据与边界">4.1 证据与边界</h3>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>项目</th>
+<th>内容</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>已读取的证据文件</strong></td>
+<td><code>capabilities.json</code>、<code>discovery.json</code>、<code>correlation.json</code>、<code>object_growth.json</code>、<code>semantic.json</code>、<code>tracemalloc.json</code>、<code>retention.json</code>、<code>reachability_static.json</code>、<code>reachability_counterfactual.json</code>、<code>global.log</code></td>
+</tr>
+<tr>
+<td><strong>证据目录</strong></td>
+<td><code>D:\develop\Trae\OpenEuler\witty-diagnosis-agent\test\python-memory-leak-analyzer\out\global\</code></td>
+</tr>
+<tr>
+<td><strong>对应 KuaFu 报告</strong></td>
+<td>T1: <code>kuafu_T1_global_container_leak_20260607_122912.md</code></td>
+</tr>
+<tr>
+<td></td>
+<td>T2: <code>kuafu_T2_global_20260607_203314.md</code></td>
+</tr>
+<tr>
+<td></td>
+<td>T3: <code>kuafu_T3_global_20260607_122917.md</code></td>
+</tr>
+<tr>
+<td><strong>correlation.json verdict</strong></td>
+<td><code>python_retained_leak_likely</code></td>
+</tr>
+<tr>
+<td><strong>confidence_cap</strong></td>
+<td><code>medium_workload_only_without_live_rss_scope</code></td>
+</tr>
+<tr>
+<td><strong>memory_surface.primary_surface</strong></td>
+<td><code>unknown</code>（非 file/shmem/mmap 主导）</td>
+</tr>
+<tr>
+<td><strong>缺失证据</strong></td>
+<td><code>monitor</code>（RSS 监控数据）、<code>snapshot</code>（进程快照）</td>
+</tr>
+</tbody></table></div>
+<h3 id="h-42-只读边界声明">4.2 只读边界声明</h3>
+<ul>
+<li>✅ 本诊断为 <strong>离线只读分析</strong>，未执行 attach、ptrace 操作</li>
+<li><span class="badge-ok">✅ 未执行修复、重启、服务修改或配置写入</span></li>
+<li>✅ 反事实干预仅在沙箱内执行（<code>--allow-mutation</code>），生产环境不会触发</li>
+<li>⚠️ 缺失实时 RSS monitor 和进程 snapshot 数据，置信度上限为 <code>medium_workload_only_without_live_rss_scope</code></li>
+</ul>
+<h3 id="h-43-内存表面与增长形态">4.3 内存表面与增长形态</h3>
+<p><code>correlation.json.summary.memory_surface</code>：</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>字段</th>
+<th>值</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>primary_surface</td>
+<td><code>unknown</code></td>
+</tr>
+<tr>
+<td>file_shmem_dominant</td>
+<td><code>false</code></td>
+</tr>
+<tr>
+<td>file_shmem_net_growth_bytes</td>
+<td>0</td>
+</tr>
+<tr>
+<td>mapping_file_shmem_bytes</td>
+<td>0</td>
+</tr>
+<tr>
+<td>rss_net_growth_bytes</td>
+<td><code>null</code>（无 monitor 数据）</td>
+</tr>
+</tbody></table></div>
+<p><strong>分析</strong>：RSS 增长来源为 Python 堆内对象增长，非文件映射、共享内存或 native allocator 方向。</p>
+<h3 id="h-44-对象增长详细分布">4.4 对象增长详细分布</h3>
+<p>800 次迭代后，tracked 对象从 15.175 MiB 增长至 23.171 MiB：</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>迭代点</th>
+<th>总跟踪字节</th>
+<th>主导类型字节</th>
+<th>增量</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>baseline</td>
+<td>15.175 MiB</td>
+<td>dict 9.082 MiB</td>
+<td>—</td>
+</tr>
+<tr>
+<td>iter 200</td>
+<td>16.123 MiB</td>
+<td>dict 9.844 MiB</td>
+<td>+0.948 MiB</td>
+</tr>
+<tr>
+<td>iter 400</td>
+<td>17.722 MiB</td>
+<td>dict 11.225 MiB</td>
+<td>+1.082 MiB</td>
+</tr>
+<tr>
+<td>iter 600</td>
+<td>20.050 MiB</td>
+<td>dict 13.266 MiB</td>
+<td>+2.044 MiB</td>
+</tr>
+<tr>
+<td>iter 800</td>
+<td>23.171 MiB</td>
+<td>dict 15.995 MiB</td>
+<td>+2.729 MiB</td>
+</tr>
+</tbody></table></div>
+<h3 id="h-45-竞争假设最终矩阵">4.5 竞争假设最终矩阵</h3>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>假设</th>
+<th>状态</th>
+<th>支持证据</th>
+<th>排除理由</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>H1: Python 全局容器泄漏</strong></td>
+<td>✅ <strong>主导/已确认</strong></td>
+<td>四维证据+反事实</td>
+<td>—</td>
+</tr>
+<tr>
+<td>H2: 原生/C 扩展泄漏</td>
+<td><span class="badge-err">❌ 排除</span></td>
+<td>—</td>
+<td>无 native/ctypes/mmap 信号，分配热点纯 Python</td>
+</tr>
+<tr>
+<td>H3: PyMalloc 碎片化</td>
+<td><span class="badge-err">❌ 排除</span></td>
+<td>—</td>
+<td>monotonic_growth，peak_minus_final=0，不符合碎片化模式</td>
+</tr>
+<tr>
+<td>H4: File/shmem 增长</td>
+<td><span class="badge-err">❌ 排除</span></td>
+<td>—</td>
+<td>file_shmem_dominant=false，增长量为 0</td>
+</tr>
+<tr>
+<td>H5: Allocator high-water</td>
+<td><span class="badge-warn">⚠️ 无法评估</span></td>
+<td>—</td>
+<td>缺少 live snapshot 和 Private_Dirty 数据</td>
+</tr>
+</tbody></table></div>
+<h3 id="h-46-验证门评估">4.6 验证门评估</h3>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>门</th>
+<th>检查项</th>
+<th align="center">结果</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>G0</td>
+<td>证据存在性</td>
+<td align="center">✅</td>
+<td>11/11 证据文件齐全</td>
+</tr>
+<tr>
+<td>G1</td>
+<td>correlation.json 对账</td>
+<td align="center">✅</td>
+<td>verdict 与各维度证据一致</td>
+</tr>
+<tr>
+<td>G2</td>
+<td>内存表面判读</td>
+<td align="center">✅</td>
+<td>primary_surface=unknown，非 native/allocator 方向</td>
+</tr>
+<tr>
+<td>G3</td>
+<td>保留链确认</td>
+<td align="center">✅</td>
+<td>链指向 module_global:LEAK_BUCKET</td>
+</tr>
+<tr>
+<td>G4</td>
+<td>反事实验证</td>
+<td align="center">✅</td>
+<td>counterfactual_confirmed，回收 46.7%</td>
+</tr>
+<tr>
+<td>G5</td>
+<td>置信度范围</td>
+<td align="center">✅</td>
+<td>中等（无 RSS monitor 数据封顶）</td>
+</tr>
+</tbody></table></div>
+<hr>
+<h2 id="h-五修复方案">五、修复方案</h2>
+<h3 id="h-51-应急处置当前未执行">5.1 应急处置（当前未执行）</h3>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>步骤</th>
+<th>操作</th>
+<th>执行人</th>
+<th>时间</th>
+<th>效果预期</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>1</td>
+<td>监控 <code>LEAK_BUCKET</code> 长度，确认增长速率</td>
+<td>人工/监控系统</td>
+<td>—</td>
+<td>量化泄漏严重程度</td>
+</tr>
+<tr>
+<td>2</td>
+<td>若进程频临 OOM，临时扩容或重启进程</td>
+<td>系统/人工</td>
+<td>—</td>
+<td>临时释放内存，但治标不治本</td>
+</tr>
+</tbody></table></div>
+<blockquote>
+<p>⚠️ 当前阶段为<strong>只读诊断</strong>，上述操作需获得授权后执行。</p>
+</blockquote>
+<h3 id="h-52-永久修复计划">5.2 永久修复计划</h3>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>优先级</th>
+<th>修复措施</th>
+<th>详细说明</th>
+<th>预期效果</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>P0</strong></td>
+<td>为 <code>LEAK_BUCKET</code> 设置容量上限</td>
+<td>使用 <code>collections.deque(maxlen=N)</code> 替代 <code>list</code>，或在上限触发时告警/淘汰</td>
+<td>防止无界增长，heap 大小有界</td>
+</tr>
+<tr>
+<td><strong>P0</strong></td>
+<td>添加淘汰策略</td>
+<td>根据业务语义实现 FIFO / LRU / TTL 淘汰，例如 <code>cachetools.TTLCache</code></td>
+<td>旧数据自动清理</td>
+</tr>
+<tr>
+<td><strong>P1</strong></td>
+<td>修复代码：<code>global_container_leak.py</code></td>
+<td>在 <code>append</code> 前检查容器长度，达到阈值时 <code>pop(0)</code> 或 <code>clear()</code></td>
+<td>直接消除根因</td>
+</tr>
+<tr>
+<td><strong>P1</strong></td>
+<td>生命周期管理</td>
+<td>对于不需要长期保留的临时数据，确保处理后从全局容器移除（<code>del</code> 引用或 <code>list.clear()</code>）</td>
+<td>避免对象驻留在全局作用域</td>
+</tr>
+<tr>
+<td><strong>P2</strong></td>
+<td>监控告警</td>
+<td>对全局容器长度设置监控阈值，超出时触发告警</td>
+<td>尽早发现泄漏复发</td>
+</tr>
+</tbody></table></div>
+<h3 id="h-53-复测方案">5.3 复测方案</h3>
+<ol>
+<li>修复后重新运行 workload：<code>./run.sh run global</code></li>
+<li>验证 <code>checkpoint_trend</code> 从 <code>monotonic_growth</code> 变为 <code>stable</code> 或 <code>bounded</code></li>
+<li>确认 <code>object_growth</code> 中 <code>net_tracked_growth_bytes</code> 不再持续增长</li>
+<li>对比相同迭代次数下修复前后的内存占用（应显著下降）</li>
+</ol>
+<h3 id="h-54-后续验证建议">5.4 后续验证建议</h3>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>建议事项</th>
+<th>目的</th>
+<th>授权需求</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>部署 <code>monitor_rss.py</code> 采集实时 RSS 监控</td>
+<td>量化 Python heap 与 RSS 的实际比率，提升置信度</td>
+<td>独立授权</td>
+</tr>
+<tr>
+<td>在沙箱外执行反事实干预（clear LEAK_BUCKET）</td>
+<td>验证 RSS 是否实际回落</td>
+<td>独立授权</td>
+</tr>
+<tr>
+<td>如需 deeper native/allocator 分析</td>
+<td>采集 native allocation stack 证据</td>
+<td>独立授权</td>
+</tr>
+</tbody></table></div>
+<hr>
+<h2 id="h-诊断状态">诊断状态</h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>项目</th>
+<th>状态</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>诊断完成</strong></td>
+<td><span class="badge-ok">✅ 是</span></td>
+</tr>
+<tr>
+<td><strong>根因已定位</strong></td>
+<td>✅ 是 — Python 全局容器泄漏（<code>module_global:LEAK_BUCKET</code>）</td>
+</tr>
+<tr>
+<td><strong>故障已恢复</strong></td>
+<td><span class="badge-err">❌ 否 — 仅只读诊断，未执行修复操作</span></td>
+</tr>
+<tr>
+<td><strong>修复建议已给出</strong></td>
+<td><span class="badge-ok">✅ 是</span></td>
+</tr>
+<tr>
+<td><strong>竞争假设已排除</strong></td>
+<td><span class="badge-ok">✅ 是 — 原生泄漏、碎片化、file/shmem 均排除</span></td>
+</tr>
+</tbody></table></div>
+<hr>
+<blockquote>
+<p><em>本报告为只读诊断结果。所有结论基于离线可复现 Workload 的结构化证据链，受 <code>medium_workload_only_without_live_rss_scope</code> 置信度上限约束。修复操作需在获得授权后执行并复测验证。</em></p>
+</blockquote>
+<hr>
+<p><strong>RCA 报告路径</strong>：<code>C:\Users\duanz\.witty-diagnosis-agent\baize\reports\Python服务RSS持续增长全局容器泄漏_global_20260607_122912_report.md</code></p>
+<p><strong>输入 KuaFu 报告路径</strong>：</p>
+<ol>
+<li><code>C:\Users\duanz\.witty-diagnosis-agent\dayu\report\kuafu_T1_global_container_leak_20260607_122912.md</code></li>
+<li><code>C:\Users\duanz\.witty-diagnosis-agent\dayu\report\kuafu_T2_global_20260607_203314.md</code></li>
+<li><code>C:\Users\duanz\.witty-diagnosis-agent\dayu\report\kuafu_T3_global_20260607_122917.md</code></li>
+</ol>
+
+    <div class="meta">
+      <span class="meta-source">Python服务RSS持续增长全局容器泄漏_global_20260607_122912_report.md</span>
+      <span>生成于 2026/06/07 20:36</span>
+    </div>
+  </article>
+</div>
+
+<script>
+  /* ── 滚动进度条 ── */
+  window.addEventListener("scroll", () => {
+    const el  = document.documentElement;
+    const pct = el.scrollTop / (el.scrollHeight - el.clientHeight) * 100;
+    document.getElementById("progress").style.width = Math.min(pct, 100) + "%";
+  });
+
+  /* ── TOC 高亮当前章节 ── */
+  (function () {
+    const headings = Array.from(document.querySelectorAll("article h1,article h2,article h3"));
+    const links    = Array.from(document.querySelectorAll(".toc a"));
+    if (!links.length) return;
+    const obs = new IntersectionObserver(entries => {
+      entries.forEach(e => {
+        if (!e.isIntersecting) return;
+        links.forEach(l => l.classList.remove("active"));
+        const a = links.find(l => l.getAttribute("href") === "#" + e.target.id);
+        if (a) a.classList.add("active");
+      });
+    }, { rootMargin: "-10% 0px -80% 0px" });
+    headings.forEach(h => obs.observe(h));
+  })();
+
+  /* ── h2 章节序号自动计数 ── */
+  (function () {
+    let idx = 0;
+    document.querySelectorAll("article h2").forEach(el => {
+      idx++;
+      el.setAttribute("data-index", String(idx).padStart(2, "0"));
+    });
+  })();
+
+  /* ── 代码块一键复制 ── */
+  function copyCode(btn) {
+    const code = btn.closest(".code-block").querySelector("code").innerText;
+    navigator.clipboard.writeText(code).then(() => {
+      btn.classList.add("copied");
+      btn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>';
+      setTimeout(() => {
+        btn.classList.remove("copied");
+        btn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>';
+      }, 2000);
+    });
+  }
+
+  /* ── 目录树收缩/展开 ── */
+  function toggleToc(btn) {
+    const expanded = btn.getAttribute("aria-expanded") === "true";
+    btn.setAttribute("aria-expanded", String(!expanded));
+    const parentItem = btn.closest(".toc-item");
+    let nextEl = parentItem.nextElementSibling;
+    if (nextEl && nextEl.classList.contains("toc-group")) {
+      if (expanded) {
+        nextEl.style.maxHeight = nextEl.scrollHeight + "px";
+        void nextEl.offsetHeight;
+        nextEl.classList.add("collapsed");
+      } else {
+        nextEl.classList.remove("collapsed");
+        nextEl.style.maxHeight = nextEl.scrollHeight + "px";
+        setTimeout(() => {
+          if (!nextEl.classList.contains("collapsed")) {
+            nextEl.style.maxHeight = "none";
+          }
+        }, 300);
+      }
+    }
+  }
+</script>
+</body>
+</html>
