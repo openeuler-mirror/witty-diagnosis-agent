@@ -88,7 +88,7 @@ Python 服务 RSS 持续增长
 ### 3.1 初始现象
 
 - **故障描述**：Python 服务 RSS 持续增长，疑似内存泄漏
-- **证据范围**：测试目录 `D:\develop\Trae\OpenEuler\witty-diagnosis-agent\test\python-memory-leak-analyzer\out\global`
+- **证据范围**：测试目录 `test/python-memory-leak-analyzer/out/global`
 - **场景类型**：可复现 Workload（`fault-injection/global_container_leak.py`），离线只读分析
 - **运行环境**：Python 3.12.3 / Linux WSL2
 
@@ -288,7 +288,7 @@ Python 服务 RSS 持续增长
 | 项目 | 内容 |
 |------|------|
 | **已读取的证据文件** | `capabilities.json`、`discovery.json`、`correlation.json`、`object_growth.json`、`semantic.json`、`tracemalloc.json`、`retention.json`、`reachability_static.json`、`reachability_counterfactual.json`、`global.log` |
-| **证据目录** | `D:\develop\Trae\OpenEuler\witty-diagnosis-agent\test\python-memory-leak-analyzer\out\global\` |
+| **证据目录** | `test/python-memory-leak-analyzer/out/global\` |
 | **对应 KuaFu 报告** | T1: `kuafu_T1_global_container_leak_20260607_122912.md` |
 | | T2: `kuafu_T2_global_20260607_203314.md` |
 | | T3: `kuafu_T3_global_20260607_122917.md` |
@@ -407,9 +407,9 @@ Python 服务 RSS 持续增长
 
 ---
 
-**RCA 报告路径**：`C:\Users\duanz\.witty-diagnosis-agent\baize\reports\Python服务RSS持续增长全局容器泄漏_global_20260607_122912_report.md`
+**RCA 报告路径**：`Witty Baize final report`
 
 **输入 KuaFu 报告路径**：
-1. `C:\Users\duanz\.witty-diagnosis-agent\dayu\report\kuafu_T1_global_container_leak_20260607_122912.md`
-2. `C:\Users\duanz\.witty-diagnosis-agent\dayu\report\kuafu_T2_global_20260607_203314.md`
-3. `C:\Users\duanz\.witty-diagnosis-agent\dayu\report\kuafu_T3_global_20260607_122917.md`
+1. `Witty Dayu intermediate report`
+2. `Witty Dayu intermediate report`
+3. `Witty Dayu intermediate report`

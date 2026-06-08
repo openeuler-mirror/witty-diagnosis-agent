@@ -84,7 +84,7 @@ make_handler() 每次被调用
 ### 3.1 初始现象
 
 - **故障描述**：Python 服务在 workload 执行过程中，RSS（常驻内存集）持续单调增长
-- **证据目录**：`D:\develop\Trae\OpenEuler\witty-diagnosis-agent\test\python-memory-leak-analyzer\out\stress\closure_capture`
+- **证据目录**：`test/python-memory-leak-analyzer/out/edge-cases/closure_capture`
 - **诊断模式**：offline（离线证据包分析）
 - **诊断状态**：诊断完成，根因已定位，修复建议已给出
 

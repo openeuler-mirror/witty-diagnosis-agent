@@ -312,6 +312,6 @@ ctypes.CDLL("libc.so.6").malloc_trim(0)
 
 | 任务 | 假设 | 结论 | 输出路径 |
 |------|------|------|---------|
-| T1 | 分配器碎片化导致 RSS 高位平台 | ✅ 支持（方向级） | `C:\Users\duanz\.witty-diagnosis-agent\dayu\report\kuafu_T1_20260607_230738.md` |
-| T2 | Python 托管对象泄漏 | ❌ 已排除 | `C:\Users\duanz\.witty-diagnosis-agent\dayu\report\kuafu_T2_20260607_230803.md` |
-| T3 | C 扩展/Native 内存泄漏 | ❌ 已排除 | `C:\Users\duanz\.witty-diagnosis-agent\dayu\report\kuafu_T3_20260607_230817.md` |
+| T1 | 分配器碎片化导致 RSS 高位平台 | ✅ 支持（方向级） | `Witty Dayu intermediate report` |
+| T2 | Python 托管对象泄漏 | ❌ 已排除 | `Witty Dayu intermediate report` |
+| T3 | C 扩展/Native 内存泄漏 | ❌ 已排除 | `Witty Dayu intermediate report` |

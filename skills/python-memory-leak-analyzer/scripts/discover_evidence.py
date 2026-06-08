@@ -257,9 +257,9 @@ def classify_file(path: Path) -> list[dict[str, Any]]:
         rows.append({"path": str(path.resolve()), "role": "python_project_file"})
     if path.name == "run.sh":
         text = read_text(path)
-        if "run-stress" in text or "python-memory-leak-analyzer" in text:
-            rows.append({"path": str(path.resolve()), "role": "test_runner", "supports_stress": "run-stress" in text})
-    if path.name in {"stress_manifest.json", "manifest.json", "metadata.json"}:
+        if "run-edge" in text or "python-memory-leak-analyzer" in text:
+            rows.append({"path": str(path.resolve()), "role": "test_runner", "supports_edge_cases": "run-edge" in text})
+    if path.name in {"scenario_manifest.json", "manifest.json", "metadata.json"}:
         row = classify_json(path)
         rows.append(row or {"path": str(path.resolve()), "role": "manifest"})
     elif path.suffix.lower() == ".json":

@@ -371,9 +371,9 @@ with tempfile.NamedTemporaryFile(dir="/dev/shm", delete=True) as handle:
 
 | 任务 | 报告文件路径 |
 |------|-------------|
-| T1 - shmem/mmap 泄漏分析 | `C:\Users\duanz\.witty-diagnosis-agent\dayu\report\kuafu_T1_20260607_144755_mmap_shmem_leak.md` |
-| T2 - 全局容器增长分析 | `C:\Users\duanz\.witty-diagnosis-agent\dayu\report\kuafu_T2_20260607_225723.md` |
-| T3 - 双路径混合分析 | `C:\Users\duanz\.witty-diagnosis-agent\dayu\report\kuafu_T3_mmap_shmem_dual_path_20260607_144800.md` |
+| T1 - shmem/mmap 泄漏分析 | `Witty Dayu intermediate report` |
+| T2 - 全局容器增长分析 | `Witty Dayu intermediate report` |
+| T3 - 双路径混合分析 | `Witty Dayu intermediate report` |
 
 ### 5.4 只读边界声明
 
@@ -385,4 +385,4 @@ with tempfile.NamedTemporaryFile(dir="/dev/shm", delete=True) as handle:
 
 ---
 
-**RCA 报告路径**：`C:\Users\duanz\.witty-diagnosis-agent\baize\reports\Python服务RSS持续增长疑似内存泄漏_20260607_230000_report.md`
+**RCA 报告路径**：`Witty Baize final report`

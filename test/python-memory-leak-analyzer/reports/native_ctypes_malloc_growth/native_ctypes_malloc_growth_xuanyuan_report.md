@@ -368,7 +368,7 @@ def native_buffer(size):
 | `memray run --native` 采集 native 分配栈 | 定位具体哪些 C 函数产生泄漏 | 精确定位到代码行级别 |
 | `valgrind --leak-check=full` 运行 workload | 检测具体的泄漏点 | 确认每个 malloc 对应的 free |
 | `malloc_info()` / `mallinfo` 采集 arena 内部状态 | 区分真实泄漏 vs arena 高水位 | 明确根因是泄漏还是碎片 |
-| 修复后复测 `./run.sh run-prod native_ctypes_malloc_growth` | 验证修复有效性 | RSS 净增长 < 5 MiB |
+| 修复后复测 `./run.sh run-realistic native_ctypes_malloc_growth` | 验证修复有效性 | RSS 净增长 < 5 MiB |
 
 ---
 
@@ -400,10 +400,10 @@ def native_buffer(size):
 
 | 文件 | 路径 |
 |------|------|
-| T1 诊断报告 | `C:\Users\duanz\.witty-diagnosis-agent\dayu\report\kuafu_T1_20260607_223951.md` |
-| T2 诊断报告 | `C:\Users\duanz\.witty-diagnosis-agent\dayu\report\kuafu_T2_20260607_223943.md` |
-| T3 诊断报告 | `C:\Users\duanz\.witty-diagnosis-agent\dayu\report\kuafu_T3_20260607_223932.md` |
-| correlation.json | `test/python-memory-leak-analyzer/out/production/native_ctypes_malloc_growth/correlation.json` |
+| T1 诊断报告 | `Witty Dayu intermediate report` |
+| T2 诊断报告 | `Witty Dayu intermediate report` |
+| T3 诊断报告 | `Witty Dayu intermediate report` |
+| correlation.json | `test/python-memory-leak-analyzer/out/realistic/native_ctypes_malloc_growth/correlation.json` |
 | monitor_rss_pid.json | 同上 |
 | object_growth.json | 同上 |
 | tracemalloc.json | 同上 |

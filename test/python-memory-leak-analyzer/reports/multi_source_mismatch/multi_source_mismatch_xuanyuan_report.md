@@ -6,7 +6,7 @@
 | --- | --- |
 | **场景** | multi_source_mismatch（多源竞争内存泄漏） |
 | **诊断模式** | 离线日志分析（Offline Analysis） |
-| **证据目录** | `test/python-memory-leak-analyzer/out/stress/multi_source_mismatch` |
+| **证据目录** | `test/python-memory-leak-analyzer/out/edge-cases/multi_source_mismatch` |
 | **故障现象** | Python 服务 RSS 持续增长，疑似内存泄漏 |
 | **诊断状态** | 只读诊断完成，未执行修复/重启/配置变更 |
 
@@ -206,10 +206,10 @@ module_global:LISTENERS (builtins.list)
 
 ```json
 {
-  "plan_path": "C:\\Users\\duanz\\.witty-diagnosis-agent\\dayu\\reports\\Python多源竞争内存泄漏RCA_multi_source_mismatch_20260607_204137_report.md",
+  "plan_path": "Witty Dayu intermediate report",
   "created_at": "2026-06-07T20:41:37+08:00",
   "mode": "offline",
-  "target": "D:\\develop\\Trae\\OpenEuler\\witty-diagnosis-agent\\test\\python-memory-leak-analyzer\\out\\stress\\multi_source_mismatch",
+  "target": "test/python-memory-leak-analyzer/out/edge-cases/multi_source_mismatch",
   "tasks": [
     {
       "id": "T1",
@@ -224,4 +224,4 @@ module_global:LISTENERS (builtins.list)
 ```
 
 📁 **输出文件路径**：
-- 诊断报告：`C:\Users\duanz\.witty-diagnosis-agent\dayu\reports\Python多源竞争内存泄漏RCA_multi_source_mismatch_20260607_204137_report.md`
+- 诊断报告：`Witty Dayu intermediate report`

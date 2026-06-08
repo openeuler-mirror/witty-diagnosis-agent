@@ -3,10 +3,9 @@
 # python-memory-leak-analyzer test runner
 # Usage:
 #   ./run.sh run <global|cache|fragmentation|all>
-#   ./run.sh run-stress <scenario|all>
-#   ./run.sh run-prod <scenario|all>
+#   ./run.sh run-edge <scenario|all>
+#   ./run.sh run-realistic <scenario|all>
 #   ./run.sh prompt <scenario> <minimal|sparse|normal>
-#   ./run.sh score <scenario> <report-path>
 #   ./run.sh status
 #   ./run.sh clean
 # =============================================================================
@@ -17,7 +16,7 @@ ROOT_DIR=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
 REPO_ROOT=$(CDPATH= cd -- "$ROOT_DIR/../.." && pwd)
 SKILL_DIR="$REPO_ROOT/skills/python-memory-leak-analyzer"
 OUT_DIR="$ROOT_DIR/out"
-MANIFEST="$ROOT_DIR/stress_manifest.json"
+MANIFEST="$ROOT_DIR/scenario_manifest.json"
 
 if [ -f "$REPO_ROOT/.venv/bin/activate" ]; then
   # Use the repository-local environment when generating evidence.
@@ -25,7 +24,7 @@ if [ -f "$REPO_ROOT/.venv/bin/activate" ]; then
   . "$REPO_ROOT/.venv/bin/activate"
 fi
 
-STRESS_SCENARIOS="
+EDGE_SCENARIOS="
 method_cache_self
 callback_registry
 closure_capture
@@ -39,7 +38,7 @@ short_window_inconclusive
 live_pid_readonly
 "
 
-PROD_SCENARIOS="
+REALISTIC_SCENARIOS="
 live_pid_python_object_leak
 native_ctypes_malloc_growth
 mmap_file_or_shmem_growth
@@ -71,7 +70,7 @@ scenario_summary() {
   esac
 }
 
-stress_manifest_value() {
+scenario_manifest_value() {
   local scenario="$1"
   local key="$2"
   python - "$MANIFEST" "$scenario" "$key" <<'PY'
@@ -92,7 +91,7 @@ else:
 PY
 }
 
-write_stress_metadata() {
+write_scenario_metadata() {
   local scenario="$1"
   local output="$2"
   python - "$MANIFEST" "$scenario" "$output" <<'PY'
@@ -142,39 +141,39 @@ report_boundary_rules:
 EOF
 }
 
-stress_script() {
+edge_script() {
   local scenario="$1"
   local rel
-  rel=$(stress_manifest_value "$scenario" script) || return 1
+  rel=$(scenario_manifest_value "$scenario" script) || return 1
   echo "$ROOT_DIR/$rel"
 }
 
-stress_summary() {
-  stress_manifest_value "$1" summary
+edge_summary() {
+  scenario_manifest_value "$1" summary
 }
 
-stress_scenarios() {
-  printf '%s\n' $STRESS_SCENARIOS
+edge_scenarios() {
+  printf '%s\n' $EDGE_SCENARIOS
 }
 
-prod_script() {
+realistic_script() {
   case "$1" in
-    live_pid_python_object_leak) echo "$ROOT_DIR/fault-injection/production/live_pid_python_object_leak.py" ;;
-    native_ctypes_malloc_growth) echo "$ROOT_DIR/fault-injection/production/native_ctypes_malloc_growth.py" ;;
-    mmap_file_or_shmem_growth) echo "$ROOT_DIR/fault-injection/production/mmap_file_or_shmem_growth.py" ;;
-    allocator_fragmentation_plateau) echo "$ROOT_DIR/fault-injection/production/allocator_fragmentation_plateau.py" ;;
-    prefork_worker_skew) echo "$ROOT_DIR/fault-injection/production/prefork_worker_skew.py" ;;
-    transient_peak_copy_volume) echo "$ROOT_DIR/fault-injection/production/transient_peak_copy_volume.py" ;;
-    cgroup_sibling_growth) echo "$ROOT_DIR/fault-injection/production/cgroup_sibling_growth.py" ;;
+    live_pid_python_object_leak) echo "$ROOT_DIR/fault-injection/realistic/live_pid_python_object_leak.py" ;;
+    native_ctypes_malloc_growth) echo "$ROOT_DIR/fault-injection/realistic/native_ctypes_malloc_growth.py" ;;
+    mmap_file_or_shmem_growth) echo "$ROOT_DIR/fault-injection/realistic/mmap_file_or_shmem_growth.py" ;;
+    allocator_fragmentation_plateau) echo "$ROOT_DIR/fault-injection/realistic/allocator_fragmentation_plateau.py" ;;
+    prefork_worker_skew) echo "$ROOT_DIR/fault-injection/realistic/prefork_worker_skew.py" ;;
+    transient_peak_copy_volume) echo "$ROOT_DIR/fault-injection/realistic/transient_peak_copy_volume.py" ;;
+    cgroup_sibling_growth) echo "$ROOT_DIR/fault-injection/realistic/cgroup_sibling_growth.py" ;;
     *) return 1 ;;
   esac
 }
 
-prod_scenarios() {
-  printf '%s\n' $PROD_SCENARIOS
+realistic_scenarios() {
+  printf '%s\n' $REALISTIC_SCENARIOS
 }
 
-prod_summary() {
+realistic_summary() {
   case "$1" in
     live_pid_python_object_leak) echo "真实 PID 只读阶段只能确认目标 PID 在涨；复现阶段应确认 Python retained leak。" ;;
     native_ctypes_malloc_growth) echo "ctypes malloc native memory retained；Python heap ratio 低，Private_Dirty/RssAnon 增长。" ;;
@@ -187,7 +186,7 @@ prod_summary() {
   esac
 }
 
-prod_iterations() {
+realistic_iterations() {
   case "$1" in
     native_ctypes_malloc_growth) echo 12 ;;
     mmap_file_or_shmem_growth) echo 8 ;;
@@ -197,7 +196,7 @@ prod_iterations() {
   esac
 }
 
-prod_retention_selector_args() {
+realistic_retention_selector_args() {
   case "$1" in
     live_pid_python_object_leak) echo '--type-filter builtins.dict' ;;
     prefork_worker_skew|cgroup_sibling_growth) echo '--type-filter builtins.dict' ;;
@@ -239,7 +238,7 @@ reachability_global_name() {
   esac
 }
 
-stress_iterations() {
+edge_iterations() {
   local scenario="$1"
   case "$scenario" in
     thread_local_worker) echo 400 ;;
@@ -256,9 +255,9 @@ write_prompt_files() {
   local scenario_dir="$2"
   local log="$3"
   local summary
-  summary=$(stress_summary "$scenario")
+  summary=$(edge_summary "$scenario")
   mkdir -p "$scenario_dir/prompts"
-  write_report_contract "$scenario" "$scenario_dir" "stress"
+  write_report_contract "$scenario" "$scenario_dir" "edge"
   printf 'python 泄露，请你分析找出原因\n' > "$scenario_dir/prompts/minimal.txt"
   printf '分析 Python 泄漏问题，范围在 %s\n' "$scenario_dir" > "$scenario_dir/prompts/sparse.txt"
   {
@@ -267,7 +266,7 @@ write_prompt_files() {
     echo "场景: $scenario"
     echo "故障概要: $summary"
     echo "日志绝对路径: $log"
-    echo "复现命令: bash ./run.sh run-stress $scenario"
+    echo "复现命令: bash ./run.sh run-edge $scenario"
     echo "会话与报告: 本场景必须单独启动一个 Xuanyuan 会话；完成后输出并归档 Markdown 和 HTML 两份 Witty 原流程报告。"
     echo "诊断边界: 离线本地日志诊断，只读，不执行修复、重启、远程登录、attach、ptrace 或配置写入。"
   } > "$scenario_dir/prompts/normal.txt"
@@ -404,26 +403,26 @@ run_live_pid_monitor() {
   fi
 }
 
-run_stress_one() {
+run_edge_one() {
   local scenario="$1"
   local script
-  script=$(stress_script "$scenario") || {
-    echo "ERROR: unknown stress scenario: $scenario" >&2
+  script=$(edge_script "$scenario") || {
+    echo "ERROR: unknown edge-case scenario: $scenario" >&2
     exit 2
   }
   local summary
-  summary=$(stress_summary "$scenario")
-  local scenario_dir="$OUT_DIR/stress/$scenario"
+  summary=$(edge_summary "$scenario")
+  local scenario_dir="$OUT_DIR/edge-cases/$scenario"
   local log="$scenario_dir/${scenario}.log"
   local iterations
-  iterations=$(stress_iterations "$scenario")
+  iterations=$(edge_iterations "$scenario")
   local selector
   selector=$(retention_selector_args "$scenario")
   local global_name
   global_name=$(reachability_global_name "$scenario")
 
   mkdir -p "$scenario_dir"
-  write_report_contract "$scenario" "$scenario_dir" "stress"
+  write_report_contract "$scenario" "$scenario_dir" "edge"
   rm -f \
     "$scenario_dir/capabilities.json" \
     "$scenario_dir/discovery.json" \
@@ -436,7 +435,7 @@ run_stress_one() {
     "$scenario_dir/reachability_static.json" \
     "$scenario_dir/reachability_counterfactual.json" \
     "$scenario_dir/correlation.json"
-  write_stress_metadata "$scenario" "$scenario_dir/metadata.json"
+  write_scenario_metadata "$scenario" "$scenario_dir/metadata.json"
   if [ "$scenario" = "live_pid_readonly" ]; then
     rm -f \
       "$scenario_dir/monitor_rss_pid.json" \
@@ -450,10 +449,10 @@ run_stress_one() {
     echo "workload=$script"
     echo "skill_dir=$SKILL_DIR"
     echo "iterations=$iterations"
-    echo "reproduce=./run.sh run-stress $scenario"
-    echo "allowed_actions=$(stress_manifest_value "$scenario" allowed_actions)"
-    echo "primary_signal=$(stress_manifest_value "$scenario" primary_signal)"
-    echo "metadata_for_scoring=$scenario_dir/metadata.json"
+    echo "reproduce=./run.sh run-edge $scenario"
+    echo "allowed_actions=$(scenario_manifest_value "$scenario" allowed_actions)"
+    echo "primary_signal=$(scenario_manifest_value "$scenario" primary_signal)"
+    echo "scenario_metadata=$scenario_dir/metadata.json"
     echo ""
     run_json_step "detect_capabilities" python "$SKILL_DIR/scripts/detect_capabilities.py" --output "$scenario_dir/capabilities.json"
     echo ""
@@ -483,7 +482,7 @@ run_stress_one() {
       echo "目标 skill 绝对路径: $SKILL_DIR"
       echo "场景: $scenario"
       echo "日志绝对路径: $log"
-      echo "复现命令: bash ./run.sh run-stress $scenario"
+      echo "复现命令: bash ./run.sh run-edge $scenario"
       echo "会话与报告: 本场景必须单独启动一个 Xuanyuan 会话；完成后输出并归档 Markdown 和 HTML 两份 Witty 原流程报告。"
       echo "诊断边界: 线上/PID 外部只读观测，不执行修复、重启、远程登录、attach、ptrace、配置写入或进程内 Python 堆归因。"
     else
@@ -524,18 +523,17 @@ run_stress_one() {
       echo "目标 skill 绝对路径: $SKILL_DIR"
       echo "场景: $scenario"
       echo "日志绝对路径: $log"
-      echo "复现命令: bash ./run.sh run-stress $scenario"
+      echo "复现命令: bash ./run.sh run-edge $scenario"
       echo "会话与报告: 本场景必须单独启动一个 Xuanyuan 会话；完成后输出并归档 Markdown 和 HTML 两份 Witty 原流程报告。"
       echo "诊断边界: 离线本地日志诊断，只读，不执行修复、重启、远程登录、attach、ptrace 或配置写入。"
     fi
   } 2>&1 | tee "$log"
 
   write_prompt_files "$scenario" "$scenario_dir" "$log"
-  update_scorecard "$scenario" "generated" "not-run" "$log" "$scenario_dir"
   echo "log=$log"
 }
 
-start_prod_processes() {
+start_realistic_processes() {
   local scenario="$1"
   local script="$2"
   local scenario_dir="$3"
@@ -555,7 +553,7 @@ start_prod_processes() {
   fi
 }
 
-stop_prod_processes() {
+stop_realistic_processes() {
   local scenario_dir="$1"
   local pid_file
   for pid_file in "$scenario_dir/live.pid" "$scenario_dir/sibling.pid"; do
@@ -579,24 +577,24 @@ stop_prod_processes() {
   done
 }
 
-run_prod_one() {
+run_realistic_one() {
   local scenario="$1"
   local script
-  script=$(prod_script "$scenario") || {
-    echo "ERROR: unknown production scenario: $scenario" >&2
+  script=$(realistic_script "$scenario") || {
+    echo "ERROR: unknown realistic scenario: $scenario" >&2
     exit 2
   }
   local summary
-  summary=$(prod_summary "$scenario")
-  local scenario_dir="$OUT_DIR/production/$scenario"
+  summary=$(realistic_summary "$scenario")
+  local scenario_dir="$OUT_DIR/realistic/$scenario"
   local log="$scenario_dir/${scenario}.log"
   local iterations
-  iterations=$(prod_iterations "$scenario")
+  iterations=$(realistic_iterations "$scenario")
   local selector
-  selector=$(prod_retention_selector_args "$scenario")
+  selector=$(realistic_retention_selector_args "$scenario")
 
   mkdir -p "$scenario_dir"
-  write_report_contract "$scenario" "$scenario_dir" "production"
+  write_report_contract "$scenario" "$scenario_dir" "realistic"
   rm -f \
     "$scenario_dir/capabilities.json" \
     "$scenario_dir/discovery.json" \
@@ -618,12 +616,12 @@ run_prod_one() {
     echo "workload=$script"
     echo "skill_dir=$SKILL_DIR"
     echo "iterations=$iterations"
-    echo "reproduce=./run.sh run-prod $scenario"
-    echo "diagnosis_boundary=stdlib-only, no attach, no ptrace, no mutation against production PID"
+    echo "reproduce=./run.sh run-realistic $scenario"
+    echo "diagnosis_boundary=stdlib-only, no attach, no ptrace, no mutation against target PID"
     echo ""
     run_json_step "detect_capabilities" python "$SKILL_DIR/scripts/detect_capabilities.py" --output "$scenario_dir/capabilities.json"
     echo ""
-    start_prod_processes "$scenario" "$script" "$scenario_dir"
+    start_realistic_processes "$scenario" "$script" "$scenario_dir"
     sleep 1
     local live_pid
     live_pid=$(cat "$scenario_dir/live.pid")
@@ -636,7 +634,7 @@ run_prod_one() {
     echo ""
     run_json_step "monitor_rss_pid" python "$SKILL_DIR/scripts/monitor_rss.py" --pid "$live_pid" --interval 0.5 --duration 4 --output "$scenario_dir/monitor_rss_pid.json"
     echo ""
-    stop_prod_processes "$scenario_dir"
+    stop_realistic_processes "$scenario_dir"
     echo ""
     run_json_step "object_growth" python "$SKILL_DIR/scripts/object_growth.py" --script "$script" --iterations "$iterations" --output "$scenario_dir/object_growth.json"
     echo ""
@@ -663,52 +661,20 @@ run_prod_one() {
     echo "final_report_must_reference=$scenario_dir/correlation.json"
   } 2>&1 | tee "$log"
 
-  stop_prod_processes "$scenario_dir"
+  stop_realistic_processes "$scenario_dir"
   echo "log=$log"
-}
-
-update_scorecard() {
-  local scenario="$1"
-  local prompt="$2"
-  local grade="$3"
-  local report="$4"
-  local evidence_dir="$5"
-  local scorecard="$OUT_DIR/stress/scorecard.tsv"
-  mkdir -p "$OUT_DIR/stress"
-  if [ ! -f "$scorecard" ]; then
-    printf 'scenario\tprompt\tgrade\treport_or_log\tevidence_dir\n' > "$scorecard"
-  fi
-  printf '%s\t%s\t%s\t%s\t%s\n' "$scenario" "$prompt" "$grade" "$report" "$evidence_dir" >> "$scorecard"
 }
 
 show_prompt() {
   local scenario="$1"
   local kind="${2:-minimal}"
-  local scenario_dir="$OUT_DIR/stress/$scenario"
+  local scenario_dir="$OUT_DIR/edge-cases/$scenario"
   local prompt_file="$scenario_dir/prompts/$kind.txt"
   if [ ! -f "$prompt_file" ]; then
-    echo "ERROR: prompt not found; run ./run.sh run-stress $scenario first" >&2
+    echo "ERROR: prompt not found; run ./run.sh run-edge $scenario first" >&2
     exit 2
   fi
   cat "$prompt_file"
-}
-
-score_report() {
-  local scenario="$1"
-  local report="$2"
-  local scenario_dir="$OUT_DIR/stress/$scenario"
-  mkdir -p "$scenario_dir"
-  local score="$scenario_dir/score-$(basename "$report").json"
-  python "$ROOT_DIR/scripts/score_stress_report.py" --scenario "$scenario" --report "$report" --manifest "$MANIFEST" --output "$score"
-  local grade
-  grade=$(python - "$score" <<'PY'
-import json
-import sys
-with open(sys.argv[1], "r", encoding="utf-8") as handle:
-    print(json.load(handle)["grade"])
-PY
-)
-  update_scorecard "$scenario" "report" "$grade" "$report" "$scenario_dir"
 }
 
 status_tests() {
@@ -743,40 +709,32 @@ case "${1:-}" in
         ;;
     esac
     ;;
-  run-stress)
+  run-edge)
     case "${2:-all}" in
       all)
-        for scenario in $(stress_scenarios); do
-          run_stress_one "$scenario"
+        for scenario in $(edge_scenarios); do
+          run_edge_one "$scenario"
         done
         ;;
       *)
-        run_stress_one "$2"
+        run_edge_one "$2"
         ;;
     esac
     ;;
-  run-prod)
+  run-realistic)
     case "${2:-all}" in
       all)
-        for scenario in $(prod_scenarios); do
-          run_prod_one "$scenario"
+        for scenario in $(realistic_scenarios); do
+          run_realistic_one "$scenario"
         done
         ;;
       *)
-        run_prod_one "$2"
+        run_realistic_one "$2"
         ;;
     esac
     ;;
   prompt)
     show_prompt "${2:-}" "${3:-minimal}"
-    ;;
-  score)
-    if [ -z "${2:-}" ] || [ -z "${3:-}" ]; then
-      echo "ERROR: score requires <scenario> <report-path>" >&2
-      usage
-      exit 2
-    fi
-    score_report "$2" "$3"
     ;;
   status)
     status_tests

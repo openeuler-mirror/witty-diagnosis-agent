@@ -255,7 +255,7 @@ PID 425 RSS 持续增长（+1.0 MiB / 2.5s）
 
 | 项目 | 路径 |
 |------|------|
-| 上游 Kuafu 诊断报告 | `C:\Users\duanz\.witty-diagnosis-agent\dayu\report\kuafu_T1_20260607_205758.md` |
-| 原始证据目录 | `D:\develop\Trae\OpenEuler\witty-diagnosis-agent\test\python-memory-leak-analyzer\out\stress\live_pid_readonly\` |
+| 上游 Kuafu 诊断报告 | `Witty Dayu intermediate report` |
+| 原始证据目录 | `test/python-memory-leak-analyzer/out/edge-cases/live_pid_readonly\` |
 | 场景元数据 | `metadata.json`（预期结果：external RSS growth only; Python heap root cause not confirmed） |
-| 本 RCA 报告 | `C:\Users\duanz\.witty-diagnosis-agent\baize\reports\Python服务内存增长RCA_default_20260607_report.md` |
+| 本 RCA 报告 | `Witty Baize final report` |
