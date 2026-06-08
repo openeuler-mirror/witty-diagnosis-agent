@@ -19,7 +19,8 @@ offline-disk-fault-diagnosis/
 │   ├── diagnose_ibmc.py              # Step 2: iBMC日志分析脚本
 │   ├── diagnose_infocollect.py       # Step 2: InfoCollect/磁盘专项分析脚本
 │   ├── diagnose_messages.py          # Step 2: OS消息日志分析脚本
-│   └── diagnose_health_rules.py      # Step 3: 健康度评估与规则匹配脚本
+│   ├── diagnose_health_rules.py      # Step 3: 健康度评估与规则匹配脚本
+│   └── analyze_sm2.py                # Step 5（可选）: SM2/FARM底层日志分析脚本
 └── references/                       # 参考资料目录
     ├── DISK_fault_scenarios.md       # 磁盘故障场景分类表
     ├── DISK_scenario_analysis.md     # 磁盘故障场景专项分析指南
@@ -28,7 +29,9 @@ offline-disk-fault-diagnosis/
     ├── messages.md                   # OS消息日志分析指南
     ├── huawei_ibmc.md                # 华为iBMC分析指南
     ├── h3c_ibmc.md                   # H3C iBMC分析指南
-    └── Inspur_ibmc.md                # Inspur iBMC分析指南
+    ├── Inspur_ibmc.md                # Inspur iBMC分析指南
+    ├── sm2_analysis.md               # SM2/FARM底层诊断指南
+    └── sm2_field_reference.md        # SM2字段与指标参考字典
 ```
 
 ## 输入日志目录结构与对应诊断脚本
@@ -43,8 +46,10 @@ offline-disk-fault-diagnosis/
 │   └── (磁盘在位/热插拔/错误事件) -> 使用 scripts/diagnose_ibmc.py
 ├── infocollect_logs/           # 系统信息收集工具生成的分类日志
 │   └── (SMART信息/RAID卡日志/性能数据) -> 使用 scripts/diagnose_infocollect.py
-└── messages/                   # 操作系统层面的系统日志
-    └── (dmesg, syslog, messages) -> 使用 scripts/diagnose_messages.py
+├── messages/                   # 操作系统层面的系统日志
+│   └── (dmesg, syslog, messages) -> 使用 scripts/diagnose_messages.py
+└── sm2_log/                    # SM2 底层日志目录 (可选)
+    └── (SN_<时间戳>_SLog.txt, ..._head0.txt, ..._head1.txt, ..._headN.txt) -> 使用 scripts/analyze_sm2.py
 ```
 
 ## ⚠️ 强制执行流程
@@ -52,7 +57,7 @@ offline-disk-fault-diagnosis/
 **必须严格按以下顺序执行，禁止跳过或乱序：**
 
 ```
-Step 0 (故障日志采集) → Step 1 (场景分类) → Step 2 (深入分析) → Step 3 (健康度评估与规则匹配) → Step 4 (根因反思与证据双向校验) → Step 5 (界面输出分析报告)
+Step 0 (故障日志采集) → Step 1 (场景分类) → Step 2 (深入分析) → Step 3 (健康度评估与规则匹配) → Step 4 (根因反思与证据双向校验) → [Step 5 (SM2底层诊断，可选)] → Step 6 (界面输出分析报告)
 ```
 
 **执行规则：**
@@ -68,7 +73,8 @@ Step 0 (故障日志采集) → Step 1 (场景分类) → Step 2 (深入分析) 
 - Step 2：输出物理级精准定位、传导链及初步根因
 - Step 3：输出每块涉事磁盘的基础元数据、判定结论及标准化对象
 - Step 4：输出根因证据校验表、原生日志证据及置信度定性
-- Step 5：在界面上按固定结构输出最终的分析报告（**严禁生成独立文件**）
+- Step 5（可选）：输出 SM2 逐磁头分析表、8 类故障部位评级与处置建议
+- Step 6：在界面上按固定结构输出最终的分析报告（**严禁生成独立文件**）
 
 ---
 
@@ -81,7 +87,8 @@ Step 0 (故障日志采集) → Step 1 (场景分类) → Step 2 (深入分析) 
 | **Step 2** 深入分析 | 构建起止 T0 的传导链并执行诊断 | 使用 `diagnose_ibmc.py/diagnose_infocollect.py/diagnose_messages.py` 获取多维证据 |
 | **Step 3** 健康度评估与规则匹配 | 对每块涉事磁盘按 SAS/SATA 规则集做客观判定与存活概率计算 | `diagnose_health_rules.py <log_dir> [--format md/json/table]` 配合 [disk_health_rules.md](references/disk_health_rules.md) |
 | **Step 4** 根因反思与证据双向校验 | 交叉质询证据链，执行证据双向校验（含 E4 规则一致性） | 对比 iBMC/内核/系统日志的一致性 + 规则评估结果，防止结论发散 |
-| **Step 5** 界面输出分析报告 | 汇总证据链与确认根因，在界面直接输出报告内容 | 结构化输出：结论 + 故障链条 + 规则评估 + 根因 + 修复建议 |
+| **Step 5** SM2/FARM 底层深度诊断（可选） | 将故障收敛至磁头/盘面级别，定界 8 类故障部位 | `analyze_sm2.py <sm2_log_dir>`，结合 `sm2_analysis.md` / `sm2_field_reference.md` 判读 |
+| **Step 6** 界面输出分析报告 | 汇总证据链与确认根因，在界面直接输出报告内容 | 结构化输出：结论 + 故障链条 + 规则评估 + 根因 + 修复建议 |
 
 ---
 
@@ -373,11 +380,38 @@ python3 scripts/diagnose_health_rules.py <log_dir> --include-passed
 4. ✅ E4 维度明确给出规则评估结论与因果链推断的一致性判断（一致 / 部分一致 / 冲突）；冲突时采取更保守的处置策略。
 
 ---
-## Step 5：界面输出分析报告
+## Step 5：SM2/FARM 底层深度诊断 (可选环节)
 
-汇总 Step 0～4 的所有分析结果，直接在当前对话界面输出结构化的诊断报告。**禁止生成任何额外的文档或报告文件。**
+**触发条件**：在前置步骤中已经识别出是某物理磁盘存在问题，并且当前的日志包内有对应的 `sm2_log` 或以该 SN 命名的底层日志目录结构。
 
-### 5.1 报告结构 (五大章节)
+**目标**：不再局限于"哪块盘坏了"，而是探究**"这块盘的内部哪里坏了"**，将其归类至 8 类部位（如：纯粹个别磁头退化、马达供电异常等）。
+
+### 5.1 运行分析引擎
+```bash
+# 执行对底层日志的自动化统计计算
+python3 scripts/analyze_sm2.py <sm2_log_dir>
+```
+
+### 5.2 结合指南定界病因
+依据以上输出结果并参考指南进行专业判读：
+> 📖 [SM2 日志诊断指南](references/sm2_analysis.md)
+> 📖 [SM2 字段与指标参考字典](references/sm2_field_reference.md)
+
+**重点关注**：
+1. **种群相对法**：对比同一硬盘内的不同磁头，找到 `FAFH`（飞高）与 `iter`（译码）高得离谱、或 `amp` 极低的"离群磁头"。
+2. **趋势判断**：确认 `g_list` 和 `vis_rd_err` 等核心报错是活跃增长状态还是暂稳。
+
+**Step 5 完成标志**：
+1. ✅ 输出 SM2 逐磁头分析表，标注离群磁头及关键异常指标。
+2. ✅ 给出 8 类故障部位评级（如：磁头退化 / 马达异常 / 盘片划伤等）及其置信度。
+3. ✅ 输出处置建议，并将 SM2 诊断结论整合至 Step 6 的报告中。
+
+---
+## Step 6：界面输出分析报告
+
+汇总 Step 0～5 的所有分析结果（若执行了 Step 5 SM2 诊断，须将其结论并入报告），直接在当前对话界面输出结构化的诊断报告。**禁止生成任何额外的文档或报告文件。**
+
+### 6.1 报告结构 (五大章节)
 
 1.  **结论 (Conclusion)**
     *   **故障摘要**：必须指明物理槽位（Slot ID）、硬盘型号、具体故障现象（如：坏道超限/链路重置）及业务后果（如：文件系统只读）。
@@ -413,7 +447,7 @@ python3 scripts/diagnose_health_rules.py <log_dir> --include-passed
     *   **处置建议**：综合 §4 因果根因与 §3 规则评估结果给出。若规则评估建议更换（`"是否已更换"=true`），即便因果根因指向其他部件，仍须建议同步更换。
     *   **具体修复路径**：针对 `"是否可修复"=true` 的部件给出线缆更换、自检、监控等建议；针对 NVMe/缺失盘提供具体的复检命令。
 
-### 5.2 诊断质量基线 (质量拦截要求)
+### 6.2 诊断质量基线 (质量拦截要求)
 
 在输出报告前，必须确认满足以下基线要求：
 - [ ] **路径溯源**：所有证据引用均包含**完整绝对路径**与**精准行号/行号范围**。
@@ -426,11 +460,15 @@ python3 scripts/diagnose_health_rules.py <log_dir> --include-passed
 
 ## 参考资料
 
+* [磁盘故障场景分类](references/DISK_fault_scenarios.md)
+* [磁盘故障场景专项分析指南](references/DISK_scenario_analysis.md)
 * [硬盘健康度评估规则](references/disk_health_rules.md)
 * [InfoCollect 诊断指南](references/infocollect_guide.md)
 * [OS Messages 诊断指南](references/messages.md)
 * [Huawei iBMC 分析](references/huawei_ibmc.md)
 * [H3C iBMC 分析](references/h3c_ibmc.md)
 * [Inspur iBMC 分析](references/Inspur_ibmc.md)
+* [SM2/FARM 底层诊断指南](references/sm2_analysis.md)
+* [SM2 字段与指标参考字典](references/sm2_field_reference.md)
 
 ---
