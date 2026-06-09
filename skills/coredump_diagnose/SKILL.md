@@ -1,6 +1,6 @@
 ---
 name: coredump_diagnose
-description: 面向 Linux 用户态 coredump（core 文件）的结构化诊断技能。适用于进程崩溃、SIGSEGV/SIGBUS/SIGABRT/SIGFPE、空指针、栈溢出、内存破坏、总线错误、除零、Python+C 混合栈等场景；当用户提到 core、coredump、gdb 分析崩溃、段错误、总线错误、生成 core、应用转储时应触发。依赖系统已安装 GNU gdb；报告日志默认写入 /tmp/core_diag/。
+description: 面向 Linux 用户态 coredump（core 文件）的结构化诊断技能。适用于进程崩溃、SIGSEGV/SIGBUS/SIGABRT/SIGFPE、空指针、栈溢出、内存破坏、总线错误、除零、Python+C 混合栈等场景；当用户提到 core、coredump、gdb 分析崩溃、段错误、总线错误、生成 core、应用转储时应触发。依赖系统已安装 GNU gdb。
 ---
 
 # Coredump 诊断
