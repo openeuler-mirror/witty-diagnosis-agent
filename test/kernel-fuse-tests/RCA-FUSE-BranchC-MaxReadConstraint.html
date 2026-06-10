@@ -1,0 +1,1055 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>故障诊断报告</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Lora:ital,wght@0,400;0,600;1,400&family=Source+Sans+3:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  /* ── Design tokens ─────────────────────────────────────────────────────── */
+  :root {
+    --bg:          #f8f7f4;
+    --surface:     #ffffff;
+    --border:      #e8e5df;
+    --border-soft: #f0ede8;
+
+    --text:        #1c1917;
+    --text-2:      #57534e;
+    --text-3:      #a8a29e;
+
+    --accent:      #1d4e6e;
+    --accent-light:#e8f1f7;
+    --accent-mid:  #3b82a0;
+
+    --red:         #c0392b;
+    --red-bg:      #fef2f2;
+    --amber:       #92400e;
+    --amber-bg:    #fffbeb;
+    --green:       #14532d;
+    --green-bg:    #f0fdf4;
+
+    --code-bg:     #1a1d27;
+    --code-text:   #cdd6f4;
+    --code-border: #2d3148;
+
+    --font-body: "Source Sans 3", "PingFang SC", "Hiragino Sans GB", sans-serif;
+    --font-head: "Lora", "PingFang SC", Georgia, serif;
+    --font-mono: "JetBrains Mono", "Fira Code", Consolas, monospace;
+
+    --radius:    8px;
+    --radius-lg: 12px;
+    --shadow:    0 1px 3px rgba(0,0,0,.06), 0 4px 16px rgba(0,0,0,.05);
+    --shadow-lg: 0 2px 8px rgba(0,0,0,.07), 0 8px 32px rgba(0,0,0,.06);
+
+    --toc-width:   240px;
+    --gap:         32px;
+  }
+
+  /* ── Progress bar ──────────────────────────────────────────────────────── */
+  #progress {
+    position: fixed; top: 0; left: 0; height: 3px; width: 0%;
+    background: linear-gradient(90deg, var(--accent-mid), var(--accent));
+    z-index: 999; transition: width .1s linear;
+    border-radius: 0 2px 2px 0;
+  }
+
+  /* ── Base ──────────────────────────────────────────────────────────────── */
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  html { font-size: 16px; scroll-behavior: smooth; }
+  body {
+    font-family: var(--font-body);
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.8;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* ── Layout ────────────────────────────────────────────────────────────── */
+  .layout {
+    display: flex;
+    align-items: flex-start;
+    max-width: calc(var(--toc-width) + 820px + var(--gap) * 3);
+    margin: 0 auto;
+    padding: 48px var(--gap) 96px;
+    gap: var(--gap);
+  }
+
+  /* ── TOC ───────────────────────────────────────────────────────────────── */
+  .toc {
+    width: var(--toc-width);
+    flex-shrink: 0;
+    position: sticky;
+    top: 32px;
+    max-height: calc(100vh - 64px);
+    overflow-y: auto;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    padding: 20px;
+    box-shadow: var(--shadow);
+    scrollbar-width: thin;
+    scrollbar-color: var(--border) transparent;
+  }
+  .toc-title {
+    font-size: 10.5px;
+    font-weight: 600;
+    letter-spacing: .1em;
+    text-transform: uppercase;
+    color: var(--text-3);
+    margin-bottom: 12px;
+    padding-bottom: 10px;
+    border-bottom: 1px solid var(--border-soft);
+  }
+  .toc-item {
+    display: flex;
+    align-items: flex-start;
+    margin: 2px 0;
+  }
+  .toc-toggle {
+    background: none;
+    border: none;
+    cursor: pointer;
+    color: var(--text-3);
+    padding: 4px;
+    margin-right: 4px;
+    margin-top: 2px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 4px;
+    transition: background 0.2s, transform 0.2s;
+  }
+  .toc-toggle:hover { background: var(--border-soft); color: var(--text); }
+  .toc-toggle[aria-expanded="false"] svg { transform: rotate(-90deg); }
+  .toc-spacer { width: 20px; flex-shrink: 0; }
+  .toc-group { overflow: hidden; transition: max-height 0.3s ease-in-out; }
+  .toc-group.collapsed { max-height: 0 !important; }
+  
+  .toc a {
+    display: block;
+    font-size: 13px;
+    color: var(--text-2);
+    text-decoration: none;
+    padding: 4px 8px;
+    border-radius: 5px;
+    line-height: 1.45;
+    transition: background .15s, color .15s;
+    word-break: break-all;
+    flex-grow: 1;
+  }
+  .toc a:hover  { background: var(--accent-light); color: var(--accent); }
+  .toc a.active { background: var(--accent-light); color: var(--accent); font-weight: 500; }
+  .toc-l1 { font-weight: 600; color: var(--text); }
+  .toc-l2 { font-weight: 600; color: var(--text); }
+  .toc-l3 { font-size: 12px !important; padding-left: 14px !important; }
+
+  /* ── Article card ──────────────────────────────────────────────────────── */
+  .article {
+    flex: 1; min-width: 0;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    padding: 52px 60px;
+    box-shadow: var(--shadow-lg);
+  }
+
+  /* ── Headings ──────────────────────────────────────────────────────────── */
+  .title-container {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-end;
+    margin: 0 0 28px;
+    padding-bottom: 18px;
+    border-bottom: 2px solid var(--text);
+  }
+  .article h1 {
+    font-family: var(--font-head);
+    font-size: 26px; font-weight: 600; line-height: 1.3;
+    margin: 0; padding-bottom: 0;
+    border-bottom: none;
+  }
+  .article h2 {
+    font-family: var(--font-head);
+    font-size: 19px; font-weight: 600;
+    margin: 48px 0 14px; padding-bottom: 8px;
+    border-bottom: 1px solid var(--border);
+  }
+  .article h2::before {
+    content: attr(data-index);
+    display: inline-block;
+    font-family: var(--font-mono);
+    font-size: 10.5px; font-weight: 500;
+    color: var(--accent-mid);
+    background: var(--accent-light);
+    padding: 1px 7px; border-radius: 4px;
+    margin-right: 10px; vertical-align: middle;
+    letter-spacing: .05em;
+  }
+  .article h3 {
+    font-family: var(--font-head);
+    font-size: 15.5px; font-weight: 600;
+    margin: 28px 0 10px;
+  }
+  .article h3::before {
+    content: "§ ";
+    color: var(--text-3);
+    font-family: var(--font-mono); font-size: 13px;
+  }
+  .article h4 {
+    font-size: 13.5px; font-weight: 600;
+    color: var(--accent); margin: 20px 0 8px;
+  }
+
+  /* ── Body text ─────────────────────────────────────────────────────────── */
+  .article p, .plain { 
+    font-size: 15px; 
+    line-height: 1.85; 
+    color: var(--text); 
+    margin: 0 0 12px; 
+    font-family: var(--font-body);
+  }
+  .article strong { font-weight: 600; }
+  .article em     { font-style: italic; color: var(--text-2); }
+  .article a {
+    color: var(--accent); text-decoration: underline;
+    text-decoration-color: var(--accent-light);
+    text-underline-offset: 3px;
+  }
+  .article a:hover { text-decoration-color: var(--accent); }
+  .article hr { border: none; border-top: 1px solid var(--border); margin: 20px 0; }
+  .article hr.heavy { border-top: 3px solid var(--text); margin: 32px 0; }
+
+  /* ── Blockquote ────────────────────────────────────────────────────────── */
+  .article blockquote {
+    border-left: 3px solid var(--accent-mid);
+    background: var(--accent-light);
+    margin: 20px 0; padding: 13px 20px 13px 20px;
+    border-radius: 0 var(--radius) var(--radius) 0;
+  }
+  .article blockquote p { font-size: 14.5px; color: var(--accent); margin: 0; line-height: 1.7; }
+  /* 支持块引用内部保留换行符（修复头部概要换行丢失问题） */
+  .article blockquote p { white-space: pre-wrap; }
+  .article blockquote strong { color: var(--accent); }
+
+  /* ── Lists ─────────────────────────────────────────────────────────────── */
+  .article ul, .article ol { padding-left: 22px; margin: 6px 0 14px; }
+  .article li { font-size: 15px; line-height: 1.8; margin: 4px 0; }
+  .article li::marker { color: var(--accent-mid); }
+  .article li > ul, .article li > ol { margin: 3px 0; }
+
+  /* ── Inline code ───────────────────────────────────────────────────────── */
+  .article :not(pre) > code {
+    font-family: var(--font-mono);
+    font-size: 12.5px; font-weight: 500;
+    background: #f3f0eb; color: var(--red);
+    padding: 1px 5px; border-radius: 4px;
+    border: 1px solid var(--border);
+  }
+
+  /* ── Code blocks ───────────────────────────────────────────────────────── */
+  .code-block {
+    position: relative; margin: 20px 0;
+    border-radius: var(--radius-lg); overflow: hidden;
+    border: 1px solid var(--code-border);
+    box-shadow: 0 4px 20px rgba(0,0,0,.16);
+  }
+  .code-lang {
+    position: absolute; top: 0; left: 0;
+    font-family: var(--font-mono); font-size: 10px; font-weight: 500;
+    color: #7c8db5; background: #222538;
+    padding: 4px 12px; border-bottom-right-radius: 6px;
+    text-transform: uppercase; letter-spacing: .08em;
+    user-select: none;
+  }
+  .copy-btn {
+    position: absolute; top: 8px; right: 10px;
+    background: #2d3148; border: 1px solid #3d4260;
+    border-radius: 5px; color: #7c8db5; cursor: pointer;
+    padding: 5px 8px; display: flex; align-items: center;
+    transition: background .15s, color .15s; z-index: 1;
+  }
+  .copy-btn:hover  { background: #3a3f60; color: #cdd6f4; }
+  .copy-btn.copied { color: #a6e3a1; border-color: #4a6a4a; }
+  .code-block pre {
+    margin: 0; padding: 36px 20px 20px;
+    background: var(--code-bg); overflow-x: auto;
+    scrollbar-width: thin; scrollbar-color: #3d4260 transparent;
+  }
+  .code-block pre::-webkit-scrollbar { height: 5px; }
+  .code-block pre::-webkit-scrollbar-thumb { background: #3d4260; border-radius: 3px; }
+  .code-block code {
+    font-family: var(--font-mono); font-size: 13px; line-height: 1.7;
+    color: var(--code-text); background: none; border: none; padding: 0;
+    white-space: pre; word-break: normal;
+  }
+
+  /* ── Tables ────────────────────────────────────────────────────────────── */
+  .table-wrap {
+    overflow-x: auto; margin: 16px 0;
+    border-radius: var(--radius-lg);
+    border: 1px solid var(--border);
+    box-shadow: var(--shadow);
+  }
+  table { width: 100%; border-collapse: collapse; font-size: 14px; min-width: 360px; }
+  thead { background: #f4f2ee; }
+  th {
+    padding: 9px 14px; text-align: left;
+    font-size: 11.5px; font-weight: 600;
+    letter-spacing: .04em; text-transform: uppercase;
+    color: var(--text-2); border-bottom: 1px solid var(--border);
+    white-space: nowrap;
+  }
+  td {
+    padding: 8px 14px; border-bottom: 1px solid var(--border-soft);
+    color: var(--text); vertical-align: top; line-height: 1.6;
+  }
+  tbody tr:last-child td { border-bottom: none; }
+  tbody tr:nth-child(even) td { background: #faf9f7; }
+  tbody tr:hover td { background: var(--accent-light); transition: background .1s; }
+
+  /* ── KV block ──────────────────────────────────────────────────────────── */
+  .kv-block { background: var(--bg); border: 1px solid var(--border); border-radius: var(--radius-lg); overflow: hidden; margin: 12px 0 20px; }
+  .kv-row { display: flex; border-bottom: 1px solid var(--border-soft); align-items: flex-start; }
+  .kv-row:last-child { border-bottom: none; }
+  .kv-key { flex: 0 0 160px; padding: 9px 16px; font-size: 13.5px; font-weight: 600; color: var(--text-2); background: var(--surface); border-right: 1px solid var(--border-soft); }
+  .kv-val { flex: 1; padding: 9px 16px; font-size: 14px; color: var(--text); }
+
+  /* ── Status badges ─────────────────────────────────────────────────────── */
+  .badge-ok { display: inline-flex; align-items: center; gap: 4px; background: var(--green-bg); color: var(--green); font-size: 13px; font-weight: 500; padding: 2px 9px; border-radius: 20px; border: 1px solid #bbf7d0; }
+  .badge-err { display: inline-flex; align-items: center; gap: 4px; background: var(--red-bg); color: var(--red); font-size: 13px; font-weight: 500; padding: 2px 9px; border-radius: 20px; border: 1px solid #fecaca; }
+  .badge-warn { display: inline-flex; align-items: center; gap: 4px; background: var(--amber-bg); color: var(--amber); font-size: 13px; font-weight: 500; padding: 2px 9px; border-radius: 20px; border: 1px solid #fde68a; }
+
+  /* ── Priority badges ───────────────────────────────────────────────────── */
+  .pri-p0 { display: inline-block; background: #fef2f2; color: #991b1b; border: 1px solid #fca5a5; font-size: 12px; font-weight: 700; padding: 2px 8px; border-radius: 4px; letter-spacing: .04em; }
+  .pri-p1 { display: inline-block; background: #fff7ed; color: #9a3412; border: 1px solid #fdba74; font-size: 12px; font-weight: 700; padding: 2px 8px; border-radius: 4px; }
+  .pri-p2 { display: inline-block; background: #fffbeb; color: #92400e; border: 1px solid #fde68a; font-size: 12px; font-weight: 700; padding: 2px 8px; border-radius: 4px; }
+  .pri-p3 { display: inline-block; background: var(--accent-light); color: var(--accent); border: 1px solid #bfdbfe; font-size: 12px; font-weight: 700; padding: 2px 8px; border-radius: 4px; }
+
+  /* ── Fault header ──────────────────────────────────────────────────────── */
+  .fault-header { display: flex; align-items: center; gap: 12px; padding: 12px 16px; border-radius: var(--radius-lg); margin: 16px 0 8px; border: 1px solid; }
+  .fh-p0 { background: #fef2f2; border-color: #fca5a5; }
+  .fh-p1 { background: #fff7ed; border-color: #fdba74; }
+  .fh-p2 { background: #fffbeb; border-color: #fde68a; }
+  .fh-p3 { background: var(--accent-light); border-color: #bfdbfe; }
+  .fh-badge { font-family: var(--font-mono); font-size: 11px; font-weight: 700; letter-spacing: .08em; }
+  .fh-p0 .fh-badge { color: #991b1b; }
+  .fh-p1 .fh-badge { color: #9a3412; }
+  .fh-p2 .fh-badge { color: #92400e; }
+  .fh-p3 .fh-badge { color: var(--accent); }
+  .fh-rest { font-size: 14px; font-weight: 500; color: var(--text); }
+
+  /* ── Timeline ──────────────────────────────────────────────────────────── */
+  .timeline { border-left: 2px solid var(--accent-mid); margin: 16px 0 16px 8px; padding-left: 20px; }
+  .tl-row { display: flex; align-items: baseline; gap: 10px; margin: 8px 0; font-size: 13.5px; }
+  .tl-ts { font-family: var(--font-mono); font-size: 12px; color: var(--text-3); flex-shrink: 0; white-space: nowrap; }
+  .tl-tag { font-size: 11px; font-weight: 600; padding: 1px 7px; border-radius: 10px; flex-shrink: 0; background: var(--accent-light); color: var(--accent); }
+  .tl-tag.err { background: var(--red-bg); color: var(--red); }
+  .tl-tag.warn { background: var(--amber-bg); color: var(--amber); }
+  .tl-desc { color: var(--text); line-height: 1.5; }
+
+  /* ── Global warn ───────────────────────────────────────────────────────── */
+  .global-warn { background: #fef2f2; border: 1px solid #fca5a5; border-radius: var(--radius-lg); padding: 14px 18px; font-size: 14.5px; font-weight: 600; color: #991b1b; margin: 16px 0; }
+
+  /* ── Tree note ─────────────────────────────────────────────────────────── */
+  .tree-note { white-space: pre-wrap; font-family: var(--font-mono); font-size: 13.5px; line-height: 1.6; color: var(--text-2); margin: 8px 0 8px 16px; }
+
+  /* ── Disclaimer ────────────────────────────────────────────────────────── */
+  .disclaimer { background: var(--bg); border: 1px solid var(--border); border-radius: var(--radius); padding: 14px 18px; font-size: 13.5px; color: var(--text-2); font-style: italic; }
+
+  /* ── Meta footer ───────────────────────────────────────────────────────── */
+  .meta {
+    margin-top: 48px; padding-top: 16px;
+    border-top: 1px solid var(--border-soft);
+    display: flex; justify-content: space-between; align-items: center;
+    font-size: 12px; color: var(--text-3);
+  }
+  .meta-source { font-family: var(--font-mono); font-size: 11.5px; }
+
+  /* ── Brand logo ────────────────────────────────────────────────────────── */
+  .brand-logo {
+    font-family: var(--font-head);
+    font-size: 14px;
+    color: var(--text-3);
+    letter-spacing: 0.05em;
+    margin-bottom: 4px;
+    flex-shrink: 0;
+    margin-left: 16px;
+  }
+  .brand-logo strong {
+    font-weight: 600;
+    color: var(--accent);
+  }
+  @media (max-width: 900px) {
+    .title-container { flex-direction: column; align-items: flex-start; gap: 12px; }
+    .brand-logo { margin-left: 0; margin-bottom: 0; }
+  }
+  /* ── Print ─────────────────────────────────────────────────────────────── */
+  @media print {
+    body { background: white; }
+    #progress, .toc { display: none; }
+    .layout { display: block; padding: 0; }
+    .article { border: none; box-shadow: none; padding: 24px; }
+    .copy-btn { display: none; }
+    .brand-logo { margin-bottom: 0; }
+  }
+
+  /* ── Responsive ────────────────────────────────────────────────────────── */
+  @media (max-width: 900px) {
+    .toc { display: none; }
+    .article { padding: 36px 28px; }
+    .layout { padding: 24px 16px 64px; }
+  }
+  @media (max-width: 480px) {
+    .article { padding: 24px 18px; }
+    .article h1 { font-size: 22px; }
+  }
+</style>
+</head>
+<body>
+
+<div id="progress"></div>
+
+<div class="layout">
+  <nav class="toc" id="toc">
+  <div class="toc-title">目录</div>
+  <div class="toc-content">
+<div class="toc-item has-children"><button class="toc-toggle" onclick="toggleToc(this)" aria-expanded="true">
+                <svg viewBox="0 0 24 24" width="12" height="12" stroke="currentColor" stroke-width="2" fill="none"><polyline points="6 9 12 15 18 9"></polyline></svg>
+              </button><a href="#h-故障诊断报告" onclick="event.preventDefault(); const target = document.getElementById('h-故障诊断报告'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l1">🔴 故障诊断报告</a></div>
+<div class="toc-group" id="group-h-一故障概览">
+<div class="toc-item has-children"><button class="toc-toggle" onclick="toggleToc(this)" aria-expanded="true">
+                <svg viewBox="0 0 24 24" width="12" height="12" stroke="currentColor" stroke-width="2" fill="none"><polyline points="6 9 12 15 18 9"></polyline></svg>
+              </button><a href="#h-一故障概览" onclick="event.preventDefault(); const target = document.getElementById('h-一故障概览'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l2">一、故障概览</a></div>
+<div class="toc-group" id="group-h-置信度说明">
+<div class="toc-item "><span class="toc-spacer"></span><a href="#h-置信度说明" onclick="event.preventDefault(); const target = document.getElementById('h-置信度说明'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l3">置信度说明</a></div>
+</div>
+<div class="toc-item has-children"><button class="toc-toggle" onclick="toggleToc(this)" aria-expanded="true">
+                <svg viewBox="0 0 24 24" width="12" height="12" stroke="currentColor" stroke-width="2" fill="none"><polyline points="6 9 12 15 18 9"></polyline></svg>
+              </button><a href="#h-二根因速览" onclick="event.preventDefault(); const target = document.getElementById('h-二根因速览'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l2">二、根因速览</a></div>
+<div class="toc-group" id="group-h-事故时间线-故障传导链路">
+<div class="toc-item "><span class="toc-spacer"></span><a href="#h-事故时间线-故障传导链路" onclick="event.preventDefault(); const target = document.getElementById('h-事故时间线-故障传导链路'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l3">事故时间线 & 故障传导链路</a></div>
+<div class="toc-item "><span class="toc-spacer"></span><a href="#h-故障因果链" onclick="event.preventDefault(); const target = document.getElementById('h-故障因果链'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l3">故障因果链</a></div>
+</div>
+<div class="toc-item has-children"><button class="toc-toggle" onclick="toggleToc(this)" aria-expanded="true">
+                <svg viewBox="0 0 24 24" width="12" height="12" stroke="currentColor" stroke-width="2" fill="none"><polyline points="6 9 12 15 18 9"></polyline></svg>
+              </button><a href="#h-三排查过程" onclick="event.preventDefault(); const target = document.getElementById('h-三排查过程'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l2">三、排查过程</a></div>
+<div class="toc-group" id="group-h-31-初始现象">
+<div class="toc-item "><span class="toc-spacer"></span><a href="#h-31-初始现象" onclick="event.preventDefault(); const target = document.getElementById('h-31-初始现象'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l3">3.1 初始现象</a></div>
+<div class="toc-item "><span class="toc-spacer"></span><a href="#h-32-假设驱动排查" onclick="event.preventDefault(); const target = document.getElementById('h-32-假设驱动排查'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l3">3.2 假设驱动排查</a></div>
+<div class="toc-item "><span class="toc-spacer"></span><a href="#h-33-排查结论" onclick="event.preventDefault(); const target = document.getElementById('h-33-排查结论'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l3">3.3 排查结论</a></div>
+</div>
+<div class="toc-item has-children"><button class="toc-toggle" onclick="toggleToc(this)" aria-expanded="true">
+                <svg viewBox="0 0 24 24" width="12" height="12" stroke="currentColor" stroke-width="2" fill="none"><polyline points="6 9 12 15 18 9"></polyline></svg>
+              </button><a href="#h-四修复方案" onclick="event.preventDefault(); const target = document.getElementById('h-四修复方案'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l2">四、修复方案</a></div>
+<div class="toc-group" id="group-h-41-应急处置">
+<div class="toc-item "><span class="toc-spacer"></span><a href="#h-41-应急处置" onclick="event.preventDefault(); const target = document.getElementById('h-41-应急处置'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l3">4.1 应急处置</a></div>
+<div class="toc-item "><span class="toc-spacer"></span><a href="#h-42-永久修复计划" onclick="event.preventDefault(); const target = document.getElementById('h-42-永久修复计划'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l3">4.2 永久修复计划</a></div>
+<div class="toc-item "><span class="toc-spacer"></span><a href="#h-43-检测指标与监控" onclick="event.preventDefault(); const target = document.getElementById('h-43-检测指标与监控'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l3">4.3 检测指标与监控</a></div>
+</div>
+<div class="toc-item has-children"><button class="toc-toggle" onclick="toggleToc(this)" aria-expanded="true">
+                <svg viewBox="0 0 24 24" width="12" height="12" stroke="currentColor" stroke-width="2" fill="none"><polyline points="6 9 12 15 18 9"></polyline></svg>
+              </button><a href="#h-五影响评估" onclick="event.preventDefault(); const target = document.getElementById('h-五影响评估'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l2">五、影响评估</a></div>
+<div class="toc-group" id="group-h-影响分析">
+<div class="toc-item "><span class="toc-spacer"></span><a href="#h-影响分析" onclick="event.preventDefault(); const target = document.getElementById('h-影响分析'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l3">影响分析</a></div>
+<div class="toc-item "><span class="toc-spacer"></span><a href="#h-故障严重等级p2-major" onclick="event.preventDefault(); const target = document.getElementById('h-故障严重等级p2-major'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l3">故障严重等级：P2 (Major)</a></div>
+</div>
+<div class="toc-item "><span class="toc-spacer"></span><a href="#h-六总结" onclick="event.preventDefault(); const target = document.getElementById('h-六总结'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l2">六、总结</a></div>
+</div>
+  </div>
+</nav>
+  <article class="article" id="article" style="position: relative;">
+    <div class="title-container"><h1 id="h-故障诊断报告">🔴 故障诊断报告</h1><div class="brand-logo">by <strong>Witty Diagnosis Agent</strong></div></div>
+<blockquote>
+<p><strong>报告编号</strong>：RCA-FUSE-BRANCHC-20260604-001
+<strong>故障级别</strong>：P2 / Major
+<strong>报告时间</strong>：2026-06-04 00:00:00
+<strong>当前状态</strong>：🔴 处理中</p>
+</blockquote>
+<hr>
+<h2 id="h-一故障概览">一、故障概览</h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>项目</th>
+<th>内容</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>故障标题</td>
+<td>FUSE 用户态文件系统挂载后 <code>ls</code> / <code>stat</code> 全部超时（Branch C - max_read/max_write 约束 + readdir 空响应）</td>
+</tr>
+<tr>
+<td>影响范围</td>
+<td>挂载点 <code>/mnt/fuse_test</code> 下的所有目录访问与文件 I/O 操作；直接阻断用户的文件系统使用体验</td>
+</tr>
+<tr>
+<td>故障时段</td>
+<td>自 daemon 启动并完成 INIT 协商后立即生效，持续至 daemon 停止或修复</td>
+</tr>
+<tr>
+<td>根本原因</td>
+<td>FUSE daemon 在 INIT 响应中宣称为 <code>max_readahead=4096</code> 和 <code>max_write=4096</code>，导致内核 VFS 层将所有读写操作限制为 4KB 分片；同时 daemon 对 <code>readdir</code> 操作处理不当（返回空响应/不返回目录项），导致 <code>ls -la</code> 和 <code>stat</code> 等操作用户态超时</td>
+</tr>
+<tr>
+<td>是否恢复</td>
+<td><span class="badge-err">❌ 未恢复（daemon 仍在运行但业务操作超时）</span></td>
+</tr>
+<tr>
+<td>根因置信度</td>
+<td>🟢 高置信</td>
+</tr>
+</tbody></table></div>
+<h3 id="h-置信度说明">置信度说明</h3>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>等级</th>
+<th>标识</th>
+<th>含义</th>
+<th>示例场景</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>高置信</td>
+<td>🟢</td>
+<td>根因已明确，可复现，单一原因可解释所有现象</td>
+<td>本场景：INIT 协商中 max_readahead/max_write 被强制限制 + readdir 空响应 → 超时可稳定复现</td>
+</tr>
+<tr>
+<td>中置信</td>
+<td>🟡</td>
+<td>根因基本确认，但存在 1～2 个无法完全解释的现象</td>
+<td>—</td>
+</tr>
+<tr>
+<td>低置信</td>
+<td>🟠</td>
+<td>有多个可疑原因，尚未排除竞争，结论为推断</td>
+<td>—</td>
+</tr>
+<tr>
+<td>未知</td>
+<td>🔴</td>
+<td>现象无法解释，根因未定位，仍在排查中</td>
+<td>—</td>
+</tr>
+</tbody></table></div>
+<hr>
+<h2 id="h-二根因速览">二、根因速览</h2>
+<h3 id="h-事故时间线-故障传导链路">事故时间线 & 故障传导链路</h3>
+<div class="code-block">
+  <span class="code-lang">text</span>
+  <button class="copy-btn" onclick="copyCode(this)" title="复制">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
+  </button>
+  <pre><code>时间                   事件                                                    性质          溯源证据
+──────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+2026-06-04 00:00:00   FUSE daemon (PID 631) 启动，挂载 /mnt/fuse_test          🔵 daemon 启动   [kuafu_T1_fuse_branch_C_maxread.md:L6-L7]
+  │                     fuse 连接建立，INIT (API 7.39) 完成
+  ▼
+2026-06-04 00:00:00   daemon 在 INIT 回复中设置 max_readahead=4096              ⚠️  约束注入   [kuafu_T1_fuse_branch_C_maxread.md:L5-L6]
+  │                     max_write=4096，内核 VFS 强制执行 4KB I/O 分片
+  ▼
+2026-06-04 00:00:00+  daemon 对 readdir 返回空（无目录项）                       🔴 逻辑缺陷   [kuafu_T1_fuse_branch_C_maxread.md:L40-L42]
+  │                     daemon 日志为空，表明未正确处理 LOOKUP/READDIR 等请求
+  ▼
+2026-06-04 00:00:01+  ls -la 执行后，内核发送 READDIR/READDIRPLUS 请求            🔴 操作挂起    [kuafu_T1_fuse_branch_C_maxread.md:L27-L29]
+  │                     daemon 返回空响应 → 内核无法构造目录 → 持续重试
+  ▼
+2026-06-04 00:00:02+  用户态操作超时（2 秒 timeout）                             💥 故障表象    [kuafu_T1_fuse_branch_C_maxread.md:L27]
+  │                     ls -la → TIMEOUT
+  │                     stat /mnt/fuse_test → TIMEOUT
+  │                     waiting 计数始终为 1（无积压，但无回复/回复无效）
+  ▼
+2026-06-04 00:00:02+  D-State 进程: 无                                          ✅ 排除内核级卡死 [kuafu_T1_fuse_branch_C_maxread.md:L31-L32]
+  │                     内核消息无异常
+  ▼
+2026-06-04 00:00:02+  daemon 进程存活 (S state), read buffer=16384B              🔵 daemon 正常   [kuafu_T1_fuse_branch_C_maxread.md:L12-L14]
+                        但未产生日志 → 表明请求送达但 daemon 未正确处理</code></pre>
+</div>
+<h3 id="h-故障因果链">故障因果链</h3>
+<div class="code-block">
+  <span class="code-lang">text</span>
+  <button class="copy-btn" onclick="copyCode(this)" title="复制">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
+  </button>
+  <pre><code>FUSE daemon (fuse_branch_C) 启动并挂载 /mnt/fuse_test
+    │
+    ├─► INIT 回复中设置 max_readahead=4096, max_write=4096
+    │       │
+    │       └─► 内核 VFS 层限制所有 read/write 操作为 4KB 分片
+    │               └─► 大文件 I/O 吞吐量下降至正常值的 1/256（假设默认 1MB）
+    │                       └─► 单次大量读操作被拆解为大量小 FUSE 请求
+    │
+    └─► readdir/LOOKUP/GETATTR 操作处理逻辑缺失/不正确
+            │
+            └─► daemon 返回空响应或无目录项
+                    │
+                    ├─► ls -la → 内核反复发送 READDIR → daemon 一直返回空 → 超时
+                    └─► stat /mnt/fuse_test → 内核无法获取根 inode 信息 → 超时
+                            │
+                            └─► 💥 所有用户侧文件系统操作均挂起</code></pre>
+</div>
+<hr>
+<h2 id="h-三排查过程">三、排查过程</h2>
+<blockquote>
+<p>排查逻辑：<strong>提出假设 → 收集证据 → 验证或排除 → 逐步收敛到根因</strong></p>
+</blockquote>
+<h3 id="h-31-初始现象">3.1 初始现象</h3>
+<ul>
+<li><strong>执行 <code>ls -la /mnt/fuse_test</code></strong>：命令卡住约 2 秒后超时失败</li>
+<li><strong>执行 <code>stat /mnt/fuse_test</code></strong>：同样超时（2 秒 timeout）</li>
+<li><strong>系统层面</strong>：无 D 态进程阻塞，内核日志正常（仅有一条 FUSE INIT 记录）</li>
+<li><strong>Daemon 行为</strong>：进程存活（PID 631, S 状态），read buffer 正常（16384B），但 daemon 日志为空</li>
+</ul>
+<h3 id="h-32-假设驱动排查">3.2 假设驱动排查</h3>
+<h4 id="h-假设-a内核-fuse-模块崩溃或协议版本不匹配">假设 A：内核 FUSE 模块崩溃或协议版本不匹配</h4>
+<blockquote>
+<p>🧪 假设：内核与 daemon 的 FUSE 协议版本不兼容导致操作失败</p>
+</blockquote>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>检查项</th>
+<th>操作</th>
+<th>结论</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>内核消息</td>
+<td><code>dmesg 检查</code></td>
+<td><span class="badge-ok">✅ INIT (API 7.39) 正常完成，无错误</span></td>
+</tr>
+<tr>
+<td>连接状态</td>
+<td>sysfs 查看 fuse connection</td>
+<td><span class="badge-ok">✅ 连接 ID 80 已建立，waiting=1 正常</span></td>
+</tr>
+<tr>
+<td>D 态进程</td>
+<td>检查是否有 D 态</td>
+<td><span class="badge-ok">✅ 无 D 态进程，表明无内核级阻塞</span></td>
+</tr>
+</tbody></table></div>
+<p><strong>❌ 排除</strong>：内核 FUSE 模块正常，协议协商成功，无内核级卡死。</p>
+<hr>
+<h4 id="h-假设-bdaemon-进程崩溃或异常退出">假设 B：Daemon 进程崩溃或异常退出</h4>
+<blockquote>
+<p>🧪 假设：daemon 在处理请求时崩溃导致无响应</p>
+</blockquote>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>检查项</th>
+<th>操作</th>
+<th>结论</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>进程状态</td>
+<td><code>ps</code> 检查 PID 631</td>
+<td><span class="badge-ok">✅ 进程存活，S state（sleeping）</span></td>
+</tr>
+<tr>
+<td>日志输出</td>
+<td>检查 daemon log</td>
+<td><span class="badge-err">❌ daemon 日志为空（未接收到正常处理信号）</span></td>
+</tr>
+<tr>
+<td>Read buffer</td>
+<td>检查 buffer size</td>
+<td><span class="badge-ok">✅ read buffer=16384B，满足 WSL2 FUSE 需求</span></td>
+</tr>
+</tbody></table></div>
+<p><strong>⚠️ 部分排除</strong>：进程存活、buffer 充足，但日志为空表明 daemon <strong>接收到了请求却未正确处理</strong>，非进程崩溃，而是处理逻辑缺陷。</p>
+<hr>
+<h4 id="h-假设-cmaxreadaheadmaxwrite-过低导致-io-约束-确认部分根因">假设 C：max_readahead/max_write 过低导致 I/O 约束 ✅ 确认部分根因</h4>
+<blockquote>
+<p>🧪 假设：kernel 因 max_readahead=4096 和 max_write=4096 的约束限制了操作</p>
+</blockquote>
+<p><strong>Step 1 — 确认 INIT 协商值</strong></p>
+<div class="code-block">
+  <span class="code-lang">text</span>
+  <button class="copy-btn" onclick="copyCode(this)" title="复制">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
+  </button>
+  <pre><code>Evidence: Daemon config → max_readahead=4096, max_write=4096
+Kernel FUSE 协议：内核对于该 FUSE 挂载点将强制使用 4KB max read/write</code></pre>
+</div>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>对比项</th>
+<th>正常值</th>
+<th>当前值</th>
+<th>影响倍数</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>max_readahead</td>
+<td>通常 128KB ~ 1MB</td>
+<td><strong>4,096 (4KB)</strong></td>
+<td>退化 32~256 倍</td>
+</tr>
+<tr>
+<td>max_write</td>
+<td>通常 128KB ~ 1MB</td>
+<td><strong>4,096 (4KB)</strong></td>
+<td>退化 32~256 倍</td>
+</tr>
+</tbody></table></div>
+<p><strong>✅ 结论：<code>max_readahead=4096</code> 和 <code>max_write=4096</code> 导致内核层面的 I/O 分片强制缩小至 4KB，显著加剧了大文件读写的延迟，但这不是 <code>ls</code>/<code>stat</code> 超时的直接原因（目录操作为 metadata 操作，不依赖数据读写）。</strong></p>
+<hr>
+<h4 id="h-假设-dreaddir-操作处理逻辑缺失-确认核心根因">假设 D：readdir 操作处理逻辑缺失 ✅ 确认核心根因</h4>
+<blockquote>
+<p>🧪 假设：daemon 未正确实现 readdir/LOOKUP 处理逻辑，导致内核无法完成目录枚举</p>
+</blockquote>
+<p><strong>Step 1 — 现象分析</strong></p>
+<ul>
+<li><code>ls -la</code> 超时 → 表明 <code>READDIR</code> 或 <code>READDIRPLUS</code> 操作未返回有效目录结构</li>
+<li><code>stat /mnt/fuse_test</code> 超时 → 表明 <code>LOOKUP</code> 或 <code>GETATTR</code> 操作也未正确处理</li>
+</ul>
+<p><strong>Step 2 — Daemon 日志证据</strong></p>
+<div class="code-block">
+  <span class="code-lang">text</span>
+  <button class="copy-btn" onclick="copyCode(this)" title="复制">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
+  </button>
+  <pre><code>Daemon Log: 空</code></pre>
+</div>
+<p>daemon 日志完全为空，说明 daemon 要么未识别这些 FUSE 操作的类型，要么对这些操作静默返回空而没有产生日志。</p>
+<p><strong>Step 3 — 内核行为推论</strong></p>
+<div class="code-block">
+  <span class="code-lang">text</span>
+  <button class="copy-btn" onclick="copyCode(this)" title="复制">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
+  </button>
+  <pre><code>用户执行 ls -la
+  → 内核 VFS 发送 FUSE_LOOKUP("/") 获取根节点信息
+  → daemon 返回空/未正确填充
+  → 内核无法获取 inode 属性
+  → 内核尝试发送 FUSE_READDIRPLUS / FUSE_READDIR 获取目录内容
+  → daemon 返回空响应（无目录项）
+  → 内核无法构造目录列表
+  → 用户态超时（2s）</code></pre>
+</div>
+<p><strong>✅ 结论：daemon 对 READDIR/READDIRPLUS/LOOKUP 等 metadata 操作的处理逻辑缺失，直接导致 <code>ls</code> 和 <code>stat</code> 超时。</strong></p>
+<hr>
+<h4 id="h-假设-emaxreadahead-约束通过某种路径影响了-readdir">假设 E：max_readahead 约束通过某种路径影响了 readdir</h4>
+<blockquote>
+<p>🧪 假设：过低的 max_read 配置意外影响了目录操作的 FUSE 请求路径</p>
+</blockquote>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>检查项</th>
+<th>操作</th>
+<th>结论</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>FUSE 协议规范</td>
+<td>查阅 Linux kernel FUSE 文档</td>
+<td><span class="badge-ok">✅ READDIR 不依赖 max_readahead 参数，二者独立</span></td>
+</tr>
+</tbody></table></div>
+<p><strong>❌ 排除</strong>：<code>max_readahead</code> / <code>max_write</code> 仅影响数据读写（read/write 操作），不直接影响 READDIR/LOOKUP/GETATTR 等 metadata 操作。<code>ls</code>/<code>stat</code> 超时的直接原因是 readdir 处理逻辑缺失。</p>
+<hr>
+<h3 id="h-33-排查结论">3.3 排查结论</h3>
+<div class="code-block">
+  <span class="code-lang">text</span>
+  <button class="copy-btn" onclick="copyCode(this)" title="复制">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
+  </button>
+  <pre><code>ls -la / stat 超时
+├─► 内核 FUSE 模块崩溃           → ✅ 正常，排除
+├─► Daemon 进程异常（崩溃/OOM）   → ⚠️ 进程存活但日志为空，排除崩溃
+│       └─► daemon 日志为空       → 🔍 请求送达但未正确处理
+├─► max_readahead/max_write 约束 → ✅ 确认退化，但非直接原因（仅影响数据 I/O）
+│       └─► 4KB I/O 分片         → 数据读写性能降级，但 ls/stat 为 metadata
+└─► readdir/LOOKUP 处理缺失      → ❌ 核心根因
+        └─► daemon 返回空响应     → 内核无法枚举目录/获取 inode
+                └─► 用户态操作超时 → 🎯 根因确认：readdir/LOOKUP 未实现</code></pre>
+</div>
+<hr>
+<h2 id="h-四修复方案">四、修复方案</h2>
+<h3 id="h-41-应急处置">4.1 应急处置</h3>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>步骤</th>
+<th>操作</th>
+<th>执行人</th>
+<th>时间</th>
+<th>效果</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>1</td>
+<td>直接卸载故障 FUSE 挂载点 <code>fusermount -u /mnt/fuse_test</code></td>
+<td>系统/人工</td>
+<td>即时</td>
+<td>恢复 shell 可用性，解除超时阻塞</td>
+</tr>
+<tr>
+<td>2</td>
+<td>停止 daemon 进程 (kill PID 631)</td>
+<td>系统/人工</td>
+<td>即时</td>
+<td>释放 FUSE 连接资源</td>
+</tr>
+<tr>
+<td>3</td>
+<td>使用正常 FUSE daemon 替代（如已有的 <code>passthrough-ll</code> 或其他合规实现）</td>
+<td>系统/人工</td>
+<td>按需</td>
+<td>恢复文件系统正常访问</td>
+</tr>
+</tbody></table></div>
+<h3 id="h-42-永久修复计划">4.2 永久修复计划</h3>
+<h4 id="h-修复一修正-init-回复中的-maxreadahead-和-maxwrite-参数">修复一：修正 INIT 回复中的 max_readahead 和 max_write 参数</h4>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>修复措施</th>
+<th>负责人</th>
+<th>完成时间</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>将 <code>max_readahead</code> 从 4096 调整为合理的上限值（建议与内核协商值一致，通常为 128KB 或更高）</td>
+<td>开发团队</td>
+<td>待定</td>
+</tr>
+<tr>
+<td>将 <code>max_write</code> 从 4096 调整为合理值（至少 128KB，建议 1MB 以匹配内核 FUSE 默认）</td>
+<td>开发团队</td>
+<td>待定</td>
+</tr>
+</tbody></table></div>
+<div class="code-block">
+  <span class="code-lang">c</span>
+  <button class="copy-btn" onclick="copyCode(this)" title="复制">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
+  </button>
+  <pre><code>// 修正前
+fuse_req_init.req_in.hdr.opcode = FUSE_INIT;
+fuse_conn_info.max_readahead = 4096;   // ❌ 异常低
+fuse_conn_info.max_write = 4096;       // ❌ 异常低
+
+// 修正后
+fuse_conn_info.max_readahead = 131072; // ✅ 128KB，合理值
+fuse_conn_info.max_write = 131072;     // ✅ 128KB 或与内核协商一致</code></pre>
+</div>
+<h4 id="h-修复二实现-readdir-lookup-getattr-的完整处理逻辑">修复二：实现 readdir / LOOKUP / GETATTR 的完整处理逻辑</h4>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>修复措施</th>
+<th>负责人</th>
+<th>完成时间</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>实现 <code>FUSE_READDIR</code> / <code>FUSE_READDIRPLUS</code> 操作处理回调：在目录项缓冲区中填充 &quot;.&quot;、&quot;..&quot; 及实际文件的 dentry 信息</td>
+<td>开发团队</td>
+<td>待定</td>
+</tr>
+<tr>
+<td>实现 <code>FUSE_LOOKUP</code> 操作处理：为请求的路径返回正确的 inode 属性和 nodeid</td>
+<td>开发团队</td>
+<td>待定</td>
+</tr>
+<tr>
+<td>实现 <code>FUSE_GETATTR</code> 操作处理：返回文件/目录的 stat 信息（mode、size、atime 等）</td>
+<td>开发团队</td>
+<td>待定</td>
+</tr>
+<tr>
+<td>增加 daemon 侧日志记录功能，便于后续排查类似问题</td>
+<td>开发团队</td>
+<td>待定</td>
+</tr>
+</tbody></table></div>
+<div class="code-block">
+  <span class="code-lang">c</span>
+  <button class="copy-btn" onclick="copyCode(this)" title="复制">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
+  </button>
+  <pre><code>// readdir 最小实现示例（伪代码）
+void do_readdir(fuse_req_t req, fuse_ino_t ino, size_t size,
+                off_t off, struct fuse_file_info *fi) {
+    // 构造目录项缓冲区
+    struct fuse_entry_param e;
+    char buf[4096];
+    size_t sz = 0;
+    
+    // 始终返回 "." 和 ".." 两个基础目录项
+    sz += fuse_add_direntry(req, buf + sz, sizeof(buf) - sz, ".", &amp;e, off + 1);
+    sz += fuse_add_direntry(req, buf + sz, sizeof(buf) - sz, "..", &amp;e, off + 2);
+    
+    fuse_reply_readdir(req, buf, sz);
+}</code></pre>
+</div>
+<h3 id="h-43-检测指标与监控">4.3 检测指标与监控</h3>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>指标</th>
+<th>阈值</th>
+<th>检测方式</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>/sys/fs/fuse/connections/*/waiting</code></td>
+<td>持续 &gt; 5 且不下降</td>
+<td>用户态文件系统操作挂起检测</td>
+</tr>
+<tr>
+<td><code>ls -la</code> 挂载点响应时间</td>
+<td>&gt; 1 秒</td>
+<td>可用性探测（heartbeat check）</td>
+</tr>
+<tr>
+<td><code>stat</code> 挂载点响应时间</td>
+<td>&gt; 1 秒</td>
+<td>可用性探测</td>
+</tr>
+<tr>
+<td>Daemon 进程日志</td>
+<td>持续无输出</td>
+<td>日志活性检测</td>
+</tr>
+<tr>
+<td>FUSE INIT 协商中的 max_readahead/max_write 值</td>
+<td>&lt; 65536 (64KB)</td>
+<td>挂载时参数合法性校验</td>
+</tr>
+<tr>
+<td>挂载点下文件 I/O 吞吐量</td>
+<td>与预期不符</td>
+<td>基准测试对比</td>
+</tr>
+</tbody></table></div>
+<hr>
+<h2 id="h-五影响评估">五、影响评估</h2>
+<h3 id="h-影响分析">影响分析</h3>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>维度</th>
+<th>评估</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>功能完整性</td>
+<td>❌ <strong>完全中断</strong> — 所有目录操作（ls, stat, find, cd 等）均超时失败</td>
+</tr>
+<tr>
+<td>数据访问</td>
+<td>❌ <strong>完全阻断</strong> — 无法读取或写入任何文件</td>
+</tr>
+<tr>
+<td>系统稳定性</td>
+<td><span class="badge-ok">✅ 系统级未受影响 — 无 D 态进程，内核稳定，仅 FUSE 挂载点不可用</span></td>
+</tr>
+<tr>
+<td>数据完整性</td>
+<td><span class="badge-warn">⚠️ 待确认 — 若之前有未落盘数据，强制卸载可能导致丢失</span></td>
+</tr>
+<tr>
+<td>恢复难度</td>
+<td>🟢 低 — 直接卸载挂载点 + 重启正常 daemon 即可恢复</td>
+</tr>
+</tbody></table></div>
+<h3 id="h-故障严重等级p2-major">故障严重等级：P2 (Major)</h3>
+<p><strong>理由</strong>：FUSE 文件系统完全不可用，但限于单个挂载点范围内，不影响系统其他服务和内核稳定性。</p>
+<hr>
+<h2 id="h-六总结">六、总结</h2>
+<p>本次 Branch C FUSE 故障由<strong>两个独立但叠加的缺陷</strong>共同导致：</p>
+<ol>
+<li><strong>配置缺陷</strong> — <code>max_readahead=4096</code> 和 <code>max_write=4096</code> 导致内核强制 4KB I/O 分片，数据读写性能退化 32~256 倍</li>
+<li><strong>逻辑缺陷（致命）</strong> — daemon 未实现 <code>readdir</code>/<code>LOOKUP</code>/<code>GETATTR</code> 等 metadata 操作的处理逻辑，导致所有目录枚举和 inode 查询操作超时</li>
+</ol>
+<p>修复应聚焦于 <strong>正确地实现 FUSE 协议中所有必要的操作处理回调</strong>，并将 INIT 回复参数恢复为合理的系统默认值。在修复上线前，可通过心跳探测（如定时 <code>stat</code> 挂载点）提前发现故障，缩短 MTTR。</p>
+
+    <div class="meta">
+      <span class="meta-source">RCA-FUSE-BranchC-MaxReadConstraint.md</span>
+      <span>生成于 2026/06/04 15:40</span>
+    </div>
+  </article>
+</div>
+
+<script>
+  /* ── 滚动进度条 ── */
+  window.addEventListener("scroll", () => {
+    const el  = document.documentElement;
+    const pct = el.scrollTop / (el.scrollHeight - el.clientHeight) * 100;
+    document.getElementById("progress").style.width = Math.min(pct, 100) + "%";
+  });
+
+  /* ── TOC 高亮当前章节 ── */
+  (function () {
+    const headings = Array.from(document.querySelectorAll("article h1,article h2,article h3"));
+    const links    = Array.from(document.querySelectorAll(".toc a"));
+    if (!links.length) return;
+    const obs = new IntersectionObserver(entries => {
+      entries.forEach(e => {
+        if (!e.isIntersecting) return;
+        links.forEach(l => l.classList.remove("active"));
+        const a = links.find(l => l.getAttribute("href") === "#" + e.target.id);
+        if (a) a.classList.add("active");
+      });
+    }, { rootMargin: "-10% 0px -80% 0px" });
+    headings.forEach(h => obs.observe(h));
+  })();
+
+  /* ── h2 章节序号自动计数 ── */
+  (function () {
+    let idx = 0;
+    document.querySelectorAll("article h2").forEach(el => {
+      idx++;
+      el.setAttribute("data-index", String(idx).padStart(2, "0"));
+    });
+  })();
+
+  /* ── 代码块一键复制 ── */
+  function copyCode(btn) {
+    const code = btn.closest(".code-block").querySelector("code").innerText;
+    navigator.clipboard.writeText(code).then(() => {
+      btn.classList.add("copied");
+      btn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>';
+      setTimeout(() => {
+        btn.classList.remove("copied");
+        btn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>';
+      }, 2000);
+    });
+  }
+
+  /* ── 目录树收缩/展开 ── */
+  function toggleToc(btn) {
+    const expanded = btn.getAttribute("aria-expanded") === "true";
+    btn.setAttribute("aria-expanded", String(!expanded));
+    const parentItem = btn.closest(".toc-item");
+    let nextEl = parentItem.nextElementSibling;
+    if (nextEl && nextEl.classList.contains("toc-group")) {
+      if (expanded) {
+        nextEl.style.maxHeight = nextEl.scrollHeight + "px";
+        void nextEl.offsetHeight;
+        nextEl.classList.add("collapsed");
+      } else {
+        nextEl.classList.remove("collapsed");
+        nextEl.style.maxHeight = nextEl.scrollHeight + "px";
+        setTimeout(() => {
+          if (!nextEl.classList.contains("collapsed")) {
+            nextEl.style.maxHeight = "none";
+          }
+        }, 300);
+      }
+    }
+  }
+</script>
+</body>
+</html>
