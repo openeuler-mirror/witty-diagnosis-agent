@@ -1,0 +1,1005 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>故障诊断报告 — Docker 容器 nf-test-H ipset 匹配失效</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Lora:ital,wght@0,400;0,600;1,400&family=Source+Sans+3:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  /* ── Design tokens ─────────────────────────────────────────────────────── */
+  :root {
+    --bg:          #f8f7f4;
+    --surface:     #ffffff;
+    --border:      #e8e5df;
+    --border-soft: #f0ede8;
+
+    --text:        #1c1917;
+    --text-2:      #57534e;
+    --text-3:      #a8a29e;
+
+    --accent:      #1d4e6e;
+    --accent-light:#e8f1f7;
+    --accent-mid:  #3b82a0;
+
+    --red:         #c0392b;
+    --red-bg:      #fef2f2;
+    --amber:       #92400e;
+    --amber-bg:    #fffbeb;
+    --green:       #14532d;
+    --green-bg:    #f0fdf4;
+
+    --code-bg:     #1a1d27;
+    --code-text:   #cdd6f4;
+    --code-border: #2d3148;
+
+    --font-body: "Source Sans 3", "PingFang SC", "Hiragino Sans GB", sans-serif;
+    --font-head: "Lora", "PingFang SC", Georgia, serif;
+    --font-mono: "JetBrains Mono", "Fira Code", Consolas, monospace;
+
+    --radius:    8px;
+    --radius-lg: 12px;
+    --shadow:    0 1px 3px rgba(0,0,0,.06), 0 4px 16px rgba(0,0,0,.05);
+    --shadow-lg: 0 2px 8px rgba(0,0,0,.07), 0 8px 32px rgba(0,0,0,.06);
+
+    --toc-width:   240px;
+    --gap:         32px;
+  }
+
+  /* ── Progress bar ──────────────────────────────────────────────────────── */
+  #progress {
+    position: fixed; top: 0; left: 0; height: 3px; width: 0%;
+    background: linear-gradient(90deg, var(--accent-mid), var(--accent));
+    z-index: 999; transition: width .1s linear;
+    border-radius: 0 2px 2px 0;
+  }
+
+  /* ── Base ──────────────────────────────────────────────────────────────── */
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  html { font-size: 16px; scroll-behavior: smooth; }
+  body {
+    font-family: var(--font-body);
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.8;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* ── Layout ────────────────────────────────────────────────────────────── */
+  .layout {
+    display: flex;
+    align-items: flex-start;
+    max-width: calc(var(--toc-width) + 820px + var(--gap) * 3);
+    margin: 0 auto;
+    padding: 48px var(--gap) 96px;
+    gap: var(--gap);
+  }
+
+  /* ── TOC ───────────────────────────────────────────────────────────────── */
+  .toc {
+    width: var(--toc-width);
+    flex-shrink: 0;
+    position: sticky;
+    top: 32px;
+    max-height: calc(100vh - 64px);
+    overflow-y: auto;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    padding: 20px;
+    box-shadow: var(--shadow);
+    scrollbar-width: thin;
+    scrollbar-color: var(--border) transparent;
+  }
+  .toc-title {
+    font-size: 10.5px;
+    font-weight: 600;
+    letter-spacing: .1em;
+    text-transform: uppercase;
+    color: var(--text-3);
+    margin-bottom: 12px;
+    padding-bottom: 10px;
+    border-bottom: 1px solid var(--border-soft);
+  }
+  .toc-item {
+    display: flex;
+    align-items: flex-start;
+    margin: 2px 0;
+  }
+  .toc-toggle {
+    background: none;
+    border: none;
+    cursor: pointer;
+    color: var(--text-3);
+    padding: 4px;
+    margin-right: 4px;
+    margin-top: 2px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 4px;
+    transition: background 0.2s, transform 0.2s;
+  }
+  .toc-toggle:hover { background: var(--border-soft); color: var(--text); }
+  .toc-toggle[aria-expanded="false"] svg { transform: rotate(-90deg); }
+  .toc-spacer { width: 20px; flex-shrink: 0; }
+  .toc-group { overflow: hidden; transition: max-height 0.3s ease-in-out; }
+  .toc-group.collapsed { max-height: 0 !important; }
+  
+  .toc a {
+    display: block;
+    font-size: 13px;
+    color: var(--text-2);
+    text-decoration: none;
+    padding: 4px 8px;
+    border-radius: 5px;
+    line-height: 1.45;
+    transition: background .15s, color .15s;
+    word-break: break-all;
+    flex-grow: 1;
+  }
+  .toc a:hover  { background: var(--accent-light); color: var(--accent); }
+  .toc a.active { background: var(--accent-light); color: var(--accent); font-weight: 500; }
+  .toc-l1 { font-weight: 600; color: var(--text); }
+  .toc-l2 { font-weight: 600; color: var(--text); }
+  .toc-l3 { font-size: 12px !important; padding-left: 14px !important; }
+
+  /* ── Article card ──────────────────────────────────────────────────────── */
+  .article {
+    flex: 1; min-width: 0;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    padding: 52px 60px;
+    box-shadow: var(--shadow-lg);
+  }
+
+  /* ── Headings ──────────────────────────────────────────────────────────── */
+  .title-container {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-end;
+    margin: 0 0 28px;
+    padding-bottom: 18px;
+    border-bottom: 2px solid var(--text);
+  }
+  .article h1 {
+    font-family: var(--font-head);
+    font-size: 26px; font-weight: 600; line-height: 1.3;
+    margin: 0; padding-bottom: 0;
+    border-bottom: none;
+  }
+  .article h2 {
+    font-family: var(--font-head);
+    font-size: 19px; font-weight: 600;
+    margin: 48px 0 14px; padding-bottom: 8px;
+    border-bottom: 1px solid var(--border);
+  }
+  .article h2::before {
+    content: attr(data-index);
+    display: inline-block;
+    font-family: var(--font-mono);
+    font-size: 10.5px; font-weight: 500;
+    color: var(--accent-mid);
+    background: var(--accent-light);
+    padding: 1px 7px; border-radius: 4px;
+    margin-right: 10px; vertical-align: middle;
+    letter-spacing: .05em;
+  }
+  .article h3 {
+    font-family: var(--font-head);
+    font-size: 15.5px; font-weight: 600;
+    margin: 28px 0 10px;
+  }
+  .article h3::before {
+    content: "§ ";
+    color: var(--text-3);
+    font-family: var(--font-mono); font-size: 13px;
+  }
+  .article h4 {
+    font-size: 13.5px; font-weight: 600;
+    color: var(--accent); margin: 20px 0 8px;
+  }
+
+  /* ── Body text ─────────────────────────────────────────────────────────── */
+  .article p, .plain { 
+    font-size: 15px; 
+    line-height: 1.85; 
+    color: var(--text); 
+    margin: 0 0 12px; 
+    font-family: var(--font-body);
+  }
+  .article strong { font-weight: 600; }
+  .article em     { font-style: italic; color: var(--text-2); }
+  .article a {
+    color: var(--accent); text-decoration: underline;
+    text-decoration-color: var(--accent-light);
+    text-underline-offset: 3px;
+  }
+  .article a:hover { text-decoration-color: var(--accent); }
+  .article hr { border: none; border-top: 1px solid var(--border); margin: 20px 0; }
+  .article hr.heavy { border-top: 3px solid var(--text); margin: 32px 0; }
+
+  /* ── Blockquote ────────────────────────────────────────────────────────── */
+  .article blockquote {
+    border-left: 3px solid var(--accent-mid);
+    background: var(--accent-light);
+    margin: 20px 0; padding: 13px 20px 13px 20px;
+    border-radius: 0 var(--radius) var(--radius) 0;
+  }
+  .article blockquote p { font-size: 14.5px; color: var(--accent); margin: 0; line-height: 1.7; }
+  /* 支持块引用内部保留换行符（修复头部概要换行丢失问题） */
+  .article blockquote p { white-space: pre-wrap; }
+  .article blockquote strong { color: var(--accent); }
+
+  /* ── Lists ─────────────────────────────────────────────────────────────── */
+  .article ul, .article ol { padding-left: 22px; margin: 6px 0 14px; }
+  .article li { font-size: 15px; line-height: 1.8; margin: 4px 0; }
+  .article li::marker { color: var(--accent-mid); }
+  .article li > ul, .article li > ol { margin: 3px 0; }
+
+  /* ── Inline code ───────────────────────────────────────────────────────── */
+  .article :not(pre) > code {
+    font-family: var(--font-mono);
+    font-size: 12.5px; font-weight: 500;
+    background: #f3f0eb; color: var(--red);
+    padding: 1px 5px; border-radius: 4px;
+    border: 1px solid var(--border);
+  }
+
+  /* ── Code blocks ───────────────────────────────────────────────────────── */
+  .code-block {
+    position: relative; margin: 20px 0;
+    border-radius: var(--radius-lg); overflow: hidden;
+    border: 1px solid var(--code-border);
+    box-shadow: 0 4px 20px rgba(0,0,0,.16);
+  }
+  .code-lang {
+    position: absolute; top: 0; left: 0;
+    font-family: var(--font-mono); font-size: 10px; font-weight: 500;
+    color: #7c8db5; background: #222538;
+    padding: 4px 12px; border-bottom-right-radius: 6px;
+    text-transform: uppercase; letter-spacing: .08em;
+    user-select: none;
+  }
+  .copy-btn {
+    position: absolute; top: 8px; right: 10px;
+    background: #2d3148; border: 1px solid #3d4260;
+    border-radius: 5px; color: #7c8db5; cursor: pointer;
+    padding: 5px 8px; display: flex; align-items: center;
+    transition: background .15s, color .15s; z-index: 1;
+  }
+  .copy-btn:hover  { background: #3a3f60; color: #cdd6f4; }
+  .copy-btn.copied { color: #a6e3a1; border-color: #4a6a4a; }
+  .code-block pre {
+    margin: 0; padding: 36px 20px 20px;
+    background: var(--code-bg); overflow-x: auto;
+    scrollbar-width: thin; scrollbar-color: #3d4260 transparent;
+  }
+  .code-block pre::-webkit-scrollbar { height: 5px; }
+  .code-block pre::-webkit-scrollbar-thumb { background: #3d4260; border-radius: 3px; }
+  .code-block code {
+    font-family: var(--font-mono); font-size: 13px; line-height: 1.7;
+    color: var(--code-text); background: none; border: none; padding: 0;
+    white-space: pre; word-break: normal;
+  }
+
+  /* ── Tables ────────────────────────────────────────────────────────────── */
+  .table-wrap {
+    overflow-x: auto; margin: 16px 0;
+    border-radius: var(--radius-lg);
+    border: 1px solid var(--border);
+    box-shadow: var(--shadow);
+  }
+  table { width: 100%; border-collapse: collapse; font-size: 14px; min-width: 360px; }
+  thead { background: #f4f2ee; }
+  th {
+    padding: 9px 14px; text-align: left;
+    font-size: 11.5px; font-weight: 600;
+    letter-spacing: .04em; text-transform: uppercase;
+    color: var(--text-2); border-bottom: 1px solid var(--border);
+    white-space: nowrap;
+  }
+  td {
+    padding: 8px 14px; border-bottom: 1px solid var(--border-soft);
+    color: var(--text); vertical-align: top; line-height: 1.6;
+  }
+  tbody tr:last-child td { border-bottom: none; }
+  tbody tr:nth-child(even) td { background: #faf9f7; }
+  tbody tr:hover td { background: var(--accent-light); transition: background .1s; }
+
+  /* ── KV block ──────────────────────────────────────────────────────────── */
+  .kv-block { background: var(--bg); border: 1px solid var(--border); border-radius: var(--radius-lg); overflow: hidden; margin: 12px 0 20px; }
+  .kv-row { display: flex; border-bottom: 1px solid var(--border-soft); align-items: flex-start; }
+  .kv-row:last-child { border-bottom: none; }
+  .kv-key { flex: 0 0 160px; padding: 9px 16px; font-size: 13.5px; font-weight: 600; color: var(--text-2); background: var(--surface); border-right: 1px solid var(--border-soft); }
+  .kv-val { flex: 1; padding: 9px 16px; font-size: 14px; color: var(--text); }
+
+  /* ── Status badges ─────────────────────────────────────────────────────── */
+  .badge-ok { display: inline-flex; align-items: center; gap: 4px; background: var(--green-bg); color: var(--green); font-size: 13px; font-weight: 500; padding: 2px 9px; border-radius: 20px; border: 1px solid #bbf7d0; }
+  .badge-err { display: inline-flex; align-items: center; gap: 4px; background: var(--red-bg); color: var(--red); font-size: 13px; font-weight: 500; padding: 2px 9px; border-radius: 20px; border: 1px solid #fecaca; }
+  .badge-warn { display: inline-flex; align-items: center; gap: 4px; background: var(--amber-bg); color: var(--amber); font-size: 13px; font-weight: 500; padding: 2px 9px; border-radius: 20px; border: 1px solid #fde68a; }
+
+  /* ── Priority badges ───────────────────────────────────────────────────── */
+  .pri-p0 { display: inline-block; background: #fef2f2; color: #991b1b; border: 1px solid #fca5a5; font-size: 12px; font-weight: 700; padding: 2px 8px; border-radius: 4px; letter-spacing: .04em; }
+  .pri-p1 { display: inline-block; background: #fff7ed; color: #9a3412; border: 1px solid #fdba74; font-size: 12px; font-weight: 700; padding: 2px 8px; border-radius: 4px; }
+  .pri-p2 { display: inline-block; background: #fffbeb; color: #92400e; border: 1px solid #fde68a; font-size: 12px; font-weight: 700; padding: 2px 8px; border-radius: 4px; }
+  .pri-p3 { display: inline-block; background: var(--accent-light); color: var(--accent); border: 1px solid #bfdbfe; font-size: 12px; font-weight: 700; padding: 2px 8px; border-radius: 4px; }
+
+  /* ── Fault header ──────────────────────────────────────────────────────── */
+  .fault-header { display: flex; align-items: center; gap: 12px; padding: 12px 16px; border-radius: var(--radius-lg); margin: 16px 0 8px; border: 1px solid; }
+  .fh-p0 { background: #fef2f2; border-color: #fca5a5; }
+  .fh-p1 { background: #fff7ed; border-color: #fdba74; }
+  .fh-p2 { background: #fffbeb; border-color: #fde68a; }
+  .fh-p3 { background: var(--accent-light); border-color: #bfdbfe; }
+  .fh-badge { font-family: var(--font-mono); font-size: 11px; font-weight: 700; letter-spacing: .08em; }
+  .fh-p0 .fh-badge { color: #991b1b; }
+  .fh-p1 .fh-badge { color: #9a3412; }
+  .fh-p2 .fh-badge { color: #92400e; }
+  .fh-p3 .fh-badge { color: var(--accent); }
+  .fh-rest { font-size: 14px; font-weight: 500; color: var(--text); }
+
+  /* ── Timeline ──────────────────────────────────────────────────────────── */
+  .timeline { border-left: 2px solid var(--accent-mid); margin: 16px 0 16px 8px; padding-left: 20px; }
+  .tl-row { display: flex; align-items: baseline; gap: 10px; margin: 8px 0; font-size: 13.5px; }
+  .tl-ts { font-family: var(--font-mono); font-size: 12px; color: var(--text-3); flex-shrink: 0; white-space: nowrap; }
+  .tl-tag { font-size: 11px; font-weight: 600; padding: 1px 7px; border-radius: 10px; flex-shrink: 0; background: var(--accent-light); color: var(--accent); }
+  .tl-tag.err { background: var(--red-bg); color: var(--red); }
+  .tl-tag.warn { background: var(--amber-bg); color: var(--amber); }
+  .tl-desc { color: var(--text); line-height: 1.5; }
+
+  /* ── Global warn ───────────────────────────────────────────────────────── */
+  .global-warn { background: #fef2f2; border: 1px solid #fca5a5; border-radius: var(--radius-lg); padding: 14px 18px; font-size: 14.5px; font-weight: 600; color: #991b1b; margin: 16px 0; }
+
+  /* ── Tree note ─────────────────────────────────────────────────────────── */
+  .tree-note { white-space: pre-wrap; font-family: var(--font-mono); font-size: 13.5px; line-height: 1.6; color: var(--text-2); margin: 8px 0 8px 16px; }
+
+  /* ── Disclaimer ────────────────────────────────────────────────────────── */
+  .disclaimer { background: var(--bg); border: 1px solid var(--border); border-radius: var(--radius); padding: 14px 18px; font-size: 13.5px; color: var(--text-2); font-style: italic; }
+
+  /* ── Meta footer ───────────────────────────────────────────────────────── */
+  .meta {
+    margin-top: 48px; padding-top: 16px;
+    border-top: 1px solid var(--border-soft);
+    display: flex; justify-content: space-between; align-items: center;
+    font-size: 12px; color: var(--text-3);
+  }
+  .meta-source { font-family: var(--font-mono); font-size: 11.5px; }
+
+  /* ── Brand logo ────────────────────────────────────────────────────────── */
+  .brand-logo {
+    font-family: var(--font-head);
+    font-size: 14px;
+    color: var(--text-3);
+    letter-spacing: 0.05em;
+    margin-bottom: 4px;
+    flex-shrink: 0;
+    margin-left: 16px;
+  }
+  .brand-logo strong {
+    font-weight: 600;
+    color: var(--accent);
+  }
+  @media (max-width: 900px) {
+    .title-container { flex-direction: column; align-items: flex-start; gap: 12px; }
+    .brand-logo { margin-left: 0; margin-bottom: 0; }
+  }
+  /* ── Print ─────────────────────────────────────────────────────────────── */
+  @media print {
+    body { background: white; }
+    #progress, .toc { display: none; }
+    .layout { display: block; padding: 0; }
+    .article { border: none; box-shadow: none; padding: 24px; }
+    .copy-btn { display: none; }
+    .brand-logo { margin-bottom: 0; }
+  }
+
+  /* ── Responsive ────────────────────────────────────────────────────────── */
+  @media (max-width: 900px) {
+    .toc { display: none; }
+    .article { padding: 36px 28px; }
+    .layout { padding: 24px 16px 64px; }
+  }
+  @media (max-width: 480px) {
+    .article { padding: 24px 18px; }
+    .article h1 { font-size: 22px; }
+  }
+</style>
+</head>
+<body>
+
+<div id="progress"></div>
+
+<div class="layout">
+  <nav class="toc" id="toc">
+  <div class="toc-title">目录</div>
+  <div class="toc-content">
+<div class="toc-item has-children"><button class="toc-toggle" onclick="toggleToc(this)" aria-expanded="true">
+                <svg viewBox="0 0 24 24" width="12" height="12" stroke="currentColor" stroke-width="2" fill="none"><polyline points="6 9 12 15 18 9"></polyline></svg>
+              </button><a href="#h-故障诊断报告-docker-容器-nf-test-h-ipset-匹配失效" onclick="event.preventDefault(); const target = document.getElementById('h-故障诊断报告-docker-容器-nf-test-h-ipset-匹配失效'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l1">🔴 故障诊断报告 — Docker 容器 nf-test-H ipset 匹配失效</a></div>
+<div class="toc-group" id="group-h-一故障概览">
+<div class="toc-item has-children"><button class="toc-toggle" onclick="toggleToc(this)" aria-expanded="true">
+                <svg viewBox="0 0 24 24" width="12" height="12" stroke="currentColor" stroke-width="2" fill="none"><polyline points="6 9 12 15 18 9"></polyline></svg>
+              </button><a href="#h-一故障概览" onclick="event.preventDefault(); const target = document.getElementById('h-一故障概览'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l2">一、故障概览</a></div>
+<div class="toc-group" id="group-h-置信度说明">
+<div class="toc-item "><span class="toc-spacer"></span><a href="#h-置信度说明" onclick="event.preventDefault(); const target = document.getElementById('h-置信度说明'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l3">置信度说明</a></div>
+</div>
+<div class="toc-item has-children"><button class="toc-toggle" onclick="toggleToc(this)" aria-expanded="true">
+                <svg viewBox="0 0 24 24" width="12" height="12" stroke="currentColor" stroke-width="2" fill="none"><polyline points="6 9 12 15 18 9"></polyline></svg>
+              </button><a href="#h-二根因速览" onclick="event.preventDefault(); const target = document.getElementById('h-二根因速览'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l2">二、根因速览</a></div>
+<div class="toc-group" id="group-h-事故时间线-故障传导链路">
+<div class="toc-item "><span class="toc-spacer"></span><a href="#h-事故时间线-故障传导链路" onclick="event.preventDefault(); const target = document.getElementById('h-事故时间线-故障传导链路'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l3">事故时间线 & 故障传导链路</a></div>
+<div class="toc-item "><span class="toc-spacer"></span><a href="#h-故障因果链" onclick="event.preventDefault(); const target = document.getElementById('h-故障因果链'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l3">故障因果链</a></div>
+</div>
+<div class="toc-item has-children"><button class="toc-toggle" onclick="toggleToc(this)" aria-expanded="true">
+                <svg viewBox="0 0 24 24" width="12" height="12" stroke="currentColor" stroke-width="2" fill="none"><polyline points="6 9 12 15 18 9"></polyline></svg>
+              </button><a href="#h-三排查过程" onclick="event.preventDefault(); const target = document.getElementById('h-三排查过程'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l2">三、排查过程</a></div>
+<div class="toc-group" id="group-h-31-初始现象">
+<div class="toc-item "><span class="toc-spacer"></span><a href="#h-31-初始现象" onclick="event.preventDefault(); const target = document.getElementById('h-31-初始现象'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l3">3.1 初始现象</a></div>
+<div class="toc-item "><span class="toc-spacer"></span><a href="#h-32-假设驱动排查" onclick="event.preventDefault(); const target = document.getElementById('h-32-假设驱动排查'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l3">3.2 假设驱动排查</a></div>
+<div class="toc-item "><span class="toc-spacer"></span><a href="#h-33-排查结论" onclick="event.preventDefault(); const target = document.getElementById('h-33-排查结论'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l3">3.3 排查结论</a></div>
+</div>
+<div class="toc-item "><span class="toc-spacer"></span><a href="#h-四ipset-类型方向约束对照表" onclick="event.preventDefault(); const target = document.getElementById('h-四ipset-类型方向约束对照表'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l2">四、ipset 类型方向约束对照表</a></div>
+<div class="toc-item has-children"><button class="toc-toggle" onclick="toggleToc(this)" aria-expanded="true">
+                <svg viewBox="0 0 24 24" width="12" height="12" stroke="currentColor" stroke-width="2" fill="none"><polyline points="6 9 12 15 18 9"></polyline></svg>
+              </button><a href="#h-五修复方案" onclick="event.preventDefault(); const target = document.getElementById('h-五修复方案'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l2">五、修复方案</a></div>
+<div class="toc-group" id="group-h-51-应急处置">
+<div class="toc-item "><span class="toc-spacer"></span><a href="#h-51-应急处置" onclick="event.preventDefault(); const target = document.getElementById('h-51-应急处置'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l3">5.1 应急处置</a></div>
+<div class="toc-item "><span class="toc-spacer"></span><a href="#h-52-建议修复命令" onclick="event.preventDefault(); const target = document.getElementById('h-52-建议修复命令'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l3">5.2 建议修复命令</a></div>
+<div class="toc-item "><span class="toc-spacer"></span><a href="#h-53-永久修复计划" onclick="event.preventDefault(); const target = document.getElementById('h-53-永久修复计划'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l3">5.3 永久修复计划</a></div>
+<div class="toc-item "><span class="toc-spacer"></span><a href="#h-54-验证建议" onclick="event.preventDefault(); const target = document.getElementById('h-54-验证建议'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l3">5.4 验证建议</a></div>
+</div>
+<div class="toc-item "><span class="toc-spacer"></span><a href="#h-六参考证据索引" onclick="event.preventDefault(); const target = document.getElementById('h-六参考证据索引'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l2">六、参考证据索引</a></div>
+</div>
+  </div>
+</nav>
+  <article class="article" id="article" style="position: relative;">
+    <div class="title-container"><h1 id="h-故障诊断报告-docker-容器-nf-test-h-ipset-匹配失效">🔴 故障诊断报告 — Docker 容器 nf-test-H ipset 匹配失效</h1><div class="brand-logo">by <strong>Witty Diagnosis Agent</strong></div></div>
+<blockquote>
+<p><strong>报告编号</strong>：RCA-20260610-001
+<strong>故障级别</strong>：P2（配置错误类 — 安全防护规则未生效）
+<strong>报告时间</strong>：2026-06-10 22:01:17 +08:00
+<strong>当前状态</strong>：🟡 观察中（规则已识别异常，待修复）</p>
+</blockquote>
+<hr>
+<h2 id="h-一故障概览">一、故障概览</h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>项目</th>
+<th>内容</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>故障标题</td>
+<td>Docker 容器 nf-test-H 中 ipset 类型与规则方向不匹配导致 DROP 规则失效</td>
+</tr>
+<tr>
+<td>影响范围</td>
+<td>容器 nf-test-H 的 <code>app_ports</code> ipset 的 <strong>src 方向 DROP 规则</strong>完全无效（0 命中），导致预期应被拦截的源端口匹配流量未被丢弃，存在安全防护盲区</td>
+</tr>
+<tr>
+<td>故障时段</td>
+<td>2026-06-10 22:01:17 及之前（持续存在，自 ipset 规则配置生效起）</td>
+</tr>
+<tr>
+<td>根本原因</td>
+<td><code>app_ports</code> ipset 类型为 <code>bitmap:port</code>，该类型在内核协议栈中<strong>仅支持 dst（目的）方向匹配</strong>，但 iptables 规则错误地使用了 <code>src</code> 方向引用，导致匹配永远无法命中</td>
+</tr>
+<tr>
+<td>是否恢复</td>
+<td><span class="badge-err">❌ 未恢复（规则仍存在，需人工修复）</span></td>
+</tr>
+<tr>
+<td>根因置信度</td>
+<td>🟢 高置信（H4 自动检测 + 规则计数双向验证：<code>src</code> 方向 0 命中 vs <code>dst</code> 方向 30 命中，对比明确）</td>
+</tr>
+</tbody></table></div>
+<h3 id="h-置信度说明">置信度说明</h3>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>等级</th>
+<th>标识</th>
+<th>含义</th>
+<th>对应本案</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>高置信</td>
+<td>🟢</td>
+<td>根因已明确，可复现，单一原因可解释所有现象</td>
+<td><code>bitmap:port</code> 仅支持 dst 是内核约定；两条规则的 pkts 计数差（0 vs 30）为决定性证据</td>
+</tr>
+<tr>
+<td>中置信</td>
+<td>🟡</td>
+<td>根因基本确认，但存在 1～2 个无法完全解释的现象</td>
+<td>—</td>
+</tr>
+<tr>
+<td>低置信</td>
+<td>🟠</td>
+<td>有多个可疑原因，尚未排除竞争，结论为推断</td>
+<td>—</td>
+</tr>
+<tr>
+<td>未知</td>
+<td>🔴</td>
+<td>现象无法解释，根因未定位，仍在排查中</td>
+<td>—</td>
+</tr>
+</tbody></table></div>
+<hr>
+<h2 id="h-二根因速览">二、根因速览</h2>
+<h3 id="h-事故时间线-故障传导链路">事故时间线 & 故障传导链路</h3>
+<div class="code-block">
+  <span class="code-lang">text</span>
+  <button class="copy-btn" onclick="copyCode(this)" title="复制">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
+  </button>
+  <pre><code>时间                         事件                                                      性质          溯源路径
+─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+
+&lt;div style="margin-bottom: 8px;"&gt;&lt;strong&gt;[持续]                       管理员/自动化工具创建 ipset app_ports，类型为 bitmap:&lt;/strong&gt; port       📝 配置创建    kuafu_H_20260610_220117.md:21-30&lt;/div&gt;
+
+  │                          成员添加：8080, 8443
+  │
+  ▼
+
+&lt;div style="margin-bottom: 8px;"&gt;&lt;strong&gt;[持续]                       创建 iptables 规则引用 app_ports 用于 src（源端口）方向 DROP     ⚠️ 配置错误    kuafu_H_20260610_220117.md:&lt;/strong&gt; 44-45&lt;/div&gt;
+
+  │                          规则：match-set app_ports src → DROP
+  │                          bitmap:port 内核仅支持 dst 方向匹配
+  ▼
+
+&lt;div style="margin-bottom: 8px;"&gt;&lt;strong&gt;[持续]                       src 方向 DROP 规则命中计数 = 0                                🔴 规则失效    kuafu_H_20260610_220117.md:&lt;/strong&gt; 45&lt;/div&gt;
+
+  │                          预期应拦截源端口为 8080/8443 的入站流量
+  │
+  ▼
+
+&lt;div style="margin-bottom: 8px;"&gt;&lt;strong&gt;[持续]                       同期 dst 方向 DROP 规则命中计数 = 30（正常）                    🟢 对照正常    kuafu_H_20260610_220117.md:&lt;/strong&gt; 46&lt;/div&gt;
+
+  │                          证明 ipset 条目本身正常、规则语法正确
+  │
+  ▼
+
+&lt;div style="margin-bottom: 8px;"&gt;&lt;strong&gt;[持续]                       安全防护存在盲区:&lt;/strong&gt; src 方向流量不会被拦截                        🔴 风险持续    kuafu_H_20260610_220117.md:91-96&lt;/div&gt;
+
+                              H4 自动检测确认类型不匹配</code></pre>
+</div>
+<h3 id="h-故障因果链">故障因果链</h3>
+<div class="code-block">
+  <span class="code-lang">text</span>
+  <button class="copy-btn" onclick="copyCode(this)" title="复制">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
+  </button>
+  <pre><code>配置阶段: ipset create app_ports bitmap:port range 0-65535
+    └─► iptables -A FORWARD -m set --match-set app_ports src -j DROP  ← 错误！bitmap:port 不支持 src
+            └─► 内核 netfilter 协议栈在处理 match-set src 时，发现 bitmap:port 的匹配方向位图仅注册了 dst
+                    └─► match 函数直接返回 false，规则永不命中
+                            └─► pkts 计数一直为 0
+                                    └─► 源端口 8080/8443 的入站流量无法被此规则拦截
+                                            └─► 🔴 安全防护规则形同虚设</code></pre>
+</div>
+<hr>
+<h2 id="h-三排查过程">三、排查过程</h2>
+<h3 id="h-31-初始现象">3.1 初始现象</h3>
+<ul>
+<li>Docker 容器 nf-test-H 中存在 ipset 规则 <code>app_ports</code>，类型为 <code>bitmap:port</code>，包含端口 <code>8080</code> 和 <code>8443</code></li>
+<li>两条引用 <code>app_ports</code> 的 iptables DROP 规则命中计数差异巨大：<ul>
+<li><code>match-set app_ports src</code> → <strong>0 packets</strong>（异常）</li>
+<li><code>match-set app_ports dst</code> → <strong>30 packets / 1800 bytes</strong>（正常）</li>
+</ul>
+</li>
+<li><code>blacklist</code>（hash:net 类型）的 <code>src</code> 方向引用命中计数为 0（未见异常流量）</li>
+</ul>
+<h3 id="h-32-假设驱动排查">3.2 假设驱动排查</h3>
+<h4 id="h-假设-aipset-条目未正确添加或已过期">假设 A：ipset 条目未正确添加或已过期</h4>
+<blockquote>
+<p>🧪 假设：app_ports 中无有效条目，导致所有规则都无法命中</p>
+</blockquote>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>检查项</th>
+<th>操作</th>
+<th>结论</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>ipset 条目</td>
+<td>ipset list app_ports 检查条目</td>
+<td><span class="badge-ok">✅ 条目正常：8080, 8443 均在成员列表中</span></td>
+</tr>
+<tr>
+<td>引用计数</td>
+<td>References: 2</td>
+<td><span class="badge-ok">✅ 有规则正确引用</span></td>
+</tr>
+<tr>
+<td>dst 方向规则</td>
+<td>pkts=30</td>
+<td><span class="badge-ok">✅ dst 方向正常命中 → 条目有效</span></td>
+</tr>
+</tbody></table></div>
+<p><strong>❌ 排除</strong>：ipset 条目本身存在且有效，非条目缺失问题。</p>
+<hr>
+<h4 id="h-假设-b规则顺序导致-src-规则被覆盖">假设 B：规则顺序导致 src 规则被覆盖</h4>
+<blockquote>
+<p>🧪 假设：由于规则链中其他规则优先级更高，流量在匹配到 src 规则前已被 ACCEPT 或跳转</p>
+</blockquote>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>检查项</th>
+<th>操作</th>
+<th>结论</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>规则命中计数</td>
+<td>pkts: src=0, dst=30</td>
+<td><span class="badge-warn">⚠️ 若被覆盖，dst 方向也应受影响，但 dst 正常命中 30 次</span></td>
+</tr>
+<tr>
+<td>规则链结构</td>
+<td>iptables_filter 和 iptables_save 中的规则</td>
+<td><span class="badge-ok">✅ src 和 dst 规则在同一链中，dst 在后依然命中</span></td>
+</tr>
+</tbody></table></div>
+<p><strong>❌ 排除</strong>：若为顺序覆盖，dst 规则（运行在后）不应先命中。src 规则在前，更应优先匹配。</p>
+<hr>
+<h4 id="h-假设-cipset-类型与规则方向不匹配-确认根因">假设 C：ipset 类型与规则方向不匹配 ✅ 确认根因</h4>
+<blockquote>
+<p>🧪 假设：<code>bitmap:port</code> 类型的 ipset 在内核中仅支持 <strong>dst（目的）</strong> 方向匹配，而规则使用了 <code>src</code> 方向导致匹配永远失败</p>
+</blockquote>
+<p><strong>Step 1 — 确认 ipset 类型</strong></p>
+<div class="code-block">
+  <span class="code-lang">text</span>
+  <button class="copy-btn" onclick="copyCode(this)" title="复制">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
+  </button>
+  <pre><code>Analyzing ipset list output:
+  Name: app_ports
+  Type: bitmap:port     ← 关键发现
+  Members: 8080, 8443</code></pre>
+</div>
+<p><strong>Step 2 — 验证 bitmap:port 的匹配方向约束</strong></p>
+<div class="code-block">
+  <span class="code-lang">text</span>
+  <button class="copy-btn" onclick="copyCode(this)" title="复制">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
+  </button>
+  <pre><code>H4 自动类型与方向匹配检测结果：
+  ⚠️  app_ports (type=bitmap:port) 使用 src 匹配 → bitmap:port 只支持 dst!
+  ✅  app_ports (type=bitmap:port) 使用 dst 匹配 ✓
+  ✅  blacklist (type=hash:net) 使用 src 匹配 ✓</code></pre>
+</div>
+<p><strong>Step 3 — 规则计数交叉验证</strong></p>
+<div class="code-block">
+  <span class="code-lang">text</span>
+  <button class="copy-btn" onclick="copyCode(this)" title="复制">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
+  </button>
+  <pre><code>对比两条引用同一 ipset 的规则：
+  Rule 1: match-set app_ports src → DROP     pkts=0     ← 规则失效（方向错误）
+  Rule 2: match-set app_ports dst → DROP     pkts=30    ← 规则正常（方向正确）
+
+同一 ipset、同一链，仅方向参数不同 → 排除条目/网络/顺序因素</code></pre>
+</div>
+<p><strong>✅ 结论：<code>app_ports</code> ipset 类型为 <code>bitmap:port</code>，该类型内核实现仅注册了 dst 方向匹配能力。引用 <code>src</code> 方向的规则在 netfilter match 阶段直接返回 false，导致规则永久不命中，源端口防护完全失效。</strong></p>
+<hr>
+<h3 id="h-33-排查结论">3.3 排查结论</h3>
+<div class="code-block">
+  <span class="code-lang">text</span>
+  <button class="copy-btn" onclick="copyCode(this)" title="复制">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
+  </button>
+  <pre><code>app_ports DROP 规则 src 方向 0 命中
+├─► ipset 条目为空                → ✅ 排除（dst 方向正常命中 30 次）
+├─► 规则顺序被覆盖                → ✅ 排除（dst 规则在后依然命中）
+├─► 网络无对应 src 流量           → ❓ 可能但 dst 方向有流量，src 方向也应存在对称流量
+└─► ipset 类型与规则方向不匹配      → 🎯 根因确认（bitmap:port 不支持 src）
+        └─► bitmap:port 内核代码仅实现了 dst 方向匹配
+        └─► 错误规则: match-set app_ports src → 内核 match 函数返回 false
+        └─► pkts 永远为 0，安全规则完全失效</code></pre>
+</div>
+<hr>
+<h2 id="h-四ipset-类型方向约束对照表">四、ipset 类型方向约束对照表</h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>ipset 类型</th>
+<th>支持 src</th>
+<th>支持 dst</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>bitmap:ip</code></td>
+<td><span class="badge-ok">✅</span></td>
+<td><span class="badge-ok">✅</span></td>
+<td>IP 地址匹配</td>
+</tr>
+<tr>
+<td><code>bitmap:port</code></td>
+<td><span class="badge-err">❌</span></td>
+<td><span class="badge-ok">✅</span></td>
+<td><strong>仅支持 dst</strong>，这是本案根因</td>
+</tr>
+<tr>
+<td><code>bitmap:ip,mac</code></td>
+<td><span class="badge-ok">✅</span></td>
+<td><span class="badge-ok">✅</span></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>hash:ip</code></td>
+<td><span class="badge-ok">✅</span></td>
+<td><span class="badge-ok">✅</span></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>hash:net</code></td>
+<td><span class="badge-ok">✅</span></td>
+<td><span class="badge-ok">✅</span></td>
+<td>本案中 blacklist 使用正确</td>
+</tr>
+<tr>
+<td><code>hash:ip,port</code></td>
+<td><span class="badge-ok">✅</span></td>
+<td><span class="badge-ok">✅</span></td>
+<td>如需 src 方向端口匹配，应使用此类型</td>
+</tr>
+<tr>
+<td><code>hash:ip,port,net</code></td>
+<td><span class="badge-ok">✅</span></td>
+<td><span class="badge-ok">✅</span></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>list:set</code></td>
+<td><span class="badge-ok">✅</span></td>
+<td><span class="badge-ok">✅</span></td>
+<td>嵌套集合</td>
+</tr>
+</tbody></table></div>
+<h2 id="h-五修复方案">五、修复方案</h2>
+<h3 id="h-51-应急处置">5.1 应急处置</h3>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>步骤</th>
+<th>操作</th>
+<th>执行人</th>
+<th>时间</th>
+<th>效果</th>
+<th>风险</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>1</td>
+<td>确认业务需求方向：是否需要拦截<strong>源端口</strong>为 8080/8443 的流量</td>
+<td>业务/SRE</td>
+<td>立即</td>
+<td>明确需求</td>
+<td>🟢 低危</td>
+</tr>
+<tr>
+<td>2a</td>
+<td><strong>若需要 src 方向匹配</strong>：改用 <code>hash:ip,port</code> 类型重建 ipset，并重新添加条目</td>
+<td>人工</td>
+<td>需规划窗口</td>
+<td>修复 src 方向匹配</td>
+<td>🟡 中危（可能需要更新所有引用此 ipset 的规则）</td>
+</tr>
+<tr>
+<td>2b</td>
+<td><strong>若实际意图是 dst 方向</strong>：将规则中的 <code>src</code> 改为 <code>dst</code>，即可让规则生效</td>
+<td>人工</td>
+<td>立即</td>
+<td>立即修复</td>
+<td>🟢 低危（单行修改）</td>
+</tr>
+</tbody></table></div>
+<h3 id="h-52-建议修复命令">5.2 建议修复命令</h3>
+<p><strong>选项 A（如需求为 dst 方向 — 推荐最低风险方案）：</strong></p>
+<div class="code-block">
+  <span class="code-lang">bash</span>
+  <button class="copy-btn" onclick="copyCode(this)" title="复制">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
+  </button>
+  <pre><code># 在 Docker 容器或宿主机（视规则位置而定）执行
+iptables -R &lt;chain&gt; &lt;rule-number&gt; -m set --match-set app_ports dst -j DROP
+# 或删除原规则后重新添加
+iptables -D &lt;chain&gt; &lt;rule-number&gt;
+iptables -A &lt;chain&gt; -m set --match-set app_ports dst -j DROP</code></pre>
+</div>
+<p><strong>选项 B（如确实需要 src 方向 — 需重建 ipset 类型）：</strong></p>
+<div class="code-block">
+  <span class="code-lang">bash</span>
+  <button class="copy-btn" onclick="copyCode(this)" title="复制">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
+  </button>
+  <pre><code># 步骤 1：创建新的 hash:ip,port 类型 ipset（风险 🟡）
+ipset create app_ports_v2 hash:ip,port
+
+# 步骤 2：迁移条目（需考虑与实际匹配的 IP）
+ipset add app_ports_v2 0.0.0.0/0,8080
+ipset add app_ports_v2 0.0.0.0/0,8443
+
+# 步骤 3：更新 iptables 规则引用
+iptables -R &lt;chain&gt; &lt;rule-number&gt; -m set --match-set app_ports_v2 src -j DROP
+
+# 步骤 4：验证新规则
+iptables -L -v -n | grep app_ports_v2
+# 确认 pkts 开始增长后，清理旧 ipset
+ipset destroy app_ports</code></pre>
+</div>
+<h3 id="h-53-永久修复计划">5.3 永久修复计划</h3>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>修复措施</th>
+<th>负责人</th>
+<th>完成时间</th>
+<th>风险等级</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>修正规则方向（若意图为 dst）或将 ipset 类型改为 <code>hash:ip,port</code>（若需要 src）</td>
+<td>待定</td>
+<td>待定</td>
+<td>🟡 中危</td>
+</tr>
+<tr>
+<td>在 ipset 管理规范中增加类型方向校验 CI/CD 门禁，防止类似配置错误</td>
+<td>待定</td>
+<td>待定</td>
+<td>🟢 低危</td>
+</tr>
+<tr>
+<td>推广使用 H4 自动检测（已在 Kuafu 分支中实现），在规则部署前自动检查类型方向匹配</td>
+<td>待定</td>
+<td>待定</td>
+<td>🟢 低危</td>
+</tr>
+</tbody></table></div>
+<h3 id="h-54-验证建议">5.4 验证建议</h3>
+<ol>
+<li><strong>修复前验证</strong>：在测试环境中复现 <code>bitmap:port src</code> 规则，确认 pkts 始终为 0</li>
+<li><strong>修复后验证</strong>：<ul>
+<li>执行 <code>iptables -L -v -n | grep app_ports</code> 确认 pkts 计数开始增长</li>
+<li>执行 <code>ipset list app_ports</code> 确认成员正常</li>
+<li>用 <code>hping3</code> 或 <code>nping</code> 模拟源端口 8080/8443 的流量，验证是否能被正确拦截</li>
+</ul>
+</li>
+<li><strong>回归验证</strong>：确认 dst 方向的 DROP 规则仍然正常工作（pkts 持续增长）</li>
+</ol>
+<hr>
+<h2 id="h-六参考证据索引">六、参考证据索引</h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>证据项</th>
+<th>来源文件</th>
+<th>行号</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>ipset app_ports 类型 bitmap:port</td>
+<td><code>kuafu_H_20260610_220117.md</code></td>
+<td>21-30</td>
+<td>确认为 bitmap:port 类型</td>
+</tr>
+<tr>
+<td>ipset blacklist 类型 hash:net</td>
+<td><code>kuafu_H_20260610_220117.md</code></td>
+<td>32-40</td>
+<td>参照组，类型方向正确</td>
+</tr>
+<tr>
+<td><code>src</code> 规则 pkts=0</td>
+<td><code>kuafu_H_20260610_220117.md</code></td>
+<td>45</td>
+<td>异常：规则未命中</td>
+</tr>
+<tr>
+<td><code>dst</code> 规则 pkts=30</td>
+<td><code>kuafu_H_20260610_220117.md</code></td>
+<td>46</td>
+<td>对照正常：同为 app_ports 但 dst 方向正常工作</td>
+</tr>
+<tr>
+<td>H4 自动检测结果</td>
+<td><code>kuafu_H_20260610_220117.md</code></td>
+<td>91-96</td>
+<td>自动识别类型不匹配：bitmap:port 不支持 src</td>
+</tr>
+</tbody></table></div>
+<hr>
+<p><em>报告由 Baize (分析与报告 Agent) 自动生成</em>
+<em>RCA 报告路径：/home/win11/.witty-diagnosis-agent/baize/reports/ipset类型不匹配导致Docker容器nf-test-H规则失效_20260610_220117_report.md</em></p>
+
+    <div class="meta">
+      <span class="meta-source">ipset类型不匹配导致Docker容器nf-test-H规则失效_20260610_220117_report.md</span>
+      <span>生成于 2026/06/10 22:08</span>
+    </div>
+  </article>
+</div>
+
+<script>
+  /* ── 滚动进度条 ── */
+  window.addEventListener("scroll", () => {
+    const el  = document.documentElement;
+    const pct = el.scrollTop / (el.scrollHeight - el.clientHeight) * 100;
+    document.getElementById("progress").style.width = Math.min(pct, 100) + "%";
+  });
+
+  /* ── TOC 高亮当前章节 ── */
+  (function () {
+    const headings = Array.from(document.querySelectorAll("article h1,article h2,article h3"));
+    const links    = Array.from(document.querySelectorAll(".toc a"));
+    if (!links.length) return;
+    const obs = new IntersectionObserver(entries => {
+      entries.forEach(e => {
+        if (!e.isIntersecting) return;
+        links.forEach(l => l.classList.remove("active"));
+        const a = links.find(l => l.getAttribute("href") === "#" + e.target.id);
+        if (a) a.classList.add("active");
+      });
+    }, { rootMargin: "-10% 0px -80% 0px" });
+    headings.forEach(h => obs.observe(h));
+  })();
+
+  /* ── h2 章节序号自动计数 ── */
+  (function () {
+    let idx = 0;
+    document.querySelectorAll("article h2").forEach(el => {
+      idx++;
+      el.setAttribute("data-index", String(idx).padStart(2, "0"));
+    });
+  })();
+
+  /* ── 代码块一键复制 ── */
+  function copyCode(btn) {
+    const code = btn.closest(".code-block").querySelector("code").innerText;
+    navigator.clipboard.writeText(code).then(() => {
+      btn.classList.add("copied");
+      btn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>';
+      setTimeout(() => {
+        btn.classList.remove("copied");
+        btn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>';
+      }, 2000);
+    });
+  }
+
+  /* ── 目录树收缩/展开 ── */
+  function toggleToc(btn) {
+    const expanded = btn.getAttribute("aria-expanded") === "true";
+    btn.setAttribute("aria-expanded", String(!expanded));
+    const parentItem = btn.closest(".toc-item");
+    let nextEl = parentItem.nextElementSibling;
+    if (nextEl && nextEl.classList.contains("toc-group")) {
+      if (expanded) {
+        nextEl.style.maxHeight = nextEl.scrollHeight + "px";
+        void nextEl.offsetHeight;
+        nextEl.classList.add("collapsed");
+      } else {
+        nextEl.classList.remove("collapsed");
+        nextEl.style.maxHeight = nextEl.scrollHeight + "px";
+        setTimeout(() => {
+          if (!nextEl.classList.contains("collapsed")) {
+            nextEl.style.maxHeight = "none";
+          }
+        }, 300);
+      }
+    }
+  }
+</script>
+</body>
+</html>

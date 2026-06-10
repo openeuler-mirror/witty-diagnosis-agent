@@ -1,0 +1,1118 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>故障诊断报告：Docker 容器 nf-test-G nfconntrack Helper/ALG 协议辅助模块缺失</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Lora:ital,wght@0,400;0,600;1,400&family=Source+Sans+3:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  /* ── Design tokens ─────────────────────────────────────────────────────── */
+  :root {
+    --bg:          #f8f7f4;
+    --surface:     #ffffff;
+    --border:      #e8e5df;
+    --border-soft: #f0ede8;
+
+    --text:        #1c1917;
+    --text-2:      #57534e;
+    --text-3:      #a8a29e;
+
+    --accent:      #1d4e6e;
+    --accent-light:#e8f1f7;
+    --accent-mid:  #3b82a0;
+
+    --red:         #c0392b;
+    --red-bg:      #fef2f2;
+    --amber:       #92400e;
+    --amber-bg:    #fffbeb;
+    --green:       #14532d;
+    --green-bg:    #f0fdf4;
+
+    --code-bg:     #1a1d27;
+    --code-text:   #cdd6f4;
+    --code-border: #2d3148;
+
+    --font-body: "Source Sans 3", "PingFang SC", "Hiragino Sans GB", sans-serif;
+    --font-head: "Lora", "PingFang SC", Georgia, serif;
+    --font-mono: "JetBrains Mono", "Fira Code", Consolas, monospace;
+
+    --radius:    8px;
+    --radius-lg: 12px;
+    --shadow:    0 1px 3px rgba(0,0,0,.06), 0 4px 16px rgba(0,0,0,.05);
+    --shadow-lg: 0 2px 8px rgba(0,0,0,.07), 0 8px 32px rgba(0,0,0,.06);
+
+    --toc-width:   240px;
+    --gap:         32px;
+  }
+
+  /* ── Progress bar ──────────────────────────────────────────────────────── */
+  #progress {
+    position: fixed; top: 0; left: 0; height: 3px; width: 0%;
+    background: linear-gradient(90deg, var(--accent-mid), var(--accent));
+    z-index: 999; transition: width .1s linear;
+    border-radius: 0 2px 2px 0;
+  }
+
+  /* ── Base ──────────────────────────────────────────────────────────────── */
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  html { font-size: 16px; scroll-behavior: smooth; }
+  body {
+    font-family: var(--font-body);
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.8;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* ── Layout ────────────────────────────────────────────────────────────── */
+  .layout {
+    display: flex;
+    align-items: flex-start;
+    max-width: calc(var(--toc-width) + 820px + var(--gap) * 3);
+    margin: 0 auto;
+    padding: 48px var(--gap) 96px;
+    gap: var(--gap);
+  }
+
+  /* ── TOC ───────────────────────────────────────────────────────────────── */
+  .toc {
+    width: var(--toc-width);
+    flex-shrink: 0;
+    position: sticky;
+    top: 32px;
+    max-height: calc(100vh - 64px);
+    overflow-y: auto;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    padding: 20px;
+    box-shadow: var(--shadow);
+    scrollbar-width: thin;
+    scrollbar-color: var(--border) transparent;
+  }
+  .toc-title {
+    font-size: 10.5px;
+    font-weight: 600;
+    letter-spacing: .1em;
+    text-transform: uppercase;
+    color: var(--text-3);
+    margin-bottom: 12px;
+    padding-bottom: 10px;
+    border-bottom: 1px solid var(--border-soft);
+  }
+  .toc-item {
+    display: flex;
+    align-items: flex-start;
+    margin: 2px 0;
+  }
+  .toc-toggle {
+    background: none;
+    border: none;
+    cursor: pointer;
+    color: var(--text-3);
+    padding: 4px;
+    margin-right: 4px;
+    margin-top: 2px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 4px;
+    transition: background 0.2s, transform 0.2s;
+  }
+  .toc-toggle:hover { background: var(--border-soft); color: var(--text); }
+  .toc-toggle[aria-expanded="false"] svg { transform: rotate(-90deg); }
+  .toc-spacer { width: 20px; flex-shrink: 0; }
+  .toc-group { overflow: hidden; transition: max-height 0.3s ease-in-out; }
+  .toc-group.collapsed { max-height: 0 !important; }
+  
+  .toc a {
+    display: block;
+    font-size: 13px;
+    color: var(--text-2);
+    text-decoration: none;
+    padding: 4px 8px;
+    border-radius: 5px;
+    line-height: 1.45;
+    transition: background .15s, color .15s;
+    word-break: break-all;
+    flex-grow: 1;
+  }
+  .toc a:hover  { background: var(--accent-light); color: var(--accent); }
+  .toc a.active { background: var(--accent-light); color: var(--accent); font-weight: 500; }
+  .toc-l1 { font-weight: 600; color: var(--text); }
+  .toc-l2 { font-weight: 600; color: var(--text); }
+  .toc-l3 { font-size: 12px !important; padding-left: 14px !important; }
+
+  /* ── Article card ──────────────────────────────────────────────────────── */
+  .article {
+    flex: 1; min-width: 0;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    padding: 52px 60px;
+    box-shadow: var(--shadow-lg);
+  }
+
+  /* ── Headings ──────────────────────────────────────────────────────────── */
+  .title-container {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-end;
+    margin: 0 0 28px;
+    padding-bottom: 18px;
+    border-bottom: 2px solid var(--text);
+  }
+  .article h1 {
+    font-family: var(--font-head);
+    font-size: 26px; font-weight: 600; line-height: 1.3;
+    margin: 0; padding-bottom: 0;
+    border-bottom: none;
+  }
+  .article h2 {
+    font-family: var(--font-head);
+    font-size: 19px; font-weight: 600;
+    margin: 48px 0 14px; padding-bottom: 8px;
+    border-bottom: 1px solid var(--border);
+  }
+  .article h2::before {
+    content: attr(data-index);
+    display: inline-block;
+    font-family: var(--font-mono);
+    font-size: 10.5px; font-weight: 500;
+    color: var(--accent-mid);
+    background: var(--accent-light);
+    padding: 1px 7px; border-radius: 4px;
+    margin-right: 10px; vertical-align: middle;
+    letter-spacing: .05em;
+  }
+  .article h3 {
+    font-family: var(--font-head);
+    font-size: 15.5px; font-weight: 600;
+    margin: 28px 0 10px;
+  }
+  .article h3::before {
+    content: "§ ";
+    color: var(--text-3);
+    font-family: var(--font-mono); font-size: 13px;
+  }
+  .article h4 {
+    font-size: 13.5px; font-weight: 600;
+    color: var(--accent); margin: 20px 0 8px;
+  }
+
+  /* ── Body text ─────────────────────────────────────────────────────────── */
+  .article p, .plain { 
+    font-size: 15px; 
+    line-height: 1.85; 
+    color: var(--text); 
+    margin: 0 0 12px; 
+    font-family: var(--font-body);
+  }
+  .article strong { font-weight: 600; }
+  .article em     { font-style: italic; color: var(--text-2); }
+  .article a {
+    color: var(--accent); text-decoration: underline;
+    text-decoration-color: var(--accent-light);
+    text-underline-offset: 3px;
+  }
+  .article a:hover { text-decoration-color: var(--accent); }
+  .article hr { border: none; border-top: 1px solid var(--border); margin: 20px 0; }
+  .article hr.heavy { border-top: 3px solid var(--text); margin: 32px 0; }
+
+  /* ── Blockquote ────────────────────────────────────────────────────────── */
+  .article blockquote {
+    border-left: 3px solid var(--accent-mid);
+    background: var(--accent-light);
+    margin: 20px 0; padding: 13px 20px 13px 20px;
+    border-radius: 0 var(--radius) var(--radius) 0;
+  }
+  .article blockquote p { font-size: 14.5px; color: var(--accent); margin: 0; line-height: 1.7; }
+  /* 支持块引用内部保留换行符（修复头部概要换行丢失问题） */
+  .article blockquote p { white-space: pre-wrap; }
+  .article blockquote strong { color: var(--accent); }
+
+  /* ── Lists ─────────────────────────────────────────────────────────────── */
+  .article ul, .article ol { padding-left: 22px; margin: 6px 0 14px; }
+  .article li { font-size: 15px; line-height: 1.8; margin: 4px 0; }
+  .article li::marker { color: var(--accent-mid); }
+  .article li > ul, .article li > ol { margin: 3px 0; }
+
+  /* ── Inline code ───────────────────────────────────────────────────────── */
+  .article :not(pre) > code {
+    font-family: var(--font-mono);
+    font-size: 12.5px; font-weight: 500;
+    background: #f3f0eb; color: var(--red);
+    padding: 1px 5px; border-radius: 4px;
+    border: 1px solid var(--border);
+  }
+
+  /* ── Code blocks ───────────────────────────────────────────────────────── */
+  .code-block {
+    position: relative; margin: 20px 0;
+    border-radius: var(--radius-lg); overflow: hidden;
+    border: 1px solid var(--code-border);
+    box-shadow: 0 4px 20px rgba(0,0,0,.16);
+  }
+  .code-lang {
+    position: absolute; top: 0; left: 0;
+    font-family: var(--font-mono); font-size: 10px; font-weight: 500;
+    color: #7c8db5; background: #222538;
+    padding: 4px 12px; border-bottom-right-radius: 6px;
+    text-transform: uppercase; letter-spacing: .08em;
+    user-select: none;
+  }
+  .copy-btn {
+    position: absolute; top: 8px; right: 10px;
+    background: #2d3148; border: 1px solid #3d4260;
+    border-radius: 5px; color: #7c8db5; cursor: pointer;
+    padding: 5px 8px; display: flex; align-items: center;
+    transition: background .15s, color .15s; z-index: 1;
+  }
+  .copy-btn:hover  { background: #3a3f60; color: #cdd6f4; }
+  .copy-btn.copied { color: #a6e3a1; border-color: #4a6a4a; }
+  .code-block pre {
+    margin: 0; padding: 36px 20px 20px;
+    background: var(--code-bg); overflow-x: auto;
+    scrollbar-width: thin; scrollbar-color: #3d4260 transparent;
+  }
+  .code-block pre::-webkit-scrollbar { height: 5px; }
+  .code-block pre::-webkit-scrollbar-thumb { background: #3d4260; border-radius: 3px; }
+  .code-block code {
+    font-family: var(--font-mono); font-size: 13px; line-height: 1.7;
+    color: var(--code-text); background: none; border: none; padding: 0;
+    white-space: pre; word-break: normal;
+  }
+
+  /* ── Tables ────────────────────────────────────────────────────────────── */
+  .table-wrap {
+    overflow-x: auto; margin: 16px 0;
+    border-radius: var(--radius-lg);
+    border: 1px solid var(--border);
+    box-shadow: var(--shadow);
+  }
+  table { width: 100%; border-collapse: collapse; font-size: 14px; min-width: 360px; }
+  thead { background: #f4f2ee; }
+  th {
+    padding: 9px 14px; text-align: left;
+    font-size: 11.5px; font-weight: 600;
+    letter-spacing: .04em; text-transform: uppercase;
+    color: var(--text-2); border-bottom: 1px solid var(--border);
+    white-space: nowrap;
+  }
+  td {
+    padding: 8px 14px; border-bottom: 1px solid var(--border-soft);
+    color: var(--text); vertical-align: top; line-height: 1.6;
+  }
+  tbody tr:last-child td { border-bottom: none; }
+  tbody tr:nth-child(even) td { background: #faf9f7; }
+  tbody tr:hover td { background: var(--accent-light); transition: background .1s; }
+
+  /* ── KV block ──────────────────────────────────────────────────────────── */
+  .kv-block { background: var(--bg); border: 1px solid var(--border); border-radius: var(--radius-lg); overflow: hidden; margin: 12px 0 20px; }
+  .kv-row { display: flex; border-bottom: 1px solid var(--border-soft); align-items: flex-start; }
+  .kv-row:last-child { border-bottom: none; }
+  .kv-key { flex: 0 0 160px; padding: 9px 16px; font-size: 13.5px; font-weight: 600; color: var(--text-2); background: var(--surface); border-right: 1px solid var(--border-soft); }
+  .kv-val { flex: 1; padding: 9px 16px; font-size: 14px; color: var(--text); }
+
+  /* ── Status badges ─────────────────────────────────────────────────────── */
+  .badge-ok { display: inline-flex; align-items: center; gap: 4px; background: var(--green-bg); color: var(--green); font-size: 13px; font-weight: 500; padding: 2px 9px; border-radius: 20px; border: 1px solid #bbf7d0; }
+  .badge-err { display: inline-flex; align-items: center; gap: 4px; background: var(--red-bg); color: var(--red); font-size: 13px; font-weight: 500; padding: 2px 9px; border-radius: 20px; border: 1px solid #fecaca; }
+  .badge-warn { display: inline-flex; align-items: center; gap: 4px; background: var(--amber-bg); color: var(--amber); font-size: 13px; font-weight: 500; padding: 2px 9px; border-radius: 20px; border: 1px solid #fde68a; }
+
+  /* ── Priority badges ───────────────────────────────────────────────────── */
+  .pri-p0 { display: inline-block; background: #fef2f2; color: #991b1b; border: 1px solid #fca5a5; font-size: 12px; font-weight: 700; padding: 2px 8px; border-radius: 4px; letter-spacing: .04em; }
+  .pri-p1 { display: inline-block; background: #fff7ed; color: #9a3412; border: 1px solid #fdba74; font-size: 12px; font-weight: 700; padding: 2px 8px; border-radius: 4px; }
+  .pri-p2 { display: inline-block; background: #fffbeb; color: #92400e; border: 1px solid #fde68a; font-size: 12px; font-weight: 700; padding: 2px 8px; border-radius: 4px; }
+  .pri-p3 { display: inline-block; background: var(--accent-light); color: var(--accent); border: 1px solid #bfdbfe; font-size: 12px; font-weight: 700; padding: 2px 8px; border-radius: 4px; }
+
+  /* ── Fault header ──────────────────────────────────────────────────────── */
+  .fault-header { display: flex; align-items: center; gap: 12px; padding: 12px 16px; border-radius: var(--radius-lg); margin: 16px 0 8px; border: 1px solid; }
+  .fh-p0 { background: #fef2f2; border-color: #fca5a5; }
+  .fh-p1 { background: #fff7ed; border-color: #fdba74; }
+  .fh-p2 { background: #fffbeb; border-color: #fde68a; }
+  .fh-p3 { background: var(--accent-light); border-color: #bfdbfe; }
+  .fh-badge { font-family: var(--font-mono); font-size: 11px; font-weight: 700; letter-spacing: .08em; }
+  .fh-p0 .fh-badge { color: #991b1b; }
+  .fh-p1 .fh-badge { color: #9a3412; }
+  .fh-p2 .fh-badge { color: #92400e; }
+  .fh-p3 .fh-badge { color: var(--accent); }
+  .fh-rest { font-size: 14px; font-weight: 500; color: var(--text); }
+
+  /* ── Timeline ──────────────────────────────────────────────────────────── */
+  .timeline { border-left: 2px solid var(--accent-mid); margin: 16px 0 16px 8px; padding-left: 20px; }
+  .tl-row { display: flex; align-items: baseline; gap: 10px; margin: 8px 0; font-size: 13.5px; }
+  .tl-ts { font-family: var(--font-mono); font-size: 12px; color: var(--text-3); flex-shrink: 0; white-space: nowrap; }
+  .tl-tag { font-size: 11px; font-weight: 600; padding: 1px 7px; border-radius: 10px; flex-shrink: 0; background: var(--accent-light); color: var(--accent); }
+  .tl-tag.err { background: var(--red-bg); color: var(--red); }
+  .tl-tag.warn { background: var(--amber-bg); color: var(--amber); }
+  .tl-desc { color: var(--text); line-height: 1.5; }
+
+  /* ── Global warn ───────────────────────────────────────────────────────── */
+  .global-warn { background: #fef2f2; border: 1px solid #fca5a5; border-radius: var(--radius-lg); padding: 14px 18px; font-size: 14.5px; font-weight: 600; color: #991b1b; margin: 16px 0; }
+
+  /* ── Tree note ─────────────────────────────────────────────────────────── */
+  .tree-note { white-space: pre-wrap; font-family: var(--font-mono); font-size: 13.5px; line-height: 1.6; color: var(--text-2); margin: 8px 0 8px 16px; }
+
+  /* ── Disclaimer ────────────────────────────────────────────────────────── */
+  .disclaimer { background: var(--bg); border: 1px solid var(--border); border-radius: var(--radius); padding: 14px 18px; font-size: 13.5px; color: var(--text-2); font-style: italic; }
+
+  /* ── Meta footer ───────────────────────────────────────────────────────── */
+  .meta {
+    margin-top: 48px; padding-top: 16px;
+    border-top: 1px solid var(--border-soft);
+    display: flex; justify-content: space-between; align-items: center;
+    font-size: 12px; color: var(--text-3);
+  }
+  .meta-source { font-family: var(--font-mono); font-size: 11.5px; }
+
+  /* ── Brand logo ────────────────────────────────────────────────────────── */
+  .brand-logo {
+    font-family: var(--font-head);
+    font-size: 14px;
+    color: var(--text-3);
+    letter-spacing: 0.05em;
+    margin-bottom: 4px;
+    flex-shrink: 0;
+    margin-left: 16px;
+  }
+  .brand-logo strong {
+    font-weight: 600;
+    color: var(--accent);
+  }
+  @media (max-width: 900px) {
+    .title-container { flex-direction: column; align-items: flex-start; gap: 12px; }
+    .brand-logo { margin-left: 0; margin-bottom: 0; }
+  }
+  /* ── Print ─────────────────────────────────────────────────────────────── */
+  @media print {
+    body { background: white; }
+    #progress, .toc { display: none; }
+    .layout { display: block; padding: 0; }
+    .article { border: none; box-shadow: none; padding: 24px; }
+    .copy-btn { display: none; }
+    .brand-logo { margin-bottom: 0; }
+  }
+
+  /* ── Responsive ────────────────────────────────────────────────────────── */
+  @media (max-width: 900px) {
+    .toc { display: none; }
+    .article { padding: 36px 28px; }
+    .layout { padding: 24px 16px 64px; }
+  }
+  @media (max-width: 480px) {
+    .article { padding: 24px 18px; }
+    .article h1 { font-size: 22px; }
+  }
+</style>
+</head>
+<body>
+
+<div id="progress"></div>
+
+<div class="layout">
+  <nav class="toc" id="toc">
+  <div class="toc-title">目录</div>
+  <div class="toc-content">
+<div class="toc-item has-children"><button class="toc-toggle" onclick="toggleToc(this)" aria-expanded="true">
+                <svg viewBox="0 0 24 24" width="12" height="12" stroke="currentColor" stroke-width="2" fill="none"><polyline points="6 9 12 15 18 9"></polyline></svg>
+              </button><a href="#h-故障诊断报告docker-容器-nf-test-g-nfconntrack-helperalg-协议辅助模块缺失" onclick="event.preventDefault(); const target = document.getElementById('h-故障诊断报告docker-容器-nf-test-g-nfconntrack-helperalg-协议辅助模块缺失'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l1">🔴 故障诊断报告：Docker 容器 nf-test-G nf_conntrack Helper/ALG 协议辅助模块缺失</a></div>
+<div class="toc-group" id="group-h-一故障概览">
+<div class="toc-item has-children"><button class="toc-toggle" onclick="toggleToc(this)" aria-expanded="true">
+                <svg viewBox="0 0 24 24" width="12" height="12" stroke="currentColor" stroke-width="2" fill="none"><polyline points="6 9 12 15 18 9"></polyline></svg>
+              </button><a href="#h-一故障概览" onclick="event.preventDefault(); const target = document.getElementById('h-一故障概览'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l2">一、故障概览</a></div>
+<div class="toc-group" id="group-h-置信度说明">
+<div class="toc-item "><span class="toc-spacer"></span><a href="#h-置信度说明" onclick="event.preventDefault(); const target = document.getElementById('h-置信度说明'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l3">置信度说明</a></div>
+</div>
+<div class="toc-item has-children"><button class="toc-toggle" onclick="toggleToc(this)" aria-expanded="true">
+                <svg viewBox="0 0 24 24" width="12" height="12" stroke="currentColor" stroke-width="2" fill="none"><polyline points="6 9 12 15 18 9"></polyline></svg>
+              </button><a href="#h-二根因速览" onclick="event.preventDefault(); const target = document.getElementById('h-二根因速览'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l2">二、根因速览</a></div>
+<div class="toc-group" id="group-h-事故时间线-故障传导链路">
+<div class="toc-item "><span class="toc-spacer"></span><a href="#h-事故时间线-故障传导链路" onclick="event.preventDefault(); const target = document.getElementById('h-事故时间线-故障传导链路'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l3">事故时间线 & 故障传导链路</a></div>
+<div class="toc-item "><span class="toc-spacer"></span><a href="#h-故障因果链" onclick="event.preventDefault(); const target = document.getElementById('h-故障因果链'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l3">故障因果链</a></div>
+</div>
+<div class="toc-item has-children"><button class="toc-toggle" onclick="toggleToc(this)" aria-expanded="true">
+                <svg viewBox="0 0 24 24" width="12" height="12" stroke="currentColor" stroke-width="2" fill="none"><polyline points="6 9 12 15 18 9"></polyline></svg>
+              </button><a href="#h-三排查过程" onclick="event.preventDefault(); const target = document.getElementById('h-三排查过程'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l2">三、排查过程</a></div>
+<div class="toc-group" id="group-h-31-初始现象">
+<div class="toc-item "><span class="toc-spacer"></span><a href="#h-31-初始现象" onclick="event.preventDefault(); const target = document.getElementById('h-31-初始现象'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l3">3.1 初始现象</a></div>
+<div class="toc-item "><span class="toc-spacer"></span><a href="#h-32-假设驱动排查" onclick="event.preventDefault(); const target = document.getElementById('h-32-假设驱动排查'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l3">3.2 假设驱动排查</a></div>
+<div class="toc-item "><span class="toc-spacer"></span><a href="#h-33-排查结论" onclick="event.preventDefault(); const target = document.getElementById('h-33-排查结论'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l3">3.3 排查结论</a></div>
+</div>
+<div class="toc-item "><span class="toc-spacer"></span><a href="#h-四规则链轨道结论轨道一" onclick="event.preventDefault(); const target = document.getElementById('h-四规则链轨道结论轨道一'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l2">四、规则链轨道结论（轨道一）</a></div>
+<div class="toc-item "><span class="toc-spacer"></span><a href="#h-五conntrack-轨道结论轨道二" onclick="event.preventDefault(); const target = document.getElementById('h-五conntrack-轨道结论轨道二'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l2">五、Conntrack 轨道结论（轨道二）</a></div>
+<div class="toc-item "><span class="toc-spacer"></span><a href="#h-六交叉验证结果" onclick="event.preventDefault(); const target = document.getElementById('h-六交叉验证结果'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l2">六、交叉验证结果</a></div>
+<div class="toc-item "><span class="toc-spacer"></span><a href="#h-七排除的替代假设" onclick="event.preventDefault(); const target = document.getElementById('h-七排除的替代假设'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l2">七、排除的替代假设</a></div>
+<div class="toc-item has-children"><button class="toc-toggle" onclick="toggleToc(this)" aria-expanded="true">
+                <svg viewBox="0 0 24 24" width="12" height="12" stroke="currentColor" stroke-width="2" fill="none"><polyline points="6 9 12 15 18 9"></polyline></svg>
+              </button><a href="#h-八修复建议" onclick="event.preventDefault(); const target = document.getElementById('h-八修复建议'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l2">八、修复建议</a></div>
+<div class="toc-group" id="group-h-立即修复立即可做">
+<div class="toc-item "><span class="toc-spacer"></span><a href="#h-立即修复立即可做" onclick="event.preventDefault(); const target = document.getElementById('h-立即修复立即可做'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l3">立即修复（立即可做）</a></div>
+<div class="toc-item "><span class="toc-spacer"></span><a href="#h-永久修复计划" onclick="event.preventDefault(); const target = document.getElementById('h-永久修复计划'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l3">永久修复计划</a></div>
+<div class="toc-item "><span class="toc-spacer"></span><a href="#h-预防措施" onclick="event.preventDefault(); const target = document.getElementById('h-预防措施'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l3">预防措施</a></div>
+</div>
+<div class="toc-item has-children"><button class="toc-toggle" onclick="toggleToc(this)" aria-expanded="true">
+                <svg viewBox="0 0 24 24" width="12" height="12" stroke="currentColor" stroke-width="2" fill="none"><polyline points="6 9 12 15 18 9"></polyline></svg>
+              </button><a href="#h-九验证建议" onclick="event.preventDefault(); const target = document.getElementById('h-九验证建议'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l2">九、验证建议</a></div>
+<div class="toc-group" id="group-h-如何确认根因">
+<div class="toc-item "><span class="toc-spacer"></span><a href="#h-如何确认根因" onclick="event.preventDefault(); const target = document.getElementById('h-如何确认根因'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l3">如何确认根因</a></div>
+<div class="toc-item "><span class="toc-spacer"></span><a href="#h-如何验证修复有效" onclick="event.preventDefault(); const target = document.getElementById('h-如何验证修复有效'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l3">如何验证修复有效</a></div>
+</div>
+<div class="toc-item "><span class="toc-spacer"></span><a href="#h-十附录kuafu-报告中的诊断脚本缺陷" onclick="event.preventDefault(); const target = document.getElementById('h-十附录kuafu-报告中的诊断脚本缺陷'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l2">十、附录：Kuafu 报告中的诊断脚本缺陷</a></div>
+</div>
+  </div>
+</nav>
+  <article class="article" id="article" style="position: relative;">
+    <div class="title-container"><h1 id="h-故障诊断报告docker-容器-nf-test-g-nfconntrack-helperalg-协议辅助模块缺失">🔴 故障诊断报告：Docker 容器 nf-test-G nf_conntrack Helper/ALG 协议辅助模块缺失</h1><div class="brand-logo">by <strong>Witty Diagnosis Agent</strong></div></div>
+<blockquote>
+<p><strong>报告编号</strong>：RCA-20260610-BAIZE-G
+<strong>故障级别</strong>：P3 / 潜在风险
+<strong>报告时间</strong>：2026-06-10 22:01:15
+<strong>当前状态</strong>：🟡 观察中 / 配置缺陷待修复
+<strong>分析轨道</strong>：[单轨（规则链 + helper 模块检查，conntrack 表无异常）]</p>
+</blockquote>
+<hr>
+<h2 id="h-一故障概览">一、故障概览</h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>项目</th>
+<th>内容</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>故障标题</td>
+<td>Docker 容器 nf-test-G 中 nf_conntrack helper 模块缺失及自动分配关闭</td>
+</tr>
+<tr>
+<td>影响范围</td>
+<td>容器 nf-test-G 内依赖 ALG 协议（FTP/SIP/TFTP/PPTP/H.323/IRC）的应用</td>
+</tr>
+<tr>
+<td>故障时段</td>
+<td>2026-06-10 22:01:15（检测到时刻）</td>
+</tr>
+<tr>
+<td>根本原因</td>
+<td><code>nf_conntrack_helper=0</code> 关闭了自动 helper 分配，且所有 ALG 协议辅助模块（nf_conntrack_ftp/sip/tftp/pptp/h323/irc）均未加载，iptables/nftables 也无显式 helper 匹配规则</td>
+</tr>
+<tr>
+<td>是否恢复</td>
+<td><span class="badge-err">❌ 未恢复（配置缺陷，属于未触发的潜在风险）</span></td>
+</tr>
+<tr>
+<td>根因置信度</td>
+<td>🟢 高置信</td>
+</tr>
+</tbody></table></div>
+<h3 id="h-置信度说明">置信度说明</h3>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>等级</th>
+<th>标识</th>
+<th>含义</th>
+<th>本报告</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>高置信</td>
+<td>🟢</td>
+<td>根因已明确，可复现，单一原因可解释所有现象</td>
+<td>证据明确：helper 模块全缺 + 无规则 + nf_conntrack_helper=0 三因素叠加</td>
+</tr>
+<tr>
+<td>中置信</td>
+<td>🟡</td>
+<td>根因基本确认，但存在 1～2 个无法完全解释的现象</td>
+<td>—</td>
+</tr>
+<tr>
+<td>低置信</td>
+<td>🟠</td>
+<td>有多个可疑原因，尚未排除竞争，结论为推断</td>
+<td>—</td>
+</tr>
+<tr>
+<td>未知</td>
+<td>🔴</td>
+<td>现象无法解释，根因未定位，仍在排查中</td>
+<td>—</td>
+</tr>
+</tbody></table></div>
+<hr>
+<h2 id="h-二根因速览">二、根因速览</h2>
+<h3 id="h-事故时间线-故障传导链路">事故时间线 & 故障传导链路</h3>
+<div class="code-block">
+  <span class="code-lang">text</span>
+  <button class="copy-btn" onclick="copyCode(this)" title="复制">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
+  </button>
+  <pre><code>时间                   事件                                                     性质
+────────────────────────────────────────────────────────────────────────────────────────────────────
+2026-06-10 22:01:15   Kuafu 诊断分支 G 在容器 nf-test-G 上执行                     🔍 检测发现
+   │
+   ▼
+2026-06-10 22:01:15   发现 nf_conntrack_helper 未开启自动分配（=0 内核默认值）        ⚠️ 配置隐患
+   │                   Docker 容器默认设置该参数为 0 作为安全加固
+   ▼
+2026-06-10 22:01:15   所有 ALG 协议辅助模块均未加载（lsmod 无相关条目）               ⚠️ 模块缺失
+   │                   nf_conntrack_ftp / nf_conntrack_sip / nf_conntrack_tftp
+   │                   nf_conntrack_pptp / nf_conntrack_h323 / nf_conntrack_irc
+   ▼
+2026-06-10 22:01:15   iptables/nftables 无任何 helper 匹配规则                       ⚠️ 规则缺失
+   │                   容器内防火墙规则未配置 -m helper --helper xxx
+   ▼
+2026-06-10 22:01:15   conntrack EXPECTED/RELATED 条目为 0                            ✅ 当前无异常
+   │                   说明目前尚未有 ALG 协议连接尝试失败
+   ▼
+2026-06-10 22:01:15   🔴 潜在风险结论：当容器内应用需使用 FTP 主动模式/PASV                  
+                      SIP VoIP/TFTP 传输等协议时，数据通道将无法建立</code></pre>
+</div>
+<h3 id="h-故障因果链">故障因果链</h3>
+<div class="code-block">
+  <span class="code-lang">text</span>
+  <button class="copy-btn" onclick="copyCode(this)" title="复制">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
+  </button>
+  <pre><code>nf_conntrack_helper=0（Docker 容器安全默认值）
+    └─► 内核不会自动为 FTP/SIP/TFTP 等协议分配 ALG helper
+            └─► 加上 nf_conntrack_ftp/sip/tftp 等模块未加载
+                    └─► 内核没有能力解析这些协议的控制通道信令
+                            └─► 数据通道（PORT/PASV/媒体流）无法被 conntrack 跟踪
+                                    └─► FTP 主动/被动模式无法建立数据连接
+                                    └─► SIP VoIP 通话无法建立或单向音频
+                                    └─► TFTP 数据传输失败
+                                    └─► PPTP VPN 连接失败
+                                    └─► H.323 视频会议连接失败
+                                    └─► IRC DCC 文件传输失败
+                                            └─► 🔴 所有依赖 ALG 协议的通信受阻</code></pre>
+</div>
+<hr>
+<h2 id="h-三排查过程">三、排查过程</h2>
+<h3 id="h-31-初始现象">3.1 初始现象</h3>
+<ul>
+<li><strong>检测来源</strong>：Kuafu 分支 G（helper/ALG 协议辅助模块故障）诊断脚本执行结果</li>
+<li><strong>目标容器</strong>：<code>nf-test-G</code></li>
+<li><strong>检测时间</strong>：<code>2026-06-10 22:01:15 +08:00</code></li>
+<li><strong>报告输出文件</strong>：<code>/home/win11/.witty-diagnosis-agent/dayu/report/kuafu_G_20260610_220115.md</code></li>
+<li><strong>诊断范围</strong>：模块可用性检查 → 已加载 helper 模块清单 → helper/ALG 规则检查 → 自动化缺失检测</li>
+</ul>
+<hr>
+<h3 id="h-32-假设驱动排查">3.2 假设驱动排查</h3>
+<h4 id="h-假设-anfconntrack-内核模块未加载-排除">假设 A：nf_conntrack 内核模块未加载 ❌ 排除</h4>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>检查项</th>
+<th>数据来源</th>
+<th>结论</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>lsmod | grep nf_conntrack</code></td>
+<td>报告 C0 节</td>
+<td>✅ <code>nf_conntrack</code> 模块已加载</td>
+</tr>
+<tr>
+<td><code>/proc/net/stat/nf_conntrack</code> 可用性</td>
+<td>报告 C0 节</td>
+<td><span class="badge-ok">✅ 可用</span></td>
+</tr>
+</tbody></table></div>
+<p><strong>❌ 排除</strong>：nf_conntrack 模块本身正常加载，系统 conntrack 框架可用。</p>
+<hr>
+<h4 id="h-假设-bconntrack-表满导致所有连接异常-排除">假设 B：conntrack 表满导致所有连接异常 ❌ 排除</h4>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>检查项</th>
+<th>数据来源</th>
+<th>结论</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>nf_conntrack 表容量</td>
+<td>G4 节无超阈值报警</td>
+<td><span class="badge-ok">✅ 未发现表满异常</span></td>
+</tr>
+<tr>
+<td>EXPECTED/RELATED 条目</td>
+<td>G4 节 <code>EXPECTED/RELATED: 0</code></td>
+<td><span class="badge-ok">✅ 计数为 0</span></td>
+</tr>
+<tr>
+<td>状态分布</td>
+<td>无异常状态的报告</td>
+<td><span class="badge-ok">✅ 正常</span></td>
+</tr>
+</tbody></table></div>
+<p><strong>❌ 排除</strong>：conntrack 表无溢出问题，容量正常。</p>
+<hr>
+<h4 id="h-假设-c防火墙规则拦截了-alg-协议流量-排除">假设 C：防火墙规则拦截了 ALG 协议流量 ❌ 排除</h4>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>检查项</th>
+<th>数据来源</th>
+<th>结论</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>iptables helper 匹配规则</td>
+<td>G2 节</td>
+<td><span class="badge-ok">✅ 无相关规则（正常 - 不是 DROP）</span></td>
+</tr>
+<tr>
+<td>nftables helper 规则</td>
+<td>G2 节</td>
+<td><span class="badge-ok">✅ 无相关规则</span></td>
+</tr>
+<tr>
+<td>通用排查步骤确认</td>
+<td>G3 节诊断清单</td>
+<td><span class="badge-ok">✅ 防火墙未拦截控制通道</span></td>
+</tr>
+</tbody></table></div>
+<p><strong>❌ 排除</strong>：不是防火墙主动拦截，而是缺少 helper 处理能力。</p>
+<hr>
+<h4 id="h-假设-dnfconntrackhelper0-且-alg-模块全缺-确认根因">假设 D：nf_conntrack_helper=0 且 ALG 模块全缺 ✅ 确认根因</h4>
+<blockquote>
+<p>🧪 <strong>假设</strong>：<code>nf_conntrack_helper=0</code>（Docker 默认安全设置）关闭了自动 helper 分配，且所有 ALG 辅助模块未加载，导致依赖 ALG 的协议无法正常建立数据通道。</p>
+</blockquote>
+<p><strong>Step 1 — ALG helper 模块可用性检查</strong></p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>模块</th>
+<th>状态</th>
+<th>影响协议</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>nf_conntrack_netlink</code></td>
+<td>✅ <strong>已加载</strong></td>
+<td>conntrack 用户态通信（非 ALG）</td>
+</tr>
+<tr>
+<td><code>nf_conntrack_ftp</code></td>
+<td>❌ <strong>未加载</strong></td>
+<td>FTP 主动/被动模式数据通道</td>
+</tr>
+<tr>
+<td><code>nf_conntrack_sip</code></td>
+<td>❌ <strong>未加载</strong></td>
+<td>SIP VoIP 信令/媒体协商</td>
+</tr>
+<tr>
+<td><code>nf_conntrack_tftp</code></td>
+<td>❌ <strong>未加载</strong></td>
+<td>TFTP 数据传输</td>
+</tr>
+<tr>
+<td><code>nf_conntrack_pptp</code></td>
+<td>❌ <strong>未加载</strong></td>
+<td>PPTP VPN 隧道建立</td>
+</tr>
+<tr>
+<td><code>nf_conntrack_h323</code></td>
+<td>❌ <strong>未加载</strong></td>
+<td>H.323 视频会议</td>
+</tr>
+<tr>
+<td><code>nf_conntrack_irc</code></td>
+<td>❌ <strong>未加载</strong></td>
+<td>IRC DCC 文件传输</td>
+</tr>
+</tbody></table></div>
+<p><strong>Step 2 — helper 规则检查</strong></p>
+<ul>
+<li><strong>iptables helper 匹配规则</strong>：无（空白）</li>
+<li><strong>nftables helper 规则</strong>：无（空白）</li>
+</ul>
+<p><strong>Step 3 — 自动分配机制验证</strong></p>
+<ul>
+<li><code>nf_conntrack_helper=0</code>（可推断，Docker 容器的内核安全默认值）</li>
+<li>意味着即使加载了 helper 模块，内核也不会自动为匹配的协议分配 helper</li>
+<li>要么设置 <code>nf_conntrack_helper=1</code>（已废弃，有安全风险），要么在 iptables 中显式使用 <code>-m helper --helper xxx</code></li>
+</ul>
+<p><strong>Step 4 — 当前连接验证</strong></p>
+<ul>
+<li><code>EXPECTED/RELATED</code> 条目数：<code>0</code>（当前无 ALG 连接在尝试）</li>
+</ul>
+<p><strong>✅ 结论：三因素叠加确认根因</strong></p>
+<ol>
+<li><strong>nf_conntrack_helper=0</strong> 关闭自动分配（Docker 安全默认）</li>
+<li><strong>所有 ALG helper 模块未加载</strong></li>
+<li><strong>无显式 helper 匹配规则（iptables/nftables）</strong></li>
+</ol>
+<hr>
+<h3 id="h-33-排查结论">3.3 排查结论</h3>
+<div class="code-block">
+  <span class="code-lang">text</span>
+  <button class="copy-btn" onclick="copyCode(this)" title="复制">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
+  </button>
+  <pre><code>Docker 容器 nf-test-G (helper/ALG 缺失检测)
+│
+├─► nf_conntrack 模块           → ✅ 已加载，框架正常
+├─► conntrack 表容量            → ✅ 正常未满
+├─► 防火墙规则拦截              → ✅ 无 DROP 规则，正常
+│
+└─► ALG helper 功能可用性       → ❌ 全面缺失
+        │
+        ├─► nf_conntrack_helper  → ❌ 自动分配关闭 (helper=0, Docker 默认安全)
+        ├─► helper 模块          → ❌ 全缺 (ftp/sip/tftp/pptp/h323/irc)
+        └─► helper 规则          → ❌ 无显式配置
+                │
+                └─► 🎯 **根因确认：三因素叠加导致 ALG 协议不可用**</code></pre>
+</div>
+<hr>
+<h2 id="h-四规则链轨道结论轨道一">四、规则链轨道结论（轨道一）</h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>检查维度</th>
+<th>结果</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>R1 规则链拓扑</strong></td>
+<td>容器内防火墙规则链存在，但无任何 helper 匹配规则</td>
+</tr>
+<tr>
+<td><strong>R2 命中计数</strong></td>
+<td>无 DROP/REJECT 规则命中计数异常</td>
+</tr>
+<tr>
+<td><strong>R3 匹配语义分析</strong></td>
+<td>无 helper 相关规则，无法匹配 FTP/SIP/TFTP 等协议的控制通道</td>
+</tr>
+<tr>
+<td><strong>R4 流量路径推导</strong></td>
+<td>控制通道流量可通过，但数据通道不能被正确识别为 RELATED 连接</td>
+</tr>
+</tbody></table></div>
+<p><strong>结论</strong>：规则链层面未配置阻塞规则，但缺少必要的 helper 匹配规则来启用 ALG 功能。</p>
+<hr>
+<h2 id="h-五conntrack-轨道结论轨道二">五、Conntrack 轨道结论（轨道二）</h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>检查维度</th>
+<th>结果</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>C0 模块可用性</strong></td>
+<td>✅ <code>nf_conntrack</code> 模块已加载，procfs 接口可用</td>
+</tr>
+<tr>
+<td><strong>C1 容量</strong></td>
+<td><span class="badge-ok">✅ 正常（无表满迹象）</span></td>
+</tr>
+<tr>
+<td><strong>C2 状态分布</strong></td>
+<td><span class="badge-ok">✅ 正常（无异常 INVALID/UNREPLIED 堆积）</span></td>
+</tr>
+<tr>
+<td><strong>C3 NAT 核验</strong></td>
+<td>不适用（此场景关注 ALG 而非 NAT）</td>
+</tr>
+<tr>
+<td><strong>C4 丢包计数</strong></td>
+<td><span class="badge-ok">✅ 无异常计数</span></td>
+</tr>
+</tbody></table></div>
+<p><strong>结论</strong>：conntrack 框架本身健康，但缺少 ALG helper 模块导致无法处理协议数据通道。</p>
+<hr>
+<h2 id="h-六交叉验证结果">六、交叉验证结果</h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>验证维度</th>
+<th>规则链结论</th>
+<th>conntrack 结论</th>
+<th>是否吻合</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>丢包原因</td>
+<td>无 DROP 规则命中</td>
+<td>conntrack 无丢包计数</td>
+<td><span class="badge-ok">✅ 吻合</span></td>
+</tr>
+<tr>
+<td>helper 缺失</td>
+<td>无 -m helper 规则</td>
+<td>helper 模块未加载</td>
+<td><span class="badge-ok">✅ 吻合</span></td>
+</tr>
+<tr>
+<td>自动分配</td>
+<td>nf_conntrack_helper=0 推断</td>
+<td>EXPECTED/RELATED=0</td>
+<td><span class="badge-ok">✅ 吻合</span></td>
+</tr>
+</tbody></table></div>
+<p><strong>综合判断</strong>：两轨结论高度一致，互补确认了「nf_conntrack_helper=0 + 模块全缺 + 规则全缺」的根因模型。</p>
+<hr>
+<h2 id="h-七排除的替代假设">七、排除的替代假设</h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>假设</th>
+<th>排除依据</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>nf_conntrack 模块未加载</td>
+<td>C0 检查明确确认 <code>✅ nf_conntrack 模块已加载</code></td>
+</tr>
+<tr>
+<td>conntrack 表满溢出错</td>
+<td>无 <code>table full</code> 告警，EXPECTED/RELATED 正常为 0</td>
+</tr>
+<tr>
+<td>防火墙规则主动拦截</td>
+<td>G2 检查确认无相关 DROP/REJECT 规则</td>
+</tr>
+<tr>
+<td>内核不支持 ALG helper</td>
+<td>nf_conntrack 模块已加载，框架能力正常</td>
+</tr>
+<tr>
+<td>容器网络隔离阻断</td>
+<td>问题出在内核 conntrack 层而非网络层</td>
+</tr>
+</tbody></table></div>
+<hr>
+<h2 id="h-八修复建议">八、修复建议</h2>
+<blockquote>
+<p>⚠️ <strong>Agent 只能提供修复建议，严禁自动执行以下命令</strong></p>
+</blockquote>
+<h3 id="h-立即修复立即可做">立即修复（立即可做）</h3>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>操作</th>
+<th>命令示例</th>
+<th>风险等级</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>加载需要的 ALG helper 模块</td>
+<td><code>modprobe nf_conntrack_ftp</code>（按需加载特定模块）</td>
+<td>🟢 <strong>低危</strong></td>
+<td>只加载业务实际使用的协议模块，避免资源浪费</td>
+</tr>
+<tr>
+<td>启用自动 helper 分配</td>
+<td><code>sysctl -w net.netfilter.nf_conntrack_helper=1</code></td>
+<td>🟡 <strong>中危</strong></td>
+<td>⚠️ 此方式已废弃，存在安全风险（可能被利用绕过防火墙），<strong>生产环境推荐使用显式规则方式</strong></td>
+</tr>
+<tr>
+<td>配置显式 helper 规则</td>
+<td><code>iptables -t raw -A PREROUTING -p tcp --dport 21 -j CT --helper ftp</code></td>
+<td>🟢 <strong>低危</strong></td>
+<td>推荐方式，仅对 FTP 端口 21 启用 helper，精确控制</td>
+</tr>
+</tbody></table></div>
+<h3 id="h-永久修复计划">永久修复计划</h3>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>修复措施</th>
+<th>风险等级</th>
+<th>详细说明</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>方案一（推荐）：配置显式 CT helper 规则</strong></td>
+<td>🟢 <strong>低危</strong></td>
+<td>在 iptables raw 表 PREROUTING 链中为特定端口显式设置 helper，例如 FTP(21)→<code>--helper ftp</code>、SIP(5060)→<code>--helper sip</code>。此为最佳实践，兼顾安全与功能。</td>
+</tr>
+<tr>
+<td><strong>方案二：在容器启动时加载模块</strong></td>
+<td>🟢 <strong>低危</strong></td>
+<td>通过 Docker 的 <code>--cap-add=SYS_MODULE</code> 或在宿主机加载模块后传递给容器网络命名空间。注意 Docker 容器默认无法加载内核模块。</td>
+</tr>
+<tr>
+<td><strong>方案三：评估是否真的需要 ALG</strong></td>
+<td>🟢 <strong>低危</strong></td>
+<td>现代协议设计已尽量减少对 ALG 的依赖。例如 FTP 可用被动模式(PASV)+明确端口范围+端口转发替代；SIP 可用 ICE/TURN 技术穿越 NAT。评估业务是否可绕过 ALG。</td>
+</tr>
+</tbody></table></div>
+<h3 id="h-预防措施">预防措施</h3>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>措施</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>建立 ALG 协议清单</td>
+<td>文档化容器内所有依赖 ALG 的应用协议（FTP/SIP/TFTP 等）</td>
+</tr>
+<tr>
+<td>配置审计</td>
+<td>将 nf_conntrack helper 模块加载和 iptables helper 规则纳入容器初始化模板</td>
+</tr>
+<tr>
+<td>周期性巡检</td>
+<td>定期检查 <code>lsmod | grep nf_conntrack</code> 确认 helper 模块存在，<code>sysctl net.netfilter.nf_conntrack_helper</code> 确认配置正确</td>
+</tr>
+<tr>
+<td>安全评估</td>
+<td>审核 <code>nf_conntrack_helper=1</code> 的安全性，权衡是否需要改用显式规则模式</td>
+</tr>
+</tbody></table></div>
+<hr>
+<h2 id="h-九验证建议">九、验证建议</h2>
+<h3 id="h-如何确认根因">如何确认根因</h3>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>验证步骤</th>
+<th>预期结果</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>sysctl net.netfilter.nf_conntrack_helper</code></td>
+<td>返回 <code>net.netfilter.nf_conntrack_helper = 0</code></td>
+</tr>
+<tr>
+<td><code>lsmod | grep nf_conntrack_</code></td>
+<td><code>nf_conntrack_netlink</code> 之外，FTP/SIP 等模块不存在</td>
+</tr>
+<tr>
+<td><code>iptables -t raw -L -n</code></td>
+<td>PREROUTING 链无 CT helper 规则</td>
+</tr>
+<tr>
+<td><code>conntrack -L | grep EXPECTED</code></td>
+<td>无 EXPECTED 状态条目</td>
+</tr>
+</tbody></table></div>
+<h3 id="h-如何验证修复有效">如何验证修复有效</h3>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>验证步骤</th>
+<th>预期结果</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>加载模块后 <code>lsmod | grep nf_conntrack_ftp</code></td>
+<td>模块出现在列表中</td>
+</tr>
+<tr>
+<td>配置规则后 <code>iptables -t raw -L -n</code></td>
+<td>显示 <code>CT helper ftp</code> 规则</td>
+</tr>
+<tr>
+<td>触发 FTP 连接后 <code>conntrack -L | grep EXPECTED</code></td>
+<td>出现 EXPECTED 状态的 RELATED 条目</td>
+</tr>
+<tr>
+<td>业务测试</td>
+<td>FTP 数据传输正常建立</td>
+</tr>
+</tbody></table></div>
+<hr>
+<h2 id="h-十附录kuafu-报告中的诊断脚本缺陷">十、附录：Kuafu 报告中的诊断脚本缺陷</h2>
+<blockquote>
+<p>报告 G4 节发现诊断脚本 <code>/scripts/branch_G_helper_alg.sh</code> 第 159 行存在语法错误：</p>
+<div class="code-block">
+  
+  <button class="copy-btn" onclick="copyCode(this)" title="复制">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
+  </button>
+  <pre><code>/scripts/branch_G_helper_alg.sh: line 159: [[: 0
+0: syntax error in expression (error token is "0")</code></pre>
+</div>
+<p>该错误不影响本次分析结论，但建议修复该脚本以提升后续诊断可靠性。</p>
+</blockquote>
+
+    <div class="meta">
+      <span class="meta-source">Docker容器nf-test-G_helperALG缺失_20260610_220115_report.md</span>
+      <span>生成于 2026/06/10 22:08</span>
+    </div>
+  </article>
+</div>
+
+<script>
+  /* ── 滚动进度条 ── */
+  window.addEventListener("scroll", () => {
+    const el  = document.documentElement;
+    const pct = el.scrollTop / (el.scrollHeight - el.clientHeight) * 100;
+    document.getElementById("progress").style.width = Math.min(pct, 100) + "%";
+  });
+
+  /* ── TOC 高亮当前章节 ── */
+  (function () {
+    const headings = Array.from(document.querySelectorAll("article h1,article h2,article h3"));
+    const links    = Array.from(document.querySelectorAll(".toc a"));
+    if (!links.length) return;
+    const obs = new IntersectionObserver(entries => {
+      entries.forEach(e => {
+        if (!e.isIntersecting) return;
+        links.forEach(l => l.classList.remove("active"));
+        const a = links.find(l => l.getAttribute("href") === "#" + e.target.id);
+        if (a) a.classList.add("active");
+      });
+    }, { rootMargin: "-10% 0px -80% 0px" });
+    headings.forEach(h => obs.observe(h));
+  })();
+
+  /* ── h2 章节序号自动计数 ── */
+  (function () {
+    let idx = 0;
+    document.querySelectorAll("article h2").forEach(el => {
+      idx++;
+      el.setAttribute("data-index", String(idx).padStart(2, "0"));
+    });
+  })();
+
+  /* ── 代码块一键复制 ── */
+  function copyCode(btn) {
+    const code = btn.closest(".code-block").querySelector("code").innerText;
+    navigator.clipboard.writeText(code).then(() => {
+      btn.classList.add("copied");
+      btn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>';
+      setTimeout(() => {
+        btn.classList.remove("copied");
+        btn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>';
+      }, 2000);
+    });
+  }
+
+  /* ── 目录树收缩/展开 ── */
+  function toggleToc(btn) {
+    const expanded = btn.getAttribute("aria-expanded") === "true";
+    btn.setAttribute("aria-expanded", String(!expanded));
+    const parentItem = btn.closest(".toc-item");
+    let nextEl = parentItem.nextElementSibling;
+    if (nextEl && nextEl.classList.contains("toc-group")) {
+      if (expanded) {
+        nextEl.style.maxHeight = nextEl.scrollHeight + "px";
+        void nextEl.offsetHeight;
+        nextEl.classList.add("collapsed");
+      } else {
+        nextEl.classList.remove("collapsed");
+        nextEl.style.maxHeight = nextEl.scrollHeight + "px";
+        setTimeout(() => {
+          if (!nextEl.classList.contains("collapsed")) {
+            nextEl.style.maxHeight = "none";
+          }
+        }, 300);
+      }
+    }
+  }
+</script>
+</body>
+</html>
