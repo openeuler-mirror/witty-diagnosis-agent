@@ -15,7 +15,6 @@ test/kernel-io-uring-diagnosis/
 │   └── src/
 │       └── io_uring_fault_probe.c
 └── reports/
-    ├── sample_report.md
     └── *_report.md / *_report.html
 ```
 
