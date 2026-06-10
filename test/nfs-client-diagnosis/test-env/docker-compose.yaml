@@ -1,0 +1,47 @@
+# NFS 客户端故障诊断 — 故障注入测试环境
+
+services:
+  nfs-server:
+    build:
+      context: ./container/server
+      dockerfile: Dockerfile
+    container_name: nfs-fault-server
+    privileged: true
+    networks:
+      nfs-test-net:
+        aliases:
+          - nfs-server
+    volumes:
+      - nfs-exports:/exports
+
+  nfs-client:
+    build:
+      context: ./container/client
+      dockerfile: Dockerfile
+    container_name: nfs-fault-client
+    privileged: true
+    networks:
+      - nfs-test-net
+    depends_on:
+      - nfs-server
+    volumes:
+      # 将诊断脚本目录挂载到客户端容器中（只读）
+      - type: bind
+        # 直接引用 skill 目录的原始诊断脚本，无拷贝
+        source: ../../skills/nfs-client-diagnosis/scripts
+        target: /diagnosis-scripts
+        read_only: true
+    environment:
+      - SERVER_HOST=nfs-server
+      - EXPORT_DIR=/exports
+      - MOUNT_DIR=/mnt/nfs-test
+
+networks:
+  nfs-test-net:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.31.254.0/24
+
+volumes:
+  nfs-exports:
