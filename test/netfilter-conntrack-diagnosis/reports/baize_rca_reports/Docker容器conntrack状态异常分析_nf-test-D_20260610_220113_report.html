@@ -1,0 +1,1275 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Docker 容器 nf-test-D conntrack 状态异常故障诊断报告</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Lora:ital,wght@0,400;0,600;1,400&family=Source+Sans+3:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  /* ── Design tokens ─────────────────────────────────────────────────────── */
+  :root {
+    --bg:          #f8f7f4;
+    --surface:     #ffffff;
+    --border:      #e8e5df;
+    --border-soft: #f0ede8;
+
+    --text:        #1c1917;
+    --text-2:      #57534e;
+    --text-3:      #a8a29e;
+
+    --accent:      #1d4e6e;
+    --accent-light:#e8f1f7;
+    --accent-mid:  #3b82a0;
+
+    --red:         #c0392b;
+    --red-bg:      #fef2f2;
+    --amber:       #92400e;
+    --amber-bg:    #fffbeb;
+    --green:       #14532d;
+    --green-bg:    #f0fdf4;
+
+    --code-bg:     #1a1d27;
+    --code-text:   #cdd6f4;
+    --code-border: #2d3148;
+
+    --font-body: "Source Sans 3", "PingFang SC", "Hiragino Sans GB", sans-serif;
+    --font-head: "Lora", "PingFang SC", Georgia, serif;
+    --font-mono: "JetBrains Mono", "Fira Code", Consolas, monospace;
+
+    --radius:    8px;
+    --radius-lg: 12px;
+    --shadow:    0 1px 3px rgba(0,0,0,.06), 0 4px 16px rgba(0,0,0,.05);
+    --shadow-lg: 0 2px 8px rgba(0,0,0,.07), 0 8px 32px rgba(0,0,0,.06);
+
+    --toc-width:   240px;
+    --gap:         32px;
+  }
+
+  /* ── Progress bar ──────────────────────────────────────────────────────── */
+  #progress {
+    position: fixed; top: 0; left: 0; height: 3px; width: 0%;
+    background: linear-gradient(90deg, var(--accent-mid), var(--accent));
+    z-index: 999; transition: width .1s linear;
+    border-radius: 0 2px 2px 0;
+  }
+
+  /* ── Base ──────────────────────────────────────────────────────────────── */
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  html { font-size: 16px; scroll-behavior: smooth; }
+  body {
+    font-family: var(--font-body);
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.8;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* ── Layout ────────────────────────────────────────────────────────────── */
+  .layout {
+    display: flex;
+    align-items: flex-start;
+    max-width: calc(var(--toc-width) + 820px + var(--gap) * 3);
+    margin: 0 auto;
+    padding: 48px var(--gap) 96px;
+    gap: var(--gap);
+  }
+
+  /* ── TOC ───────────────────────────────────────────────────────────────── */
+  .toc {
+    width: var(--toc-width);
+    flex-shrink: 0;
+    position: sticky;
+    top: 32px;
+    max-height: calc(100vh - 64px);
+    overflow-y: auto;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    padding: 20px;
+    box-shadow: var(--shadow);
+    scrollbar-width: thin;
+    scrollbar-color: var(--border) transparent;
+  }
+  .toc-title {
+    font-size: 10.5px;
+    font-weight: 600;
+    letter-spacing: .1em;
+    text-transform: uppercase;
+    color: var(--text-3);
+    margin-bottom: 12px;
+    padding-bottom: 10px;
+    border-bottom: 1px solid var(--border-soft);
+  }
+  .toc-item {
+    display: flex;
+    align-items: flex-start;
+    margin: 2px 0;
+  }
+  .toc-toggle {
+    background: none;
+    border: none;
+    cursor: pointer;
+    color: var(--text-3);
+    padding: 4px;
+    margin-right: 4px;
+    margin-top: 2px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 4px;
+    transition: background 0.2s, transform 0.2s;
+  }
+  .toc-toggle:hover { background: var(--border-soft); color: var(--text); }
+  .toc-toggle[aria-expanded="false"] svg { transform: rotate(-90deg); }
+  .toc-spacer { width: 20px; flex-shrink: 0; }
+  .toc-group { overflow: hidden; transition: max-height 0.3s ease-in-out; }
+  .toc-group.collapsed { max-height: 0 !important; }
+  
+  .toc a {
+    display: block;
+    font-size: 13px;
+    color: var(--text-2);
+    text-decoration: none;
+    padding: 4px 8px;
+    border-radius: 5px;
+    line-height: 1.45;
+    transition: background .15s, color .15s;
+    word-break: break-all;
+    flex-grow: 1;
+  }
+  .toc a:hover  { background: var(--accent-light); color: var(--accent); }
+  .toc a.active { background: var(--accent-light); color: var(--accent); font-weight: 500; }
+  .toc-l1 { font-weight: 600; color: var(--text); }
+  .toc-l2 { font-weight: 600; color: var(--text); }
+  .toc-l3 { font-size: 12px !important; padding-left: 14px !important; }
+
+  /* ── Article card ──────────────────────────────────────────────────────── */
+  .article {
+    flex: 1; min-width: 0;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    padding: 52px 60px;
+    box-shadow: var(--shadow-lg);
+  }
+
+  /* ── Headings ──────────────────────────────────────────────────────────── */
+  .title-container {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-end;
+    margin: 0 0 28px;
+    padding-bottom: 18px;
+    border-bottom: 2px solid var(--text);
+  }
+  .article h1 {
+    font-family: var(--font-head);
+    font-size: 26px; font-weight: 600; line-height: 1.3;
+    margin: 0; padding-bottom: 0;
+    border-bottom: none;
+  }
+  .article h2 {
+    font-family: var(--font-head);
+    font-size: 19px; font-weight: 600;
+    margin: 48px 0 14px; padding-bottom: 8px;
+    border-bottom: 1px solid var(--border);
+  }
+  .article h2::before {
+    content: attr(data-index);
+    display: inline-block;
+    font-family: var(--font-mono);
+    font-size: 10.5px; font-weight: 500;
+    color: var(--accent-mid);
+    background: var(--accent-light);
+    padding: 1px 7px; border-radius: 4px;
+    margin-right: 10px; vertical-align: middle;
+    letter-spacing: .05em;
+  }
+  .article h3 {
+    font-family: var(--font-head);
+    font-size: 15.5px; font-weight: 600;
+    margin: 28px 0 10px;
+  }
+  .article h3::before {
+    content: "§ ";
+    color: var(--text-3);
+    font-family: var(--font-mono); font-size: 13px;
+  }
+  .article h4 {
+    font-size: 13.5px; font-weight: 600;
+    color: var(--accent); margin: 20px 0 8px;
+  }
+
+  /* ── Body text ─────────────────────────────────────────────────────────── */
+  .article p, .plain { 
+    font-size: 15px; 
+    line-height: 1.85; 
+    color: var(--text); 
+    margin: 0 0 12px; 
+    font-family: var(--font-body);
+  }
+  .article strong { font-weight: 600; }
+  .article em     { font-style: italic; color: var(--text-2); }
+  .article a {
+    color: var(--accent); text-decoration: underline;
+    text-decoration-color: var(--accent-light);
+    text-underline-offset: 3px;
+  }
+  .article a:hover { text-decoration-color: var(--accent); }
+  .article hr { border: none; border-top: 1px solid var(--border); margin: 20px 0; }
+  .article hr.heavy { border-top: 3px solid var(--text); margin: 32px 0; }
+
+  /* ── Blockquote ────────────────────────────────────────────────────────── */
+  .article blockquote {
+    border-left: 3px solid var(--accent-mid);
+    background: var(--accent-light);
+    margin: 20px 0; padding: 13px 20px 13px 20px;
+    border-radius: 0 var(--radius) var(--radius) 0;
+  }
+  .article blockquote p { font-size: 14.5px; color: var(--accent); margin: 0; line-height: 1.7; }
+  /* 支持块引用内部保留换行符（修复头部概要换行丢失问题） */
+  .article blockquote p { white-space: pre-wrap; }
+  .article blockquote strong { color: var(--accent); }
+
+  /* ── Lists ─────────────────────────────────────────────────────────────── */
+  .article ul, .article ol { padding-left: 22px; margin: 6px 0 14px; }
+  .article li { font-size: 15px; line-height: 1.8; margin: 4px 0; }
+  .article li::marker { color: var(--accent-mid); }
+  .article li > ul, .article li > ol { margin: 3px 0; }
+
+  /* ── Inline code ───────────────────────────────────────────────────────── */
+  .article :not(pre) > code {
+    font-family: var(--font-mono);
+    font-size: 12.5px; font-weight: 500;
+    background: #f3f0eb; color: var(--red);
+    padding: 1px 5px; border-radius: 4px;
+    border: 1px solid var(--border);
+  }
+
+  /* ── Code blocks ───────────────────────────────────────────────────────── */
+  .code-block {
+    position: relative; margin: 20px 0;
+    border-radius: var(--radius-lg); overflow: hidden;
+    border: 1px solid var(--code-border);
+    box-shadow: 0 4px 20px rgba(0,0,0,.16);
+  }
+  .code-lang {
+    position: absolute; top: 0; left: 0;
+    font-family: var(--font-mono); font-size: 10px; font-weight: 500;
+    color: #7c8db5; background: #222538;
+    padding: 4px 12px; border-bottom-right-radius: 6px;
+    text-transform: uppercase; letter-spacing: .08em;
+    user-select: none;
+  }
+  .copy-btn {
+    position: absolute; top: 8px; right: 10px;
+    background: #2d3148; border: 1px solid #3d4260;
+    border-radius: 5px; color: #7c8db5; cursor: pointer;
+    padding: 5px 8px; display: flex; align-items: center;
+    transition: background .15s, color .15s; z-index: 1;
+  }
+  .copy-btn:hover  { background: #3a3f60; color: #cdd6f4; }
+  .copy-btn.copied { color: #a6e3a1; border-color: #4a6a4a; }
+  .code-block pre {
+    margin: 0; padding: 36px 20px 20px;
+    background: var(--code-bg); overflow-x: auto;
+    scrollbar-width: thin; scrollbar-color: #3d4260 transparent;
+  }
+  .code-block pre::-webkit-scrollbar { height: 5px; }
+  .code-block pre::-webkit-scrollbar-thumb { background: #3d4260; border-radius: 3px; }
+  .code-block code {
+    font-family: var(--font-mono); font-size: 13px; line-height: 1.7;
+    color: var(--code-text); background: none; border: none; padding: 0;
+    white-space: pre; word-break: normal;
+  }
+
+  /* ── Tables ────────────────────────────────────────────────────────────── */
+  .table-wrap {
+    overflow-x: auto; margin: 16px 0;
+    border-radius: var(--radius-lg);
+    border: 1px solid var(--border);
+    box-shadow: var(--shadow);
+  }
+  table { width: 100%; border-collapse: collapse; font-size: 14px; min-width: 360px; }
+  thead { background: #f4f2ee; }
+  th {
+    padding: 9px 14px; text-align: left;
+    font-size: 11.5px; font-weight: 600;
+    letter-spacing: .04em; text-transform: uppercase;
+    color: var(--text-2); border-bottom: 1px solid var(--border);
+    white-space: nowrap;
+  }
+  td {
+    padding: 8px 14px; border-bottom: 1px solid var(--border-soft);
+    color: var(--text); vertical-align: top; line-height: 1.6;
+  }
+  tbody tr:last-child td { border-bottom: none; }
+  tbody tr:nth-child(even) td { background: #faf9f7; }
+  tbody tr:hover td { background: var(--accent-light); transition: background .1s; }
+
+  /* ── KV block ──────────────────────────────────────────────────────────── */
+  .kv-block { background: var(--bg); border: 1px solid var(--border); border-radius: var(--radius-lg); overflow: hidden; margin: 12px 0 20px; }
+  .kv-row { display: flex; border-bottom: 1px solid var(--border-soft); align-items: flex-start; }
+  .kv-row:last-child { border-bottom: none; }
+  .kv-key { flex: 0 0 160px; padding: 9px 16px; font-size: 13.5px; font-weight: 600; color: var(--text-2); background: var(--surface); border-right: 1px solid var(--border-soft); }
+  .kv-val { flex: 1; padding: 9px 16px; font-size: 14px; color: var(--text); }
+
+  /* ── Status badges ─────────────────────────────────────────────────────── */
+  .badge-ok { display: inline-flex; align-items: center; gap: 4px; background: var(--green-bg); color: var(--green); font-size: 13px; font-weight: 500; padding: 2px 9px; border-radius: 20px; border: 1px solid #bbf7d0; }
+  .badge-err { display: inline-flex; align-items: center; gap: 4px; background: var(--red-bg); color: var(--red); font-size: 13px; font-weight: 500; padding: 2px 9px; border-radius: 20px; border: 1px solid #fecaca; }
+  .badge-warn { display: inline-flex; align-items: center; gap: 4px; background: var(--amber-bg); color: var(--amber); font-size: 13px; font-weight: 500; padding: 2px 9px; border-radius: 20px; border: 1px solid #fde68a; }
+
+  /* ── Priority badges ───────────────────────────────────────────────────── */
+  .pri-p0 { display: inline-block; background: #fef2f2; color: #991b1b; border: 1px solid #fca5a5; font-size: 12px; font-weight: 700; padding: 2px 8px; border-radius: 4px; letter-spacing: .04em; }
+  .pri-p1 { display: inline-block; background: #fff7ed; color: #9a3412; border: 1px solid #fdba74; font-size: 12px; font-weight: 700; padding: 2px 8px; border-radius: 4px; }
+  .pri-p2 { display: inline-block; background: #fffbeb; color: #92400e; border: 1px solid #fde68a; font-size: 12px; font-weight: 700; padding: 2px 8px; border-radius: 4px; }
+  .pri-p3 { display: inline-block; background: var(--accent-light); color: var(--accent); border: 1px solid #bfdbfe; font-size: 12px; font-weight: 700; padding: 2px 8px; border-radius: 4px; }
+
+  /* ── Fault header ──────────────────────────────────────────────────────── */
+  .fault-header { display: flex; align-items: center; gap: 12px; padding: 12px 16px; border-radius: var(--radius-lg); margin: 16px 0 8px; border: 1px solid; }
+  .fh-p0 { background: #fef2f2; border-color: #fca5a5; }
+  .fh-p1 { background: #fff7ed; border-color: #fdba74; }
+  .fh-p2 { background: #fffbeb; border-color: #fde68a; }
+  .fh-p3 { background: var(--accent-light); border-color: #bfdbfe; }
+  .fh-badge { font-family: var(--font-mono); font-size: 11px; font-weight: 700; letter-spacing: .08em; }
+  .fh-p0 .fh-badge { color: #991b1b; }
+  .fh-p1 .fh-badge { color: #9a3412; }
+  .fh-p2 .fh-badge { color: #92400e; }
+  .fh-p3 .fh-badge { color: var(--accent); }
+  .fh-rest { font-size: 14px; font-weight: 500; color: var(--text); }
+
+  /* ── Timeline ──────────────────────────────────────────────────────────── */
+  .timeline { border-left: 2px solid var(--accent-mid); margin: 16px 0 16px 8px; padding-left: 20px; }
+  .tl-row { display: flex; align-items: baseline; gap: 10px; margin: 8px 0; font-size: 13.5px; }
+  .tl-ts { font-family: var(--font-mono); font-size: 12px; color: var(--text-3); flex-shrink: 0; white-space: nowrap; }
+  .tl-tag { font-size: 11px; font-weight: 600; padding: 1px 7px; border-radius: 10px; flex-shrink: 0; background: var(--accent-light); color: var(--accent); }
+  .tl-tag.err { background: var(--red-bg); color: var(--red); }
+  .tl-tag.warn { background: var(--amber-bg); color: var(--amber); }
+  .tl-desc { color: var(--text); line-height: 1.5; }
+
+  /* ── Global warn ───────────────────────────────────────────────────────── */
+  .global-warn { background: #fef2f2; border: 1px solid #fca5a5; border-radius: var(--radius-lg); padding: 14px 18px; font-size: 14.5px; font-weight: 600; color: #991b1b; margin: 16px 0; }
+
+  /* ── Tree note ─────────────────────────────────────────────────────────── */
+  .tree-note { white-space: pre-wrap; font-family: var(--font-mono); font-size: 13.5px; line-height: 1.6; color: var(--text-2); margin: 8px 0 8px 16px; }
+
+  /* ── Disclaimer ────────────────────────────────────────────────────────── */
+  .disclaimer { background: var(--bg); border: 1px solid var(--border); border-radius: var(--radius); padding: 14px 18px; font-size: 13.5px; color: var(--text-2); font-style: italic; }
+
+  /* ── Meta footer ───────────────────────────────────────────────────────── */
+  .meta {
+    margin-top: 48px; padding-top: 16px;
+    border-top: 1px solid var(--border-soft);
+    display: flex; justify-content: space-between; align-items: center;
+    font-size: 12px; color: var(--text-3);
+  }
+  .meta-source { font-family: var(--font-mono); font-size: 11.5px; }
+
+  /* ── Brand logo ────────────────────────────────────────────────────────── */
+  .brand-logo {
+    font-family: var(--font-head);
+    font-size: 14px;
+    color: var(--text-3);
+    letter-spacing: 0.05em;
+    margin-bottom: 4px;
+    flex-shrink: 0;
+    margin-left: 16px;
+  }
+  .brand-logo strong {
+    font-weight: 600;
+    color: var(--accent);
+  }
+  @media (max-width: 900px) {
+    .title-container { flex-direction: column; align-items: flex-start; gap: 12px; }
+    .brand-logo { margin-left: 0; margin-bottom: 0; }
+  }
+  /* ── Print ─────────────────────────────────────────────────────────────── */
+  @media print {
+    body { background: white; }
+    #progress, .toc { display: none; }
+    .layout { display: block; padding: 0; }
+    .article { border: none; box-shadow: none; padding: 24px; }
+    .copy-btn { display: none; }
+    .brand-logo { margin-bottom: 0; }
+  }
+
+  /* ── Responsive ────────────────────────────────────────────────────────── */
+  @media (max-width: 900px) {
+    .toc { display: none; }
+    .article { padding: 36px 28px; }
+    .layout { padding: 24px 16px 64px; }
+  }
+  @media (max-width: 480px) {
+    .article { padding: 24px 18px; }
+    .article h1 { font-size: 22px; }
+  }
+</style>
+</head>
+<body>
+
+<div id="progress"></div>
+
+<div class="layout">
+  <nav class="toc" id="toc">
+  <div class="toc-title">目录</div>
+  <div class="toc-content">
+<div class="toc-item has-children"><button class="toc-toggle" onclick="toggleToc(this)" aria-expanded="true">
+                <svg viewBox="0 0 24 24" width="12" height="12" stroke="currentColor" stroke-width="2" fill="none"><polyline points="6 9 12 15 18 9"></polyline></svg>
+              </button><a href="#h-docker-容器-nf-test-d-conntrack-状态异常故障诊断报告" onclick="event.preventDefault(); const target = document.getElementById('h-docker-容器-nf-test-d-conntrack-状态异常故障诊断报告'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l1">Docker 容器 nf-test-D conntrack 状态异常故障诊断报告</a></div>
+<div class="toc-group" id="group-h-一故障概览">
+<div class="toc-item has-children"><button class="toc-toggle" onclick="toggleToc(this)" aria-expanded="true">
+                <svg viewBox="0 0 24 24" width="12" height="12" stroke="currentColor" stroke-width="2" fill="none"><polyline points="6 9 12 15 18 9"></polyline></svg>
+              </button><a href="#h-一故障概览" onclick="event.preventDefault(); const target = document.getElementById('h-一故障概览'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l2">一、故障概览</a></div>
+<div class="toc-group" id="group-h-置信度说明">
+<div class="toc-item "><span class="toc-spacer"></span><a href="#h-置信度说明" onclick="event.preventDefault(); const target = document.getElementById('h-置信度说明'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l3">置信度说明</a></div>
+</div>
+<div class="toc-item has-children"><button class="toc-toggle" onclick="toggleToc(this)" aria-expanded="true">
+                <svg viewBox="0 0 24 24" width="12" height="12" stroke="currentColor" stroke-width="2" fill="none"><polyline points="6 9 12 15 18 9"></polyline></svg>
+              </button><a href="#h-二根因速览" onclick="event.preventDefault(); const target = document.getElementById('h-二根因速览'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l2">二、根因速览</a></div>
+<div class="toc-group" id="group-h-事故时间线-故障传导链路">
+<div class="toc-item "><span class="toc-spacer"></span><a href="#h-事故时间线-故障传导链路" onclick="event.preventDefault(); const target = document.getElementById('h-事故时间线-故障传导链路'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l3">事故时间线 & 故障传导链路</a></div>
+<div class="toc-item "><span class="toc-spacer"></span><a href="#h-故障因果链" onclick="event.preventDefault(); const target = document.getElementById('h-故障因果链'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l3">故障因果链</a></div>
+</div>
+<div class="toc-item has-children"><button class="toc-toggle" onclick="toggleToc(this)" aria-expanded="true">
+                <svg viewBox="0 0 24 24" width="12" height="12" stroke="currentColor" stroke-width="2" fill="none"><polyline points="6 9 12 15 18 9"></polyline></svg>
+              </button><a href="#h-三双轨分析" onclick="event.preventDefault(); const target = document.getElementById('h-三双轨分析'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l2">三、双轨分析</a></div>
+<div class="toc-group" id="group-h-31-轨道一规则链分析正向追踪">
+<div class="toc-item "><span class="toc-spacer"></span><a href="#h-31-轨道一规则链分析正向追踪" onclick="event.preventDefault(); const target = document.getElementById('h-31-轨道一规则链分析正向追踪'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l3">3.1 轨道一：规则链分析（正向追踪）</a></div>
+<div class="toc-item "><span class="toc-spacer"></span><a href="#h-32-轨道二conntrack-分析逆向溯源" onclick="event.preventDefault(); const target = document.getElementById('h-32-轨道二conntrack-分析逆向溯源'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l3">3.2 轨道二：conntrack 分析（逆向溯源）</a></div>
+<div class="toc-item "><span class="toc-spacer"></span><a href="#h-33-交叉验证结果" onclick="event.preventDefault(); const target = document.getElementById('h-33-交叉验证结果'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l3">3.3 交叉验证结果</a></div>
+</div>
+<div class="toc-item has-children"><button class="toc-toggle" onclick="toggleToc(this)" aria-expanded="true">
+                <svg viewBox="0 0 24 24" width="12" height="12" stroke="currentColor" stroke-width="2" fill="none"><polyline points="6 9 12 15 18 9"></polyline></svg>
+              </button><a href="#h-四排查过程" onclick="event.preventDefault(); const target = document.getElementById('h-四排查过程'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l2">四、排查过程</a></div>
+<div class="toc-group" id="group-h-41-初始现象">
+<div class="toc-item "><span class="toc-spacer"></span><a href="#h-41-初始现象" onclick="event.preventDefault(); const target = document.getElementById('h-41-初始现象'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l3">4.1 初始现象</a></div>
+<div class="toc-item "><span class="toc-spacer"></span><a href="#h-42-假设驱动排查" onclick="event.preventDefault(); const target = document.getElementById('h-42-假设驱动排查'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l3">4.2 假设驱动排查</a></div>
+<div class="toc-item "><span class="toc-spacer"></span><a href="#h-43-排查结论" onclick="event.preventDefault(); const target = document.getElementById('h-43-排查结论'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l3">4.3 排查结论</a></div>
+</div>
+<div class="toc-item has-children"><button class="toc-toggle" onclick="toggleToc(this)" aria-expanded="true">
+                <svg viewBox="0 0 24 24" width="12" height="12" stroke="currentColor" stroke-width="2" fill="none"><polyline points="6 9 12 15 18 9"></polyline></svg>
+              </button><a href="#h-五修复方案" onclick="event.preventDefault(); const target = document.getElementById('h-五修复方案'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l2">五、修复方案</a></div>
+<div class="toc-group" id="group-h-51-应急处置如再次出现-unreplied-大量增长">
+<div class="toc-item "><span class="toc-spacer"></span><a href="#h-51-应急处置如再次出现-unreplied-大量增长" onclick="event.preventDefault(); const target = document.getElementById('h-51-应急处置如再次出现-unreplied-大量增长'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l3">5.1 应急处置（如再次出现 UNREPLIED 大量增长）</a></div>
+<div class="toc-item "><span class="toc-spacer"></span><a href="#h-52-永久修复计划" onclick="event.preventDefault(); const target = document.getElementById('h-52-永久修复计划'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l3">5.2 永久修复计划</a></div>
+<div class="toc-item "><span class="toc-spacer"></span><a href="#h-53-风险等级说明" onclick="event.preventDefault(); const target = document.getElementById('h-53-风险等级说明'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l3">5.3 风险等级说明</a></div>
+</div>
+<div class="toc-item has-children"><button class="toc-toggle" onclick="toggleToc(this)" aria-expanded="true">
+                <svg viewBox="0 0 24 24" width="12" height="12" stroke="currentColor" stroke-width="2" fill="none"><polyline points="6 9 12 15 18 9"></polyline></svg>
+              </button><a href="#h-六验证建议" onclick="event.preventDefault(); const target = document.getElementById('h-六验证建议'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l2">六、验证建议</a></div>
+<div class="toc-group" id="group-h-61-根因确认">
+<div class="toc-item "><span class="toc-spacer"></span><a href="#h-61-根因确认" onclick="event.preventDefault(); const target = document.getElementById('h-61-根因确认'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l3">6.1 根因确认</a></div>
+<div class="toc-item "><span class="toc-spacer"></span><a href="#h-62-修复验证" onclick="event.preventDefault(); const target = document.getElementById('h-62-修复验证'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l3">6.2 修复验证</a></div>
+</div>
+<div class="toc-item has-children"><button class="toc-toggle" onclick="toggleToc(this)" aria-expanded="true">
+                <svg viewBox="0 0 24 24" width="12" height="12" stroke="currentColor" stroke-width="2" fill="none"><polyline points="6 9 12 15 18 9"></polyline></svg>
+              </button><a href="#h-七附录" onclick="event.preventDefault(); const target = document.getElementById('h-七附录'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l2">七、附录</a></div>
+<div class="toc-group" id="group-h-71-分析数据源">
+<div class="toc-item "><span class="toc-spacer"></span><a href="#h-71-分析数据源" onclick="event.preventDefault(); const target = document.getElementById('h-71-分析数据源'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l3">7.1 分析数据源</a></div>
+<div class="toc-item "><span class="toc-spacer"></span><a href="#h-72-使用的分析技能" onclick="event.preventDefault(); const target = document.getElementById('h-72-使用的分析技能'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l3">7.2 使用的分析技能</a></div>
+</div>
+</div>
+  </div>
+</nav>
+  <article class="article" id="article" style="position: relative;">
+    <div class="title-container"><h1 id="h-docker-容器-nf-test-d-conntrack-状态异常故障诊断报告">Docker 容器 nf-test-D conntrack 状态异常故障诊断报告</h1><div class="brand-logo">by <strong>Witty Diagnosis Agent</strong></div></div>
+<blockquote>
+<p><strong>报告编号</strong>：RCA-20260610-NF001
+<strong>故障级别</strong>：P2（潜在风险类）
+<strong>报告时间</strong>：2026-06-10 22:05:56
+<strong>当前状态</strong>：🟡 已恢复（待验证）</p>
+</blockquote>
+<hr>
+<h2 id="h-一故障概览">一、故障概览</h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>项目</th>
+<th>内容</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>故障标题</td>
+<td>Docker 容器 nf-test-D conntrack 出现大量 UNREPLIED 条目(约200个)，配置了 ctstate INVALID DROP 规则可能导致丢包</td>
+</tr>
+<tr>
+<td>影响范围</td>
+<td>Docker 容器 nf-test-D 的入站连接</td>
+</tr>
+<tr>
+<td>故障时段</td>
+<td>2026-06-10 13:50:00 ～ 2026-06-10 22:01:13（诊断时间，实际已自愈）</td>
+</tr>
+<tr>
+<td>根本原因</td>
+<td><strong>直接原因</strong>：瞬时的并发连接突发导致 conntrack 表出现大量 UNREPLIED 条目（约200个），但在诊断收据时已被 conntrack GC 自动清理；<strong>根本风险</strong>：conntrack timeout 配置过于激进（tcp_timeout_established=10s, udp_timeout=5s），以及 ctstate INVALID DROP 规则存在的潜在丢包隐患</td>
+</tr>
+<tr>
+<td>是否恢复</td>
+<td><span class="badge-ok">✅ 已恢复（UNREPLIED 条目在诊断时已归零，规则未实际触发）</span></td>
+</tr>
+<tr>
+<td>根因置信度</td>
+<td>🟡 中置信度（现象已消失，基于间接证据推断）</td>
+</tr>
+</tbody></table></div>
+<h3 id="h-置信度说明">置信度说明</h3>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>等级</th>
+<th>标识</th>
+<th>含义</th>
+<th>适用场景</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>高置信</td>
+<td>🟢</td>
+<td>根因已明确，可复现，单一原因可解释所有现象</td>
+<td>—</td>
+</tr>
+<tr>
+<td>中置信</td>
+<td>🟡</td>
+<td>根因基本确认，但存在 1～2 个无法完全解释的现象</td>
+<td><span class="badge-ok">✅ 当前场景：200 个 UNREPLIED 条目已消失，依赖日志交叉验证</span></td>
+</tr>
+<tr>
+<td>低置信</td>
+<td>🟠</td>
+<td>有多个可疑原因，尚未排除竞争，结论为推断</td>
+<td>—</td>
+</tr>
+<tr>
+<td>未知</td>
+<td>🔴</td>
+<td>现象无法解释，根因未定位，仍在排查中</td>
+<td>—</td>
+</tr>
+</tbody></table></div>
+<hr>
+<h2 id="h-二根因速览">二、根因速览</h2>
+<h3 id="h-事故时间线-故障传导链路">事故时间线 & 故障传导链路</h3>
+<div class="code-block">
+  <span class="code-lang">text</span>
+  <button class="copy-btn" onclick="copyCode(this)" title="复制">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
+  </button>
+  <pre><code>时间                   事件                                                      性质         溯源路径
+───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+2026-06-10 13:50:00   业务突发流量→容器 nf-test-D 产生约200个 conntrack UNREPLIED  📈 外部触发   [故障报告描述]
+                       条目（疑似 DNS/UDP 短连接或 TCP SYN 突发）
+  │
+  ▼
+2026-06-10 13:52:00   kuafu_A 报告 nf-test-A 出现 "nf_conntrack: table full,       ⚠️  系统告警   [kuafu_A_conntrack_full.md:66-71]
+                       dropping packet"(90+条 dmesg 告警)，conntrack 表满溢出
+  │                   同集群其他容器出现 conntrack 过载，印证流量突发背景
+  ▼
+2026-06-10 ~13:55     并发连接逐渐完成/超时。由于 conntrack timeout 配置极度激进      🔄 自愈过程   [kuafu_F_20260610_220115.md:127-137]
+                      (tcp_timeout_established=10s, udp_timeout=5s,               (超时配置)
+                       tcp_timeout_time_wait=5s)，UNREPLIED 条目被快速 GC 清理
+  │
+  ▼
+2026-06-10 22:01:13   Kuafu 分支 D 诊断采集时，conntrack 状态全部清零                🟢 已自愈      [kuafu_D_20260610_220113.md:20-26]
+                      (INVALID=0, UNREPLIED=0, TCP=0, UDP=0)                     (诊断结果)
+  │                   DROP 规则命中计数为 0（从未触发）
+  │
+  ═══════════════════════════════════════════════════════════════════════════════
+  ⚠️  潜在风险（未完全消除）：                                    🟡 风险持续
+      1. ctstate INVALID DROP 规则已配置 → 若因超时过短导致 conntrack
+         提前回收合法连接，后续报文将被标记为 INVALID 并 DROP
+      2. conntrack timeout 配置畸低（established=10s）→ 长连接会被
+         频繁提前切断，产生大量 INVALID 状态并触发 DROP</code></pre>
+</div>
+<h3 id="h-故障因果链">故障因果链</h3>
+<div class="code-block">
+  <span class="code-lang">text</span>
+  <button class="copy-btn" onclick="copyCode(this)" title="复制">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
+  </button>
+  <pre><code>流量突发（并发连接数飙升）
+    │
+    ├─► conntrack 表产生约 200 个 UNREPLIED 条目
+    │       └─► 正常现象：短连接在收到回包前处于 UNREPLIED 状态
+    │
+    ├─► conntrack timeout 配置过于激进（tcp_timeout_established=10s）
+    │       └─► 连接很快被 GC 回收，UNREPLIED 条目自动消失
+    │
+    └─► ctstate INVALID DROP 规则已配置但未触发
+            └─► 风险：若 conntrack 在连接仍有流量时提前回收，
+                   后续报文 → INVALID → 被 DROP → 业务中断
+                   
+    └─► 🎯 诊断结论：当前系统已恢复，但存在潜在的丢包风险</code></pre>
+</div>
+<hr>
+<h2 id="h-三双轨分析">三、双轨分析</h2>
+<blockquote>
+<p>依据 <code>netfilter-conntrack-diagnosis</code> 方法论，执行&quot;规则链轨道 + conntrack 轨道&quot;并行双轨分析。</p>
+</blockquote>
+<h3 id="h-31-轨道一规则链分析正向追踪">3.1 轨道一：规则链分析（正向追踪）</h3>
+<h4 id="h-r1-规则链拓扑">R1 规则链拓扑</h4>
+<p>容器 nf-test-D 的 iptables 规则链中出现以下 stateful 规则：</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>表</th>
+<th>链</th>
+<th>规则</th>
+<th>动作</th>
+<th>命中计数</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>filter</td>
+<td>INPUT</td>
+<td><code>-m conntrack --ctstate INVALID -j DROP</code></td>
+<td>DROP</td>
+<td>pkts=0 / bytes=0</td>
+</tr>
+<tr>
+<td>nftables</td>
+<td>—</td>
+<td><code>ct state invalid counter packets 0 bytes 0 drop</code></td>
+<td>drop</td>
+<td>pkts=0 / bytes=0</td>
+</tr>
+</tbody></table></div>
+<h4 id="h-r2-命中计数核查">R2 命中计数核查</h4>
+<ul>
+<li><strong>iptables DROP 规则命中计数</strong>：pkts=0（从未匹配任何报文）</li>
+<li><strong>nftables drop 规则命中计数</strong>：pkts=0 / bytes=0（从未匹配任何报文）</li>
+<li>两条规则的命中计数均为零，说明 <strong>截至目前，该 DROP 规则从未产生实际丢包</strong></li>
+</ul>
+<h4 id="h-r3-匹配语义分析">R3 匹配语义分析</h4>
+<ul>
+<li>规则条件：<code>ctstate INVALID</code> 匹配 conntrack 状态机判定为无效的连接报文</li>
+<li>规则动作：<code>DROP</code> 丢弃匹配的报文</li>
+<li>潜在触发场景：<ul>
+<li>TCP 窗口违规（tcp_be_liberal=0 时 window violation）</li>
+<li>校验和错误（网卡 offload 问题）</li>
+<li>conntrack 表满后新连接被拒绝、但仍有后续报文到达</li>
+<li>conntrack 超时回收后，同一五元组的后续报文</li>
+</ul>
+</li>
+<li><strong>当前未触发</strong>：说明上述场景尚未发生</li>
+</ul>
+<h4 id="h-r4-流量路径推导">R4 流量路径推导</h4>
+<div class="code-block">
+  
+  <button class="copy-btn" onclick="copyCode(this)" title="复制">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
+  </button>
+  <pre><code>入站报文 → raw:PREROUTING → mangle:PREROUTING → nat:PREROUTING
+    → 路由决策（本机目的地）
+    → filter:INPUT
+        → ✂️ [rule: ctstate INVALID → DROP] (pkts=0, 未触发)
+        → 【ACCEPT 默认策略】→ 本机应用</code></pre>
+</div>
+<p><strong>结论</strong>：规则链配置无误，当前未产生任何 DROP 动作。但规则的存在意味着一旦条件满足（产生 INVALID entry），流量将被静默丢弃。</p>
+<hr>
+<h3 id="h-32-轨道二conntrack-分析逆向溯源">3.2 轨道二：conntrack 分析（逆向溯源）</h3>
+<h4 id="h-c0-模块可用性检查">C0 模块可用性检查</h4>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>检查项</th>
+<th>结果</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>nf_conntrack 模块加载</td>
+<td><span class="badge-ok">✅ 已加载</span></td>
+</tr>
+<tr>
+<td>/proc/net/stat/nf_conntrack 可用</td>
+<td><span class="badge-ok">✅ 可用</span></td>
+</tr>
+<tr>
+<td><strong>分析可行性</strong></td>
+<td><strong>✅ conntrack 双轨完全可行</strong></td>
+</tr>
+</tbody></table></div>
+<h4 id="h-c1-容量分析">C1 容量分析</h4>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>指标</th>
+<th>值</th>
+<th>分析</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>当前条目数 (count)</td>
+<td>0</td>
+<td>诊断时 conntrack 表完全为空</td>
+</tr>
+<tr>
+<td>最大条目数 (max)</td>
+<td>4096（来自 kuafu_A 同环境）</td>
+<td>容量阈值为 4096</td>
+</tr>
+<tr>
+<td>使用率</td>
+<td>0.0%</td>
+<td>完全空闲</td>
+</tr>
+</tbody></table></div>
+<h4 id="h-c2-状态分布诊断时刻">C2 状态分布（诊断时刻）</h4>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>协议/状态</th>
+<th>数量</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>TCP</td>
+<td>0</td>
+<td>无 TCP 连接跟踪条目</td>
+</tr>
+<tr>
+<td>UDP</td>
+<td>0</td>
+<td>无 UDP 连接跟踪条目</td>
+</tr>
+<tr>
+<td>ICMP</td>
+<td>0</td>
+<td>无 ICMP 条目</td>
+</tr>
+<tr>
+<td>INVALID</td>
+<td>0</td>
+<td><span class="badge-ok">✅ 无无效条目</span></td>
+</tr>
+<tr>
+<td>UNREPLIED</td>
+<td>0</td>
+<td><span class="badge-ok">✅ 无未回复条目（故障现象已消失）</span></td>
+</tr>
+</tbody></table></div>
+<h4 id="h-c3-nat-映射核验">C3 NAT 映射核验</h4>
+<p>诊断未报告 NAT 条目，容器 nf-test-D 无活跃的 NAT 映射。本分支非 NAT 相关问题。</p>
+<h4 id="h-c4-丢包计数定位">C4 丢包计数定位</h4>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>CPU</th>
+<th>found</th>
+<th>drop</th>
+<th>early_drop</th>
+<th>insert_failed</th>
+<th>分析</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>cpu=0~14</td>
+<td>0</td>
+<td>0</td>
+<td>0</td>
+<td>0</td>
+<td>无 conntrack 活动</td>
+</tr>
+<tr>
+<td>cpu=15</td>
+<td><strong>400</strong></td>
+<td>0</td>
+<td>0</td>
+<td>0</td>
+<td><span class="badge-warn">⚠️ 所有 conntrack 处理集中在单一 CPU</span></td>
+</tr>
+</tbody></table></div>
+<p><strong>关键发现</strong>：</p>
+<ul>
+<li>全部 conntrack 处理集中在 <strong>cpu=15</strong>（found=400），其他 CPU 均为 0</li>
+<li>所有丢包计数器（drop, early_drop, insert_failed）均为 0</li>
+<li>说明 nf_conntrack 子系统的哈希分配策略将所有连接映射到了单个 CPU</li>
+</ul>
+<h4 id="h-交叉关联kuafuf-超时配置分析">交叉关联：kuafu_F 超时配置分析</h4>
+<p>从 kuafu_F（同一轮诊断、同环境的另一容器）获取的超时参数：</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>参数</th>
+<th>当前值</th>
+<th>推荐值</th>
+<th>偏差程度</th>
+<th>风险等级</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>tcp_timeout_established</td>
+<td><strong>10s</strong></td>
+<td>432000s (5天)</td>
+<td><strong>仅 0.002%</strong></td>
+<td>🔴 严重偏离</td>
+</tr>
+<tr>
+<td>tcp_timeout_time_wait</td>
+<td><strong>5s</strong></td>
+<td>120s</td>
+<td><strong>仅 4%</strong></td>
+<td>🟡 过于激进</td>
+</tr>
+<tr>
+<td>udp_timeout</td>
+<td><strong>5s</strong></td>
+<td>30s</td>
+<td><strong>仅 17%</strong></td>
+<td>🟡 过于激进</td>
+</tr>
+<tr>
+<td>udp_timeout_stream</td>
+<td>120s</td>
+<td>180s</td>
+<td>67%</td>
+<td>🟡 偏低</td>
+</tr>
+<tr>
+<td>tcp_timeout_fin_wait</td>
+<td>120s</td>
+<td>120s</td>
+<td><span class="badge-ok">100% ✅</span></td>
+<td>—</td>
+</tr>
+<tr>
+<td>tcp_timeout_syn_recv</td>
+<td>60s</td>
+<td>60s</td>
+<td><span class="badge-ok">100% ✅</span></td>
+<td>—</td>
+</tr>
+<tr>
+<td>tcp_timeout_syn_sent</td>
+<td>120s</td>
+<td>120s</td>
+<td><span class="badge-ok">100% ✅</span></td>
+<td>—</td>
+</tr>
+<tr>
+<td>icmp_timeout</td>
+<td>30s</td>
+<td>30s</td>
+<td><span class="badge-ok">100% ✅</span></td>
+<td>—</td>
+</tr>
+</tbody></table></div>
+<hr>
+<h3 id="h-33-交叉验证结果">3.3 交叉验证结果</h3>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>验证维度</th>
+<th>规则链结论</th>
+<th>conntrack 结论</th>
+<th>是否吻合</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>丢包原因</td>
+<td>DROP 规则 pkts=0，未产生丢包</td>
+<td>所有丢包计数为 0</td>
+<td><span class="badge-ok">✅ 吻合</span></td>
+</tr>
+<tr>
+<td>流量方向</td>
+<td>规则作用于 INPUT 链（入站）</td>
+<td>无活跃入口</td>
+<td><span class="badge-ok">✅ 吻合</span></td>
+</tr>
+<tr>
+<td>NAT 映射</td>
+<td>无 NAT 规则</td>
+<td>无 NAT 条目</td>
+<td><span class="badge-ok">✅ 吻合</span></td>
+</tr>
+<tr>
+<td>stateful 规则</td>
+<td>ctstate INVALID DROP 已配置但未触发</td>
+<td>INVALID=0，无触发条件</td>
+<td><span class="badge-ok">✅ 吻合</span></td>
+</tr>
+</tbody></table></div>
+<p><strong>综合判断</strong>：</p>
+<ul>
+<li>双轨结论完全一致，无矛盾</li>
+<li><strong>当前系统状态</strong>：conntrack 子系统健康，无丢包、无异常条目</li>
+<li><strong>根本风险</strong>：ctstate INVALID DROP 规则存在 + 超时配置畸短 = 潜在丢包风险</li>
+<li><strong>置信度</strong>：🟡 中置信度（故障现象已消失，依赖间接证据与交叉推理）</li>
+</ul>
+<hr>
+<h2 id="h-四排查过程">四、排查过程</h2>
+<h3 id="h-41-初始现象">4.1 初始现象</h3>
+<ul>
+<li><strong>上游报告</strong>：Docker 容器 nf-test-D 出现 conntrack UNREPLIED 条目约 200 个</li>
+<li><strong>规则配置</strong>：该容器 iptables INPUT 链配置了 <code>-m conntrack --ctstate INVALID -j DROP</code></li>
+<li><strong>怀疑方向</strong>：conntrack 状态异常导致丢包</li>
+</ul>
+<h3 id="h-42-假设驱动排查">4.2 假设驱动排查</h3>
+<h4 id="h-假设-a200-个-unreplied-条目导致-conntrack-表满丢包">假设 A：200 个 UNREPLIED 条目导致 conntrack 表满丢包</h4>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>检查项</th>
+<th>操作</th>
+<th>结论</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>conntrack 条目计数</td>
+<td>诊断时 count=0</td>
+<td><span class="badge-ok">✅ 表已空，未过载</span></td>
+</tr>
+<tr>
+<td>drop/insert_failed</td>
+<td>全部为 0</td>
+<td><span class="badge-ok">✅ 无丢包计数</span></td>
+</tr>
+<tr>
+<td><strong>结论</strong></td>
+<td>—</td>
+<td><strong>❌ 排除</strong>：UNREPLIED 条目已被自动清理</td>
+</tr>
+</tbody></table></div>
+<h4 id="h-假设-bctstate-invalid-drop-规则实际产生了丢包">假设 B：ctstate INVALID DROP 规则实际产生了丢包</h4>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>检查项</th>
+<th>操作</th>
+<th>结论</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>iptables 规则 pkts 计数</td>
+<td>pkts=0</td>
+<td><span class="badge-ok">✅ 规则从未命中</span></td>
+</tr>
+<tr>
+<td>nftables 规则计数器</td>
+<td>packets=0 bytes=0</td>
+<td><span class="badge-ok">✅ 规则从未触发</span></td>
+</tr>
+<tr>
+<td>conntrack INVALID 条目数</td>
+<td>0</td>
+<td><span class="badge-ok">✅ 无 INVALID 状态</span></td>
+</tr>
+<tr>
+<td><strong>结论</strong></td>
+<td>—</td>
+<td><strong>❌ 排除</strong>：DROP 规则未产生实际丢包</td>
+</tr>
+</tbody></table></div>
+<h4 id="h-假设-cconntrack-超时过短导致连接被提前回收-产生-invalid-触发-drop-确认根本风险">假设 C：conntrack 超时过短导致连接被提前回收 → 产生 INVALID → 触发 DROP ✅ 确认根本风险</h4>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>检查项</th>
+<th>操作</th>
+<th>结论</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>tcp_timeout_established</td>
+<td><strong>10s</strong>（kuafu_F 数据）</td>
+<td>✅ <strong>异常</strong>：推荐 432000s</td>
+</tr>
+<tr>
+<td>udp_timeout</td>
+<td><strong>5s</strong>（kuafu_F 数据）</td>
+<td>✅ <strong>异常</strong>：推荐 30s</td>
+</tr>
+<tr>
+<td>tcp_timeout_time_wait</td>
+<td><strong>5s</strong>（kuafu_F 数据）</td>
+<td>✅ <strong>异常</strong>：推荐 120s</td>
+</tr>
+<tr>
+<td>是否已触发 DROP</td>
+<td>pkts=0 尚未触发</td>
+<td>✅ <strong>当前未触发，但风险持续存在</strong></td>
+</tr>
+<tr>
+<td><strong>结论</strong></td>
+<td>—</td>
+<td><strong>✅ 确认：超时配置极端异常，是潜在根因</strong></td>
+</tr>
+</tbody></table></div>
+<h3 id="h-43-排查结论">4.3 排查结论</h3>
+<div class="code-block">
+  <span class="code-lang">text</span>
+  <button class="copy-btn" onclick="copyCode(this)" title="复制">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
+  </button>
+  <pre><code>nf-test-D conntrack 状态异常（200 UNREPLIED）
+│
+├─► 假设 A：conntrack 表满丢包
+│       └─→ count=0, drop=0 → ❌ 排除
+│
+├─► 假设 B：ctstate INVALID DROP 实际丢包
+│       └─→ pkts=0 → ❌ 排除
+│
+└─► 假设 C：超时配置极端异常 + DROP 规则构成潜在风险 ✅ 确认
+        │
+        ├─► tcp_timeout_established=10s（推荐 432000s） → 🔴 严重异常
+        ├─► udp_timeout=5s（推荐 30s）                 → 🟡 异常
+        ├─► tcp_timeout_time_wait=5s（推荐 120s）      → 🟡 异常
+        │
+        └─► ctstate INVALID DROP 规则已配置且就绪
+                └─► 一旦连接在仍有流量时被 conntrack 回收
+                     → 后续报文被判 INVALID → DROP
+                     → 🎯 根本风险确认</code></pre>
+</div>
+<hr>
+<h2 id="h-五修复方案">五、修复方案</h2>
+<h3 id="h-51-应急处置如再次出现-unreplied-大量增长">5.1 应急处置（如再次出现 UNREPLIED 大量增长）</h3>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>步骤</th>
+<th>操作</th>
+<th>执行人</th>
+<th>风险等级</th>
+<th>效果</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>1</td>
+<td>确认突发的流量来源：<code>docker logs nf-test-D</code> 或 <code>conntrack -L -n</code> 查看条目明细</td>
+<td>运维/SRE</td>
+<td>🟢 低危</td>
+<td>定位流量源</td>
+</tr>
+<tr>
+<td>2</td>
+<td>如连接数持续增长，临时调整超时：<code>sysctl -w net.netfilter.nf_conntrack_tcp_timeout_established=432000</code></td>
+<td>运维/SRE</td>
+<td>🟡 中危</td>
+<td>防止合法连接被提前回收</td>
+</tr>
+<tr>
+<td>3</td>
+<td>如需扩大 conntrack 容量：<code>sysctl -w net.netfilter.nf_conntrack_max=1048576</code></td>
+<td>运维/SRE</td>
+<td>🟡 中危</td>
+<td>防止表满丢包</td>
+</tr>
+</tbody></table></div>
+<h3 id="h-52-永久修复计划">5.2 永久修复计划</h3>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>修复措施</th>
+<th>风险等级</th>
+<th>详细操作</th>
+<th>回滚方案</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>1. 调整 conntrack 超时参数至合理值</strong></td>
+<td>🟡 中危</td>
+<td>编辑 <code>/etc/sysctl.conf</code> 或容器 sysctl 配置：<br><code>net.netfilter.nf_conntrack_tcp_timeout_established = 432000</code>（5天）<br><code>net.netfilter.nf_conntrack_tcp_timeout_time_wait = 120</code><br><code>net.netfilter.nf_conntrack_udp_timeout = 30</code></td>
+<td>恢复为原值后 <code>sysctl -p</code></td>
+</tr>
+<tr>
+<td><strong>2. 评估 ctstate INVALID DROP 规则的必要性</strong></td>
+<td>🟡 中危</td>
+<td>确认该规则是否为安全基线的一部分。如果是防御性配置，建议保留；但需确保超时参数合理，避免合法流量被误杀。如果非必要，可删除该规则：<br><code>iptables -D INPUT -m conntrack --ctstate INVALID -j DROP</code></td>
+<td>重新添加规则</td>
+</tr>
+<tr>
+<td><strong>3. 优化 conntrack 哈希分布</strong></td>
+<td>🟢 低危</td>
+<td>检查 <code>nf_conntrack_buckets</code> 配置，增大哈希桶数以改善多 CPU 分布：<br><code>sysctl -w net.netfilter.nf_conntrack_buckets=262144</code></td>
+<td>恢复原值</td>
+</tr>
+<tr>
+<td><strong>4. 监控告警完善</strong></td>
+<td>🟢 低危</td>
+<td>为 conntrack 使用率添加监控告警，阈值设为 80%：<br><code>current/max &gt; 80% → 告警</code></td>
+<td>—</td>
+</tr>
+</tbody></table></div>
+<h3 id="h-53-风险等级说明">5.3 风险等级说明</h3>
+<blockquote>
+<p>⚠️ <strong>Agent 只提供修复建议，严禁自动执行</strong></p>
+</blockquote>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>风险等级</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>🔴 <strong>高危</strong></td>
+<td>可能导致服务中断、连接断开、安全策略失效的操作</td>
+</tr>
+<tr>
+<td>🟡 <strong>中危</strong></td>
+<td>可能影响部分服务或需谨慎评估的操作</td>
+</tr>
+<tr>
+<td>🟢 <strong>低危</strong></td>
+<td>风险较低，通常可安全执行的操作</td>
+</tr>
+</tbody></table></div>
+<hr>
+<h2 id="h-六验证建议">六、验证建议</h2>
+<h3 id="h-61-根因确认">6.1 根因确认</h3>
+<ol>
+<li><strong>复现验证</strong>：在低峰期，向容器 nf-test-D 发送大量短连接（如 HTTP GET / DNS 查询），观察：<ul>
+<li>conntrack 是否出现 UNREPLIED 条目：<code>conntrack -L -n | grep UNREPLIED | wc -l</code></li>
+<li>iptables DROP 计数是否增长：<code>iptables -L INPUT -n -v | grep INVALID</code></li>
+</ul>
+</li>
+<li><strong>超时验证</strong>：确认当前超时值：<code>sysctl net.netfilter.nf_conntrack_tcp_timeout_established</code></li>
+</ol>
+<h3 id="h-62-修复验证">6.2 修复验证</h3>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>验证项</th>
+<th>验证方法</th>
+<th>预期结果</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>超时参数生效</td>
+<td><code>sysctl net.netfilter.nf_conntrack_tcp_timeout_established</code></td>
+<td>应为 432000</td>
+</tr>
+<tr>
+<td>DROP 规则状态</td>
+<td><code>iptables -L INPUT -n -v</code></td>
+<td>确认规则存在或已被移除</td>
+</tr>
+<tr>
+<td>conntrack 容量</td>
+<td><code>sysctl net.netfilter.nf_conntrack_max</code></td>
+<td>建议 ≥ 1048576</td>
+</tr>
+<tr>
+<td>conntrack 使用率</td>
+<td>监控 conntrack 当前条目数/max</td>
+<td>应在 80% 以下</td>
+</tr>
+</tbody></table></div>
+<hr>
+<h2 id="h-七附录">七、附录</h2>
+<h3 id="h-71-分析数据源">7.1 分析数据源</h3>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>数据源</th>
+<th>路径</th>
+<th>用途</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Kuafu 分支 D 报告</td>
+<td><code>/home/win11/.witty-diagnosis-agent/dayu/report/kuafu_D_20260610_220113.md</code></td>
+<td>容器 nf-test-D conntrack 诊断数据</td>
+</tr>
+<tr>
+<td>Kuafu 分支 F 报告</td>
+<td><code>/home/win11/.witty-diagnosis-agent/dayu/report/kuafu_F_20260610_220115.md</code></td>
+<td>conntrack timeout 配置对照</td>
+</tr>
+<tr>
+<td>Kuafu 分支 A 报告</td>
+<td><code>/home/win11/.witty-diagnosis-agent/dayu/report/kuafu_A_conntrack_full.md</code></td>
+<td>同环境 conntrack 表满溢出证据</td>
+</tr>
+</tbody></table></div>
+<h3 id="h-72-使用的分析技能">7.2 使用的分析技能</h3>
+<ul>
+<li><code>fault-rca-report-generation</code>：故障诊断根因分析与报告生成方法论</li>
+<li><code>netfilter-conntrack-diagnosis</code>：Netfilter/conntrack 双轨分析模型</li>
+</ul>
+<hr>
+<p><em>本报告由 Baize（白泽）Phase 1.4 分析与报告 Agent 自动生成</em></p>
+
+    <div class="meta">
+      <span class="meta-source">Docker容器conntrack状态异常分析_nf-test-D_20260610_220113_report.md</span>
+      <span>生成于 2026/06/10 22:07</span>
+    </div>
+  </article>
+</div>
+
+<script>
+  /* ── 滚动进度条 ── */
+  window.addEventListener("scroll", () => {
+    const el  = document.documentElement;
+    const pct = el.scrollTop / (el.scrollHeight - el.clientHeight) * 100;
+    document.getElementById("progress").style.width = Math.min(pct, 100) + "%";
+  });
+
+  /* ── TOC 高亮当前章节 ── */
+  (function () {
+    const headings = Array.from(document.querySelectorAll("article h1,article h2,article h3"));
+    const links    = Array.from(document.querySelectorAll(".toc a"));
+    if (!links.length) return;
+    const obs = new IntersectionObserver(entries => {
+      entries.forEach(e => {
+        if (!e.isIntersecting) return;
+        links.forEach(l => l.classList.remove("active"));
+        const a = links.find(l => l.getAttribute("href") === "#" + e.target.id);
+        if (a) a.classList.add("active");
+      });
+    }, { rootMargin: "-10% 0px -80% 0px" });
+    headings.forEach(h => obs.observe(h));
+  })();
+
+  /* ── h2 章节序号自动计数 ── */
+  (function () {
+    let idx = 0;
+    document.querySelectorAll("article h2").forEach(el => {
+      idx++;
+      el.setAttribute("data-index", String(idx).padStart(2, "0"));
+    });
+  })();
+
+  /* ── 代码块一键复制 ── */
+  function copyCode(btn) {
+    const code = btn.closest(".code-block").querySelector("code").innerText;
+    navigator.clipboard.writeText(code).then(() => {
+      btn.classList.add("copied");
+      btn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>';
+      setTimeout(() => {
+        btn.classList.remove("copied");
+        btn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>';
+      }, 2000);
+    });
+  }
+
+  /* ── 目录树收缩/展开 ── */
+  function toggleToc(btn) {
+    const expanded = btn.getAttribute("aria-expanded") === "true";
+    btn.setAttribute("aria-expanded", String(!expanded));
+    const parentItem = btn.closest(".toc-item");
+    let nextEl = parentItem.nextElementSibling;
+    if (nextEl && nextEl.classList.contains("toc-group")) {
+      if (expanded) {
+        nextEl.style.maxHeight = nextEl.scrollHeight + "px";
+        void nextEl.offsetHeight;
+        nextEl.classList.add("collapsed");
+      } else {
+        nextEl.classList.remove("collapsed");
+        nextEl.style.maxHeight = nextEl.scrollHeight + "px";
+        setTimeout(() => {
+          if (!nextEl.classList.contains("collapsed")) {
+            nextEl.style.maxHeight = "none";
+          }
+        }, 300);
+      }
+    }
+  }
+</script>
+</body>
+</html>
