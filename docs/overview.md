@@ -19,6 +19,7 @@
 - **[运维 Skills 定义规范](standards/ops-skills-spec.md)**: 专为运维场景定制的 Skills 开发与安全标准。
 - **[Skill 文档格式](standards/skill-documentation-format.md)**: Skill 文档的编写标准。
 - **[数据格式](standards/data-formats.md)**: 系统交互的数据结构定义。
+- **[Xuanyuan 测试输入标准](standards/xuanyuan-test-standard.md)**: 统一手动和自动化端到端验证的用户反馈式输入要求。
 - **[命令规范](standards/commands.md)**: CLI 命令的设计准则。
 
 ## 🗺️ 路标与演进 (Roadmap)

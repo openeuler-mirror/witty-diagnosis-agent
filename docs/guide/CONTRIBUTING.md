@@ -114,6 +114,8 @@ export async function run(ctx: SkillContext) {
 
 建议先使用OpenCode内置的**build Agent**单独调试Skill本身，调试通过后再在**Witty智能诊断Agent**中调试端到端效果，以提升调试效率。
 
+正式使用 `Xuanyuan` Agent 做端到端验证时，测试输入应模拟真实用户反馈，不应写入目标 skill、测试场景、复现命令、关键日志、根因词或预期结论。统一输入要求见 [Xuanyuan 测试输入标准](../standards/xuanyuan-test-standard.md)。
+
 #### 使用build Agent调试
 
 1. 执行`/agents`命令选择`build`Agent：
