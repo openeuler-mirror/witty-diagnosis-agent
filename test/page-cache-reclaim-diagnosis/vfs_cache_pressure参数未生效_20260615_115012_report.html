@@ -1,0 +1,1024 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>故障诊断报告</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Lora:ital,wght@0,400;0,600;1,400&family=Source+Sans+3:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  /* ── Design tokens ─────────────────────────────────────────────────────── */
+  :root {
+    --bg:          #f8f7f4;
+    --surface:     #ffffff;
+    --border:      #e8e5df;
+    --border-soft: #f0ede8;
+
+    --text:        #1c1917;
+    --text-2:      #57534e;
+    --text-3:      #a8a29e;
+
+    --accent:      #1d4e6e;
+    --accent-light:#e8f1f7;
+    --accent-mid:  #3b82a0;
+
+    --red:         #c0392b;
+    --red-bg:      #fef2f2;
+    --amber:       #92400e;
+    --amber-bg:    #fffbeb;
+    --green:       #14532d;
+    --green-bg:    #f0fdf4;
+
+    --code-bg:     #1a1d27;
+    --code-text:   #cdd6f4;
+    --code-border: #2d3148;
+
+    --font-body: "Source Sans 3", "PingFang SC", "Hiragino Sans GB", sans-serif;
+    --font-head: "Lora", "PingFang SC", Georgia, serif;
+    --font-mono: "JetBrains Mono", "Fira Code", Consolas, monospace;
+
+    --radius:    8px;
+    --radius-lg: 12px;
+    --shadow:    0 1px 3px rgba(0,0,0,.06), 0 4px 16px rgba(0,0,0,.05);
+    --shadow-lg: 0 2px 8px rgba(0,0,0,.07), 0 8px 32px rgba(0,0,0,.06);
+
+    --toc-width:   240px;
+    --gap:         32px;
+  }
+
+  /* ── Progress bar ──────────────────────────────────────────────────────── */
+  #progress {
+    position: fixed; top: 0; left: 0; height: 3px; width: 0%;
+    background: linear-gradient(90deg, var(--accent-mid), var(--accent));
+    z-index: 999; transition: width .1s linear;
+    border-radius: 0 2px 2px 0;
+  }
+
+  /* ── Base ──────────────────────────────────────────────────────────────── */
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  html { font-size: 16px; scroll-behavior: smooth; }
+  body {
+    font-family: var(--font-body);
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.8;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* ── Layout ────────────────────────────────────────────────────────────── */
+  .layout {
+    display: flex;
+    align-items: flex-start;
+    max-width: calc(var(--toc-width) + 820px + var(--gap) * 3);
+    margin: 0 auto;
+    padding: 48px var(--gap) 96px;
+    gap: var(--gap);
+  }
+
+  /* ── TOC ───────────────────────────────────────────────────────────────── */
+  .toc {
+    width: var(--toc-width);
+    flex-shrink: 0;
+    position: sticky;
+    top: 32px;
+    max-height: calc(100vh - 64px);
+    overflow-y: auto;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    padding: 20px;
+    box-shadow: var(--shadow);
+    scrollbar-width: thin;
+    scrollbar-color: var(--border) transparent;
+  }
+  .toc-title {
+    font-size: 10.5px;
+    font-weight: 600;
+    letter-spacing: .1em;
+    text-transform: uppercase;
+    color: var(--text-3);
+    margin-bottom: 12px;
+    padding-bottom: 10px;
+    border-bottom: 1px solid var(--border-soft);
+  }
+  .toc-item {
+    display: flex;
+    align-items: flex-start;
+    margin: 2px 0;
+  }
+  .toc-toggle {
+    background: none;
+    border: none;
+    cursor: pointer;
+    color: var(--text-3);
+    padding: 4px;
+    margin-right: 4px;
+    margin-top: 2px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 4px;
+    transition: background 0.2s, transform 0.2s;
+  }
+  .toc-toggle:hover { background: var(--border-soft); color: var(--text); }
+  .toc-toggle[aria-expanded="false"] svg { transform: rotate(-90deg); }
+  .toc-spacer { width: 20px; flex-shrink: 0; }
+  .toc-group { overflow: hidden; transition: max-height 0.3s ease-in-out; }
+  .toc-group.collapsed { max-height: 0 !important; }
+  
+  .toc a {
+    display: block;
+    font-size: 13px;
+    color: var(--text-2);
+    text-decoration: none;
+    padding: 4px 8px;
+    border-radius: 5px;
+    line-height: 1.45;
+    transition: background .15s, color .15s;
+    word-break: break-all;
+    flex-grow: 1;
+  }
+  .toc a:hover  { background: var(--accent-light); color: var(--accent); }
+  .toc a.active { background: var(--accent-light); color: var(--accent); font-weight: 500; }
+  .toc-l1 { font-weight: 600; color: var(--text); }
+  .toc-l2 { font-weight: 600; color: var(--text); }
+  .toc-l3 { font-size: 12px !important; padding-left: 14px !important; }
+
+  /* ── Article card ──────────────────────────────────────────────────────── */
+  .article {
+    flex: 1; min-width: 0;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    padding: 52px 60px;
+    box-shadow: var(--shadow-lg);
+  }
+
+  /* ── Headings ──────────────────────────────────────────────────────────── */
+  .title-container {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-end;
+    margin: 0 0 28px;
+    padding-bottom: 18px;
+    border-bottom: 2px solid var(--text);
+  }
+  .article h1 {
+    font-family: var(--font-head);
+    font-size: 26px; font-weight: 600; line-height: 1.3;
+    margin: 0; padding-bottom: 0;
+    border-bottom: none;
+  }
+  .article h2 {
+    font-family: var(--font-head);
+    font-size: 19px; font-weight: 600;
+    margin: 48px 0 14px; padding-bottom: 8px;
+    border-bottom: 1px solid var(--border);
+  }
+  .article h2::before {
+    content: attr(data-index);
+    display: inline-block;
+    font-family: var(--font-mono);
+    font-size: 10.5px; font-weight: 500;
+    color: var(--accent-mid);
+    background: var(--accent-light);
+    padding: 1px 7px; border-radius: 4px;
+    margin-right: 10px; vertical-align: middle;
+    letter-spacing: .05em;
+  }
+  .article h3 {
+    font-family: var(--font-head);
+    font-size: 15.5px; font-weight: 600;
+    margin: 28px 0 10px;
+  }
+  .article h3::before {
+    content: "§ ";
+    color: var(--text-3);
+    font-family: var(--font-mono); font-size: 13px;
+  }
+  .article h4 {
+    font-size: 13.5px; font-weight: 600;
+    color: var(--accent); margin: 20px 0 8px;
+  }
+
+  /* ── Body text ─────────────────────────────────────────────────────────── */
+  .article p, .plain { 
+    font-size: 15px; 
+    line-height: 1.85; 
+    color: var(--text); 
+    margin: 0 0 12px; 
+    font-family: var(--font-body);
+  }
+  .article strong { font-weight: 600; }
+  .article em     { font-style: italic; color: var(--text-2); }
+  .article a {
+    color: var(--accent); text-decoration: underline;
+    text-decoration-color: var(--accent-light);
+    text-underline-offset: 3px;
+  }
+  .article a:hover { text-decoration-color: var(--accent); }
+  .article hr { border: none; border-top: 1px solid var(--border); margin: 20px 0; }
+  .article hr.heavy { border-top: 3px solid var(--text); margin: 32px 0; }
+
+  /* ── Blockquote ────────────────────────────────────────────────────────── */
+  .article blockquote {
+    border-left: 3px solid var(--accent-mid);
+    background: var(--accent-light);
+    margin: 20px 0; padding: 13px 20px 13px 20px;
+    border-radius: 0 var(--radius) var(--radius) 0;
+  }
+  .article blockquote p { font-size: 14.5px; color: var(--accent); margin: 0; line-height: 1.7; }
+  /* 支持块引用内部保留换行符（修复头部概要换行丢失问题） */
+  .article blockquote p { white-space: pre-wrap; }
+  .article blockquote strong { color: var(--accent); }
+
+  /* ── Lists ─────────────────────────────────────────────────────────────── */
+  .article ul, .article ol { padding-left: 22px; margin: 6px 0 14px; }
+  .article li { font-size: 15px; line-height: 1.8; margin: 4px 0; }
+  .article li::marker { color: var(--accent-mid); }
+  .article li > ul, .article li > ol { margin: 3px 0; }
+
+  /* ── Inline code ───────────────────────────────────────────────────────── */
+  .article :not(pre) > code {
+    font-family: var(--font-mono);
+    font-size: 12.5px; font-weight: 500;
+    background: #f3f0eb; color: var(--red);
+    padding: 1px 5px; border-radius: 4px;
+    border: 1px solid var(--border);
+  }
+
+  /* ── Code blocks ───────────────────────────────────────────────────────── */
+  .code-block {
+    position: relative; margin: 20px 0;
+    border-radius: var(--radius-lg); overflow: hidden;
+    border: 1px solid var(--code-border);
+    box-shadow: 0 4px 20px rgba(0,0,0,.16);
+  }
+  .code-lang {
+    position: absolute; top: 0; left: 0;
+    font-family: var(--font-mono); font-size: 10px; font-weight: 500;
+    color: #7c8db5; background: #222538;
+    padding: 4px 12px; border-bottom-right-radius: 6px;
+    text-transform: uppercase; letter-spacing: .08em;
+    user-select: none;
+  }
+  .copy-btn {
+    position: absolute; top: 8px; right: 10px;
+    background: #2d3148; border: 1px solid #3d4260;
+    border-radius: 5px; color: #7c8db5; cursor: pointer;
+    padding: 5px 8px; display: flex; align-items: center;
+    transition: background .15s, color .15s; z-index: 1;
+  }
+  .copy-btn:hover  { background: #3a3f60; color: #cdd6f4; }
+  .copy-btn.copied { color: #a6e3a1; border-color: #4a6a4a; }
+  .code-block pre {
+    margin: 0; padding: 36px 20px 20px;
+    background: var(--code-bg); overflow-x: auto;
+    scrollbar-width: thin; scrollbar-color: #3d4260 transparent;
+  }
+  .code-block pre::-webkit-scrollbar { height: 5px; }
+  .code-block pre::-webkit-scrollbar-thumb { background: #3d4260; border-radius: 3px; }
+  .code-block code {
+    font-family: var(--font-mono); font-size: 13px; line-height: 1.7;
+    color: var(--code-text); background: none; border: none; padding: 0;
+    white-space: pre; word-break: normal;
+  }
+
+  /* ── Tables ────────────────────────────────────────────────────────────── */
+  .table-wrap {
+    overflow-x: auto; margin: 16px 0;
+    border-radius: var(--radius-lg);
+    border: 1px solid var(--border);
+    box-shadow: var(--shadow);
+  }
+  table { width: 100%; border-collapse: collapse; font-size: 14px; min-width: 360px; }
+  thead { background: #f4f2ee; }
+  th {
+    padding: 9px 14px; text-align: left;
+    font-size: 11.5px; font-weight: 600;
+    letter-spacing: .04em; text-transform: uppercase;
+    color: var(--text-2); border-bottom: 1px solid var(--border);
+    white-space: nowrap;
+  }
+  td {
+    padding: 8px 14px; border-bottom: 1px solid var(--border-soft);
+    color: var(--text); vertical-align: top; line-height: 1.6;
+  }
+  tbody tr:last-child td { border-bottom: none; }
+  tbody tr:nth-child(even) td { background: #faf9f7; }
+  tbody tr:hover td { background: var(--accent-light); transition: background .1s; }
+
+  /* ── KV block ──────────────────────────────────────────────────────────── */
+  .kv-block { background: var(--bg); border: 1px solid var(--border); border-radius: var(--radius-lg); overflow: hidden; margin: 12px 0 20px; }
+  .kv-row { display: flex; border-bottom: 1px solid var(--border-soft); align-items: flex-start; }
+  .kv-row:last-child { border-bottom: none; }
+  .kv-key { flex: 0 0 160px; padding: 9px 16px; font-size: 13.5px; font-weight: 600; color: var(--text-2); background: var(--surface); border-right: 1px solid var(--border-soft); }
+  .kv-val { flex: 1; padding: 9px 16px; font-size: 14px; color: var(--text); }
+
+  /* ── Status badges ─────────────────────────────────────────────────────── */
+  .badge-ok { display: inline-flex; align-items: center; gap: 4px; background: var(--green-bg); color: var(--green); font-size: 13px; font-weight: 500; padding: 2px 9px; border-radius: 20px; border: 1px solid #bbf7d0; }
+  .badge-err { display: inline-flex; align-items: center; gap: 4px; background: var(--red-bg); color: var(--red); font-size: 13px; font-weight: 500; padding: 2px 9px; border-radius: 20px; border: 1px solid #fecaca; }
+  .badge-warn { display: inline-flex; align-items: center; gap: 4px; background: var(--amber-bg); color: var(--amber); font-size: 13px; font-weight: 500; padding: 2px 9px; border-radius: 20px; border: 1px solid #fde68a; }
+
+  /* ── Priority badges ───────────────────────────────────────────────────── */
+  .pri-p0 { display: inline-block; background: #fef2f2; color: #991b1b; border: 1px solid #fca5a5; font-size: 12px; font-weight: 700; padding: 2px 8px; border-radius: 4px; letter-spacing: .04em; }
+  .pri-p1 { display: inline-block; background: #fff7ed; color: #9a3412; border: 1px solid #fdba74; font-size: 12px; font-weight: 700; padding: 2px 8px; border-radius: 4px; }
+  .pri-p2 { display: inline-block; background: #fffbeb; color: #92400e; border: 1px solid #fde68a; font-size: 12px; font-weight: 700; padding: 2px 8px; border-radius: 4px; }
+  .pri-p3 { display: inline-block; background: var(--accent-light); color: var(--accent); border: 1px solid #bfdbfe; font-size: 12px; font-weight: 700; padding: 2px 8px; border-radius: 4px; }
+
+  /* ── Fault header ──────────────────────────────────────────────────────── */
+  .fault-header { display: flex; align-items: center; gap: 12px; padding: 12px 16px; border-radius: var(--radius-lg); margin: 16px 0 8px; border: 1px solid; }
+  .fh-p0 { background: #fef2f2; border-color: #fca5a5; }
+  .fh-p1 { background: #fff7ed; border-color: #fdba74; }
+  .fh-p2 { background: #fffbeb; border-color: #fde68a; }
+  .fh-p3 { background: var(--accent-light); border-color: #bfdbfe; }
+  .fh-badge { font-family: var(--font-mono); font-size: 11px; font-weight: 700; letter-spacing: .08em; }
+  .fh-p0 .fh-badge { color: #991b1b; }
+  .fh-p1 .fh-badge { color: #9a3412; }
+  .fh-p2 .fh-badge { color: #92400e; }
+  .fh-p3 .fh-badge { color: var(--accent); }
+  .fh-rest { font-size: 14px; font-weight: 500; color: var(--text); }
+
+  /* ── Timeline ──────────────────────────────────────────────────────────── */
+  .timeline { border-left: 2px solid var(--accent-mid); margin: 16px 0 16px 8px; padding-left: 20px; }
+  .tl-row { display: flex; align-items: baseline; gap: 10px; margin: 8px 0; font-size: 13.5px; }
+  .tl-ts { font-family: var(--font-mono); font-size: 12px; color: var(--text-3); flex-shrink: 0; white-space: nowrap; }
+  .tl-tag { font-size: 11px; font-weight: 600; padding: 1px 7px; border-radius: 10px; flex-shrink: 0; background: var(--accent-light); color: var(--accent); }
+  .tl-tag.err { background: var(--red-bg); color: var(--red); }
+  .tl-tag.warn { background: var(--amber-bg); color: var(--amber); }
+  .tl-desc { color: var(--text); line-height: 1.5; }
+
+  /* ── Global warn ───────────────────────────────────────────────────────── */
+  .global-warn { background: #fef2f2; border: 1px solid #fca5a5; border-radius: var(--radius-lg); padding: 14px 18px; font-size: 14.5px; font-weight: 600; color: #991b1b; margin: 16px 0; }
+
+  /* ── Tree note ─────────────────────────────────────────────────────────── */
+  .tree-note { white-space: pre-wrap; font-family: var(--font-mono); font-size: 13.5px; line-height: 1.6; color: var(--text-2); margin: 8px 0 8px 16px; }
+
+  /* ── Disclaimer ────────────────────────────────────────────────────────── */
+  .disclaimer { background: var(--bg); border: 1px solid var(--border); border-radius: var(--radius); padding: 14px 18px; font-size: 13.5px; color: var(--text-2); font-style: italic; }
+
+  /* ── Meta footer ───────────────────────────────────────────────────────── */
+  .meta {
+    margin-top: 48px; padding-top: 16px;
+    border-top: 1px solid var(--border-soft);
+    display: flex; justify-content: space-between; align-items: center;
+    font-size: 12px; color: var(--text-3);
+  }
+  .meta-source { font-family: var(--font-mono); font-size: 11.5px; }
+
+  /* ── Brand logo ────────────────────────────────────────────────────────── */
+  .brand-logo {
+    font-family: var(--font-head);
+    font-size: 14px;
+    color: var(--text-3);
+    letter-spacing: 0.05em;
+    margin-bottom: 4px;
+    flex-shrink: 0;
+    margin-left: 16px;
+  }
+  .brand-logo strong {
+    font-weight: 600;
+    color: var(--accent);
+  }
+  @media (max-width: 900px) {
+    .title-container { flex-direction: column; align-items: flex-start; gap: 12px; }
+    .brand-logo { margin-left: 0; margin-bottom: 0; }
+  }
+  /* ── Print ─────────────────────────────────────────────────────────────── */
+  @media print {
+    body { background: white; }
+    #progress, .toc { display: none; }
+    .layout { display: block; padding: 0; }
+    .article { border: none; box-shadow: none; padding: 24px; }
+    .copy-btn { display: none; }
+    .brand-logo { margin-bottom: 0; }
+  }
+
+  /* ── Responsive ────────────────────────────────────────────────────────── */
+  @media (max-width: 900px) {
+    .toc { display: none; }
+    .article { padding: 36px 28px; }
+    .layout { padding: 24px 16px 64px; }
+  }
+  @media (max-width: 480px) {
+    .article { padding: 24px 18px; }
+    .article h1 { font-size: 22px; }
+  }
+</style>
+</head>
+<body>
+
+<div id="progress"></div>
+
+<div class="layout">
+  <nav class="toc" id="toc">
+  <div class="toc-title">目录</div>
+  <div class="toc-content">
+<div class="toc-item has-children"><button class="toc-toggle" onclick="toggleToc(this)" aria-expanded="true">
+                <svg viewBox="0 0 24 24" width="12" height="12" stroke="currentColor" stroke-width="2" fill="none"><polyline points="6 9 12 15 18 9"></polyline></svg>
+              </button><a href="#h-故障诊断报告" onclick="event.preventDefault(); const target = document.getElementById('h-故障诊断报告'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l1">故障诊断报告</a></div>
+<div class="toc-group" id="group-h-一故障概览">
+<div class="toc-item has-children"><button class="toc-toggle" onclick="toggleToc(this)" aria-expanded="true">
+                <svg viewBox="0 0 24 24" width="12" height="12" stroke="currentColor" stroke-width="2" fill="none"><polyline points="6 9 12 15 18 9"></polyline></svg>
+              </button><a href="#h-一故障概览" onclick="event.preventDefault(); const target = document.getElementById('h-一故障概览'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l2">一、故障概览</a></div>
+<div class="toc-group" id="group-h-置信度说明">
+<div class="toc-item "><span class="toc-spacer"></span><a href="#h-置信度说明" onclick="event.preventDefault(); const target = document.getElementById('h-置信度说明'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l3">置信度说明</a></div>
+</div>
+<div class="toc-item has-children"><button class="toc-toggle" onclick="toggleToc(this)" aria-expanded="true">
+                <svg viewBox="0 0 24 24" width="12" height="12" stroke="currentColor" stroke-width="2" fill="none"><polyline points="6 9 12 15 18 9"></polyline></svg>
+              </button><a href="#h-二根因速览" onclick="event.preventDefault(); const target = document.getElementById('h-二根因速览'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l2">二、根因速览</a></div>
+<div class="toc-group" id="group-h-事故时间线-故障传导链路">
+<div class="toc-item "><span class="toc-spacer"></span><a href="#h-事故时间线-故障传导链路" onclick="event.preventDefault(); const target = document.getElementById('h-事故时间线-故障传导链路'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l3">事故时间线 & 故障传导链路</a></div>
+<div class="toc-item "><span class="toc-spacer"></span><a href="#h-故障因果链" onclick="event.preventDefault(); const target = document.getElementById('h-故障因果链'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l3">故障因果链</a></div>
+</div>
+<div class="toc-item has-children"><button class="toc-toggle" onclick="toggleToc(this)" aria-expanded="true">
+                <svg viewBox="0 0 24 24" width="12" height="12" stroke="currentColor" stroke-width="2" fill="none"><polyline points="6 9 12 15 18 9"></polyline></svg>
+              </button><a href="#h-三排查过程" onclick="event.preventDefault(); const target = document.getElementById('h-三排查过程'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l2">三、排查过程</a></div>
+<div class="toc-group" id="group-h-31-初始现象">
+<div class="toc-item "><span class="toc-spacer"></span><a href="#h-31-初始现象" onclick="event.preventDefault(); const target = document.getElementById('h-31-初始现象'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l3">3.1 初始现象</a></div>
+<div class="toc-item "><span class="toc-spacer"></span><a href="#h-32-假设驱动排查" onclick="event.preventDefault(); const target = document.getElementById('h-32-假设驱动排查'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l3">3.2 假设驱动排查</a></div>
+<div class="toc-item "><span class="toc-spacer"></span><a href="#h-33-排查结论" onclick="event.preventDefault(); const target = document.getElementById('h-33-排查结论'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l3">3.3 排查结论</a></div>
+</div>
+<div class="toc-item has-children"><button class="toc-toggle" onclick="toggleToc(this)" aria-expanded="true">
+                <svg viewBox="0 0 24 24" width="12" height="12" stroke="currentColor" stroke-width="2" fill="none"><polyline points="6 9 12 15 18 9"></polyline></svg>
+              </button><a href="#h-四修复方案" onclick="event.preventDefault(); const target = document.getElementById('h-四修复方案'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l2">四、修复方案</a></div>
+<div class="toc-group" id="group-h-41-正确测试方法建议">
+<div class="toc-item "><span class="toc-spacer"></span><a href="#h-41-正确测试方法建议" onclick="event.preventDefault(); const target = document.getElementById('h-41-正确测试方法建议'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l3">4.1 正确测试方法建议</a></div>
+<div class="toc-item "><span class="toc-spacer"></span><a href="#h-42-关键知识点总结" onclick="event.preventDefault(); const target = document.getElementById('h-42-关键知识点总结'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l3">4.2 关键知识点总结</a></div>
+<div class="toc-item "><span class="toc-spacer"></span><a href="#h-43-补充建议" onclick="event.preventDefault(); const target = document.getElementById('h-43-补充建议'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l3">4.3 补充建议</a></div>
+</div>
+<div class="toc-item "><span class="toc-spacer"></span><a href="#h-五证据清单" onclick="event.preventDefault(); const target = document.getElementById('h-五证据清单'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l2">五、证据清单</a></div>
+<div class="toc-item "><span class="toc-spacer"></span><a href="#h-六参考链接" onclick="event.preventDefault(); const target = document.getElementById('h-六参考链接'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l2">六、参考链接</a></div>
+</div>
+  </div>
+</nav>
+  <article class="article" id="article" style="position: relative;">
+    <div class="title-container"><h1 id="h-故障诊断报告">故障诊断报告</h1><div class="brand-logo">by <strong>Witty Diagnosis Agent</strong></div></div>
+<blockquote>
+<p><strong>报告编号</strong>：RCA-20260615-001
+<strong>故障级别</strong>：P3（配置理解偏差 / 测试方法不当）
+<strong>报告时间</strong>：2026-06-15 11:50:12
+<strong>当前状态</strong>：🟢 已分析完成（非系统故障，为测试设计偏差）</p>
+</blockquote>
+<hr>
+<h2 id="h-一故障概览">一、故障概览</h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>项目</th>
+<th>内容</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>故障标题</td>
+<td>WSL2 Ubuntu 22.04 <code>vfs_cache_pressure</code> 参数调节后 slab 增长无差异</td>
+</tr>
+<tr>
+<td>影响范围</td>
+<td>单一 WSL2 测试环境，无业务影响</td>
+</tr>
+<tr>
+<td>故障时段</td>
+<td>2026-06-15 11:34:00（诊断时间）~ 分析完成</td>
+</tr>
+<tr>
+<td>根本原因</td>
+<td><strong>测试设计偏差</strong>：<code>vfs_cache_pressure</code> 是&quot;回收压力调节器&quot;而非&quot;缓存增长节流阀&quot;。系统内存充裕（MemFree 占 87%）时 kswapd/slab shrinker 未被唤醒，参数无论设何值均不会影响 dentry 缓存增长率。</td>
+</tr>
+<tr>
+<td>是否恢复</td>
+<td><span class="badge-ok">✅ 不适用（系统本身无故障）</span></td>
+</tr>
+<tr>
+<td>根因置信度</td>
+<td>🟢 高置信</td>
+</tr>
+</tbody></table></div>
+<h3 id="h-置信度说明">置信度说明</h3>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>等级</th>
+<th>标识</th>
+<th>含义</th>
+<th>本报告适用情况</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>高置信</td>
+<td>🟢</td>
+<td>根因已明确，可复现，单一原因可解释所有现象</td>
+<td><span class="badge-ok">✅ 通过 kallsyms 符号验证、drop_caches 回收验证、slabs_scanned 计数器监控、内存状态等多维度证据，完整解释参数未生效的原因</span></td>
+</tr>
+<tr>
+<td>中置信</td>
+<td>🟡</td>
+<td>根因基本确认，但存在 1～2 个无法完全解释的现象</td>
+<td>—</td>
+</tr>
+<tr>
+<td>低置信</td>
+<td>🟠</td>
+<td>有多个可疑原因，尚未排除竞争，结论为推断</td>
+<td>—</td>
+</tr>
+<tr>
+<td>未知</td>
+<td>🔴</td>
+<td>现象无法解释，根因未定位，仍在排查中</td>
+<td>—</td>
+</tr>
+</tbody></table></div>
+<hr>
+<h2 id="h-二根因速览">二、根因速览</h2>
+<h3 id="h-事故时间线-故障传导链路">事故时间线 & 故障传导链路</h3>
+<div class="code-block">
+  <span class="code-lang">text</span>
+  <button class="copy-btn" onclick="copyCode(this)" title="复制">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
+  </button>
+  <pre><code>时间                            事件                                                    性质          证据来源
+─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+2026-06-15 11:34:00            用户测试在不同 vfs_cache_pressure 下创建 100K 文件          📋 测试执行   [用户测试脚本]
+                                  │
+                                  ▼
+                                各配置下 slab 增长量无差异（139~150MB）                    ❓ 异常表现   [kuafu_T1: L15-L21]
+                                  │
+                                  ▼
+2026-06-15 11:34:00            系统状态确认：MemFree=14GB/15.4GB (87%)                   📊 关键背景   [/proc/meminfo]
+                                  │                   MemFree 充裕 → kswapd 不唤醒
+                                  │                   → slab shrinker 不执行
+                                  │
+                                  ▼
+                                验证：参数可写性确认                                       ✅ 系统正常   [/proc/sys/vm/vfs_cache_pressure]
+                                  │                   echo 1000 → 读取确认 1000
+                                  │
+                                  ▼
+                                验证：drop_caches 手动回收确认                             ✅ 回收机制正常 [sync; echo 3 &gt; drop_caches]
+                                  │                   Slab 从 400MB+ 降至 ~113MB
+                                  │
+                                  ▼
+                                验证：内存压力下 slab shrinker 扫描确认                     ✅ shrinker 正常 [/proc/vmstat:slabs_scanned]
+                                  │                   slabs_scanned = 12,354,742
+                                  │
+                                  ▼
+                                验证：内核符号与参数实现确认                                 ✅ 实现完整   [/proc/kallsyms]
+                                  │                   sysctl_vfs_cache_pressure_denom 存在
+                                  │                   公式：effective = vfs_cache_pressure / denom
+                                  │
+                                  ▼
+                                🎯 结论：参数实现正确，测试方法衡量的      是"增长"而非"回收"</code></pre>
+</div>
+<h3 id="h-故障因果链">故障因果链</h3>
+<div class="code-block">
+  <span class="code-lang">text</span>
+  <button class="copy-btn" onclick="copyCode(this)" title="复制">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
+  </button>
+  <pre><code>用户创建 100K 文件
+    │
+    ├─► 内核分配 dentry + inode 对象 → Slab 缓存增长（正常行为）
+    │
+    ├─► 系统 MemFree = 14GB / 总量 15.4GB（空闲 87%）
+    │       │
+    │       └─► 无内存压力 → kswapd 不唤醒 → slab shrinker 不执行
+    │               │
+    │               └─► vfs_cache_pressure 参数不参与缓存增长过程
+    │                       │
+    │                       └─► 无论设 0、100、1000 还是 10000
+    │                               增长阶段表现完全相同 ← 🔴 用户观察到的现象
+    │
+    └─► 🔍 正确理解：vfs_cache_pressure 仅在回收阶段生效
+            │
+            └─► effective_pressure = vfs_cache_pressure / vfs_cache_pressure_denom
+                    │
+                    ├─► vfs_cache_pressure=0    → 0%  回收（完全不回收）
+                    ├─► vfs_cache_pressure=100  → 1.0x 标准行为（denom=100）
+                    ├─► vfs_cache_pressure=1000 → 10.0x 激进回收
+                    └─► vfs_cache_pressure=10000→ 100.0x 极端激进</code></pre>
+</div>
+<hr>
+<h2 id="h-三排查过程">三、排查过程</h2>
+<blockquote>
+<p>排查逻辑：<strong>确认参数实现完整性 → 验证参数可写性 → 验证回收机制 → 分析测试方法缺陷 → 得出结论</strong></p>
+</blockquote>
+<h3 id="h-31-初始现象">3.1 初始现象</h3>
+<ul>
+<li>在 WSL2 Ubuntu-22.04 环境中，对 <code>vfs_cache_pressure</code> 设置不同值（0, 100, 1000, 10000）后执行 100K 文件创建测试</li>
+<li>各配置下 <strong>Slab 增长量无明显差异</strong>（139MB ~ 150MB），用户认为&quot;参数未生效&quot;</li>
+<li>测试环境：内核 <code>6.18.33.1-microsoft-standard-WSL2</code>，内存总量 <code>~15.4GB</code></li>
+</ul>
+<hr>
+<h3 id="h-32-假设驱动排查">3.2 假设驱动排查</h3>
+<h4 id="h-假设-awsl2-内核未编译-vfscachepressure-支持">假设 A：WSL2 内核未编译 vfs_cache_pressure 支持</h4>
+<blockquote>
+<p>🧪 假设：WSL2 定制内核可能移除了 vfs_cache_pressure 功能</p>
+</blockquote>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>检查项</th>
+<th>操作</th>
+<th>结论</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>内核符号验证</td>
+<td><code>sudo cat /proc/kallsyms | grep vfs_cache</code></td>
+<td>✅ <code>sysctl_vfs_cache_pressure</code> 与 <code>sysctl_vfs_cache_pressure_denom</code> 均存在</td>
+</tr>
+<tr>
+<td>参数读取</td>
+<td><code>cat /proc/sys/vm/vfs_cache_pressure</code></td>
+<td>✅ 返回 <code>100</code>（默认值正常）</td>
+</tr>
+<tr>
+<td>WSL2 源码验证</td>
+<td>查阅 WSL2-Linux-Kernel 6.18.y <code>fs/dcache.c</code></td>
+<td>✅ <code>vfs_pressure_ratio()</code> 完整实现，含 <code>vfs_cache_pressure_denom</code></td>
+</tr>
+<tr>
+<td>Kconfig 检查</td>
+<td><code>zcat /proc/config.gz | grep -i VFS_CACHE</code></td>
+<td><span class="badge-ok">✅ 该功能无 Kconfig 开关，是 VFS 层内置功能，始终编译</span></td>
+</tr>
+</tbody></table></div>
+<p><strong>❌ 排除</strong>：WSL2 内核实现完整，参数存在且可读。</p>
+<hr>
+<h4 id="h-假设-b参数不可写写入后未生效">假设 B：参数不可写，写入后未生效</h4>
+<blockquote>
+<p>🧪 假设：<code>/proc/sys/vm/vfs_cache_pressure</code> 权限限制导致写入失败</p>
+</blockquote>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>检查项</th>
+<th>操作</th>
+<th>结论</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>权限检查</td>
+<td><code>ls -la /proc/sys/vm/vfs_cache_pressure</code></td>
+<td>✅ <code>rw-r--r--</code>，root 可写</td>
+</tr>
+<tr>
+<td>写入验证</td>
+<td><code>echo 1000 | sudo tee ...</code> → <code>cat</code> 验证</td>
+<td>✅ 写入成功，读取确认值为 <code>1000</code></td>
+</tr>
+</tbody></table></div>
+<p><strong>❌ 排除</strong>：参数可写，写入后读取值正确。</p>
+<hr>
+<h4 id="h-假设-c内核-slab-回收机制故障">假设 C：内核 slab 回收机制故障</h4>
+<blockquote>
+<p>🧪 假设：内核 slab shrinker 存在缺陷，无法回收 dentry/inode 缓存</p>
+</blockquote>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>检查项</th>
+<th>操作</th>
+<th>结论</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>drop_caches 回收</td>
+<td><code>sync; echo 3 | sudo tee /proc/sys/vm/drop_caches</code></td>
+<td><span class="badge-ok">✅ Slab 从 400MB+ 降至 ~113MB（SReclaimable 从 281MB 降至 ~28MB）</span></td>
+</tr>
+<tr>
+<td>内存压力下 shrinker 激活</td>
+<td>设置 <code>vfs_cache_pressure=10000</code>，<code>stress-ng</code> 制造压力</td>
+<td>✅ <code>slabs_scanned</code> 从 0 增至 12,354,742，shrinker 正常扫描</td>
+</tr>
+<tr>
+<td>cgroup 验证</td>
+<td><code>mount | grep cgroup</code> → cgroup2</td>
+<td>ℹ️ WSL2 仅用 cgroup v2，cgroup 内存限制不回收 dentry/inode slab（计入根 cgroup）</td>
+</tr>
+</tbody></table></div>
+<p><strong>❌ 排除</strong>：slab 回收机制正常，shrinker 在内存压力下正确激活。</p>
+<hr>
+<h4 id="h-假设-dvfscachepressuredenom-导致有效值被缩小核心发现">假设 D：vfs_cache_pressure_denom 导致有效值被缩小（核心发现 ✅）</h4>
+<blockquote>
+<p>🧪 假设：WSL2 特有参数 <code>vfs_cache_pressure_denom=100</code> 导致有效回收压力被缩小，使参数调节效果被掩盖</p>
+</blockquote>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>检查项</th>
+<th>操作</th>
+<th>结论</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>denom 值确认</td>
+<td><code>cat /proc/sys/vm/vfs_cache_pressure_denom</code></td>
+<td>✅ 值为 <code>100</code>（最小值）</td>
+</tr>
+<tr>
+<td>有效压力计算</td>
+<td><code>effective = vfs_cache_pressure / denom</code></td>
+<td><span class="badge-ok">✅ vfs_cache_pressure=1000 → 有效值=10.0x（激进）；10000 → 100.0x（极端）</span></td>
+</tr>
+<tr>
+<td>参数公式影响分析</td>
+<td>查阅内核源码 <code>vfs_pressure_ratio()</code></td>
+<td>✅ 公式正确，<code>denom=100</code> 未缩小参数效果，反而使设置值等比例生效</td>
+</tr>
+</tbody></table></div>
+<p><strong>❌ 排除（补充发现）</strong>：<code>vfs_cache_pressure_denom=100</code> 不影响参数功能。该参数仅为内核提供更细粒度的中间值控制能力，默认值 100 等价于标准行为；即便设 10000（有效 100.0x），在无内存压力时依然不生效。</p>
+<hr>
+<h3 id="h-33-排查结论">3.3 排查结论</h3>
+<div class="code-block">
+  <span class="code-lang">text</span>
+  <button class="copy-btn" onclick="copyCode(this)" title="复制">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
+  </button>
+  <pre><code>参数 "未生效" 现象
+├─► 假设 A：内核未编译支持       → ❌ 排除（符号存在，实现完整）
+├─► 假设 B：参数不可写           → ❌ 排除（rw 权限，写入确认成功）
+├─► 假设 C：slab 回收机制故障    → ❌ 排除（drop_caches 正常，shrinker 正常激活）
+├─► 假设 D：denom 缩小效果       → ❌ 排除（公式正确，denom=100 为最小值）
+│
+└─► 🎯 真正根因：测试方法偏差
+        │
+        ├─► 测量的对象：dentry/inode 缓存**增长**速率
+        ├─► 系统状态：MemFree=14GB（总量 15.4GB，空闲 87%）
+        ├─► kswapd 状态：未唤醒（无内存压力）
+        ├─► slab shrinker：未执行
+        │
+        └─► vfs_cache_pressure 的作用域：仅在 slab shrinker 回收阶段生效
+                └─► 增长阶段不受此参数影响 → 所有配置值表现相同 ← 与观测一致</code></pre>
+</div>
+<hr>
+<h2 id="h-四修复方案">四、修复方案</h2>
+<h3 id="h-41-正确测试方法建议">4.1 正确测试方法建议</h3>
+<p>由于此案例是 <strong>测试设计偏差</strong> 而非系统故障，以下为验证 <code>vfs_cache_pressure</code> 效果的正确方案：</p>
+<h4 id="h-方案一制造全局内存压力后再观察回收差异推荐">方案一：制造全局内存压力后再观察回收差异（推荐）</h4>
+<div class="code-block">
+  <span class="code-lang">bash</span>
+  <button class="copy-btn" onclick="copyCode(this)" title="复制">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
+  </button>
+  <pre><code># 1. 先创建大量文件构建 dentry 缓存
+# 2. 同步并记录 slab 基线
+sync
+grep Slab /proc/meminfo
+
+# 3. 设置目标 vfs_cache_pressure 值（如 10000）
+echo 10000 | sudo tee /proc/sys/vm/vfs_cache_pressure
+
+# 4. 制造全局内存压力触发 kswapd 回收
+stress-ng --vm 2 --vm-bytes 12G --timeout 30s
+
+# 5. 观察 slab 回收量差异
+grep Slab /proc/meminfo</code></pre>
+</div>
+<h4 id="h-方案二对比不同压力值下的回收效率">方案二：对比不同压力值下的回收效率</h4>
+<div class="code-block">
+  <span class="code-lang">bash</span>
+  <button class="copy-btn" onclick="copyCode(this)" title="复制">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
+  </button>
+  <pre><code># 设置保守值（压力=100）
+echo 100 | sudo tee /proc/sys/vm/vfs_cache_pressure
+stress-ng --vm 2 --vm-bytes 12G --timeout 30s
+grep Slab /proc/meminfo
+# 记录残留 slab 量
+
+# 恢复后设置激进值（压力=10000）
+echo 10000 | sudo tee /proc/sys/vm/vfs_cache_pressure
+stress-ng --vm 2 --vm-bytes 12G --timeout 30s
+grep Slab /proc/meminfo
+# 对比：激进值应回收更多 slab，残留量显著更低</code></pre>
+</div>
+<h4 id="h-方案三直接监控-slabsscanned-计数器">方案三：直接监控 slabs_scanned 计数器</h4>
+<div class="code-block">
+  <span class="code-lang">bash</span>
+  <button class="copy-btn" onclick="copyCode(this)" title="复制">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
+  </button>
+  <pre><code># 设置不同压力值后观察 shrinker 扫描深度
+echo 100 | sudo tee /proc/sys/vm/vfs_cache_pressure
+stress-ng --vm 2 --vm-bytes 12G --timeout 30s
+grep slabs_scanned /proc/vmstat
+# 压力值越高，slabs_scanned 应越大（shrinker 扫描更积极）</code></pre>
+</div>
+<h3 id="h-42-关键知识点总结">4.2 关键知识点总结</h3>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>知识点</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>vfs_cache_pressure</code> 的作用域</td>
+<td><strong>仅控制 slab 回收阶段</strong>，不参与缓存增长过程</td>
+</tr>
+<tr>
+<td>生效前提</td>
+<td>必须存在全局内存压力（kswapd 被唤醒）</td>
+</tr>
+<tr>
+<td>WSL2 <code>vfs_cache_pressure_denom</code></td>
+<td>上游主线补丁（commit <code>e7b9cea718ee</code>），非 WSL2 独有，用于提供更细粒度的中间压力值控制</td>
+</tr>
+<tr>
+<td>有效压力公式</td>
+<td><code>effective = vfs_cache_pressure / vfs_cache_pressure_denom</code></td>
+</tr>
+<tr>
+<td><code>denom</code> 默认值</td>
+<td>100（最小值），不影响标准行为</td>
+</tr>
+<tr>
+<td><code>min_slab_ratio=5</code></td>
+<td>确保 slab 至少占用 5% 内存，是下限而非上限，不影响本次分析</td>
+</tr>
+</tbody></table></div>
+<h3 id="h-43-补充建议">4.3 补充建议</h3>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>建议项</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>理解参数语义</td>
+<td><code>vfs_cache_pressure</code> 是&quot;回收倾向&quot;参数，类似内存回收的&quot;油门&quot;，不是&quot;缓存限速阀&quot;</td>
+</tr>
+<tr>
+<td>测试验证方法</td>
+<td>验证回收类参数的正确方法是<strong>制造对应压力条件</strong>后观察回收行为差异，而非观察增长行为</td>
+</tr>
+<tr>
+<td>内核版本兼容</td>
+<td>如需在非 WSL2 环境复现，<code>vfs_cache_pressure_denom</code> 需要 Linux 主线内核 ≥ 2025年5月合入版本</td>
+</tr>
+</tbody></table></div>
+<hr>
+<h2 id="h-五证据清单">五、证据清单</h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>#</th>
+<th>命令/操作</th>
+<th>关键输出</th>
+<th>支撑结论</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>1</td>
+<td><code>cat /proc/sys/vm/vfs_cache_pressure</code></td>
+<td><code>100</code></td>
+<td>参数存在，默认值正常</td>
+</tr>
+<tr>
+<td>2</td>
+<td><code>cat /proc/sys/vm/vfs_cache_pressure_denom</code></td>
+<td><code>100</code></td>
+<td>WSL2 特有参数，默认值 100（最小值）</td>
+</tr>
+<tr>
+<td>3</td>
+<td><code>uname -a</code></td>
+<td><code>6.18.33.1-microsoft-standard-WSL2</code></td>
+<td>内核版本确认</td>
+</tr>
+<tr>
+<td>4</td>
+<td><code>zcat /proc/config.gz | grep -iE &quot;VFS_CACHE|SLAB|MEMCG&quot;</code></td>
+<td>无 <code>CONFIG_VFS_CACHE_PRESSURE</code></td>
+<td>该功能无 Kconfig 开关，VFS 层内置</td>
+</tr>
+<tr>
+<td>5</td>
+<td><code>sudo cat /proc/kallsyms | grep vfs_cache</code></td>
+<td><code>sysctl_vfs_cache_pressure_denom</code></td>
+<td>内核符号存在，实现已编译</td>
+</tr>
+<tr>
+<td>6</td>
+<td><code>ls -la /proc/sys/vm/vfs_cache_pressure</code></td>
+<td><code>rw-r--r-- root root</code></td>
+<td>参数可写</td>
+</tr>
+<tr>
+<td>7</td>
+<td><code>sync; echo 3 | sudo tee /proc/sys/vm/drop_caches</code></td>
+<td>Slab 从 400MB+ 降至 ~113MB</td>
+<td>回收机制正常</td>
+</tr>
+<tr>
+<td>8</td>
+<td><code>cat /proc/vmstat | grep slabs_scanned</code></td>
+<td><code>slabs_scanned 12354742</code></td>
+<td>slab shrinker 在压力下正常扫描</td>
+</tr>
+<tr>
+<td>9</td>
+<td><code>grep Slab /proc/meminfo</code></td>
+<td><code>Slab: 123884 kB</code>; <code>SReclaimable: 33316 kB</code></td>
+<td>当前 slab 使用量较小</td>
+</tr>
+<tr>
+<td>10</td>
+<td><code>grep MemFree /proc/meminfo</code></td>
+<td><code>MemFree: 14084204 kB</code></td>
+<td>系统内存充裕（87% 空闲），无回收压力</td>
+</tr>
+</tbody></table></div>
+<hr>
+<h2 id="h-六参考链接">六、参考链接</h2>
+<ul>
+<li><a href="https://github.com/microsoft/WSL2-Linux-Kernel/blob/linux-msft-wsl-6.18.y/fs/dcache.c">WSL2-Linux-Kernel 源码 fs/dcache.c</a> — <code>vfs_pressure_ratio()</code> 与 <code>vfs_cache_pressure_denom</code> 实现</li>
+<li><a href="https://lore.kernel.org/20250511083624.9305-1-laoar.shao@gmail.com">上游主线补丁</a> — commit <code>e7b9cea718ee</code>，作者 Yafang Shao，2025年5月合入</li>
+<li>诊断原始报告：<code>C:\Users\86135\.witty-diagnosis-agent\dayu\report\kuafu_T1_20260615_113412.md</code></li>
+</ul>
+<hr>
+<p><em>报告由 Baize (分析与报告 Agent v1.4) 自动生成</em>
+<em>生成时间：2026-06-15 11:50:12 (UTC+8)</em></p>
+
+    <div class="meta">
+      <span class="meta-source">vfs_cache_pressure参数未生效_20260615_115012_report.md</span>
+      <span>生成于 2026/06/15 11:51</span>
+    </div>
+  </article>
+</div>
+
+<script>
+  /* ── 滚动进度条 ── */
+  window.addEventListener("scroll", () => {
+    const el  = document.documentElement;
+    const pct = el.scrollTop / (el.scrollHeight - el.clientHeight) * 100;
+    document.getElementById("progress").style.width = Math.min(pct, 100) + "%";
+  });
+
+  /* ── TOC 高亮当前章节 ── */
+  (function () {
+    const headings = Array.from(document.querySelectorAll("article h1,article h2,article h3"));
+    const links    = Array.from(document.querySelectorAll(".toc a"));
+    if (!links.length) return;
+    const obs = new IntersectionObserver(entries => {
+      entries.forEach(e => {
+        if (!e.isIntersecting) return;
+        links.forEach(l => l.classList.remove("active"));
+        const a = links.find(l => l.getAttribute("href") === "#" + e.target.id);
+        if (a) a.classList.add("active");
+      });
+    }, { rootMargin: "-10% 0px -80% 0px" });
+    headings.forEach(h => obs.observe(h));
+  })();
+
+  /* ── h2 章节序号自动计数 ── */
+  (function () {
+    let idx = 0;
+    document.querySelectorAll("article h2").forEach(el => {
+      idx++;
+      el.setAttribute("data-index", String(idx).padStart(2, "0"));
+    });
+  })();
+
+  /* ── 代码块一键复制 ── */
+  function copyCode(btn) {
+    const code = btn.closest(".code-block").querySelector("code").innerText;
+    navigator.clipboard.writeText(code).then(() => {
+      btn.classList.add("copied");
+      btn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>';
+      setTimeout(() => {
+        btn.classList.remove("copied");
+        btn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>';
+      }, 2000);
+    });
+  }
+
+  /* ── 目录树收缩/展开 ── */
+  function toggleToc(btn) {
+    const expanded = btn.getAttribute("aria-expanded") === "true";
+    btn.setAttribute("aria-expanded", String(!expanded));
+    const parentItem = btn.closest(".toc-item");
+    let nextEl = parentItem.nextElementSibling;
+    if (nextEl && nextEl.classList.contains("toc-group")) {
+      if (expanded) {
+        nextEl.style.maxHeight = nextEl.scrollHeight + "px";
+        void nextEl.offsetHeight;
+        nextEl.classList.add("collapsed");
+      } else {
+        nextEl.classList.remove("collapsed");
+        nextEl.style.maxHeight = nextEl.scrollHeight + "px";
+        setTimeout(() => {
+          if (!nextEl.classList.contains("collapsed")) {
+            nextEl.style.maxHeight = "none";
+          }
+        }, 300);
+      }
+    }
+  }
+</script>
+</body>
+</html>
