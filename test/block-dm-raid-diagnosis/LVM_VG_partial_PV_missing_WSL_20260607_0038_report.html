@@ -1,0 +1,1265 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>故障诊断报告</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Lora:ital,wght@0,400;0,600;1,400&family=Source+Sans+3:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  /* ── Design tokens ─────────────────────────────────────────────────────── */
+  :root {
+    --bg:          #f8f7f4;
+    --surface:     #ffffff;
+    --border:      #e8e5df;
+    --border-soft: #f0ede8;
+
+    --text:        #1c1917;
+    --text-2:      #57534e;
+    --text-3:      #a8a29e;
+
+    --accent:      #1d4e6e;
+    --accent-light:#e8f1f7;
+    --accent-mid:  #3b82a0;
+
+    --red:         #c0392b;
+    --red-bg:      #fef2f2;
+    --amber:       #92400e;
+    --amber-bg:    #fffbeb;
+    --green:       #14532d;
+    --green-bg:    #f0fdf4;
+
+    --code-bg:     #1a1d27;
+    --code-text:   #cdd6f4;
+    --code-border: #2d3148;
+
+    --font-body: "Source Sans 3", "PingFang SC", "Hiragino Sans GB", sans-serif;
+    --font-head: "Lora", "PingFang SC", Georgia, serif;
+    --font-mono: "JetBrains Mono", "Fira Code", Consolas, monospace;
+
+    --radius:    8px;
+    --radius-lg: 12px;
+    --shadow:    0 1px 3px rgba(0,0,0,.06), 0 4px 16px rgba(0,0,0,.05);
+    --shadow-lg: 0 2px 8px rgba(0,0,0,.07), 0 8px 32px rgba(0,0,0,.06);
+
+    --toc-width:   240px;
+    --gap:         32px;
+  }
+
+  /* ── Progress bar ──────────────────────────────────────────────────────── */
+  #progress {
+    position: fixed; top: 0; left: 0; height: 3px; width: 0%;
+    background: linear-gradient(90deg, var(--accent-mid), var(--accent));
+    z-index: 999; transition: width .1s linear;
+    border-radius: 0 2px 2px 0;
+  }
+
+  /* ── Base ──────────────────────────────────────────────────────────────── */
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  html { font-size: 16px; scroll-behavior: smooth; }
+  body {
+    font-family: var(--font-body);
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.8;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* ── Layout ────────────────────────────────────────────────────────────── */
+  .layout {
+    display: flex;
+    align-items: flex-start;
+    max-width: calc(var(--toc-width) + 820px + var(--gap) * 3);
+    margin: 0 auto;
+    padding: 48px var(--gap) 96px;
+    gap: var(--gap);
+  }
+
+  /* ── TOC ───────────────────────────────────────────────────────────────── */
+  .toc {
+    width: var(--toc-width);
+    flex-shrink: 0;
+    position: sticky;
+    top: 32px;
+    max-height: calc(100vh - 64px);
+    overflow-y: auto;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    padding: 20px;
+    box-shadow: var(--shadow);
+    scrollbar-width: thin;
+    scrollbar-color: var(--border) transparent;
+  }
+  .toc-title {
+    font-size: 10.5px;
+    font-weight: 600;
+    letter-spacing: .1em;
+    text-transform: uppercase;
+    color: var(--text-3);
+    margin-bottom: 12px;
+    padding-bottom: 10px;
+    border-bottom: 1px solid var(--border-soft);
+  }
+  .toc-item {
+    display: flex;
+    align-items: flex-start;
+    margin: 2px 0;
+  }
+  .toc-toggle {
+    background: none;
+    border: none;
+    cursor: pointer;
+    color: var(--text-3);
+    padding: 4px;
+    margin-right: 4px;
+    margin-top: 2px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 4px;
+    transition: background 0.2s, transform 0.2s;
+  }
+  .toc-toggle:hover { background: var(--border-soft); color: var(--text); }
+  .toc-toggle[aria-expanded="false"] svg { transform: rotate(-90deg); }
+  .toc-spacer { width: 20px; flex-shrink: 0; }
+  .toc-group { overflow: hidden; transition: max-height 0.3s ease-in-out; }
+  .toc-group.collapsed { max-height: 0 !important; }
+  
+  .toc a {
+    display: block;
+    font-size: 13px;
+    color: var(--text-2);
+    text-decoration: none;
+    padding: 4px 8px;
+    border-radius: 5px;
+    line-height: 1.45;
+    transition: background .15s, color .15s;
+    word-break: break-all;
+    flex-grow: 1;
+  }
+  .toc a:hover  { background: var(--accent-light); color: var(--accent); }
+  .toc a.active { background: var(--accent-light); color: var(--accent); font-weight: 500; }
+  .toc-l1 { font-weight: 600; color: var(--text); }
+  .toc-l2 { font-weight: 600; color: var(--text); }
+  .toc-l3 { font-size: 12px !important; padding-left: 14px !important; }
+
+  /* ── Article card ──────────────────────────────────────────────────────── */
+  .article {
+    flex: 1; min-width: 0;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    padding: 52px 60px;
+    box-shadow: var(--shadow-lg);
+  }
+
+  /* ── Headings ──────────────────────────────────────────────────────────── */
+  .title-container {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-end;
+    margin: 0 0 28px;
+    padding-bottom: 18px;
+    border-bottom: 2px solid var(--text);
+  }
+  .article h1 {
+    font-family: var(--font-head);
+    font-size: 26px; font-weight: 600; line-height: 1.3;
+    margin: 0; padding-bottom: 0;
+    border-bottom: none;
+  }
+  .article h2 {
+    font-family: var(--font-head);
+    font-size: 19px; font-weight: 600;
+    margin: 48px 0 14px; padding-bottom: 8px;
+    border-bottom: 1px solid var(--border);
+  }
+  .article h2::before {
+    content: attr(data-index);
+    display: inline-block;
+    font-family: var(--font-mono);
+    font-size: 10.5px; font-weight: 500;
+    color: var(--accent-mid);
+    background: var(--accent-light);
+    padding: 1px 7px; border-radius: 4px;
+    margin-right: 10px; vertical-align: middle;
+    letter-spacing: .05em;
+  }
+  .article h3 {
+    font-family: var(--font-head);
+    font-size: 15.5px; font-weight: 600;
+    margin: 28px 0 10px;
+  }
+  .article h3::before {
+    content: "§ ";
+    color: var(--text-3);
+    font-family: var(--font-mono); font-size: 13px;
+  }
+  .article h4 {
+    font-size: 13.5px; font-weight: 600;
+    color: var(--accent); margin: 20px 0 8px;
+  }
+
+  /* ── Body text ─────────────────────────────────────────────────────────── */
+  .article p, .plain { 
+    font-size: 15px; 
+    line-height: 1.85; 
+    color: var(--text); 
+    margin: 0 0 12px; 
+    font-family: var(--font-body);
+  }
+  .article strong { font-weight: 600; }
+  .article em     { font-style: italic; color: var(--text-2); }
+  .article a {
+    color: var(--accent); text-decoration: underline;
+    text-decoration-color: var(--accent-light);
+    text-underline-offset: 3px;
+  }
+  .article a:hover { text-decoration-color: var(--accent); }
+  .article hr { border: none; border-top: 1px solid var(--border); margin: 20px 0; }
+  .article hr.heavy { border-top: 3px solid var(--text); margin: 32px 0; }
+
+  /* ── Blockquote ────────────────────────────────────────────────────────── */
+  .article blockquote {
+    border-left: 3px solid var(--accent-mid);
+    background: var(--accent-light);
+    margin: 20px 0; padding: 13px 20px 13px 20px;
+    border-radius: 0 var(--radius) var(--radius) 0;
+  }
+  .article blockquote p { font-size: 14.5px; color: var(--accent); margin: 0; line-height: 1.7; }
+  /* 支持块引用内部保留换行符（修复头部概要换行丢失问题） */
+  .article blockquote p { white-space: pre-wrap; }
+  .article blockquote strong { color: var(--accent); }
+
+  /* ── Lists ─────────────────────────────────────────────────────────────── */
+  .article ul, .article ol { padding-left: 22px; margin: 6px 0 14px; }
+  .article li { font-size: 15px; line-height: 1.8; margin: 4px 0; }
+  .article li::marker { color: var(--accent-mid); }
+  .article li > ul, .article li > ol { margin: 3px 0; }
+
+  /* ── Inline code ───────────────────────────────────────────────────────── */
+  .article :not(pre) > code {
+    font-family: var(--font-mono);
+    font-size: 12.5px; font-weight: 500;
+    background: #f3f0eb; color: var(--red);
+    padding: 1px 5px; border-radius: 4px;
+    border: 1px solid var(--border);
+  }
+
+  /* ── Code blocks ───────────────────────────────────────────────────────── */
+  .code-block {
+    position: relative; margin: 20px 0;
+    border-radius: var(--radius-lg); overflow: hidden;
+    border: 1px solid var(--code-border);
+    box-shadow: 0 4px 20px rgba(0,0,0,.16);
+  }
+  .code-lang {
+    position: absolute; top: 0; left: 0;
+    font-family: var(--font-mono); font-size: 10px; font-weight: 500;
+    color: #7c8db5; background: #222538;
+    padding: 4px 12px; border-bottom-right-radius: 6px;
+    text-transform: uppercase; letter-spacing: .08em;
+    user-select: none;
+  }
+  .copy-btn {
+    position: absolute; top: 8px; right: 10px;
+    background: #2d3148; border: 1px solid #3d4260;
+    border-radius: 5px; color: #7c8db5; cursor: pointer;
+    padding: 5px 8px; display: flex; align-items: center;
+    transition: background .15s, color .15s; z-index: 1;
+  }
+  .copy-btn:hover  { background: #3a3f60; color: #cdd6f4; }
+  .copy-btn.copied { color: #a6e3a1; border-color: #4a6a4a; }
+  .code-block pre {
+    margin: 0; padding: 36px 20px 20px;
+    background: var(--code-bg); overflow-x: auto;
+    scrollbar-width: thin; scrollbar-color: #3d4260 transparent;
+  }
+  .code-block pre::-webkit-scrollbar { height: 5px; }
+  .code-block pre::-webkit-scrollbar-thumb { background: #3d4260; border-radius: 3px; }
+  .code-block code {
+    font-family: var(--font-mono); font-size: 13px; line-height: 1.7;
+    color: var(--code-text); background: none; border: none; padding: 0;
+    white-space: pre; word-break: normal;
+  }
+
+  /* ── Tables ────────────────────────────────────────────────────────────── */
+  .table-wrap {
+    overflow-x: auto; margin: 16px 0;
+    border-radius: var(--radius-lg);
+    border: 1px solid var(--border);
+    box-shadow: var(--shadow);
+  }
+  table { width: 100%; border-collapse: collapse; font-size: 14px; min-width: 360px; }
+  thead { background: #f4f2ee; }
+  th {
+    padding: 9px 14px; text-align: left;
+    font-size: 11.5px; font-weight: 600;
+    letter-spacing: .04em; text-transform: uppercase;
+    color: var(--text-2); border-bottom: 1px solid var(--border);
+    white-space: nowrap;
+  }
+  td {
+    padding: 8px 14px; border-bottom: 1px solid var(--border-soft);
+    color: var(--text); vertical-align: top; line-height: 1.6;
+  }
+  tbody tr:last-child td { border-bottom: none; }
+  tbody tr:nth-child(even) td { background: #faf9f7; }
+  tbody tr:hover td { background: var(--accent-light); transition: background .1s; }
+
+  /* ── KV block ──────────────────────────────────────────────────────────── */
+  .kv-block { background: var(--bg); border: 1px solid var(--border); border-radius: var(--radius-lg); overflow: hidden; margin: 12px 0 20px; }
+  .kv-row { display: flex; border-bottom: 1px solid var(--border-soft); align-items: flex-start; }
+  .kv-row:last-child { border-bottom: none; }
+  .kv-key { flex: 0 0 160px; padding: 9px 16px; font-size: 13.5px; font-weight: 600; color: var(--text-2); background: var(--surface); border-right: 1px solid var(--border-soft); }
+  .kv-val { flex: 1; padding: 9px 16px; font-size: 14px; color: var(--text); }
+
+  /* ── Status badges ─────────────────────────────────────────────────────── */
+  .badge-ok { display: inline-flex; align-items: center; gap: 4px; background: var(--green-bg); color: var(--green); font-size: 13px; font-weight: 500; padding: 2px 9px; border-radius: 20px; border: 1px solid #bbf7d0; }
+  .badge-err { display: inline-flex; align-items: center; gap: 4px; background: var(--red-bg); color: var(--red); font-size: 13px; font-weight: 500; padding: 2px 9px; border-radius: 20px; border: 1px solid #fecaca; }
+  .badge-warn { display: inline-flex; align-items: center; gap: 4px; background: var(--amber-bg); color: var(--amber); font-size: 13px; font-weight: 500; padding: 2px 9px; border-radius: 20px; border: 1px solid #fde68a; }
+
+  /* ── Priority badges ───────────────────────────────────────────────────── */
+  .pri-p0 { display: inline-block; background: #fef2f2; color: #991b1b; border: 1px solid #fca5a5; font-size: 12px; font-weight: 700; padding: 2px 8px; border-radius: 4px; letter-spacing: .04em; }
+  .pri-p1 { display: inline-block; background: #fff7ed; color: #9a3412; border: 1px solid #fdba74; font-size: 12px; font-weight: 700; padding: 2px 8px; border-radius: 4px; }
+  .pri-p2 { display: inline-block; background: #fffbeb; color: #92400e; border: 1px solid #fde68a; font-size: 12px; font-weight: 700; padding: 2px 8px; border-radius: 4px; }
+  .pri-p3 { display: inline-block; background: var(--accent-light); color: var(--accent); border: 1px solid #bfdbfe; font-size: 12px; font-weight: 700; padding: 2px 8px; border-radius: 4px; }
+
+  /* ── Fault header ──────────────────────────────────────────────────────── */
+  .fault-header { display: flex; align-items: center; gap: 12px; padding: 12px 16px; border-radius: var(--radius-lg); margin: 16px 0 8px; border: 1px solid; }
+  .fh-p0 { background: #fef2f2; border-color: #fca5a5; }
+  .fh-p1 { background: #fff7ed; border-color: #fdba74; }
+  .fh-p2 { background: #fffbeb; border-color: #fde68a; }
+  .fh-p3 { background: var(--accent-light); border-color: #bfdbfe; }
+  .fh-badge { font-family: var(--font-mono); font-size: 11px; font-weight: 700; letter-spacing: .08em; }
+  .fh-p0 .fh-badge { color: #991b1b; }
+  .fh-p1 .fh-badge { color: #9a3412; }
+  .fh-p2 .fh-badge { color: #92400e; }
+  .fh-p3 .fh-badge { color: var(--accent); }
+  .fh-rest { font-size: 14px; font-weight: 500; color: var(--text); }
+
+  /* ── Timeline ──────────────────────────────────────────────────────────── */
+  .timeline { border-left: 2px solid var(--accent-mid); margin: 16px 0 16px 8px; padding-left: 20px; }
+  .tl-row { display: flex; align-items: baseline; gap: 10px; margin: 8px 0; font-size: 13.5px; }
+  .tl-ts { font-family: var(--font-mono); font-size: 12px; color: var(--text-3); flex-shrink: 0; white-space: nowrap; }
+  .tl-tag { font-size: 11px; font-weight: 600; padding: 1px 7px; border-radius: 10px; flex-shrink: 0; background: var(--accent-light); color: var(--accent); }
+  .tl-tag.err { background: var(--red-bg); color: var(--red); }
+  .tl-tag.warn { background: var(--amber-bg); color: var(--amber); }
+  .tl-desc { color: var(--text); line-height: 1.5; }
+
+  /* ── Global warn ───────────────────────────────────────────────────────── */
+  .global-warn { background: #fef2f2; border: 1px solid #fca5a5; border-radius: var(--radius-lg); padding: 14px 18px; font-size: 14.5px; font-weight: 600; color: #991b1b; margin: 16px 0; }
+
+  /* ── Tree note ─────────────────────────────────────────────────────────── */
+  .tree-note { white-space: pre-wrap; font-family: var(--font-mono); font-size: 13.5px; line-height: 1.6; color: var(--text-2); margin: 8px 0 8px 16px; }
+
+  /* ── Disclaimer ────────────────────────────────────────────────────────── */
+  .disclaimer { background: var(--bg); border: 1px solid var(--border); border-radius: var(--radius); padding: 14px 18px; font-size: 13.5px; color: var(--text-2); font-style: italic; }
+
+  /* ── Meta footer ───────────────────────────────────────────────────────── */
+  .meta {
+    margin-top: 48px; padding-top: 16px;
+    border-top: 1px solid var(--border-soft);
+    display: flex; justify-content: space-between; align-items: center;
+    font-size: 12px; color: var(--text-3);
+  }
+  .meta-source { font-family: var(--font-mono); font-size: 11.5px; }
+
+  /* ── Brand logo ────────────────────────────────────────────────────────── */
+  .brand-logo {
+    font-family: var(--font-head);
+    font-size: 14px;
+    color: var(--text-3);
+    letter-spacing: 0.05em;
+    margin-bottom: 4px;
+    flex-shrink: 0;
+    margin-left: 16px;
+  }
+  .brand-logo strong {
+    font-weight: 600;
+    color: var(--accent);
+  }
+  @media (max-width: 900px) {
+    .title-container { flex-direction: column; align-items: flex-start; gap: 12px; }
+    .brand-logo { margin-left: 0; margin-bottom: 0; }
+  }
+  /* ── Print ─────────────────────────────────────────────────────────────── */
+  @media print {
+    body { background: white; }
+    #progress, .toc { display: none; }
+    .layout { display: block; padding: 0; }
+    .article { border: none; box-shadow: none; padding: 24px; }
+    .copy-btn { display: none; }
+    .brand-logo { margin-bottom: 0; }
+  }
+
+  /* ── Responsive ────────────────────────────────────────────────────────── */
+  @media (max-width: 900px) {
+    .toc { display: none; }
+    .article { padding: 36px 28px; }
+    .layout { padding: 24px 16px 64px; }
+  }
+  @media (max-width: 480px) {
+    .article { padding: 24px 18px; }
+    .article h1 { font-size: 22px; }
+  }
+</style>
+</head>
+<body>
+
+<div id="progress"></div>
+
+<div class="layout">
+  <nav class="toc" id="toc">
+  <div class="toc-title">目录</div>
+  <div class="toc-content">
+<div class="toc-item has-children"><button class="toc-toggle" onclick="toggleToc(this)" aria-expanded="true">
+                <svg viewBox="0 0 24 24" width="12" height="12" stroke="currentColor" stroke-width="2" fill="none"><polyline points="6 9 12 15 18 9"></polyline></svg>
+              </button><a href="#h-故障诊断报告" onclick="event.preventDefault(); const target = document.getElementById('h-故障诊断报告'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l1">故障诊断报告</a></div>
+<div class="toc-group" id="group-h-一故障概览">
+<div class="toc-item has-children"><button class="toc-toggle" onclick="toggleToc(this)" aria-expanded="true">
+                <svg viewBox="0 0 24 24" width="12" height="12" stroke="currentColor" stroke-width="2" fill="none"><polyline points="6 9 12 15 18 9"></polyline></svg>
+              </button><a href="#h-一故障概览" onclick="event.preventDefault(); const target = document.getElementById('h-一故障概览'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l2">一、故障概览</a></div>
+<div class="toc-group" id="group-h-置信度说明">
+<div class="toc-item "><span class="toc-spacer"></span><a href="#h-置信度说明" onclick="event.preventDefault(); const target = document.getElementById('h-置信度说明'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l3">置信度说明</a></div>
+</div>
+<div class="toc-item has-children"><button class="toc-toggle" onclick="toggleToc(this)" aria-expanded="true">
+                <svg viewBox="0 0 24 24" width="12" height="12" stroke="currentColor" stroke-width="2" fill="none"><polyline points="6 9 12 15 18 9"></polyline></svg>
+              </button><a href="#h-二根因速览" onclick="event.preventDefault(); const target = document.getElementById('h-二根因速览'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l2">二、根因速览</a></div>
+<div class="toc-group" id="group-h-事故时间线-故障传导链路">
+<div class="toc-item "><span class="toc-spacer"></span><a href="#h-事故时间线-故障传导链路" onclick="event.preventDefault(); const target = document.getElementById('h-事故时间线-故障传导链路'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l3">事故时间线 & 故障传导链路</a></div>
+<div class="toc-item "><span class="toc-spacer"></span><a href="#h-故障因果链" onclick="event.preventDefault(); const target = document.getElementById('h-故障因果链'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l3">故障因果链</a></div>
+</div>
+<div class="toc-item has-children"><button class="toc-toggle" onclick="toggleToc(this)" aria-expanded="true">
+                <svg viewBox="0 0 24 24" width="12" height="12" stroke="currentColor" stroke-width="2" fill="none"><polyline points="6 9 12 15 18 9"></polyline></svg>
+              </button><a href="#h-三三堆栈分析结论l1l2l3" onclick="event.preventDefault(); const target = document.getElementById('h-三三堆栈分析结论l1l2l3'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l2">三、三堆栈分析结论（L1→L2→L3）</a></div>
+<div class="toc-group" id="group-h-l1-块层结论">
+<div class="toc-item "><span class="toc-spacer"></span><a href="#h-l1-块层结论" onclick="event.preventDefault(); const target = document.getElementById('h-l1-块层结论'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l3">L1 块层结论</a></div>
+<div class="toc-item "><span class="toc-spacer"></span><a href="#h-l2-映射栈结论" onclick="event.preventDefault(); const target = document.getElementById('h-l2-映射栈结论'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l3">L2 映射栈结论</a></div>
+<div class="toc-item "><span class="toc-spacer"></span><a href="#h-l3-物理层结论" onclick="event.preventDefault(); const target = document.getElementById('h-l3-物理层结论'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l3">L3 物理层结论</a></div>
+<div class="toc-item "><span class="toc-spacer"></span><a href="#h-三层交叉验证" onclick="event.preventDefault(); const target = document.getElementById('h-三层交叉验证'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l3">三层交叉验证</a></div>
+</div>
+<div class="toc-item has-children"><button class="toc-toggle" onclick="toggleToc(this)" aria-expanded="true">
+                <svg viewBox="0 0 24 24" width="12" height="12" stroke="currentColor" stroke-width="2" fill="none"><polyline points="6 9 12 15 18 9"></polyline></svg>
+              </button><a href="#h-四排查过程" onclick="event.preventDefault(); const target = document.getElementById('h-四排查过程'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l2">四、排查过程</a></div>
+<div class="toc-group" id="group-h-41-初始现象">
+<div class="toc-item "><span class="toc-spacer"></span><a href="#h-41-初始现象" onclick="event.preventDefault(); const target = document.getElementById('h-41-初始现象'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l3">4.1 初始现象</a></div>
+<div class="toc-item "><span class="toc-spacer"></span><a href="#h-42-假设驱动排查" onclick="event.preventDefault(); const target = document.getElementById('h-42-假设驱动排查'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l3">4.2 假设驱动排查</a></div>
+<div class="toc-item "><span class="toc-spacer"></span><a href="#h-43-排除的替代假设" onclick="event.preventDefault(); const target = document.getElementById('h-43-排除的替代假设'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l3">4.3 排除的替代假设</a></div>
+<div class="toc-item "><span class="toc-spacer"></span><a href="#h-44-排查结论树" onclick="event.preventDefault(); const target = document.getElementById('h-44-排查结论树'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l3">4.4 排查结论树</a></div>
+</div>
+<div class="toc-item has-children"><button class="toc-toggle" onclick="toggleToc(this)" aria-expanded="true">
+                <svg viewBox="0 0 24 24" width="12" height="12" stroke="currentColor" stroke-width="2" fill="none"><polyline points="6 9 12 15 18 9"></polyline></svg>
+              </button><a href="#h-五修复方案" onclick="event.preventDefault(); const target = document.getElementById('h-五修复方案'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l2">五、修复方案</a></div>
+<div class="toc-group" id="group-h-51-数据可恢复性评估">
+<div class="toc-item "><span class="toc-spacer"></span><a href="#h-51-数据可恢复性评估" onclick="event.preventDefault(); const target = document.getElementById('h-51-数据可恢复性评估'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l3">5.1 数据可恢复性评估</a></div>
+<div class="toc-item "><span class="toc-spacer"></span><a href="#h-52-修复方案" onclick="event.preventDefault(); const target = document.getElementById('h-52-修复方案'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l3">5.2 修复方案</a></div>
+<div class="toc-item "><span class="toc-spacer"></span><a href="#h-53-验证方法" onclick="event.preventDefault(); const target = document.getElementById('h-53-验证方法'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l3">5.3 验证方法</a></div>
+</div>
+<div class="toc-item has-children"><button class="toc-toggle" onclick="toggleToc(this)" aria-expanded="true">
+                <svg viewBox="0 0 24 24" width="12" height="12" stroke="currentColor" stroke-width="2" fill="none"><polyline points="6 9 12 15 18 9"></polyline></svg>
+              </button><a href="#h-六附录" onclick="event.preventDefault(); const target = document.getElementById('h-六附录'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l2">六、附录</a></div>
+<div class="toc-group" id="group-h-61-lvm-元数据备份清单">
+<div class="toc-item "><span class="toc-spacer"></span><a href="#h-61-lvm-元数据备份清单" onclick="event.preventDefault(); const target = document.getElementById('h-61-lvm-元数据备份清单'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l3">6.1 LVM 元数据备份清单</a></div>
+<div class="toc-item "><span class="toc-spacer"></span><a href="#h-62-环境信息" onclick="event.preventDefault(); const target = document.getElementById('h-62-环境信息'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l3">6.2 环境信息</a></div>
+<div class="toc-item "><span class="toc-spacer"></span><a href="#h-63-相关文件路径" onclick="event.preventDefault(); const target = document.getElementById('h-63-相关文件路径'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l3">6.3 相关文件路径</a></div>
+</div>
+</div>
+  </div>
+</nav>
+  <article class="article" id="article" style="position: relative;">
+    <div class="title-container"><h1 id="h-故障诊断报告">故障诊断报告</h1><div class="brand-logo">by <strong>Witty Diagnosis Agent</strong></div></div>
+<blockquote>
+<p><strong>报告编号</strong>：RCA-20260607-001
+<strong>故障级别</strong>：P2（VG partial，LV 不可激活，但系统盘不受影响）
+<strong>报告时间</strong>：2026-06-07 11:34:14
+<strong>当前状态</strong>：🔴 未恢复</p>
+</blockquote>
+<hr>
+<h2 id="h-一故障概览">一、故障概览</h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>项目</th>
+<th>内容</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>故障标题</td>
+<td>WSL Ubuntu 22.04 中 VG test_vg_b 因 PV /dev/loop1 后端文件丢失处于 partial 状态</td>
+</tr>
+<tr>
+<td>影响范围</td>
+<td>VG <code>test_vg_b</code> 整体不可激活，LV <code>test_lv_b</code> 无法挂载使用；同一环境中的 VG <code>test_vg</code> 同样因 loop 无后端文件不可用</td>
+</tr>
+<tr>
+<td>故障时段</td>
+<td>2026-06-07 11:27:34 起持续至今</td>
+</tr>
+<tr>
+<td>根本原因</td>
+<td>PV <code>/dev/loop1</code> 的后端文件（backing file）被意外删除/移除，导致 LVM 无法在该设备上读取 PV 标签，VG 无法发现所有 PV 而进入 partial 状态</td>
+</tr>
+<tr>
+<td>是否恢复</td>
+<td><span class="badge-err">❌ 未恢复</span></td>
+</tr>
+<tr>
+<td>根因置信度</td>
+<td>🟢 高置信</td>
+</tr>
+</tbody></table></div>
+<h3 id="h-置信度说明">置信度说明</h3>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>等级</th>
+<th>标识</th>
+<th>含义</th>
+<th>对应本故障</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>高置信</td>
+<td>🟢</td>
+<td>根因已明确，可复现，单一原因可解释所有现象</td>
+<td><span class="badge-ok">✅ LVM 备份元数据中明确记录了 PV 对应关系；后端文件被删除是唯一解释；缺失 PV 上无 LV 数据分配的发现与 partial 现象完全吻合</span></td>
+</tr>
+<tr>
+<td>中置信</td>
+<td>🟡</td>
+<td>根因基本确认，但存在 1～2 个无法完全解释的现象</td>
+<td>—</td>
+</tr>
+<tr>
+<td>低置信</td>
+<td>🟠</td>
+<td>有多个可疑原因，尚未排除竞争，结论为推断</td>
+<td>—</td>
+</tr>
+<tr>
+<td>未知</td>
+<td>🔴</td>
+<td>现象无法解释，根因未定位，仍在排查中</td>
+<td>—</td>
+</tr>
+</tbody></table></div>
+<hr>
+<h2 id="h-二根因速览">二、根因速览</h2>
+<h3 id="h-事故时间线-故障传导链路">事故时间线 & 故障传导链路</h3>
+<div class="code-block">
+  <span class="code-lang">text</span>
+  <button class="copy-btn" onclick="copyCode(this)" title="复制">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
+  </button>
+  <pre><code>时间                               事件                                                    性质           证据来源
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+2026-06-07 11:27:34               VG test_vg_b 被创建 (vgcreate)                           📋 正常操作     /etc/lvm/archive/test_vg_b_00000
+  │
+  ▼
+2026-06-07 11:27:34 (续)          LV test_lv_b 被创建 (lvcreate)，数据全部在 pv0/loop0      📋 正常操作     /etc/lvm/backup/test_vg_b
+  │                                pv1/loop1 上未分配任何 LV 段
+  │
+  ▼
+[故障发生时刻 - 时间不详]         /dev/loop1 的后端文件被意外删除/移除                      ⚠️  触发事件     losetup -a 返回空
+  │
+  ▼
+[紧随其后]                        /dev/loop1 设备节点虽存在，但无后端文件提供存储能力          ⚠️  条件劣化     dmesg / 设备状态
+  │
+  ▼
+[紧随其后]                        LVM 扫描 /dev/loop1 时找不到已写入的 PV 标签                🔴 故障激活     pvs 显示 [unknown]; 
+  │                                (UUID: E1FyXU-DNYs-b29T-Q7t6-8Jyr-xkcW-NxHPXB)                       系统日志: "Couldn't find device"
+  ▼
+[紧随其后]                        VG test_vg_b 标记 #PV Missing = 1                         🔴 故障确认     vgs 显示 partial (wz-pn-)
+  │                                状态变为 partial
+  ▼
+[持续至今]                        VG partial 阻止 VG/LV 激活                                🔴 故障持续     lvs 返回空; LV 不可用
+                                   LV test_lv_b 无法挂载</code></pre>
+</div>
+<h3 id="h-故障因果链">故障因果链</h3>
+<div class="code-block">
+  <span class="code-lang">text</span>
+  <button class="copy-btn" onclick="copyCode(this)" title="复制">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
+  </button>
+  <pre><code>/dev/loop1 后端文件被删除
+    └─► losetup 无法关联后端文件，loop1 设备无实际存储能力
+            └─► LVM 扫描 loop1 时无法读取 PV 标签（pv1 UUID=E1FyXU-DNYs-...）
+                    └─► VG test_vg_b 标记 #PV Missing=1，状态变为 partial (wz-pn-)
+                            └─► VG partial 状态下系统拒绝激活 VG/LV
+                                    └─► LV test_lv_b 无法挂载，数据不可访问</code></pre>
+</div>
+<hr>
+<h2 id="h-三三堆栈分析结论l1l2l3">三、三堆栈分析结论（L1→L2→L3）</h2>
+<h3 id="h-l1-块层结论">L1 块层结论</h3>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>检查项</th>
+<th>结果</th>
+<th>判定</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>IO 性能（%util / await）</td>
+<td>系统盘 sdd IO 正常，无性能瓶颈</td>
+<td><span class="badge-ok">✅ 正常</span></td>
+</tr>
+<tr>
+<td>队列状态（scheduler / queue）</td>
+<td>未发现异常</td>
+<td><span class="badge-ok">✅ 正常</span></td>
+</tr>
+<tr>
+<td>错误计数（dmesg I/O error）</td>
+<td>无块层 IO 错误记录</td>
+<td><span class="badge-ok">✅ 正常</span></td>
+</tr>
+<tr>
+<td>D 状态进程</td>
+<td>未发现异常堆积</td>
+<td><span class="badge-ok">✅ 正常</span></td>
+</tr>
+</tbody></table></div>
+<p><strong>L1 判定：✅ 正常</strong> — 本故障非块层 IO 问题，系统盘正常运行。</p>
+<h3 id="h-l2-映射栈结论">L2 映射栈结论</h3>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>检查项</th>
+<th>结果</th>
+<th>判定</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>DM 设备</td>
+<td><code>/dev/mapper/</code> 仅 control 节点，<code>dmsetup</code> 返回 &quot;No devices found&quot;</td>
+<td><span class="badge-warn">⚠️ 无活动 DM 设备</span></td>
+</tr>
+<tr>
+<td><strong>PV 状态</strong></td>
+<td><code>pvs</code> 返回空（sudo 下无 PV）；pvscan 无匹配 PV；所有 loop 设备无后端文件</td>
+<td><span class="badge-err">❌ 异常</span></td>
+</tr>
+<tr>
+<td><strong>VG 状态</strong></td>
+<td><code>vgs/vgscan</code> 返回 &quot;No volume groups found&quot;；元数据仅存在于备份中</td>
+<td><span class="badge-err">❌ 异常</span></td>
+</tr>
+<tr>
+<td><strong>LV 状态</strong></td>
+<td><code>lvs/lvscan</code> 返回空；无活动 LV</td>
+<td><span class="badge-err">❌ 异常</span></td>
+</tr>
+<tr>
+<td>LVM 元数据</td>
+<td>备份 <code>/etc/lvm/backup/test_vg_b</code> 完整可读，记录了正确的 PV/UUID/LV 信息</td>
+<td><span class="badge-ok">✅ 元数据完好</span></td>
+</tr>
+</tbody></table></div>
+<p><strong>重要发现 — LV 数据布局：</strong></p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>属性</th>
+<th>值</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>LV 名称</td>
+<td>test_lv_b</td>
+</tr>
+<tr>
+<td>LV UUID</td>
+<td>KfkBK1-ihRv-mHR0-FAG7-wjeD-1rFc-xtzepf</td>
+</tr>
+<tr>
+<td>大小</td>
+<td>100 MiB (25 extents)</td>
+</tr>
+<tr>
+<td>类型</td>
+<td>linear (stripe_count=1)</td>
+</tr>
+<tr>
+<td><strong>数据位置</strong></td>
+<td><strong>pv0 (/dev/loop0)，start_extent=0</strong></td>
+</tr>
+<tr>
+<td><strong>pv1 占用</strong></td>
+<td><strong>无任何 LV 段分配</strong></td>
+</tr>
+</tbody></table></div>
+<blockquote>
+<p><strong>关键：</strong> LV <code>test_lv_b</code> 的 100MB 数据全部位于 pv0 (/dev/loop0)，缺失的 pv1 (/dev/loop1) 上未分配任何 LV 段。<strong>pv1 的缺失不影响 LV 数据的完整性</strong>。</p>
+</blockquote>
+<p><strong>L2 判定：❌ 异常</strong> — PV missing，VG partial，LV 不可激活。但元数据备份完好，数据理论上可恢复。</p>
+<h3 id="h-l3-物理层结论">L3 物理层结论</h3>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>检查项</th>
+<th>结果</th>
+<th>判定</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>设备健康</td>
+<td>非物理磁盘，为 WSL2 虚拟 loop 设备</td>
+<td>不适用</td>
+</tr>
+<tr>
+<td>链路/硬件错误</td>
+<td>无</td>
+<td><span class="badge-ok">✅ 正常</span></td>
+</tr>
+<tr>
+<td>后端文件</td>
+<td>所有 loop 设备（loop0-loop7）均无后端文件关联</td>
+<td><span class="badge-warn">⚠️ 异常（人为删除）</span></td>
+</tr>
+</tbody></table></div>
+<p><strong>L3 判定：⚠️ 不适用（虚拟设备场景）</strong> — 本故障涉及 WSL2 的 loop 虚拟设备，非物理磁盘硬件故障。</p>
+<h3 id="h-三层交叉验证">三层交叉验证</h3>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>验证维度</th>
+<th>L1 块层</th>
+<th>L2 映射栈</th>
+<th>L3 物理层</th>
+<th>是否吻合</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>IO 错误源</td>
+<td>正常</td>
+<td>DM 无设备</td>
+<td>虚拟设备无后端文件</td>
+<td><span class="badge-ok">✅ 吻合：不是硬件 IO 问题</span></td>
+</tr>
+<tr>
+<td>设备不可用</td>
+<td>正常</td>
+<td>pv1 missing, VG partial</td>
+<td>loop1 无后端文件</td>
+<td><span class="badge-ok">✅ 吻合：后端文件丢失导致</span></td>
+</tr>
+<tr>
+<td>性能下降</td>
+<td>正常</td>
+<td>未激活</td>
+<td>无后端文件</td>
+<td><span class="badge-ok">✅ 吻合：非性能问题</span></td>
+</tr>
+<tr>
+<td>只读切换</td>
+<td>正常</td>
+<td>无 DM 错误传播</td>
+<td>正常</td>
+<td><span class="badge-ok">✅ 吻合：未涉及只读切换</span></td>
+</tr>
+</tbody></table></div>
+<hr>
+<h2 id="h-四排查过程">四、排查过程</h2>
+<h3 id="h-41-初始现象">4.1 初始现象</h3>
+<ul>
+<li>VG <code>test_vg_b</code> 处于 <strong>partial</strong> 状态（wz-pn-），<code>#PV Missing = 1</code></li>
+<li><code>pvs</code> 显示一个 PV 为 <code>[unknown]</code> 状态 <code>a-m</code>（missing）</li>
+<li><code>vgs</code> 返回 &quot;No volume groups found&quot;（sudo 下）</li>
+<li>系统日志：<code>Couldn&#39;t find device with uuid E1FyXU-DNYs-b29T-Q7t6-8Jyr-xkcW-NxHPXB</code></li>
+</ul>
+<h3 id="h-42-假设驱动排查">4.2 假设驱动排查</h3>
+<h4 id="h-假设-a块设备硬件故障">假设 A：块设备硬件故障</h4>
+<blockquote>
+<p>🧪 假设：底层磁盘硬件损坏导致 PV 无法读取</p>
+</blockquote>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>检查项</th>
+<th>操作</th>
+<th>结论</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>物理磁盘状态</td>
+<td>检查系统盘 sdd 运行正常</td>
+<td><span class="badge-ok">✅ 正常</span></td>
+</tr>
+<tr>
+<td>dmesg 错误</td>
+<td>无 I/O error / Buffer I/O error</td>
+<td><span class="badge-ok">✅ 正常</span></td>
+</tr>
+<tr>
+<td>系统环境</td>
+<td>WSL2 虚拟化环境，loop 设备使用虚拟后端文件</td>
+<td><span class="badge-ok">✅ 确认非物理磁盘故障</span></td>
+</tr>
+</tbody></table></div>
+<p><strong>❌ 排除</strong>：本场景为 WSL2 虚拟 loop 设备，不存在物理磁盘硬件故障。</p>
+<hr>
+<h4 id="h-假设-blvm-元数据损坏">假设 B：LVM 元数据损坏</h4>
+<blockquote>
+<p>🧪 假设：VG 元数据丢失或损坏，导致内核无法识别 PV</p>
+</blockquote>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>检查项</th>
+<th>操作</th>
+<th>结论</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>备份元数据</td>
+<td>读取 <code>/etc/lvm/backup/test_vg_b</code></td>
+<td><span class="badge-ok">✅ 完整可读</span></td>
+</tr>
+<tr>
+<td>归档元数据</td>
+<td>读取 <code>/etc/lvm/archive/test_vg_b_00000/00001</code></td>
+<td><span class="badge-ok">✅ 完整可读</span></td>
+</tr>
+<tr>
+<td>元数据一致性</td>
+<td>pv0/pv1 UUID 与 LV 段映射清晰记录</td>
+<td><span class="badge-ok">✅ 一致</span></td>
+</tr>
+</tbody></table></div>
+<p><strong>❌ 排除</strong>：LVM 元数据备份完好，非元数据损坏问题。</p>
+<hr>
+<h4 id="h-假设-clvm-filter-配置过滤了设备">假设 C：LVM filter 配置过滤了设备</h4>
+<blockquote>
+<p>🧪 假设：lvm.conf 中 device_filter 阻止了 LVM 扫描 loop 设备</p>
+</blockquote>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>检查项</th>
+<th>操作</th>
+<th>结论</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>lvm.conf filter</td>
+<td>filter = [ &quot;a|.*|&quot; ]</td>
+<td><span class="badge-ok">✅ 接受所有设备</span></td>
+</tr>
+<tr>
+<td>设备可见性</td>
+<td><code>/dev/loop1</code> 设备节点存在</td>
+<td><span class="badge-ok">✅ 存在</span></td>
+</tr>
+</tbody></table></div>
+<p><strong>❌ 排除</strong>：filter 配置为接受所有设备，LVM 扫描路径正常。</p>
+<hr>
+<h4 id="h-假设-dloop-设备后端文件被移除-确认为根因">假设 D：loop 设备后端文件被移除 ✅ **确认为根因**</h4>
+<blockquote>
+<p>🧪 假设：<code>/dev/loop1</code> 的后端文件（backing file）被意外删除，导致 PV 标签和数据一并丢失</p>
+</blockquote>
+<p><strong>Step 1 — 确认 losetup 关联状态</strong></p>
+<div class="code-block">
+  <span class="code-lang">bash</span>
+  <button class="copy-btn" onclick="copyCode(this)" title="复制">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
+  </button>
+  <pre><code>losetup -a  →  返回空（所有 loop 设备均无后端文件关联）</code></pre>
+</div>
+<p><strong>Step 2 — 确认 LVM 扫描结果</strong></p>
+<div class="code-block">
+  <span class="code-lang">bash</span>
+  <button class="copy-btn" onclick="copyCode(this)" title="复制">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
+  </button>
+  <pre><code>pvs    → 无输出（sudo 下找不到任何 PV）
+pvscan → "No matching physical volumes found"</code></pre>
+</div>
+<p><strong>Step 3 — 确认 VG/LV 元数据</strong></p>
+<div class="code-block">
+  <span class="code-lang">bash</span>
+  <button class="copy-btn" onclick="copyCode(this)" title="复制">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
+  </button>
+  <pre><code># 备份元数据完整，LV 数据全部在 pv0 上
+vgcfgrestore -l test_vg_b  → 显示 seqno=2 的完整备份</code></pre>
+</div>
+<p><strong>Step 4 — 确认 PV 状态</strong></p>
+<div class="code-block">
+  <span class="code-lang">text</span>
+  <button class="copy-btn" onclick="copyCode(this)" title="复制">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
+  </button>
+  <pre><code>pv0: /dev/loop0 - 正常（但无后端文件）
+pv1: /dev/loop1 - [unknown] missing（无后端文件）
+LV test_lv_b: 数据全部在 pv0, stripe 0, extent 0-24</code></pre>
+</div>
+<p><strong>✅ 结论：PV <code>/dev/loop1</code> 的后端文件被删除 → LVM 无法读取 PV 标签 → VG partial。但 LV 数据全部在 pv0 上，缺失的 pv1 不包含任何 LV 数据。</strong></p>
+<hr>
+<h3 id="h-43-排除的替代假设">4.3 排除的替代假设</h3>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>替代假设</th>
+<th>排除原因</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>块设备硬件故障</td>
+<td>排除。WSL2 中 loop 设备使用虚拟后端文件，非物理磁盘</td>
+</tr>
+<tr>
+<td>DM 映射表损坏</td>
+<td>排除。无活动的 DM 设备，dmsetup 正常返回</td>
+</tr>
+<tr>
+<td>LVM 元数据损坏</td>
+<td>排除。备份元数据（/etc/lvm/backup/test_vg_b）完整可读</td>
+</tr>
+<tr>
+<td>LVM filter 过滤</td>
+<td>排除。lvm.conf 中 filter = [ &quot;a|.*|&quot; ]（接受所有设备）</td>
+</tr>
+<tr>
+<td>内核模块问题</td>
+<td>排除。loop 内核模块正常，设备节点存在</td>
+</tr>
+</tbody></table></div>
+<h3 id="h-44-排查结论树">4.4 排查结论树</h3>
+<div class="code-block">
+  <span class="code-lang">text</span>
+  <button class="copy-btn" onclick="copyCode(this)" title="复制">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
+  </button>
+  <pre><code>VG test_vg_b partial（#PV Missing = 1）
+├─► 块设备硬件故障      → ✅ 正常，排除（WSL2 虚拟环境）
+├─► LVM 元数据损坏      → ✅ 正常，排除（备份完整可读）
+├─► LVM filter 过滤     → ✅ 正常，排除（接受所有设备）
+└─► loop 设备后端文件丢失 → ❌ 确认根因
+        ├─► pv0 (/dev/loop0): 后端文件也丢失，但 LV 数据位于此
+        └─► pv1 (/dev/loop1): 后端文件丢失 → [unknown] missing
+                └─► 🎯 根因确认：后端文件被删除</code></pre>
+</div>
+<hr>
+<h2 id="h-五修复方案">五、修复方案</h2>
+<h3 id="h-51-数据可恢复性评估">5.1 数据可恢复性评估</h3>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>场景</th>
+<th>恢复可能性</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>loop0 和 loop1 的后端文件均丢失</td>
+<td><span class="badge-err">❌ 数据不可恢复</span></td>
+<td>所有 loop 无后端文件，PV 数据已丢失</td>
+</tr>
+<tr>
+<td><strong>仅 loop1 后端文件丢失，loop0 保留</strong></td>
+<td>✅ <strong>数据可恢复</strong></td>
+<td>LV 数据全在 pv0，缺失 pv1 无数据分配</td>
+</tr>
+<tr>
+<td>两个后端文件均存在但 losetup 未关联</td>
+<td><span class="badge-ok">✅ 数据可恢复</span></td>
+<td>重新关联后端文件，vgscan 即可恢复</td>
+</tr>
+</tbody></table></div>
+<h3 id="h-52-修复方案">5.2 修复方案</h3>
+<h4 id="h-方案-a后端文件仍存在优先级最高">方案 A：后端文件仍存在（优先级最高）</h4>
+<p>如果 <code>.img</code> 后端文件仍在文件系统中但未关联为 loop 设备：</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>步骤</th>
+<th>操作</th>
+<th>风险等级</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>1</td>
+<td><code>find / -name &quot;*.img&quot; 2&gt;/dev/null</code> 查找后端文件</td>
+<td>低</td>
+<td>确认文件是否存在</td>
+</tr>
+<tr>
+<td>2</td>
+<td><code>losetup /dev/loop0 /path/to/backing.img0</code> 重新关联</td>
+<td>中</td>
+<td>关联 loop0 的后端文件</td>
+</tr>
+<tr>
+<td>3</td>
+<td><code>losetup /dev/loop1 /path/to/backing.img1</code> 重新关联</td>
+<td>中</td>
+<td>关联 loop1 的后端文件</td>
+</tr>
+<tr>
+<td>4</td>
+<td><code>vgscan &amp;&amp; vgchange -ay</code> 扫描并激活 VG</td>
+<td>中</td>
+<td>激活后即可挂载 LV</td>
+</tr>
+</tbody></table></div>
+<h4 id="h-方案-b仅-loop0-后端文件存在推荐-无损恢复">方案 B：仅 loop0 后端文件存在（推荐 — 无损恢复）</h4>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>步骤</th>
+<th>操作</th>
+<th>风险等级</th>
+<th>回滚方案</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>1</td>
+<td><code>losetup /dev/loop0 /path/to/loop0_backing.img</code></td>
+<td>中</td>
+<td><code>losetup -d /dev/loop0</code></td>
+</tr>
+<tr>
+<td>2</td>
+<td><code>vgscan</code> 扫描发现 VG</td>
+<td>低</td>
+<td>无操作风险</td>
+</tr>
+<tr>
+<td>3</td>
+<td><code>vgreduce --removemissing --force test_vg_b</code></td>
+<td><strong>高</strong></td>
+<td>从 VG 中移除 missing 的 pv1</td>
+</tr>
+<tr>
+<td>4</td>
+<td><code>vgchange -ay test_vg_b</code> 激活 VG</td>
+<td>中</td>
+<td><code>vgchange -an test_vg_b</code></td>
+</tr>
+<tr>
+<td>5</td>
+<td><code>mount /dev/test_vg_b/test_lv_b /mnt</code> 挂载 LV</td>
+<td>低</td>
+<td><code>umount /mnt</code></td>
+</tr>
+</tbody></table></div>
+<blockquote>
+<p><strong>⚠️ 风险提示：</strong> <code>vgreduce --removemissing</code> 操作风险等级为<strong>高</strong>。执行前必须确认缺失的 pv1 上确实无 LV 数据分配（已通过备份元数据验证）。建议在执行前备份 <code>/etc/lvm/backup/test_vg_b</code>。</p>
+</blockquote>
+<h4 id="h-方案-c两个后端文件均丢失-数据不可恢复">方案 C：两个后端文件均丢失 — 数据不可恢复</h4>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>步骤</th>
+<th>操作</th>
+<th>风险等级</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>1</td>
+<td>确认所有后端文件已丢失</td>
+<td>低</td>
+<td><code>losetup -a</code> + 搜索文件系统</td>
+</tr>
+<tr>
+<td>2</td>
+<td><code>vgcfgrestore -f /etc/lvm/archive/test_vg_b_00000 test_vg_b</code> 回退</td>
+<td>低</td>
+<td>仅恢复元数据结构</td>
+</tr>
+<tr>
+<td>3</td>
+<td>重建后端文件 + 重新创建 VG/LV</td>
+<td>低</td>
+<td>数据需要从其他备份恢复</td>
+</tr>
+</tbody></table></div>
+<h3 id="h-53-验证方法">5.3 验证方法</h3>
+<ol>
+<li>检查后端文件残留：<code>find / -name &quot;*.img&quot; 2&gt;/dev/null</code></li>
+<li>检查 loop 设备关联状态：<code>losetup -a</code></li>
+<li>恢复后验证 VG 状态：<code>vgs -o+missing</code></li>
+<li>激活并挂载验证：<code>vgchange -ay test_vg_b &amp;&amp; mount /dev/test_vg_b/test_lv_b /mnt &amp;&amp; ls /mnt</code></li>
+<li>查看 LV 数据完整性：<code>mount | grep test_lv_b</code></li>
+</ol>
+<hr>
+<h2 id="h-六附录">六、附录</h2>
+<h3 id="h-61-lvm-元数据备份清单">6.1 LVM 元数据备份清单</h3>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>文件</th>
+<th>描述</th>
+<th>时间</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>/etc/lvm/archive/test_vg_b_00000</code></td>
+<td>vgcreate 之前</td>
+<td>2026-06-07 11:27:34</td>
+</tr>
+<tr>
+<td><code>/etc/lvm/archive/test_vg_b_00001</code></td>
+<td>lvcreate 之前</td>
+<td>2026-06-07 11:27:34</td>
+</tr>
+<tr>
+<td><code>/etc/lvm/backup/test_vg_b</code></td>
+<td>lvcreate 之后（最新）</td>
+<td>2026-06-07 11:27:34</td>
+</tr>
+<tr>
+<td><code>/etc/lvm/archive/test_vg_00000</code></td>
+<td>vgcreate 之前</td>
+<td>2026-06-07 08:48:59</td>
+</tr>
+<tr>
+<td><code>/etc/lvm/archive/test_vg_00001</code></td>
+<td>lvcreate 之前</td>
+<td>2026-06-07 08:49:04</td>
+</tr>
+<tr>
+<td><code>/etc/lvm/backup/test_vg</code></td>
+<td>lvcreate 之后（最新）</td>
+<td>2026-06-07 08:49:04</td>
+</tr>
+</tbody></table></div>
+<h3 id="h-62-环境信息">6.2 环境信息</h3>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>项目</th>
+<th>值</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>操作系统</td>
+<td>Ubuntu 22.04.5 LTS (Jammy Jellyfish)</td>
+</tr>
+<tr>
+<td>内核版本</td>
+<td>6.6.114.1-microsoft-standard-WSL2</td>
+</tr>
+<tr>
+<td>环境类型</td>
+<td>WSL2 (Windows Subsystem for Linux)</td>
+</tr>
+<tr>
+<td>故障 VG</td>
+<td>test_vg_b (UUID: 7l9Fc2-4add-W6Dc-pL4t-XCcg-61rl-Sdkrnq)</td>
+</tr>
+<tr>
+<td>故障 LV</td>
+<td>test_lv_b (UUID: KfkBK1-ihRv-mHR0-FAG7-wjeD-1rFc-xtzepf, 100MiB)</td>
+</tr>
+<tr>
+<td>缺失 PV</td>
+<td>/dev/loop1 (UUID: E1FyXU-DNYs-b29T-Q7t6-8Jyr-xkcW-NxHPXB)</td>
+</tr>
+<tr>
+<td>关联 VG</td>
+<td>test_vg（同样因 loop 无后端文件不可用）</td>
+</tr>
+</tbody></table></div>
+<h3 id="h-63-相关文件路径">6.3 相关文件路径</h3>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>文件</th>
+<th>绝对路径</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>诊断证据（Kuafu 报告）</td>
+<td><code>C:\Users\86135\.witty-diagnosis-agent\kuafu\kuafu_T1_20260607_0038.md</code></td>
+</tr>
+<tr>
+<td>本 RCA 报告</td>
+<td><code>C:\Users\86135\.witty-diagnosis-agent\baize\reports\LVM_VG_partial_PV_missing_WSL_20260607_0038_report.md</code></td>
+</tr>
+</tbody></table></div>
+
+    <div class="meta">
+      <span class="meta-source">LVM_VG_partial_PV_missing_WSL_20260607_0038_report.md</span>
+      <span>生成于 2026/06/07 11:35</span>
+    </div>
+  </article>
+</div>
+
+<script>
+  /* ── 滚动进度条 ── */
+  window.addEventListener("scroll", () => {
+    const el  = document.documentElement;
+    const pct = el.scrollTop / (el.scrollHeight - el.clientHeight) * 100;
+    document.getElementById("progress").style.width = Math.min(pct, 100) + "%";
+  });
+
+  /* ── TOC 高亮当前章节 ── */
+  (function () {
+    const headings = Array.from(document.querySelectorAll("article h1,article h2,article h3"));
+    const links    = Array.from(document.querySelectorAll(".toc a"));
+    if (!links.length) return;
+    const obs = new IntersectionObserver(entries => {
+      entries.forEach(e => {
+        if (!e.isIntersecting) return;
+        links.forEach(l => l.classList.remove("active"));
+        const a = links.find(l => l.getAttribute("href") === "#" + e.target.id);
+        if (a) a.classList.add("active");
+      });
+    }, { rootMargin: "-10% 0px -80% 0px" });
+    headings.forEach(h => obs.observe(h));
+  })();
+
+  /* ── h2 章节序号自动计数 ── */
+  (function () {
+    let idx = 0;
+    document.querySelectorAll("article h2").forEach(el => {
+      idx++;
+      el.setAttribute("data-index", String(idx).padStart(2, "0"));
+    });
+  })();
+
+  /* ── 代码块一键复制 ── */
+  function copyCode(btn) {
+    const code = btn.closest(".code-block").querySelector("code").innerText;
+    navigator.clipboard.writeText(code).then(() => {
+      btn.classList.add("copied");
+      btn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>';
+      setTimeout(() => {
+        btn.classList.remove("copied");
+        btn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>';
+      }, 2000);
+    });
+  }
+
+  /* ── 目录树收缩/展开 ── */
+  function toggleToc(btn) {
+    const expanded = btn.getAttribute("aria-expanded") === "true";
+    btn.setAttribute("aria-expanded", String(!expanded));
+    const parentItem = btn.closest(".toc-item");
+    let nextEl = parentItem.nextElementSibling;
+    if (nextEl && nextEl.classList.contains("toc-group")) {
+      if (expanded) {
+        nextEl.style.maxHeight = nextEl.scrollHeight + "px";
+        void nextEl.offsetHeight;
+        nextEl.classList.add("collapsed");
+      } else {
+        nextEl.classList.remove("collapsed");
+        nextEl.style.maxHeight = nextEl.scrollHeight + "px";
+        setTimeout(() => {
+          if (!nextEl.classList.contains("collapsed")) {
+            nextEl.style.maxHeight = "none";
+          }
+        }, 300);
+      }
+    }
+  }
+</script>
+</body>
+</html>

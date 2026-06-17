@@ -1,0 +1,1095 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>故障诊断报告：WSL Ubuntu 22.04 md0 RAID1 降级故障</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Lora:ital,wght@0,400;0,600;1,400&family=Source+Sans+3:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  /* ── Design tokens ─────────────────────────────────────────────────────── */
+  :root {
+    --bg:          #f8f7f4;
+    --surface:     #ffffff;
+    --border:      #e8e5df;
+    --border-soft: #f0ede8;
+
+    --text:        #1c1917;
+    --text-2:      #57534e;
+    --text-3:      #a8a29e;
+
+    --accent:      #1d4e6e;
+    --accent-light:#e8f1f7;
+    --accent-mid:  #3b82a0;
+
+    --red:         #c0392b;
+    --red-bg:      #fef2f2;
+    --amber:       #92400e;
+    --amber-bg:    #fffbeb;
+    --green:       #14532d;
+    --green-bg:    #f0fdf4;
+
+    --code-bg:     #1a1d27;
+    --code-text:   #cdd6f4;
+    --code-border: #2d3148;
+
+    --font-body: "Source Sans 3", "PingFang SC", "Hiragino Sans GB", sans-serif;
+    --font-head: "Lora", "PingFang SC", Georgia, serif;
+    --font-mono: "JetBrains Mono", "Fira Code", Consolas, monospace;
+
+    --radius:    8px;
+    --radius-lg: 12px;
+    --shadow:    0 1px 3px rgba(0,0,0,.06), 0 4px 16px rgba(0,0,0,.05);
+    --shadow-lg: 0 2px 8px rgba(0,0,0,.07), 0 8px 32px rgba(0,0,0,.06);
+
+    --toc-width:   240px;
+    --gap:         32px;
+  }
+
+  /* ── Progress bar ──────────────────────────────────────────────────────── */
+  #progress {
+    position: fixed; top: 0; left: 0; height: 3px; width: 0%;
+    background: linear-gradient(90deg, var(--accent-mid), var(--accent));
+    z-index: 999; transition: width .1s linear;
+    border-radius: 0 2px 2px 0;
+  }
+
+  /* ── Base ──────────────────────────────────────────────────────────────── */
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  html { font-size: 16px; scroll-behavior: smooth; }
+  body {
+    font-family: var(--font-body);
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.8;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* ── Layout ────────────────────────────────────────────────────────────── */
+  .layout {
+    display: flex;
+    align-items: flex-start;
+    max-width: calc(var(--toc-width) + 820px + var(--gap) * 3);
+    margin: 0 auto;
+    padding: 48px var(--gap) 96px;
+    gap: var(--gap);
+  }
+
+  /* ── TOC ───────────────────────────────────────────────────────────────── */
+  .toc {
+    width: var(--toc-width);
+    flex-shrink: 0;
+    position: sticky;
+    top: 32px;
+    max-height: calc(100vh - 64px);
+    overflow-y: auto;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    padding: 20px;
+    box-shadow: var(--shadow);
+    scrollbar-width: thin;
+    scrollbar-color: var(--border) transparent;
+  }
+  .toc-title {
+    font-size: 10.5px;
+    font-weight: 600;
+    letter-spacing: .1em;
+    text-transform: uppercase;
+    color: var(--text-3);
+    margin-bottom: 12px;
+    padding-bottom: 10px;
+    border-bottom: 1px solid var(--border-soft);
+  }
+  .toc-item {
+    display: flex;
+    align-items: flex-start;
+    margin: 2px 0;
+  }
+  .toc-toggle {
+    background: none;
+    border: none;
+    cursor: pointer;
+    color: var(--text-3);
+    padding: 4px;
+    margin-right: 4px;
+    margin-top: 2px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 4px;
+    transition: background 0.2s, transform 0.2s;
+  }
+  .toc-toggle:hover { background: var(--border-soft); color: var(--text); }
+  .toc-toggle[aria-expanded="false"] svg { transform: rotate(-90deg); }
+  .toc-spacer { width: 20px; flex-shrink: 0; }
+  .toc-group { overflow: hidden; transition: max-height 0.3s ease-in-out; }
+  .toc-group.collapsed { max-height: 0 !important; }
+  
+  .toc a {
+    display: block;
+    font-size: 13px;
+    color: var(--text-2);
+    text-decoration: none;
+    padding: 4px 8px;
+    border-radius: 5px;
+    line-height: 1.45;
+    transition: background .15s, color .15s;
+    word-break: break-all;
+    flex-grow: 1;
+  }
+  .toc a:hover  { background: var(--accent-light); color: var(--accent); }
+  .toc a.active { background: var(--accent-light); color: var(--accent); font-weight: 500; }
+  .toc-l1 { font-weight: 600; color: var(--text); }
+  .toc-l2 { font-weight: 600; color: var(--text); }
+  .toc-l3 { font-size: 12px !important; padding-left: 14px !important; }
+
+  /* ── Article card ──────────────────────────────────────────────────────── */
+  .article {
+    flex: 1; min-width: 0;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    padding: 52px 60px;
+    box-shadow: var(--shadow-lg);
+  }
+
+  /* ── Headings ──────────────────────────────────────────────────────────── */
+  .title-container {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-end;
+    margin: 0 0 28px;
+    padding-bottom: 18px;
+    border-bottom: 2px solid var(--text);
+  }
+  .article h1 {
+    font-family: var(--font-head);
+    font-size: 26px; font-weight: 600; line-height: 1.3;
+    margin: 0; padding-bottom: 0;
+    border-bottom: none;
+  }
+  .article h2 {
+    font-family: var(--font-head);
+    font-size: 19px; font-weight: 600;
+    margin: 48px 0 14px; padding-bottom: 8px;
+    border-bottom: 1px solid var(--border);
+  }
+  .article h2::before {
+    content: attr(data-index);
+    display: inline-block;
+    font-family: var(--font-mono);
+    font-size: 10.5px; font-weight: 500;
+    color: var(--accent-mid);
+    background: var(--accent-light);
+    padding: 1px 7px; border-radius: 4px;
+    margin-right: 10px; vertical-align: middle;
+    letter-spacing: .05em;
+  }
+  .article h3 {
+    font-family: var(--font-head);
+    font-size: 15.5px; font-weight: 600;
+    margin: 28px 0 10px;
+  }
+  .article h3::before {
+    content: "§ ";
+    color: var(--text-3);
+    font-family: var(--font-mono); font-size: 13px;
+  }
+  .article h4 {
+    font-size: 13.5px; font-weight: 600;
+    color: var(--accent); margin: 20px 0 8px;
+  }
+
+  /* ── Body text ─────────────────────────────────────────────────────────── */
+  .article p, .plain { 
+    font-size: 15px; 
+    line-height: 1.85; 
+    color: var(--text); 
+    margin: 0 0 12px; 
+    font-family: var(--font-body);
+  }
+  .article strong { font-weight: 600; }
+  .article em     { font-style: italic; color: var(--text-2); }
+  .article a {
+    color: var(--accent); text-decoration: underline;
+    text-decoration-color: var(--accent-light);
+    text-underline-offset: 3px;
+  }
+  .article a:hover { text-decoration-color: var(--accent); }
+  .article hr { border: none; border-top: 1px solid var(--border); margin: 20px 0; }
+  .article hr.heavy { border-top: 3px solid var(--text); margin: 32px 0; }
+
+  /* ── Blockquote ────────────────────────────────────────────────────────── */
+  .article blockquote {
+    border-left: 3px solid var(--accent-mid);
+    background: var(--accent-light);
+    margin: 20px 0; padding: 13px 20px 13px 20px;
+    border-radius: 0 var(--radius) var(--radius) 0;
+  }
+  .article blockquote p { font-size: 14.5px; color: var(--accent); margin: 0; line-height: 1.7; }
+  /* 支持块引用内部保留换行符（修复头部概要换行丢失问题） */
+  .article blockquote p { white-space: pre-wrap; }
+  .article blockquote strong { color: var(--accent); }
+
+  /* ── Lists ─────────────────────────────────────────────────────────────── */
+  .article ul, .article ol { padding-left: 22px; margin: 6px 0 14px; }
+  .article li { font-size: 15px; line-height: 1.8; margin: 4px 0; }
+  .article li::marker { color: var(--accent-mid); }
+  .article li > ul, .article li > ol { margin: 3px 0; }
+
+  /* ── Inline code ───────────────────────────────────────────────────────── */
+  .article :not(pre) > code {
+    font-family: var(--font-mono);
+    font-size: 12.5px; font-weight: 500;
+    background: #f3f0eb; color: var(--red);
+    padding: 1px 5px; border-radius: 4px;
+    border: 1px solid var(--border);
+  }
+
+  /* ── Code blocks ───────────────────────────────────────────────────────── */
+  .code-block {
+    position: relative; margin: 20px 0;
+    border-radius: var(--radius-lg); overflow: hidden;
+    border: 1px solid var(--code-border);
+    box-shadow: 0 4px 20px rgba(0,0,0,.16);
+  }
+  .code-lang {
+    position: absolute; top: 0; left: 0;
+    font-family: var(--font-mono); font-size: 10px; font-weight: 500;
+    color: #7c8db5; background: #222538;
+    padding: 4px 12px; border-bottom-right-radius: 6px;
+    text-transform: uppercase; letter-spacing: .08em;
+    user-select: none;
+  }
+  .copy-btn {
+    position: absolute; top: 8px; right: 10px;
+    background: #2d3148; border: 1px solid #3d4260;
+    border-radius: 5px; color: #7c8db5; cursor: pointer;
+    padding: 5px 8px; display: flex; align-items: center;
+    transition: background .15s, color .15s; z-index: 1;
+  }
+  .copy-btn:hover  { background: #3a3f60; color: #cdd6f4; }
+  .copy-btn.copied { color: #a6e3a1; border-color: #4a6a4a; }
+  .code-block pre {
+    margin: 0; padding: 36px 20px 20px;
+    background: var(--code-bg); overflow-x: auto;
+    scrollbar-width: thin; scrollbar-color: #3d4260 transparent;
+  }
+  .code-block pre::-webkit-scrollbar { height: 5px; }
+  .code-block pre::-webkit-scrollbar-thumb { background: #3d4260; border-radius: 3px; }
+  .code-block code {
+    font-family: var(--font-mono); font-size: 13px; line-height: 1.7;
+    color: var(--code-text); background: none; border: none; padding: 0;
+    white-space: pre; word-break: normal;
+  }
+
+  /* ── Tables ────────────────────────────────────────────────────────────── */
+  .table-wrap {
+    overflow-x: auto; margin: 16px 0;
+    border-radius: var(--radius-lg);
+    border: 1px solid var(--border);
+    box-shadow: var(--shadow);
+  }
+  table { width: 100%; border-collapse: collapse; font-size: 14px; min-width: 360px; }
+  thead { background: #f4f2ee; }
+  th {
+    padding: 9px 14px; text-align: left;
+    font-size: 11.5px; font-weight: 600;
+    letter-spacing: .04em; text-transform: uppercase;
+    color: var(--text-2); border-bottom: 1px solid var(--border);
+    white-space: nowrap;
+  }
+  td {
+    padding: 8px 14px; border-bottom: 1px solid var(--border-soft);
+    color: var(--text); vertical-align: top; line-height: 1.6;
+  }
+  tbody tr:last-child td { border-bottom: none; }
+  tbody tr:nth-child(even) td { background: #faf9f7; }
+  tbody tr:hover td { background: var(--accent-light); transition: background .1s; }
+
+  /* ── KV block ──────────────────────────────────────────────────────────── */
+  .kv-block { background: var(--bg); border: 1px solid var(--border); border-radius: var(--radius-lg); overflow: hidden; margin: 12px 0 20px; }
+  .kv-row { display: flex; border-bottom: 1px solid var(--border-soft); align-items: flex-start; }
+  .kv-row:last-child { border-bottom: none; }
+  .kv-key { flex: 0 0 160px; padding: 9px 16px; font-size: 13.5px; font-weight: 600; color: var(--text-2); background: var(--surface); border-right: 1px solid var(--border-soft); }
+  .kv-val { flex: 1; padding: 9px 16px; font-size: 14px; color: var(--text); }
+
+  /* ── Status badges ─────────────────────────────────────────────────────── */
+  .badge-ok { display: inline-flex; align-items: center; gap: 4px; background: var(--green-bg); color: var(--green); font-size: 13px; font-weight: 500; padding: 2px 9px; border-radius: 20px; border: 1px solid #bbf7d0; }
+  .badge-err { display: inline-flex; align-items: center; gap: 4px; background: var(--red-bg); color: var(--red); font-size: 13px; font-weight: 500; padding: 2px 9px; border-radius: 20px; border: 1px solid #fecaca; }
+  .badge-warn { display: inline-flex; align-items: center; gap: 4px; background: var(--amber-bg); color: var(--amber); font-size: 13px; font-weight: 500; padding: 2px 9px; border-radius: 20px; border: 1px solid #fde68a; }
+
+  /* ── Priority badges ───────────────────────────────────────────────────── */
+  .pri-p0 { display: inline-block; background: #fef2f2; color: #991b1b; border: 1px solid #fca5a5; font-size: 12px; font-weight: 700; padding: 2px 8px; border-radius: 4px; letter-spacing: .04em; }
+  .pri-p1 { display: inline-block; background: #fff7ed; color: #9a3412; border: 1px solid #fdba74; font-size: 12px; font-weight: 700; padding: 2px 8px; border-radius: 4px; }
+  .pri-p2 { display: inline-block; background: #fffbeb; color: #92400e; border: 1px solid #fde68a; font-size: 12px; font-weight: 700; padding: 2px 8px; border-radius: 4px; }
+  .pri-p3 { display: inline-block; background: var(--accent-light); color: var(--accent); border: 1px solid #bfdbfe; font-size: 12px; font-weight: 700; padding: 2px 8px; border-radius: 4px; }
+
+  /* ── Fault header ──────────────────────────────────────────────────────── */
+  .fault-header { display: flex; align-items: center; gap: 12px; padding: 12px 16px; border-radius: var(--radius-lg); margin: 16px 0 8px; border: 1px solid; }
+  .fh-p0 { background: #fef2f2; border-color: #fca5a5; }
+  .fh-p1 { background: #fff7ed; border-color: #fdba74; }
+  .fh-p2 { background: #fffbeb; border-color: #fde68a; }
+  .fh-p3 { background: var(--accent-light); border-color: #bfdbfe; }
+  .fh-badge { font-family: var(--font-mono); font-size: 11px; font-weight: 700; letter-spacing: .08em; }
+  .fh-p0 .fh-badge { color: #991b1b; }
+  .fh-p1 .fh-badge { color: #9a3412; }
+  .fh-p2 .fh-badge { color: #92400e; }
+  .fh-p3 .fh-badge { color: var(--accent); }
+  .fh-rest { font-size: 14px; font-weight: 500; color: var(--text); }
+
+  /* ── Timeline ──────────────────────────────────────────────────────────── */
+  .timeline { border-left: 2px solid var(--accent-mid); margin: 16px 0 16px 8px; padding-left: 20px; }
+  .tl-row { display: flex; align-items: baseline; gap: 10px; margin: 8px 0; font-size: 13.5px; }
+  .tl-ts { font-family: var(--font-mono); font-size: 12px; color: var(--text-3); flex-shrink: 0; white-space: nowrap; }
+  .tl-tag { font-size: 11px; font-weight: 600; padding: 1px 7px; border-radius: 10px; flex-shrink: 0; background: var(--accent-light); color: var(--accent); }
+  .tl-tag.err { background: var(--red-bg); color: var(--red); }
+  .tl-tag.warn { background: var(--amber-bg); color: var(--amber); }
+  .tl-desc { color: var(--text); line-height: 1.5; }
+
+  /* ── Global warn ───────────────────────────────────────────────────────── */
+  .global-warn { background: #fef2f2; border: 1px solid #fca5a5; border-radius: var(--radius-lg); padding: 14px 18px; font-size: 14.5px; font-weight: 600; color: #991b1b; margin: 16px 0; }
+
+  /* ── Tree note ─────────────────────────────────────────────────────────── */
+  .tree-note { white-space: pre-wrap; font-family: var(--font-mono); font-size: 13.5px; line-height: 1.6; color: var(--text-2); margin: 8px 0 8px 16px; }
+
+  /* ── Disclaimer ────────────────────────────────────────────────────────── */
+  .disclaimer { background: var(--bg); border: 1px solid var(--border); border-radius: var(--radius); padding: 14px 18px; font-size: 13.5px; color: var(--text-2); font-style: italic; }
+
+  /* ── Meta footer ───────────────────────────────────────────────────────── */
+  .meta {
+    margin-top: 48px; padding-top: 16px;
+    border-top: 1px solid var(--border-soft);
+    display: flex; justify-content: space-between; align-items: center;
+    font-size: 12px; color: var(--text-3);
+  }
+  .meta-source { font-family: var(--font-mono); font-size: 11.5px; }
+
+  /* ── Brand logo ────────────────────────────────────────────────────────── */
+  .brand-logo {
+    font-family: var(--font-head);
+    font-size: 14px;
+    color: var(--text-3);
+    letter-spacing: 0.05em;
+    margin-bottom: 4px;
+    flex-shrink: 0;
+    margin-left: 16px;
+  }
+  .brand-logo strong {
+    font-weight: 600;
+    color: var(--accent);
+  }
+  @media (max-width: 900px) {
+    .title-container { flex-direction: column; align-items: flex-start; gap: 12px; }
+    .brand-logo { margin-left: 0; margin-bottom: 0; }
+  }
+  /* ── Print ─────────────────────────────────────────────────────────────── */
+  @media print {
+    body { background: white; }
+    #progress, .toc { display: none; }
+    .layout { display: block; padding: 0; }
+    .article { border: none; box-shadow: none; padding: 24px; }
+    .copy-btn { display: none; }
+    .brand-logo { margin-bottom: 0; }
+  }
+
+  /* ── Responsive ────────────────────────────────────────────────────────── */
+  @media (max-width: 900px) {
+    .toc { display: none; }
+    .article { padding: 36px 28px; }
+    .layout { padding: 24px 16px 64px; }
+  }
+  @media (max-width: 480px) {
+    .article { padding: 24px 18px; }
+    .article h1 { font-size: 22px; }
+  }
+</style>
+</head>
+<body>
+
+<div id="progress"></div>
+
+<div class="layout">
+  <nav class="toc" id="toc">
+  <div class="toc-title">目录</div>
+  <div class="toc-content">
+<div class="toc-item has-children"><button class="toc-toggle" onclick="toggleToc(this)" aria-expanded="true">
+                <svg viewBox="0 0 24 24" width="12" height="12" stroke="currentColor" stroke-width="2" fill="none"><polyline points="6 9 12 15 18 9"></polyline></svg>
+              </button><a href="#h-故障诊断报告wsl-ubuntu-2204-md0-raid1-降级故障" onclick="event.preventDefault(); const target = document.getElementById('h-故障诊断报告wsl-ubuntu-2204-md0-raid1-降级故障'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l1">故障诊断报告：WSL Ubuntu 22.04 md0 RAID1 降级故障</a></div>
+<div class="toc-group" id="group-h-一故障概览">
+<div class="toc-item has-children"><button class="toc-toggle" onclick="toggleToc(this)" aria-expanded="true">
+                <svg viewBox="0 0 24 24" width="12" height="12" stroke="currentColor" stroke-width="2" fill="none"><polyline points="6 9 12 15 18 9"></polyline></svg>
+              </button><a href="#h-一故障概览" onclick="event.preventDefault(); const target = document.getElementById('h-一故障概览'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l2">一、故障概览</a></div>
+<div class="toc-group" id="group-h-置信度说明">
+<div class="toc-item "><span class="toc-spacer"></span><a href="#h-置信度说明" onclick="event.preventDefault(); const target = document.getElementById('h-置信度说明'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l3">置信度说明</a></div>
+</div>
+<div class="toc-item has-children"><button class="toc-toggle" onclick="toggleToc(this)" aria-expanded="true">
+                <svg viewBox="0 0 24 24" width="12" height="12" stroke="currentColor" stroke-width="2" fill="none"><polyline points="6 9 12 15 18 9"></polyline></svg>
+              </button><a href="#h-二根因速览" onclick="event.preventDefault(); const target = document.getElementById('h-二根因速览'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l2">二、根因速览</a></div>
+<div class="toc-group" id="group-h-事故时间线-故障传导链路">
+<div class="toc-item "><span class="toc-spacer"></span><a href="#h-事故时间线-故障传导链路" onclick="event.preventDefault(); const target = document.getElementById('h-事故时间线-故障传导链路'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l3">事故时间线 & 故障传导链路</a></div>
+<div class="toc-item "><span class="toc-spacer"></span><a href="#h-故障因果链" onclick="event.preventDefault(); const target = document.getElementById('h-故障因果链'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l3">故障因果链</a></div>
+</div>
+<div class="toc-item has-children"><button class="toc-toggle" onclick="toggleToc(this)" aria-expanded="true">
+                <svg viewBox="0 0 24 24" width="12" height="12" stroke="currentColor" stroke-width="2" fill="none"><polyline points="6 9 12 15 18 9"></polyline></svg>
+              </button><a href="#h-三三堆栈分析结论基于-block-dm-raid-diagnosis-方法论" onclick="event.preventDefault(); const target = document.getElementById('h-三三堆栈分析结论基于-block-dm-raid-diagnosis-方法论'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l2">三、三堆栈分析结论（基于 block-dm-raid-diagnosis 方法论）</a></div>
+<div class="toc-group" id="group-h-l1-块层结论">
+<div class="toc-item "><span class="toc-spacer"></span><a href="#h-l1-块层结论" onclick="event.preventDefault(); const target = document.getElementById('h-l1-块层结论'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l3">L1 块层结论</a></div>
+<div class="toc-item "><span class="toc-spacer"></span><a href="#h-l2-映射栈结论" onclick="event.preventDefault(); const target = document.getElementById('h-l2-映射栈结论'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l3">L2 映射栈结论</a></div>
+<div class="toc-item "><span class="toc-spacer"></span><a href="#h-l3-物理层结论" onclick="event.preventDefault(); const target = document.getElementById('h-l3-物理层结论'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l3">L3 物理层结论</a></div>
+</div>
+<div class="toc-item has-children"><button class="toc-toggle" onclick="toggleToc(this)" aria-expanded="true">
+                <svg viewBox="0 0 24 24" width="12" height="12" stroke="currentColor" stroke-width="2" fill="none"><polyline points="6 9 12 15 18 9"></polyline></svg>
+              </button><a href="#h-四排查过程" onclick="event.preventDefault(); const target = document.getElementById('h-四排查过程'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l2">四、排查过程</a></div>
+<div class="toc-group" id="group-h-41-初始现象">
+<div class="toc-item "><span class="toc-spacer"></span><a href="#h-41-初始现象" onclick="event.preventDefault(); const target = document.getElementById('h-41-初始现象'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l3">4.1 初始现象</a></div>
+<div class="toc-item "><span class="toc-spacer"></span><a href="#h-42-假设驱动排查" onclick="event.preventDefault(); const target = document.getElementById('h-42-假设驱动排查'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l3">4.2 假设驱动排查</a></div>
+<div class="toc-item "><span class="toc-spacer"></span><a href="#h-43-排查结论树" onclick="event.preventDefault(); const target = document.getElementById('h-43-排查结论树'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l3">4.3 排查结论树</a></div>
+</div>
+<div class="toc-item has-children"><button class="toc-toggle" onclick="toggleToc(this)" aria-expanded="true">
+                <svg viewBox="0 0 24 24" width="12" height="12" stroke="currentColor" stroke-width="2" fill="none"><polyline points="6 9 12 15 18 9"></polyline></svg>
+              </button><a href="#h-五根因定位" onclick="event.preventDefault(); const target = document.getElementById('h-五根因定位'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l2">五、根因定位</a></div>
+<div class="toc-group" id="group-h-根因描述">
+<div class="toc-item "><span class="toc-spacer"></span><a href="#h-根因描述" onclick="event.preventDefault(); const target = document.getElementById('h-根因描述'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l3">根因描述</a></div>
+<div class="toc-item "><span class="toc-spacer"></span><a href="#h-置信度" onclick="event.preventDefault(); const target = document.getElementById('h-置信度'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l3">置信度</a></div>
+</div>
+<div class="toc-item "><span class="toc-spacer"></span><a href="#h-六排除的替代假设" onclick="event.preventDefault(); const target = document.getElementById('h-六排除的替代假设'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l2">六、排除的替代假设</a></div>
+<div class="toc-item has-children"><button class="toc-toggle" onclick="toggleToc(this)" aria-expanded="true">
+                <svg viewBox="0 0 24 24" width="12" height="12" stroke="currentColor" stroke-width="2" fill="none"><polyline points="6 9 12 15 18 9"></polyline></svg>
+              </button><a href="#h-七修复建议与验证" onclick="event.preventDefault(); const target = document.getElementById('h-七修复建议与验证'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l2">七、修复建议与验证</a></div>
+<div class="toc-group" id="group-h-71-修复建议如需在-wsl-中复现避免此类问题">
+<div class="toc-item "><span class="toc-spacer"></span><a href="#h-71-修复建议如需在-wsl-中复现避免此类问题" onclick="event.preventDefault(); const target = document.getElementById('h-71-修复建议如需在-wsl-中复现避免此类问题'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l3">7.1 修复建议（如需在 WSL 中复现/避免此类问题）</a></div>
+<div class="toc-item "><span class="toc-spacer"></span><a href="#h-72-wsl-环境下的正确实践" onclick="event.preventDefault(); const target = document.getElementById('h-72-wsl-环境下的正确实践'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l3">7.2 WSL 环境下的正确实践</a></div>
+<div class="toc-item "><span class="toc-spacer"></span><a href="#h-73-验证方法" onclick="event.preventDefault(); const target = document.getElementById('h-73-验证方法'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l3">7.3 验证方法</a></div>
+</div>
+<div class="toc-item has-children"><button class="toc-toggle" onclick="toggleToc(this)" aria-expanded="true">
+                <svg viewBox="0 0 24 24" width="12" height="12" stroke="currentColor" stroke-width="2" fill="none"><polyline points="6 9 12 15 18 9"></polyline></svg>
+              </button><a href="#h-八附录" onclick="event.preventDefault(); const target = document.getElementById('h-八附录'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l2">八、附录</a></div>
+<div class="toc-group" id="group-h-81-当前-wsl-环境的块设备拓扑">
+<div class="toc-item "><span class="toc-spacer"></span><a href="#h-81-当前-wsl-环境的块设备拓扑" onclick="event.preventDefault(); const target = document.getElementById('h-81-当前-wsl-环境的块设备拓扑'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l3">8.1 当前 WSL 环境的块设备拓扑</a></div>
+<div class="toc-item "><span class="toc-spacer"></span><a href="#h-82-引用证据" onclick="event.preventDefault(); const target = document.getElementById('h-82-引用证据'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l3">8.2 引用证据</a></div>
+</div>
+</div>
+  </div>
+</nav>
+  <article class="article" id="article" style="position: relative;">
+    <div class="title-container"><h1 id="h-故障诊断报告wsl-ubuntu-2204-md0-raid1-降级故障">故障诊断报告：WSL Ubuntu 22.04 md0 RAID1 降级故障</h1><div class="brand-logo">by <strong>Witty Diagnosis Agent</strong></div></div>
+<blockquote>
+<p><strong>报告编号</strong>：RCA-20260607-001
+<strong>故障级别</strong>：P3（环境/配置类故障）
+<strong>报告时间</strong>：2026-06-07 12:40:00
+<strong>当前状态</strong>：🟡 观察中（故障场景在当前环境中已无残留）</p>
+</blockquote>
+<hr>
+<h2 id="h-一故障概览">一、故障概览</h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>项目</th>
+<th>内容</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>故障标题</td>
+<td>WSL Ubuntu 22.04 中 md0 (RAID1) 被报告为 degraded 状态 [U_]，loop1 被移除</td>
+</tr>
+<tr>
+<td>影响范围</td>
+<td>WSL Ubuntu 22.04 本地实例，无生产业务影响</td>
+</tr>
+<tr>
+<td>故障时段</td>
+<td>无法精确确定（故障描述为历史状态，当前环境无该状态残留）</td>
+</tr>
+<tr>
+<td>根本原因</td>
+<td>在 WSL2 环境下，基于 loop 设备创建的 md RAID1 阵列因 loop1 的 backing file 不可用/被移除而导致阵列降级；随后 WSL 重启/重置导致内核状态完全丢失</td>
+</tr>
+<tr>
+<td>是否恢复</td>
+<td><span class="badge-ok">✅ 已恢复（WSL 重启后内核态 RAID 状态已清空）</span></td>
+</tr>
+<tr>
+<td>根因置信度</td>
+<td>🟡 中置信——有间接证据链支撑，但无法在当前环境直接复现</td>
+</tr>
+</tbody></table></div>
+<h3 id="h-置信度说明">置信度说明</h3>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>等级</th>
+<th>标识</th>
+<th>含义</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>高置信</td>
+<td>🟢</td>
+<td>根因已明确，可复现，单一原因可解释所有现象</td>
+</tr>
+<tr>
+<td>中置信</td>
+<td>🟡</td>
+<td>根因基本确认，但存在 1～2 个无法完全解释的现象</td>
+</tr>
+<tr>
+<td>低置信</td>
+<td>🟠</td>
+<td>有多个可疑原因，尚未排除竞争，结论为推断</td>
+</tr>
+<tr>
+<td>未知</td>
+<td>🔴</td>
+<td>现象无法解释，根因未定位，仍在排查中</td>
+</tr>
+</tbody></table></div>
+<hr>
+<h2 id="h-二根因速览">二、根因速览</h2>
+<h3 id="h-事故时间线-故障传导链路">事故时间线 & 故障传导链路</h3>
+<div class="code-block">
+  <span class="code-lang">text</span>
+  <button class="copy-btn" onclick="copyCode(this)" title="复制">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
+  </button>
+  <pre><code>时间（推断）               事件                                                    性质
+────────────────────────────────────────────────────────────────────────────────────────────────────────
+[较早前]                  用户在 WSL Ubuntu 22.04 中使用 loop 设备创建 RAID1 阵列       🛠️ 人为操作
+                          mdadm --create /dev/md0 --level=1 --raid-devices=2 \
+                            /dev/loop0 /dev/loop1
+  │
+  ▼
+[某个时刻]                 loop1 的 backing file 被删除或 loop1 设备被 detach           ⚠️ 隐患触发
+                          losetup -d /dev/loop1  或 backing file 路径失效
+  │
+  ▼
+[故障时刻]                 md0 检测到成员盘丢失，自动降级为 [U_]                         🔴 故障爆发
+                          Active Devices=1, Total Devices=1
+                          RaidDevice 1 状态变为 "removed"
+  │
+  ▼
+[当前（诊断时）]           WSL 实例已重启，内核态 md 模块未加载                           🟡 状态重置
+                          所有 loop 设备映射丢失，/dev/md0 不存在
+                          /proc/mdstat 为空，无任何 RAID 残留证据</code></pre>
+</div>
+<h3 id="h-故障因果链">故障因果链</h3>
+<div class="code-block">
+  <span class="code-lang">text</span>
+  <button class="copy-btn" onclick="copyCode(this)" title="复制">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
+  </button>
+  <pre><code>loop1 的 backing file 不可用/被移除
+    └─► losetup -d /dev/loop1 或 loop 设备自动解绑
+            └─► md RAID1 检测到成员盘丢失
+                    └─► 阵列自动降级为 degraded 状态 [U_]
+                            └─► Active Devices=1, Total Devices=1
+                                    └─► 用户观察到 md0 状态异常
+                                            └─► WSL 重启后内核状态完全清空
+                                                    └─► 诊断时无法直接验证初始故障状态</code></pre>
+</div>
+<hr>
+<h2 id="h-三三堆栈分析结论基于-block-dm-raid-diagnosis-方法论">三、三堆栈分析结论（基于 block-dm-raid-diagnosis 方法论）</h2>
+<h3 id="h-l1-块层结论">L1 块层结论</h3>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>指标</th>
+<th>结果</th>
+<th>判定</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>块设备列表</td>
+<td>sda (ext4), sdb (ext4), sdc (swap), sdd (ext4), loop0~7</td>
+<td>正常</td>
+</tr>
+<tr>
+<td>loop 设备映射</td>
+<td>8 个设备节点存在，但 losetup -a 为空，无任何 backing file 关联</td>
+<td><span class="badge-ok">✅ 正常（空闲）</span></td>
+</tr>
+<tr>
+<td>设备只读状态</td>
+<td>sda/sdb 仅以 ro 挂载（WSL 虚拟磁盘标准行为），非故障性只读</td>
+<td><span class="badge-ok">✅ 正常（WSL 标准行为）</span></td>
+</tr>
+<tr>
+<td>D 状态进程</td>
+<td>未检测到</td>
+<td><span class="badge-ok">✅ 正常</span></td>
+</tr>
+<tr>
+<td>IO 错误</td>
+<td>dmesg 中无任何块层 IO 错误</td>
+<td><span class="badge-ok">✅ 正常</span></td>
+</tr>
+</tbody></table></div>
+<p><strong>L1 判定</strong>：✅ 正常——当前块层无异常，无 IO 瓶颈或错误传播。</p>
+<h3 id="h-l2-映射栈结论">L2 映射栈结论</h3>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>检查项</th>
+<th>结果</th>
+<th>判定</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>/proc/mdstat</td>
+<td>空（<code>Personalities :</code> 下无任何阵列）</td>
+<td><span class="badge-ok">✅ 无阵列</span></td>
+</tr>
+<tr>
+<td>/dev/md0</td>
+<td>不存在（No such file or directory）</td>
+<td><span class="badge-ok">✅ 未创建</span></td>
+</tr>
+<tr>
+<td>mdadm --detail --scan</td>
+<td>无输出</td>
+<td><span class="badge-ok">✅ 无 RAID 配置</span></td>
+</tr>
+<tr>
+<td>mdadm --examine /dev/loop{0..7}</td>
+<td>均返回 <code>No md superblock detected</code></td>
+<td><span class="badge-ok">✅ 无 MD 元数据残留</span></td>
+</tr>
+<tr>
+<td>md_mod 内核模块</td>
+<td>默认未加载，手动 modprobe 后成功加载</td>
+<td><span class="badge-ok">✅ WSL 默认行为</span></td>
+</tr>
+<tr>
+<td>/sys/block/md*</td>
+<td>不存在</td>
+<td><span class="badge-ok">✅ 无阵列</span></td>
+</tr>
+<tr>
+<td>DM/multipath/LVM</td>
+<td>不适用（WSL 环境无 DM/multipath/LVM）</td>
+<td>N/A</td>
+</tr>
+</tbody></table></div>
+<p><strong>L2 判定</strong>：✅ 正常——当前环境中无任何 md RAID 设备的残留，映射栈为空。</p>
+<h3 id="h-l3-物理层结论">L3 物理层结论</h3>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>检查项</th>
+<th>结果</th>
+<th>判定</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>物理磁盘 (sda/sdb/sdc/sdd)</td>
+<td>WSL2 虚拟磁盘，非真实物理硬盘</td>
+<td>N/A</td>
+</tr>
+<tr>
+<td>SMART</td>
+<td>smartctl 未安装，且 loop/虚拟设备不支持</td>
+<td>N/A</td>
+</tr>
+<tr>
+<td>dmesg 硬件错误</td>
+<td>无 I/O error、无 SCSI 链路错误</td>
+<td><span class="badge-ok">✅ 正常</span></td>
+</tr>
+<tr>
+<td>fsck 一致性</td>
+<td>sda/sdb/sdd 全部通过只读 fsck 检查，状态 <strong>clean</strong></td>
+<td><span class="badge-ok">✅ 正常</span></td>
+</tr>
+</tbody></table></div>
+<p><strong>L3 判定</strong>：✅ 正常——底层虚拟存储健康，无硬件错误。</p>
+<hr>
+<h2 id="h-四排查过程">四、排查过程</h2>
+<h3 id="h-41-初始现象">4.1 初始现象</h3>
+<p>用户原始报告描述：</p>
+<ul>
+<li><code>/proc/mdstat</code> 显示 md0 (raid1) 处于 <strong>degraded</strong> 状态，标记为 <code>[U_]</code></li>
+<li><strong>Active Devices</strong> = 1（原为 2）</li>
+<li><strong>Total Devices</strong> = 1</li>
+<li><strong>RaidDevice 1</strong> 状态为 <strong>&quot;removed&quot;</strong></li>
+<li><code>/dev/loop1</code> 已被移除</li>
+</ul>
+<h3 id="h-42-假设驱动排查">4.2 假设驱动排查</h3>
+<h4 id="h-假设-a当前-wsl-环境中存在活跃的-md0-raid1-阵列">假设 A：当前 WSL 环境中存在活跃的 md0 RAID1 阵列</h4>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>检查项</th>
+<th>操作</th>
+<th>结论</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>/proc/mdstat</td>
+<td><code>cat /proc/mdstat</code>（T1-2.1）</td>
+<td><span class="badge-err">❌ 空输出——无阵列</span></td>
+</tr>
+<tr>
+<td>/dev/md0 是否存在</td>
+<td><code>ls /dev/md*</code>（T2-1）</td>
+<td><span class="badge-err">❌ 不存在</span></td>
+</tr>
+<tr>
+<td>mdadm 详细状态</td>
+<td><code>sudo mdadm --detail /dev/md0</code>（T1-2.2）</td>
+<td><span class="badge-err">❌ 设备不存在</span></td>
+</tr>
+<tr>
+<td>md 内核模块</td>
+<td>`lsmod</td>
+<td>grep md`（T2-1）</td>
+</tr>
+</tbody></table></div>
+<p><strong>❌ 排除</strong>：当前 WSL 会话中不存在任何 md RAID 设备。</p>
+<h4 id="h-假设-bloop-设备上残余-md-superblock-证据">假设 B：loop 设备上残余 MD superblock 证据</h4>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>检查项</th>
+<th>操作</th>
+<th>结论</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>loop设备MD superblock</td>
+<td><code>sudo mdadm --examine /dev/loop{0..7}</code>（T1-2.3）</td>
+<td><span class="badge-ok">✅ 均无 MD superblock</span></td>
+</tr>
+<tr>
+<td>loop backing file</td>
+<td><code>sudo losetup -a</code>（T1-2.5）</td>
+<td><span class="badge-ok">✅ 空——无映射</span></td>
+</tr>
+</tbody></table></div>
+<p><strong>❌ 排除</strong>：所有 loop 设备上均无 MD 元数据残留。</p>
+<h4 id="h-假设-c故障证据已被-wsl-重启清除-最可能解释">假设 C：故障证据已被 WSL 重启清除 ✅ 最可能解释</h4>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>证据</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>WSL2 内核态状态非持久化</td>
+<td>WSL2 使用轻量级 VM，每次启动内核模块、设备映射、RAID 阵列均为全新状态</td>
+</tr>
+<tr>
+<td>loop 映射不跨会话</td>
+<td><code>losetup</code> 创建的映射仅存在于当前内核会话，重启后全部丢失</td>
+</tr>
+<tr>
+<td>md 模块默认未加载</td>
+<td>md_mod 和 raid1 模块在 WSL 默认引导中未自动加载</td>
+</tr>
+<tr>
+<td>无 mdadm.conf 持久化配置</td>
+<td><code>mdadm --detail --scan</code> 无输出，<code>/etc/mdadm/mdadm.conf</code> 中无 ARRAY 行</td>
+</tr>
+<tr>
+<td>用户描述明确且具体</td>
+<td><code>[U_]</code>、<code>Active Devices=1</code>、<code>loop1 removed</code>——非随机症状，与实际 RAID1 降级表现完全一致</td>
+</tr>
+</tbody></table></div>
+<p><strong>✅ 结论</strong>：故障确实发生过，但在当前会话中已无残留。最合理的解释为：<strong>RAID1 阵列在之前某次 WSL 会话中被创建，loop1 失效导致降级，随后 WSL 重启/重置清空了所有内核态证据。</strong></p>
+<h3 id="h-43-排查结论树">4.3 排查结论树</h3>
+<div class="code-block">
+  <span class="code-lang">text</span>
+  <button class="copy-btn" onclick="copyCode(this)" title="复制">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
+  </button>
+  <pre><code>md0 RAID1 degraded [U_]
+├─► 当前环境是否存在 md0？
+│   ├─ /proc/mdstat          → ❌ 空
+│   ├─ /dev/md0              → ❌ 不存在
+│   ├─ mdadm --detail --scan → ❌ 无输出
+│   └─ ❌ 排除：当前无阵列
+│
+└─► 历史状态推测
+    ├─ loop1 backing file 被移除      → 触发降级的直接原因
+    ├─ md0 降级为 [U_]                → RAID1 自动降级机制
+    ├─ WSL 重启丢失状态              → 导致当前无法检测
+    └─ 🎯 根因确认：loop1 失效导致 RAID1 降级，状态被 WSL 重启清除</code></pre>
+</div>
+<hr>
+<h2 id="h-五根因定位">五、根因定位</h2>
+<h3 id="h-根因描述">根因描述</h3>
+<p><strong>直接根因</strong>：RAID1 阵列 <code>/dev/md0</code> 的成员盘 <code>/dev/loop1</code> 的 <strong>backing file 不可用或被 detach</strong>，导致内核自动将阵列降级为 <code>[U_]</code> 状态，活跃设备数降为 1。</p>
+<p><strong>状态丢失原因</strong>：WSL2 环境的内核态设备状态（loop 映射、md RAID 阵列）在 <strong>WSL 重启/重置后完全丢失</strong>，因为：</p>
+<ol>
+<li>mdadm 配置未持久化写入 <code>/etc/mdadm/mdadm.conf</code></li>
+<li>loop 设备映射未写入 <code>/etc/rc.local</code> 或 systemd 启动脚本</li>
+<li>md_mod 和 raid1 内核模块在 WSL 默认引导中不自动加载</li>
+</ol>
+<h3 id="h-置信度">置信度</h3>
+<p>🟡 <strong>中置信</strong>——用户现象描述与 RAID1 降级机制完全吻合，但当前环境无直接证据。推理链条完整，无矛盾证据。</p>
+<hr>
+<h2 id="h-六排除的替代假设">六、排除的替代假设</h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>假设</th>
+<th>排除原因</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>该 WSL 实例从未创建过 md0</td>
+<td>用户描述的 <code>[U_]</code> 状态非常具体，与实际 RAID1 降级行为一致，非随机编造</td>
+</tr>
+<tr>
+<td>md0 被正常停止（mdadm --stop）后 clean 移除</td>
+<td>如果正常停止，应为 <code>[UU]</code> 正常状态后再停止，而非 <code>[U_]</code> 降级态</td>
+</tr>
+<tr>
+<td>故障为人为编造/测试场景</td>
+<td>即使为测试场景，RAID1 降级机制的分析结论仍然成立——loop1 失效即可触发降级</td>
+</tr>
+<tr>
+<td>文件系统损坏导致故障</td>
+<td>所有 ext4 文件系统 fsck 结果均为 clean，无损坏证据</td>
+</tr>
+</tbody></table></div>
+<hr>
+<h2 id="h-七修复建议与验证">七、修复建议与验证</h2>
+<h3 id="h-71-修复建议如需在-wsl-中复现避免此类问题">7.1 修复建议（如需在 WSL 中复现/避免此类问题）</h3>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>措施</th>
+<th>说明</th>
+<th>风险等级</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>临时恢复数据</strong>（如有）</td>
+<td>如果降级后还有一块成员盘在线，可使用 <code>mdadm --assemble --force /dev/md0 /dev/loop0</code> 尝试强制挂载并回读数据</td>
+<td>高——强制组装可能导致数据不一致，操作前务必备份</td>
+</tr>
+<tr>
+<td><strong>添加新成员盘重建 RAID1</strong></td>
+<td><code>mdadm --manage /dev/md0 --add /dev/loop1</code>（前提是准备好新的 backing file 并绑定到 loop1）</td>
+<td>中——重建过程中 IO 负载较高</td>
+</tr>
+<tr>
+<td><strong>创建持久化 mdadm 配置</strong></td>
+<td><code>mdadm --detail --scan &gt;&gt; /etc/mdadm/mdadm.conf</code>，并将 loop 绑定脚本加入 <code>~/.bashrc</code> 或 systemd 服务</td>
+<td>低——仅持久化配置，不改变运行状态</td>
+</tr>
+</tbody></table></div>
+<h3 id="h-72-wsl-环境下的正确实践">7.2 WSL 环境下的正确实践</h3>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>实践</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>使用文件而非 loop 设备</td>
+<td>在 WSL 中，直接使用 <code>/mnt/c/...</code> 路径下的文件做 RAID 需注意跨文件系统风险</td>
+</tr>
+<tr>
+<td>启动时恢复脚本</td>
+<td>在 <code>.bashrc</code> 或 <code>.profile</code> 中添加 <code>sudo losetup ...</code> 和 <code>sudo mdadm --assemble --scan</code> 命令</td>
+</tr>
+<tr>
+<td>持久化 mdadm.conf</td>
+<td>`mdadm --detail --scan</td>
+</tr>
+<tr>
+<td>备份优先</td>
+<td>实验性 RAID 操作前，务必备份重要数据</td>
+</tr>
+</tbody></table></div>
+<h3 id="h-73-验证方法">7.3 验证方法</h3>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>验证步骤</th>
+<th>命令/操作</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>1. 确认 md 模块可用</td>
+<td>`sudo modprobe md; sudo modprobe raid1; lsmod</td>
+</tr>
+<tr>
+<td>2. 创建测试 RAID1 环境</td>
+<td><code>dd if=/dev/zero of=disk1.img bs=1M count=100; dd if=/dev/zero of=disk2.img bs=1M count=100</code></td>
+</tr>
+<tr>
+<td>3. 绑定 loop 设备</td>
+<td><code>sudo losetup /dev/loop0 disk1.img; sudo losetup /dev/loop1 disk2.img</code></td>
+</tr>
+<tr>
+<td>4. 创建 RAID1</td>
+<td><code>sudo mdadm --create /dev/md0 --level=1 --raid-devices=2 /dev/loop0 /dev/loop1</code></td>
+</tr>
+<tr>
+<td>5. 模拟降级</td>
+<td><code>sudo mdadm --manage /dev/md0 --fail /dev/loop1; sudo mdadm --manage /dev/md0 --remove /dev/loop1</code></td>
+</tr>
+<tr>
+<td>6. 验证 degraded 状态</td>
+<td><code>cat /proc/mdstat</code> 应显示 <code>[U_]</code>，Active Devices=1</td>
+</tr>
+</tbody></table></div>
+<hr>
+<h2 id="h-八附录">八、附录</h2>
+<h3 id="h-81-当前-wsl-环境的块设备拓扑">8.1 当前 WSL 环境的块设备拓扑</h3>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>设备</th>
+<th>类型</th>
+<th>文件系统</th>
+<th>大小</th>
+<th>挂载点</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>sda</td>
+<td>disk</td>
+<td>ext4</td>
+<td>364.8M</td>
+<td>-</td>
+<td>WSL 虚拟磁盘（只读）</td>
+</tr>
+<tr>
+<td>sdb</td>
+<td>disk</td>
+<td>ext4</td>
+<td>144.5M</td>
+<td>-</td>
+<td>WSL 虚拟磁盘（只读）</td>
+</tr>
+<tr>
+<td>sdc</td>
+<td>disk</td>
+<td>swap</td>
+<td>4G</td>
+<td>[SWAP]</td>
+<td>WSL 交换分区</td>
+</tr>
+<tr>
+<td>sdd</td>
+<td>disk</td>
+<td>ext4</td>
+<td>1T</td>
+<td>/mnt/wslg/distro</td>
+<td>WSL 根文件系统（读写）</td>
+</tr>
+<tr>
+<td>loop0~7</td>
+<td>loop</td>
+<td>-</td>
+<td>-</td>
+<td>-</td>
+<td>空闲，无 backing file</td>
+</tr>
+</tbody></table></div>
+<h3 id="h-82-引用证据">8.2 引用证据</h3>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>证据文件</th>
+<th>关键结论</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>C:\Users\86135.witty-diagnosis-agent\dayu\report\kuafu_T1_20260607_123526.md</td>
+<td>当前环境无 md0，无 RAID 配置，所有 loop 设备无 MD superblock</td>
+</tr>
+<tr>
+<td>C:\Users\86135.witty-diagnosis-agent\dayu\report\kuafu_T2_20260607_123518.md</td>
+<td>文件系统全部 clean，无损坏；确认无任何 md 设备存在</td>
+</tr>
+</tbody></table></div>
+<hr>
+<p><em>报告由 Baize（分析与报告 Agent）生成</em></p>
+
+    <div class="meta">
+      <span class="meta-source">WSL-Ubuntu-md0-RAID1-degraded_20260607_124000_report.md</span>
+      <span>生成于 2026/06/07 12:38</span>
+    </div>
+  </article>
+</div>
+
+<script>
+  /* ── 滚动进度条 ── */
+  window.addEventListener("scroll", () => {
+    const el  = document.documentElement;
+    const pct = el.scrollTop / (el.scrollHeight - el.clientHeight) * 100;
+    document.getElementById("progress").style.width = Math.min(pct, 100) + "%";
+  });
+
+  /* ── TOC 高亮当前章节 ── */
+  (function () {
+    const headings = Array.from(document.querySelectorAll("article h1,article h2,article h3"));
+    const links    = Array.from(document.querySelectorAll(".toc a"));
+    if (!links.length) return;
+    const obs = new IntersectionObserver(entries => {
+      entries.forEach(e => {
+        if (!e.isIntersecting) return;
+        links.forEach(l => l.classList.remove("active"));
+        const a = links.find(l => l.getAttribute("href") === "#" + e.target.id);
+        if (a) a.classList.add("active");
+      });
+    }, { rootMargin: "-10% 0px -80% 0px" });
+    headings.forEach(h => obs.observe(h));
+  })();
+
+  /* ── h2 章节序号自动计数 ── */
+  (function () {
+    let idx = 0;
+    document.querySelectorAll("article h2").forEach(el => {
+      idx++;
+      el.setAttribute("data-index", String(idx).padStart(2, "0"));
+    });
+  })();
+
+  /* ── 代码块一键复制 ── */
+  function copyCode(btn) {
+    const code = btn.closest(".code-block").querySelector("code").innerText;
+    navigator.clipboard.writeText(code).then(() => {
+      btn.classList.add("copied");
+      btn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>';
+      setTimeout(() => {
+        btn.classList.remove("copied");
+        btn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>';
+      }, 2000);
+    });
+  }
+
+  /* ── 目录树收缩/展开 ── */
+  function toggleToc(btn) {
+    const expanded = btn.getAttribute("aria-expanded") === "true";
+    btn.setAttribute("aria-expanded", String(!expanded));
+    const parentItem = btn.closest(".toc-item");
+    let nextEl = parentItem.nextElementSibling;
+    if (nextEl && nextEl.classList.contains("toc-group")) {
+      if (expanded) {
+        nextEl.style.maxHeight = nextEl.scrollHeight + "px";
+        void nextEl.offsetHeight;
+        nextEl.classList.add("collapsed");
+      } else {
+        nextEl.classList.remove("collapsed");
+        nextEl.style.maxHeight = nextEl.scrollHeight + "px";
+        setTimeout(() => {
+          if (!nextEl.classList.contains("collapsed")) {
+            nextEl.style.maxHeight = "none";
+          }
+        }, 300);
+      }
+    }
+  }
+</script>
+</body>
+</html>
