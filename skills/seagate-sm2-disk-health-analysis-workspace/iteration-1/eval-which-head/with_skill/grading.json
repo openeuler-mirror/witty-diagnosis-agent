@@ -1,0 +1,28 @@
+{
+  "eval_id": "which-head",
+  "config": "with_skill",
+  "expectations": [
+    {
+      "text": "指出异常磁头为 H10",
+      "passed": true,
+      "evidence": "H10"
+    },
+    {
+      "text": "FAFH 较同族偏高（约 +30%）",
+      "passed": true,
+      "evidence": "+31% 超离群阈值"
+    },
+    {
+      "text": "g_list 达到约 1100",
+      "passed": true,
+      "evidence": "g_list 1100"
+    },
+    {
+      "text": "时间方向正确：增长而非下降",
+      "passed": true,
+      "evidence": "按 poh 升序校正为增长"
+    }
+  ],
+  "passed": 4,
+  "total": 4
+}

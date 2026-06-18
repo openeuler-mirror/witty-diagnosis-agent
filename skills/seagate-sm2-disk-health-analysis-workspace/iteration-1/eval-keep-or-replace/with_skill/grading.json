@@ -1,0 +1,28 @@
+{
+  "eval_id": "keep-or-replace",
+  "config": "with_skill",
+  "expectations": [
+    {
+      "text": "结论为不能简单留用 / 需降级或换盘",
+      "passed": true,
+      "evidence": "必须降级/换盘"
+    },
+    {
+      "text": "定位 H10 为退化磁头",
+      "passed": true,
+      "evidence": "H10"
+    },
+    {
+      "text": "时间方向正确：g_list 0->1100 增长（活跃），未误判为已自愈到0",
+      "passed": true,
+      "evidence": "复核 poh 后确认 0->1100 增长"
+    },
+    {
+      "text": "依据包含 vis_rd_err>0 或命令超时等活跃退化证据",
+      "passed": true,
+      "evidence": "vis_rd_err=181 且命令超时 0->6"
+    }
+  ],
+  "passed": 4,
+  "total": 4
+}
