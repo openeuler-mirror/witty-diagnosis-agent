@@ -188,8 +188,7 @@ select_install_target() {
 
   draw_target_menu() {
     local i marker color
-    echo -e "${CYAN}◆${NC}  Select installation platform/framework for Witty Diagnosis Agent / 选择 Witty Diagnosis Agent 的安装平台/框架"
-    echo -e "   ${dim}(Use ↑/↓ arrows to navigate, Enter to select / 使用上下键操作，回车或空格键确认)${NC}"
+    echo -e "${CYAN}◆${NC}  Select installation target for Witty Diagnosis Agent / 选择 Witty Diagnosis Agent 的安装目标"
     for i in 0 1; do
       if [ "$i" -eq "$selected" ]; then
         marker="●"
@@ -243,9 +242,9 @@ XIAOO_CONFIG_FILE="${XIAOO_CONFIG_DIR}/config.toml"
 XIAOO_ASSETS_DIR="${SCRIPT_DIR}/src/xiaoO"
 XIAOO_CONFIG_TEMPLATE="${XIAOO_ASSETS_DIR}/config/config.toml"
 
-# --- Platform/Framework Detection ---
+# --- Target Detection ---
 print_header
-print_step 1 5 "Detecting installation platform/framework"
+print_step 1 5 "Detecting installation target"
 
 HAS_OPENCODE=0
 HAS_XIAOO=0
