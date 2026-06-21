@@ -142,6 +142,34 @@ describe("applyMcpConfig", () => {
     expect(mergedMcp.firecrawl.enabled).toBe(true)
   })
 
+  test("lets loaded lightrag config override builtin lightrag", async () => {
+    //#given
+    createBuiltinMcpsSpy.mockReturnValue({
+      lightrag: { type: "local", command: ["node", "builtin-lightrag.js"], enabled: true },
+    })
+
+    loadMcpConfigsSpy.mockResolvedValue({
+      servers: {
+        lightrag: { type: "local", command: ["uv", "run", "src/lightrag_mcp/main.py"], enabled: true },
+      },
+    })
+
+    const config: Record<string, unknown> = { mcp: {} }
+    const pluginConfig = createPluginConfig()
+
+    //#when
+    const { applyMcpConfig } = await import("./mcp-config-handler")
+    await applyMcpConfig({ config, pluginConfig, pluginComponents: EMPTY_PLUGIN_COMPONENTS })
+
+    //#then
+    const mergedMcp = config.mcp as Record<string, Record<string, unknown>>
+    expect(mergedMcp.lightrag).toEqual({
+      type: "local",
+      command: ["uv", "run", "src/lightrag_mcp/main.py"],
+      enabled: true,
+    })
+  })
+
   test("deletes plugin MCPs that are in disabled_mcps", async () => {
     //#given
     const config: Record<string, unknown> = { mcp: {} }

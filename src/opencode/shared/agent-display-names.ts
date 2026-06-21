@@ -12,6 +12,7 @@ export const AGENT_DISPLAY_NAMES: Record<string, string> = {
   "nuwa-sub": "Nuwa-Sub (Remediation Planner Subagent)",
   dayu: "Dayu (Orchestration and Scheduling)",
   kuafu: "Kuafu (General Diagnostic Executor)",
+  "taiyi": "taiyi",
   "multimodal-looker": "multimodal-looker",
 }
 

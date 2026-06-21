@@ -10,12 +10,18 @@ const WITTY_OWNED_AGENT_KEYS = new Set([
   "dayu",
   "baize",
   "kuafu",
+  "taiyi",
   "multimodal-looker",
   "build"
 ])
 
 /** Xuanyuan/Fuxi：主界面；build：OpenCode 原生 Build 模式，需与上游一致在 UI 中可选 */
-const UI_VISIBLE_AGENT_KEYS = new Set(["xuanyuan", "fuxi", "build"])
+const UI_VISIBLE_AGENT_KEYS = new Set([
+  "xuanyuan",
+  "fuxi",
+  "taiyi",
+  "build",
+])
 
 export function applyUiAgentVisibility(
   agents: Record<string, unknown>,

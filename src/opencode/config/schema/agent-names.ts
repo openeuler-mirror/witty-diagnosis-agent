@@ -9,6 +9,7 @@ export const BuiltinAgentNameSchema = z.enum([
   "nuwa-sub",
   "dayu",
   "kuafu",
+  "taiyi",
   "multimodal-looker",
 ])
 
@@ -31,6 +32,7 @@ export const OverridableAgentNameSchema = z.enum([
   "nuwa-sub",
   "dayu",
   "kuafu",
+  "taiyi",
   "multimodal-looker",
 ])
 

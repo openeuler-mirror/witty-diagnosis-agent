@@ -11,15 +11,17 @@ describe("applyUiAgentVisibility", () => {
     expect(result.dayu).toMatchObject({ hidden: true, mode: "subagent" })
   })
 
-  it("keeps xuanyuan and fuxi visible in the UI", () => {
+  it("keeps xuanyuan, fuxi, and taiyi visible in the UI", () => {
     const result = applyUiAgentVisibility({
       xuanyuan: { mode: "all", color: "#2196F3" },
       fuxi: { mode: "all", color: "#FF5722" },
+      "taiyi": { mode: "primary", color: "#4CAF50" },
     })
 
     expect(result).toEqual({
       xuanyuan: { mode: "all", color: "#2196F3" },
       fuxi: { mode: "all", color: "#FF5722" },
+      "taiyi": { mode: "primary", color: "#4CAF50" },
     })
   })
 
@@ -40,9 +42,8 @@ describe("applyUiAgentVisibility", () => {
       },
       build: { mode: "primary", temperature: 0.1 },
       "custom-agent": {
-        mode: "subagent",
+        mode: "all",
         description: "custom",
-        hidden: true,
       },
     })
   })
@@ -51,12 +52,14 @@ describe("applyUiAgentVisibility", () => {
     const result = applyUiAgentVisibility({
       "Xuanyuan (Controller)": { mode: "all" },
       "Fuxi (Diagnostic Planner)": { mode: "all" },
+      "taiyi": { mode: "primary" },
       "Baize (Root Cause Analysis)": { mode: "all" },
     })
 
     expect(result).toEqual({
       "Xuanyuan (Controller)": { mode: "all" },
       "Fuxi (Diagnostic Planner)": { mode: "all" },
+      "taiyi": { mode: "primary" },
       "Baize (Root Cause Analysis)": { mode: "subagent", hidden: true },
     })
   })

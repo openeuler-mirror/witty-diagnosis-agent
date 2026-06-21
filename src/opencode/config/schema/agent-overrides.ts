@@ -66,6 +66,7 @@ export const AgentOverridesSchema = z.object({
   "nuwa-sub": AgentOverrideConfigSchema.optional(),
   dayu: AgentOverrideConfigSchema.optional(),
   kuafu: AgentOverrideConfigSchema.optional(),
+  "taiyi": AgentOverrideConfigSchema.optional(),
   "multimodal-looker": AgentOverrideConfigSchema.optional(),
 })
 

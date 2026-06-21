@@ -230,6 +230,35 @@ describe("getSystemMcpServerNames", () => {
         process.chdir(originalCwd)
       }
      })
+
+  it("reads ~/.witty-diagnosis-agent/mcp-config.json and normalizes lightrag-mcp", async () => {
+    // given
+    const wittyDir = join(TEST_HOME, ".witty-diagnosis-agent")
+    mkdirSync(wittyDir, { recursive: true })
+    writeFileSync(join(wittyDir, "mcp-config.json"), JSON.stringify({
+      mcpServers: {
+        "lightrag-mcp": {
+          command: "uv",
+          args: ["run", "src/lightrag_mcp/main.py"],
+        },
+      },
+    }))
+
+    const originalCwd = process.cwd()
+    process.chdir(TEST_DIR)
+
+    try {
+      // when
+      const { getSystemMcpServerNames } = await import("./loader")
+      const names = getSystemMcpServerNames()
+
+      // then
+      expect(names.has("lightrag")).toBe(true)
+      expect(names.has("lightrag-mcp")).toBe(false)
+    } finally {
+      process.chdir(originalCwd)
+    }
+  })
 })
 
 describe("loadMcpConfigs", () => {
@@ -333,5 +362,69 @@ describe("loadMcpConfigs", () => {
       process.chdir(originalCwd)
     }
   })
-})
 
+  it("should load ~/.witty-diagnosis-agent/mcp-config.json and map lightrag-mcp to lightrag", async () => {
+    //#given
+    const wittyDir = join(TEST_HOME, ".witty-diagnosis-agent")
+    mkdirSync(wittyDir, { recursive: true })
+    writeFileSync(join(wittyDir, "mcp-config.json"), JSON.stringify({
+      mcpServers: {
+        "lightrag-mcp": {
+          command: "uv",
+          args: [
+            "--directory",
+            "/opt/src/lightrag-mcp",
+            "run",
+            "src/lightrag_mcp/main.py",
+          ],
+        },
+      },
+    }))
+
+    const originalCwd = process.cwd()
+    process.chdir(TEST_DIR)
+
+    try {
+      //#when
+      const { loadMcpConfigs } = await import("./loader")
+      const result = await loadMcpConfigs()
+
+      //#then
+      expect(result.servers).toHaveProperty("lightrag")
+      expect(result.servers).not.toHaveProperty("lightrag-mcp")
+      expect(result.loadedServers.find((s) => s.name === "lightrag")).toBeDefined()
+      expect(result.loadedServers.find((s) => s.name === "lightrag-mcp")).toBeUndefined()
+    } finally {
+      process.chdir(originalCwd)
+    }
+  })
+
+  it("should allow disabled_mcps to disable normalized lightrag name", async () => {
+    //#given
+    const wittyDir = join(TEST_HOME, ".witty-diagnosis-agent")
+    mkdirSync(wittyDir, { recursive: true })
+    writeFileSync(join(wittyDir, "mcp-config.json"), JSON.stringify({
+      mcpServers: {
+        "lightrag-mcp": {
+          command: "uv",
+          args: ["run", "src/lightrag_mcp/main.py"],
+        },
+      },
+    }))
+
+    const originalCwd = process.cwd()
+    process.chdir(TEST_DIR)
+
+    try {
+      //#when
+      const { loadMcpConfigs } = await import("./loader")
+      const result = await loadMcpConfigs(["lightrag"])
+
+      //#then
+      expect(result.servers).not.toHaveProperty("lightrag")
+      expect(result.loadedServers.find((s) => s.name === "lightrag")).toBeUndefined()
+    } finally {
+      process.chdir(originalCwd)
+    }
+  })
+})

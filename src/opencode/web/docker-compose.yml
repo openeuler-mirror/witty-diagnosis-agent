@@ -1,0 +1,48 @@
+# 前后端分离容器化部署（NFR-011 / BC-012 / 02 §2.4）。
+# 前端容器 nginx 反代后端；后端单实例（D-005）。默认 SQLite（命名卷持久化）；
+# 取消 mysql 服务注释并将 DB_CLIENT=mysql 即切换到 MySQL（云化推荐，NFR-010）。
+services:
+  backend:
+    build: ./server
+    environment:
+      - PORT=8787
+      - HOST=0.0.0.0
+      - DB_CLIENT=sqlite
+      - DB_SQLITE_PATH=/data/witty.db
+      - SCHEDULER_MAX_CONCURRENT=4
+      - TASK_RETENTION_DAYS=30
+      - COOKIE_SECRET=change-me-in-prod
+      # 切 MySQL（取消下面注释 + 启用 mysql 服务）：
+      # - DB_CLIENT=mysql
+      # - DB_MYSQL_HOST=mysql
+      # - DB_MYSQL_PORT=3306
+      # - DB_MYSQL_USER=witty
+      # - DB_MYSQL_PASSWORD=witty-pass
+      # - DB_MYSQL_DATABASE=witty
+    volumes:
+      - backend-data:/data
+    expose:
+      - "8787"
+    # depends_on:
+    #   - mysql
+
+  frontend:
+    build: ./frontend
+    ports:
+      - "8080:80"
+    depends_on:
+      - backend
+
+  # mysql:
+  #   image: mysql:8
+  #   environment:
+  #     - MYSQL_DATABASE=witty
+  #     - MYSQL_USER=witty
+  #     - MYSQL_PASSWORD=witty-pass
+  #     - MYSQL_ROOT_PASSWORD=root-pass
+  #   volumes:
+  #     - mysql-data:/var/lib/mysql
+
+volumes:
+  backend-data:
+  # mysql-data:
