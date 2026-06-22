@@ -17,6 +17,12 @@ interface McpConfigPath {
   scope: McpScope
 }
 
+function normalizeMcpServerName(name: string): string {
+  const normalized = name.trim().toLowerCase()
+  if (normalized === "lightrag-mcp") return "lightrag"
+  return name
+}
+
 function getMcpConfigPaths(): McpConfigPath[] {
   const claudeConfigDir = getClaudeConfigDir()
   const cwd = process.cwd()
@@ -24,6 +30,7 @@ function getMcpConfigPaths(): McpConfigPath[] {
   return [
     { path: join(homedir(), ".claude.json"), scope: "user" },
     { path: join(claudeConfigDir, ".mcp.json"), scope: "user" },
+    { path: join(homedir(), ".witty-diagnosis-agent", "mcp-config.json"), scope: "user" },
     { path: join(cwd, ".mcp.json"), scope: "project" },
     { path: join(cwd, ".claude", ".mcp.json"), scope: "local" },
   ]
@@ -58,8 +65,9 @@ export function getSystemMcpServerNames(): Set<string> {
       if (!config?.mcpServers) continue
 
       for (const [name, serverConfig] of Object.entries(config.mcpServers)) {
+        const resolvedName = normalizeMcpServerName(name)
         if (serverConfig.disabled) continue
-        names.add(name)
+        names.add(resolvedName)
       }
     } catch {
       continue
@@ -82,36 +90,37 @@ export async function loadMcpConfigs(
     if (!config?.mcpServers) continue
 
     for (const [name, serverConfig] of Object.entries(config.mcpServers)) {
-      if (disabledSet.has(name)) {
-        log(`Skipping MCP "${name}" (in disabled_mcps)`, { path })
+      const resolvedName = normalizeMcpServerName(name)
+      if (disabledSet.has(resolvedName)) {
+        log(`Skipping MCP "${resolvedName}" (in disabled_mcps)`, { path, originalName: name })
         continue
       }
 
       if (serverConfig.disabled) {
-        log(`Disabling MCP server "${name}"`, { path })
-        delete servers[name]
-        const existingIndex = loadedServers.findIndex((s) => s.name === name)
+        log(`Disabling MCP server "${resolvedName}"`, { path, originalName: name })
+        delete servers[resolvedName]
+        const existingIndex = loadedServers.findIndex((s) => s.name === resolvedName)
         if (existingIndex !== -1) {
           loadedServers.splice(existingIndex, 1)
-          log(`Removed previously loaded MCP server "${name}"`, { path })
+          log(`Removed previously loaded MCP server "${resolvedName}"`, { path, originalName: name })
         }
         continue
       }
 
       try {
-        const transformed = transformMcpServer(name, serverConfig)
-        servers[name] = transformed
+        const transformed = transformMcpServer(resolvedName, serverConfig)
+        servers[resolvedName] = transformed
 
-        const existingIndex = loadedServers.findIndex((s) => s.name === name)
+        const existingIndex = loadedServers.findIndex((s) => s.name === resolvedName)
         if (existingIndex !== -1) {
           loadedServers.splice(existingIndex, 1)
         }
 
-        loadedServers.push({ name, scope, config: transformed })
+        loadedServers.push({ name: resolvedName, scope, config: transformed })
 
-        log(`Loaded MCP server "${name}" from ${scope}`, { path })
+        log(`Loaded MCP server "${resolvedName}" from ${scope}`, { path, originalName: name })
       } catch (error) {
-        log(`Failed to transform MCP server "${name}"`, error)
+        log(`Failed to transform MCP server "${resolvedName}"`, error)
       }
     }
   }

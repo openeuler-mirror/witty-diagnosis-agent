@@ -26,6 +26,7 @@ import {
   createTaskUpdateTool,
   createHashlineEditTool,
   createReportVisualizationTool,
+  createLightragTool,
 } from "../tools"
 import { getMainSessionID } from "../features/claude-code-session-state"
 import { filterDisabledTools } from "../shared/disabled-tools"
@@ -125,6 +126,7 @@ export function createToolRegistry(args: {
     ...createAstGrepTools(ctx),
     ...createSessionManagerTools(ctx),
     ...createReportVisualizationTool(ctx),
+    ...createLightragTool(),
     ...backgroundTools,
     call_witty_agent: callWittyAgent,
     ...(lookAt ? { look_at: lookAt } : {}),

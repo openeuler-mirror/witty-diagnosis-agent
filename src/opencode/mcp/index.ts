@@ -13,8 +13,17 @@ type RemoteMcpConfig = {
   oauth?: false
 }
 
+type LocalMcpConfig = {
+  type: "local"
+  command: string[]
+  enabled: boolean
+  environment?: Record<string, string>
+}
+
+type BuiltinMcpConfig = RemoteMcpConfig | LocalMcpConfig
+
 export function createBuiltinMcps(disabledMcps: string[] = [], config?: WittyDiagnosisAgentConfig) {
-  const mcps: Record<string, RemoteMcpConfig> = {}
+  const mcps: Record<string, BuiltinMcpConfig> = {}
 
   if (!disabledMcps.includes("websearch")) {
     mcps.websearch = createWebsearchConfig(config?.websearch)

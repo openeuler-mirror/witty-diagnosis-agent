@@ -89,6 +89,7 @@ export function isGeminiModel(model: string): boolean {
 }
 
 export type BuiltinAgentName =
+  | "taiyi"
   | "multimodal-looker"
 
 export type OverridableAgentName =

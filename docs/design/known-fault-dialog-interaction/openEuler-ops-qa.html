@@ -1,0 +1,801 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>openEuler 运维平台 · 运维问答（RAG 高保真）</title>
+<style>
+  :root{
+    --ink:#1b2430; --ink-2:#243140; --ink-3:#2f3f52;
+    --bg:#f4f6f9; --surface:#ffffff; --surface-2:#fbfcfe;
+    --border:#e2e8f0; --border-2:#eef2f7;
+    --text:#1b2430; --text-2:#5a6b7b; --text-3:#8a99a8;
+    --accent:#0d8b80; --accent-d:#0a6e65; --accent-soft:#e3f4f1;
+    --ok:#1f9d57; --ok-soft:#e6f5ec;
+    --warn:#c87f04; --warn-soft:#fdf3df;
+    --danger:#d64545; --danger-soft:#fbe9e9;
+    --info:#2f6fb0; --info-soft:#e6f0f9;
+    --purple:#7659c4; --purple-soft:#efeafb;
+    --neutral:#7b8794; --neutral-soft:#eef1f5;
+    --font-ui:-apple-system,"Segoe UI",Roboto,"Helvetica Neue","PingFang SC","Microsoft YaHei",sans-serif;
+    --font-mono:ui-monospace,"SF Mono","JetBrains Mono","Cascadia Code",Menlo,Consolas,monospace;
+    --shadow:0 1px 2px rgba(27,36,48,.04),0 4px 16px rgba(27,36,48,.06);
+    --radius:10px;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;height:100%}
+  body{font-family:var(--font-ui);background:var(--bg);color:var(--text);font-size:14px;line-height:1.55;-webkit-font-smoothing:antialiased}
+  button{font-family:inherit;cursor:pointer}
+  a{color:var(--accent-d);text-decoration:none}
+  a:hover{text-decoration:underline}
+  .mono{font-family:var(--font-mono)}
+  ::-webkit-scrollbar{width:10px;height:10px}
+  ::-webkit-scrollbar-thumb{background:#cdd6e0;border-radius:6px;border:2px solid var(--bg)}
+  ::-webkit-scrollbar-track{background:transparent}
+
+  /* ---------- App shell ---------- */
+  .app{display:flex;height:100vh;overflow:hidden}
+
+  /* ---------- Sidebar ---------- */
+  .sidebar{width:212px;flex-shrink:0;background:var(--ink);color:#c7d2dd;display:flex;flex-direction:column;padding:14px 10px}
+  .brand{display:flex;align-items:center;gap:9px;padding:8px 10px 14px}
+  .brand .logo{width:28px;height:28px;border-radius:7px;background:linear-gradient(135deg,#16b3a4,#0d8b80);display:flex;align-items:center;justify-content:center;color:#fff;font-weight:700;font-size:15px}
+  .brand .name{font-weight:600;color:#eef3f7;font-size:14px;line-height:1.2}
+  .brand .name small{display:block;font-weight:400;color:#7f93a6;font-size:11px}
+  .nav{margin-top:6px;display:flex;flex-direction:column;gap:2px}
+  .nav .grp{font-size:11px;color:#62788c;padding:12px 12px 5px;letter-spacing:.04em}
+  .nav a{display:flex;align-items:center;gap:10px;padding:8px 11px;border-radius:8px;color:#aebccb;font-size:13px;transition:.13s}
+  .nav a:hover{background:rgba(255,255,255,.05);color:#e7eef4;text-decoration:none}
+  .nav a.active{background:var(--accent);color:#fff;font-weight:500}
+  .nav a .ic{width:16px;text-align:center;opacity:.95}
+  .side-foot{margin-top:auto;padding:10px;border-top:1px solid rgba(255,255,255,.07);display:flex;align-items:center;gap:9px}
+  .side-foot .av{width:30px;height:30px;border-radius:50%;background:#33485c;display:flex;align-items:center;justify-content:center;color:#cfe0ee;font-size:12px;font-weight:600}
+  .side-foot .who{font-size:12px;color:#cdd9e3;line-height:1.3}
+  .side-foot .who small{color:#73879a;font-size:11px}
+
+  /* ---------- Main ---------- */
+  .main{flex:1;display:flex;flex-direction:column;min-width:0}
+  .topbar{height:56px;flex-shrink:0;background:var(--surface);border-bottom:1px solid var(--border);display:flex;align-items:center;gap:14px;padding:0 18px}
+  .topbar h1{font-size:15px;font-weight:600;margin:0}
+  .topbar .sub{color:var(--text-3);font-size:12px}
+  .topbar .spacer{flex:1}
+  .pill{display:inline-flex;align-items:center;gap:6px;font-size:12px;color:var(--text-2);background:var(--surface-2);border:1px solid var(--border);border-radius:20px;padding:5px 11px}
+  .pill .dot{width:7px;height:7px;border-radius:50%;background:var(--ok)}
+  .kb-select{display:inline-flex;align-items:center;gap:7px;font-size:12.5px;color:var(--text);background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:6px 11px;cursor:pointer}
+  .kb-select:hover{border-color:#c8d2dd}
+  .kb-select .ic{color:var(--accent)}
+
+  /* ---------- QA body: chat + evidence ---------- */
+  .qa-body{flex:1;display:flex;min-height:0}
+  .chat{flex:1;display:flex;flex-direction:column;min-width:0;border-right:1px solid var(--border)}
+  .stream{flex:1;overflow-y:auto;padding:22px 26px 8px}
+  .stream-inner{max-width:760px;margin:0 auto}
+
+  /* intro / empty hint */
+  .intro{display:flex;gap:12px;align-items:flex-start;background:var(--accent-soft);border:1px solid #c7e8e2;border-radius:12px;padding:13px 15px;margin-bottom:18px}
+  .intro .ic{font-size:18px;line-height:1.2}
+  .intro b{color:var(--accent-d)}
+  .intro p{margin:3px 0 0;color:var(--text-2);font-size:12.5px}
+
+  /* messages */
+  .msg{margin-bottom:22px}
+  .msg.user{display:flex;justify-content:flex-end}
+  .msg.user .bubble{background:var(--ink-2);color:#eaf1f6;border-radius:12px 12px 3px 12px;padding:11px 15px;max-width:80%;font-size:13.5px;line-height:1.6}
+  .msg.ai{display:flex;gap:11px;align-items:flex-start}
+  .ai-av{width:30px;height:30px;border-radius:8px;flex-shrink:0;background:linear-gradient(135deg,#16b3a4,#0d8b80);display:flex;align-items:center;justify-content:center;color:#fff;font-weight:700;font-size:13px}
+  .ai-body{flex:1;min-width:0}
+
+  /* retrieval trace (lightRAG dual-level) */
+  .trace{border:1px solid var(--border);background:var(--surface-2);border-radius:10px;margin-bottom:11px;overflow:hidden}
+  .trace-head{display:flex;align-items:center;gap:9px;padding:9px 13px;cursor:pointer;user-select:none}
+  .trace-head .tg{font-size:11px;color:var(--text-3);transition:.2s}
+  .trace-head.open .tg{transform:rotate(90deg)}
+  .trace-head .lab{font-size:12.5px;font-weight:600;color:var(--text)}
+  .trace-head .meta{margin-left:auto;font-size:11.5px;color:var(--text-3)}
+  .trace-head .spin{width:13px;height:13px;border:2px solid var(--border);border-top-color:var(--accent);border-radius:50%;animation:spin .7s linear infinite}
+  @keyframes spin{to{transform:rotate(360deg)}}
+  .trace-body{display:none;border-top:1px solid var(--border);padding:11px 13px;background:#fff}
+  .trace-body.open{display:block}
+  .rlevel{margin-bottom:11px}
+  .rlevel:last-child{margin-bottom:0}
+  .rlevel .rl-head{display:flex;align-items:center;gap:7px;margin-bottom:7px}
+  .rl-tag{font-size:10.5px;font-weight:600;padding:2px 7px;border-radius:5px}
+  .rl-low{background:var(--info-soft);color:var(--info)}
+  .rl-high{background:var(--purple-soft);color:var(--purple)}
+  .rl-head .desc{font-size:11.5px;color:var(--text-3)}
+  .chips{display:flex;flex-wrap:wrap;gap:6px}
+  .gchip{font-size:11.5px;font-family:var(--font-mono);padding:3px 9px;border-radius:6px;border:1px solid var(--border);background:var(--surface-2);color:var(--text-2)}
+  .gchip.ent{border-color:#cfe1f2;background:var(--info-soft);color:var(--info)}
+  .gchip.rel{border-color:#dccff2;background:var(--purple-soft);color:var(--purple)}
+
+  /* answer text */
+  .answer{font-size:14px;line-height:1.72;color:var(--text)}
+  .answer p{margin:0 0 11px}
+  .answer ol,.answer ul{margin:0 0 11px;padding-left:20px}
+  .answer li{margin-bottom:5px}
+  .answer code{font-family:var(--font-mono);font-size:12.5px;background:#eef2f7;border:1px solid var(--border-2);border-radius:5px;padding:1px 6px;color:var(--ink-3)}
+  .answer .tag-step{font-weight:600;color:var(--accent-d)}
+  .answer strong{color:var(--ink)}
+
+  /* inline citation marker */
+  .cite{display:inline-flex;align-items:center;justify-content:center;min-width:17px;height:17px;padding:0 4px;margin:0 1px;border-radius:5px;border:1px solid #bfe4dd;background:var(--accent-soft);color:var(--accent-d);font-size:10.5px;font-weight:700;vertical-align:super;line-height:1;cursor:pointer;transition:.12s;font-family:var(--font-mono)}
+  .cite:hover{background:var(--accent);color:#fff;border-color:var(--accent)}
+  .cite.active{background:var(--accent);color:#fff;border-color:var(--accent)}
+
+  /* answer actions + followups */
+  .ai-foot{margin-top:13px}
+  .act-row{display:flex;align-items:center;gap:5px;margin-bottom:13px}
+  .iact{display:inline-flex;align-items:center;gap:5px;font-size:12px;color:var(--text-3);background:none;border:1px solid transparent;border-radius:7px;padding:5px 9px}
+  .iact:hover{background:var(--neutral-soft);color:var(--text-2)}
+  .iact.done{color:var(--accent-d)}
+  .followups{display:flex;flex-direction:column;gap:7px}
+  .fu-label{font-size:11.5px;color:var(--text-3);margin-bottom:1px}
+  .fu{text-align:left;display:flex;align-items:center;gap:9px;border:1px solid var(--border);background:var(--surface);border-radius:9px;padding:9px 12px;font-size:13px;color:var(--text);transition:.13s}
+  .fu:hover{border-color:var(--accent);background:var(--accent-soft);color:var(--accent-d)}
+  .fu .ar{margin-left:auto;color:var(--text-3);font-size:13px}
+  .fu:hover .ar{color:var(--accent-d)}
+
+  /* composer */
+  .composer{flex-shrink:0;border-top:1px solid var(--border);background:var(--surface);padding:13px 26px 16px}
+  .composer-inner{max-width:760px;margin:0 auto}
+  .suggest-row{display:flex;gap:7px;flex-wrap:wrap;margin-bottom:9px}
+  .schip{font-size:12px;color:var(--text-2);background:var(--surface-2);border:1px solid var(--border);border-radius:18px;padding:5px 12px;transition:.13s}
+  .schip:hover{border-color:var(--accent);color:var(--accent-d);background:var(--accent-soft)}
+  .input-wrap{display:flex;align-items:flex-end;gap:10px;border:1px solid var(--border);border-radius:12px;background:var(--surface);padding:8px 8px 8px 14px;box-shadow:var(--shadow)}
+  .input-wrap:focus-within{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft)}
+  .input-wrap textarea{flex:1;border:none;outline:none;resize:none;font-family:inherit;font-size:14px;line-height:1.5;background:transparent;color:var(--text);max-height:120px;padding:5px 0}
+  .send{width:38px;height:38px;flex-shrink:0;border:none;border-radius:9px;background:var(--accent);color:#fff;font-size:16px;display:flex;align-items:center;justify-content:center;transition:.13s}
+  .send:hover{background:var(--accent-d)}
+  .send:disabled{background:#c3cdd6;cursor:not-allowed}
+  .composer-hint{display:flex;align-items:center;gap:6px;margin-top:8px;font-size:11px;color:var(--text-3)}
+  kbd{font-family:var(--font-mono);font-size:10.5px;background:var(--neutral-soft);border:1px solid var(--border);border-bottom-width:2px;border-radius:4px;padding:0 5px;color:var(--text-2)}
+
+  /* ---------- Evidence panel ---------- */
+  .evidence{width:392px;flex-shrink:0;display:flex;flex-direction:column;background:var(--surface-2);min-width:0}
+  .ev-head{flex-shrink:0;padding:14px 18px 0;background:var(--surface);border-bottom:1px solid var(--border)}
+  .ev-title{display:flex;align-items:center;gap:8px;font-size:13.5px;font-weight:600;margin-bottom:11px}
+  .ev-title .ic{color:var(--accent)}
+  .ev-title .ct{margin-left:auto;font-size:11.5px;font-weight:500;color:var(--text-3);background:var(--neutral-soft);border-radius:11px;padding:2px 9px}
+  .ev-close{display:none;border:none;background:none;color:var(--text-3);font-size:15px;padding:2px 6px;margin-left:6px}
+  .ev-tabs{display:flex;gap:2px}
+  .ev-tab{border:none;background:none;font-size:12.5px;color:var(--text-3);padding:8px 12px;border-bottom:2px solid transparent;margin-bottom:-1px;font-weight:500}
+  .ev-tab:hover{color:var(--text)}
+  .ev-tab.active{color:var(--accent-d);border-bottom-color:var(--accent)}
+  .ev-scroll{flex:1;overflow-y:auto;padding:14px 16px 22px}
+
+  /* source card */
+  .src{background:var(--surface);border:1px solid var(--border);border-radius:11px;margin-bottom:12px;overflow:hidden;scroll-margin-top:8px;transition:box-shadow .2s,border-color .2s}
+  .src.flash{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft)}
+  .src-top{display:flex;align-items:flex-start;gap:10px;padding:12px 13px 10px}
+  .src-idx{width:21px;height:21px;flex-shrink:0;border-radius:6px;background:var(--accent);color:#fff;font-family:var(--font-mono);font-size:11.5px;font-weight:700;display:flex;align-items:center;justify-content:center}
+  .src-hd{flex:1;min-width:0}
+  .src-badge{display:inline-block;font-size:10.5px;font-weight:600;padding:2px 7px;border-radius:5px;margin-bottom:5px}
+  .b-doc{background:var(--info-soft);color:var(--info)}
+  .b-kb{background:var(--warn-soft);color:var(--warn)}
+  .b-inc{background:var(--danger-soft);color:var(--danger)}
+  .b-skill{background:var(--purple-soft);color:var(--purple)}
+  .src-title{font-size:13px;font-weight:600;color:var(--text);line-height:1.4}
+  .src-origin{display:flex;align-items:center;gap:6px;padding:0 13px 10px;font-size:11.5px}
+  .src-origin .ic{color:var(--text-3);flex-shrink:0}
+  .src-origin a{font-family:var(--font-mono);font-size:11px;word-break:break-all}
+  .src-excerpt{margin:0 13px 11px;padding:10px 12px;background:var(--surface-2);border-left:3px solid var(--accent);border-radius:0 7px 7px 0;font-size:12.5px;line-height:1.65;color:var(--text-2)}
+  .src-excerpt em{font-style:normal;background:#fff6d6;border-radius:3px;padding:0 2px;color:var(--ink)}
+  .src-kg{padding:0 13px 13px}
+  .src-kg .kg-lab{font-size:10.5px;color:var(--text-3);margin-bottom:6px;letter-spacing:.02em}
+  .src-foot{display:flex;align-items:center;gap:6px;padding:10px 13px;border-top:1px solid var(--border-2);background:var(--surface-2)}
+  .src-foot a{display:inline-flex;align-items:center;gap:5px;font-size:12px;font-weight:500}
+  .src-foot .relevance{margin-left:auto;font-size:11px;color:var(--text-3);display:flex;align-items:center;gap:6px}
+  .relbar{width:46px;height:5px;border-radius:3px;background:var(--neutral-soft);overflow:hidden}
+  .relbar i{display:block;height:100%;background:var(--accent);border-radius:3px}
+
+  .ev-empty{text-align:center;color:var(--text-3);font-size:12.5px;padding:40px 20px;line-height:1.7}
+  .ev-empty .ic{font-size:30px;display:block;margin-bottom:10px;opacity:.5}
+
+  /* graph tab */
+  .graph-wrap{background:var(--surface);border:1px solid var(--border);border-radius:11px;padding:6px}
+  .graph-cap{font-size:11.5px;color:var(--text-3);padding:8px 8px 4px;line-height:1.6}
+  .graph-legend{display:flex;gap:14px;padding:6px 8px 10px;font-size:11px;color:var(--text-2)}
+  .graph-legend span{display:inline-flex;align-items:center;gap:5px}
+  .lg-dot{width:9px;height:9px;border-radius:50%}
+
+  .fade-in{animation:fadein .35s ease both}
+  @keyframes fadein{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}
+
+  @media(max-width:1180px){.evidence{width:340px}}
+  @media(max-width:980px){
+    .sidebar{display:none}
+    .evidence{position:fixed;right:0;top:0;bottom:0;width:88%;max-width:392px;z-index:40;box-shadow:-8px 0 30px rgba(0,0,0,.12);transform:translateX(100%);transition:transform .25s}
+    .evidence.show{transform:none}
+    .ev-close{display:block}
+  }
+</style>
+</head>
+<body>
+<div class="app">
+
+  <!-- ===== Sidebar (context) ===== -->
+  <aside class="sidebar">
+    <div class="brand">
+      <div class="logo">e</div>
+      <div class="name">openEuler 运维<small>智能运维平台</small></div>
+    </div>
+    <nav class="nav">
+      <div class="grp">运维中心</div>
+      <a href="#"><span class="ic">▤</span> 资产概览</a>
+      <a href="#"><span class="ic">◷</span> 巡检任务</a>
+      <a href="#"><span class="ic">⚠</span> CVE 管理</a>
+      <a href="#"><span class="ic">⚙</span> 故障诊断</a>
+      <div class="grp">智能助手</div>
+      <a href="#" class="active"><span class="ic">◈</span> 运维问答</a>
+      <a href="#"><span class="ic">▦</span> 知识库</a>
+      <a href="#"><span class="ic">↻</span> 历史会话</a>
+    </nav>
+    <div class="side-foot">
+      <div class="av">运</div>
+      <div class="who">运维管理员<small>SRE · 平台组</small></div>
+    </div>
+  </aside>
+
+  <!-- ===== Main ===== -->
+  <main class="main">
+    <header class="topbar">
+      <h1>运维问答</h1>
+      <span class="sub">基于知识图谱的 RAG 检索增强问答</span>
+      <span class="spacer"></span>
+      <button class="kb-select" title="当前检索的知识库范围">
+        <span class="ic">▦</span> 知识库：openEuler 全量 <span style="color:var(--text-3)">▾</span>
+      </button>
+      <span class="pill"><span class="dot"></span> 图谱已就绪 · 12,480 实体</span>
+    </header>
+
+    <div class="qa-body">
+      <!-- ===== Chat column ===== -->
+      <section class="chat">
+        <div class="stream" id="stream">
+          <div class="stream-inner" id="streamInner">
+            <div class="intro">
+              <span class="ic">◈</span>
+              <div>
+                <b>检索增强问答（RAG）</b>—— 回答均来自你的运维知识库（官方文档 / 内部案例 / 运维 Skill）。
+                <p>正文中的引用角标 <span class="cite" style="cursor:default">1</span> 可点击，右侧将定位到对应原文与出处。下面是一段已生成的示例问答。</p>
+              </div>
+            </div>
+            <!-- messages injected here -->
+          </div>
+        </div>
+
+        <!-- composer -->
+        <div class="composer">
+          <div class="composer-inner">
+            <div class="suggest-row" id="suggestRow"></div>
+            <div class="input-wrap">
+              <textarea id="ta" rows="1" placeholder="描述你遇到的运维问题，例如：升级 docker 后所有容器启动失败……"></textarea>
+              <button class="send" id="sendBtn" title="发送（Enter）">➤</button>
+            </div>
+            <div class="composer-hint">
+              <kbd>Enter</kbd> 发送 · <kbd>Shift</kbd>+<kbd>Enter</kbd> 换行 · 回答内容由知识库检索生成，请结合现场核实
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ===== Evidence panel ===== -->
+      <aside class="evidence" id="evidence">
+        <div class="ev-head">
+          <div class="ev-title">
+            <span class="ic">◳</span> 引用与出处
+            <span class="ct" id="evCount">0 处来源</span>
+            <button class="ev-close" id="evClose" title="收起">✕</button>
+          </div>
+          <div class="ev-tabs">
+            <button class="ev-tab active" data-tab="src">引用来源</button>
+            <button class="ev-tab" data-tab="graph">检索图谱</button>
+          </div>
+        </div>
+        <div class="ev-scroll" id="evScroll">
+          <div class="ev-empty"><span class="ic">◳</span>选择一个问题或点击回答中的引用角标，<br>这里会显示对应的原文片段与出处链接。</div>
+        </div>
+      </aside>
+    </div>
+  </main>
+</div>
+
+<script>
+/* ============================================================
+   知识库（mock）：每条问答包含
+   - retrieval：lightRAG 双层检索（低层实体/关系 + 高层主题）
+   - answer：含 [n] 引用角标的回答
+   - sources：被引用的原文（标题/类型/出处链接/摘录/关联实体&关系/相关度）
+   - graph：检索子图（节点 + 关系），对应 lightRAG 的图谱检索
+   - followups：建议追问
+   ============================================================ */
+const KB = {
+  q1:{
+    question:"firewalld reload 之后，主机上所有容器突然都无法访问外网，docker ps 显示容器都在正常运行。这是什么原因，怎么快速恢复？",
+    retrieval:{
+      low:["firewalld","iptables：DOCKER 链","iptables：DOCKER-USER 链","容器 NAT/转发规则","firewalld reload → 重建 iptables 规则"],
+      high:["容器网络中断","防火墙与容器规则冲突"]
+    },
+    answer:`<p>这是 openEuler / CentOS 上高频的<strong>「防火墙与容器规则冲突」</strong>问题，容器进程本身正常，但网络全断。</p>
+<p><strong>根因：</strong>firewalld 在 <code>reload</code> 时会重建整张 iptables 规则表，从而清空 Docker 启动时注入的自定义链（<code>DOCKER</code>、<code>DOCKER-USER</code> 等）<span class="cite" data-cite="1">1</span>。这些链承载了容器的 NAT 与转发规则，链一旦丢失，容器就无法做地址转换，表现为「进程在跑、网络不通」<span class="cite" data-cite="2">2</span>。</p>
+<p><strong>快速验证：</strong>执行 <code>iptables -L DOCKER -n</code>，若该链为空或不存在，即可确认<span class="cite" data-cite="2">2</span>。</p>
+<p><strong>恢复手段（按优先级）：</strong></p>
+<ol>
+<li><span class="tag-step">【立即】</span>重启 docker 让其重新注入规则：<code>systemctl restart docker</code><span class="cite" data-cite="2">2</span></li>
+<li><span class="tag-step">【根治】</span>把 docker 规则纳入 firewalld 托管，或调整启动顺序使 docker 在 firewalld 之后启动<span class="cite" data-cite="3">3</span></li>
+<li><span class="tag-step">【预防】</span>生产环境固定二者依赖关系，避免对线上裸跑 <code>firewall-cmd --reload</code><span class="cite" data-cite="3">3</span></li>
+</ol>`,
+    sources:[
+      {id:1,type:"doc",badge:"官方文档",title:"容器网络配置指南 · iptables 与 firewalld 协同",
+       origin:"docs.openeuler.org",url:"https://docs.openeuler.org/zh/.../container-network.html",
+       excerpt:"当 firewalld 执行 reload 时，会清除并重建全部 iptables 规则，<em>Docker 注入的 DOCKER、DOCKER-USER 链将被一并清空</em>，需重启容器运行时或重新加载网络规则方可恢复。",
+       entities:["firewalld","iptables","DOCKER 链"],relations:["firewalld reload → 重建 iptables"],rel:96},
+      {id:2,type:"inc",badge:"故障案例",title:"INC-20241108 firewalld reload 致容器网络中断",
+       origin:"内部知识库 · 事件库",url:"kb.internal/incidents/INC-20241108",
+       excerpt:"现场 docker ps 全部 Up，容器内 ping 外网超时。执行 <em>iptables -L DOCKER -n 返回空链</em>，确认规则被 firewalld 清空；systemctl restart docker 后 90 秒内恢复。",
+       entities:["DOCKER 链","容器 NAT"],relations:["规则丢失 → 网络不通"],rel:91},
+      {id:3,type:"skill",badge:"运维 Skill",title:"docker-fault-diagnosis · network_iptables.md",
+       origin:"运维 Skill 库",url:"skill://docker-fault-diagnosis/references/network_iptables.md",
+       excerpt:"长期方案：将 docker.service 配置为 After=firewalld.service，或启用 firewalld 的 docker zone 托管；<em>避免在业务时段对线上主机执行 reload</em>。",
+       entities:["docker.service","firewalld zone"],relations:["启动顺序 → 规则保留"],rel:84}
+    ],
+    graph:{
+      nodes:[
+        {id:"firewalld",x:90,y:60,t:"ent"},
+        {id:"iptables",x:250,y:55,t:"ent"},
+        {id:"DOCKER 链",x:255,y:165,t:"ent"},
+        {id:"容器网络",x:95,y:175,t:"core"},
+        {id:"docker.service",x:120,y:270,t:"ent"}
+      ],
+      edges:[
+        {a:"firewalld",b:"iptables",l:"reload 重建"},
+        {a:"iptables",b:"DOCKER 链",l:"清空"},
+        {a:"DOCKER 链",b:"容器网络",l:"承载 NAT"},
+        {a:"docker.service",b:"DOCKER 链",l:"注入"}
+      ]
+    },
+    followups:[
+      "怎么彻底避免 firewalld 和 docker 的规则冲突？",
+      "DOCKER 链和 DOCKER-USER 链有什么区别？"
+    ]
+  },
+
+  q2:{
+    question:"把 docker 升级之后，主机上所有容器都启动失败，报 overlay2 相关错误。这是怎么回事？",
+    retrieval:{
+      low:["overlay2 存储驱动","XFS 文件系统","ftype=0","d_type 支持","XFS ftype=0 → overlay2 不支持"],
+      high:["容器启动失败","存储驱动兼容性"]
+    },
+    answer:`<p>典型的<strong>「XFS + overlay2 兼容性」</strong>问题，常在 CentOS 7 升级链路上出现，openEuler 同样适用。</p>
+<p><strong>根因：</strong>overlay2 依赖文件系统的 <code>d_type</code> 能力。若承载 <code>/var/lib/docker</code> 的 XFS 分区在格式化时 <code>ftype=0</code>，则不支持 d_type，overlay2 无法工作，容器全部启动失败<span class="cite" data-cite="1">1</span>。</p>
+<p><strong>快速验证：</strong><code>xfs_info /var/lib/docker | grep ftype</code>，若显示 <code>ftype=0</code> 即命中<span class="cite" data-cite="2">2</span>。</p>
+<p><strong>处置：</strong></p>
+<ol>
+<li><span class="tag-step">【根治】</span>用 <code>ftype=1</code> 重新格式化该分区（需备份数据）<span class="cite" data-cite="1">1</span></li>
+<li><span class="tag-step">【临时】</span>切换到 devicemapper 等其它存储驱动可临时绕过，但不建议长期使用<span class="cite" data-cite="2">2</span></li>
+</ol>`,
+    sources:[
+      {id:1,type:"doc",badge:"官方文档",title:"容器存储驱动选型与 overlay2 要求",
+       origin:"docs.openeuler.org",url:"https://docs.openeuler.org/zh/.../storage-driver.html",
+       excerpt:"overlay2 要求底层文件系统支持 d_type。<em>XFS 必须以 ftype=1 创建</em>，否则 overlay2 无法挂载，容器创建会失败。",
+       entities:["overlay2","XFS","ftype"],relations:["ftype=1 → 支持 d_type"],rel:95},
+      {id:2,type:"skill",badge:"运维 Skill",title:"docker-fault-diagnosis · storage_overlay.md",
+       origin:"运维 Skill 库",url:"skill://docker-fault-diagnosis/references/storage_overlay.md",
+       excerpt:"高危场景速查：CentOS 7 + XFS + Docker 升级常因 <em>ftype=0 不支持 overlay2</em> 导致全量容器启动失败；快速验证命令 xfs_info | grep ftype。",
+       entities:["devicemapper","xfs_info"],relations:["ftype=0 → 启动失败"],rel:88}
+    ],
+    graph:{
+      nodes:[
+        {id:"docker 升级",x:95,y:55,t:"ent"},
+        {id:"overlay2",x:250,y:70,t:"ent"},
+        {id:"XFS",x:255,y:180,t:"ent"},
+        {id:"容器启动失败",x:95,y:185,t:"core"},
+        {id:"ftype=0",x:255,y:275,t:"ent"}
+      ],
+      edges:[
+        {a:"docker 升级",b:"overlay2",l:"默认驱动"},
+        {a:"overlay2",b:"XFS",l:"依赖 d_type"},
+        {a:"XFS",b:"ftype=0",l:"格式化参数"},
+        {a:"ftype=0",b:"容器启动失败",l:"不支持"}
+      ]
+    },
+    followups:[
+      "ftype=1 重新格式化会丢数据吗？怎么平滑迁移？",
+      "怎么提前巡检全集群的 XFS ftype 配置？"
+    ]
+  },
+
+  q3:{
+    question:"一个 Java 容器反复重启，docker ps 显示不断 Exited(137)，但宿主机内存看起来还很充足。为什么？",
+    retrieval:{
+      low:["ExitCode 137","OOMKilled","cgroup 内存限制","JVM Xmx","JVM 未感知 cgroup limit"],
+      high:["容器循环重启","内存配额与 JVM 配置不匹配"]
+    },
+    answer:`<p>这是<strong>「JVM 未感知 cgroup 限制」</strong>导致的容器级 OOM，和宿主机整体内存是否充足无关。</p>
+<p><strong>根因：</strong><code>Exited(137)</code> = 128 + 9（SIGKILL），通常是容器触发了 cgroup 内存上限被 OOMKilled<span class="cite" data-cite="1">1</span>。若 JVM 的 <code>-Xmx</code> 大于容器 <code>--memory</code> 限制，或旧版 JDK 未启用 cgroup 感知，JVM 会按宿主机物理内存设堆，超过容器配额即被杀<span class="cite" data-cite="2">2</span>。</p>
+<p><strong>快速验证：</strong>对比 <code>docker inspect</code> 的 Memory 限制与 JVM 启动参数；查 <code>dmesg | grep -i oom</code> 是否有 OOM 记录<span class="cite" data-cite="1">1</span>。</p>
+<p><strong>处置：</strong></p>
+<ol>
+<li><span class="tag-step">【根治】</span>显式设置 <code>-Xmx</code> 低于容器内存上限，或升级 JDK 并启用容器感知<span class="cite" data-cite="2">2</span></li>
+<li><span class="tag-step">【预防】</span>为容器设置合理的 <code>--memory</code> 并预留堆外内存余量<span class="cite" data-cite="2">2</span></li>
+</ol>`,
+    sources:[
+      {id:1,type:"inc",badge:"故障案例",title:"INC-20250216 Java 容器 Exited(137) 循环重启",
+       origin:"内部知识库 · 事件库",url:"kb.internal/incidents/INC-20250216",
+       excerpt:"容器反复 Exited(137)，宿主机 free 充足。<em>dmesg 出现 Memory cgroup out of memory</em>，确认为容器级 OOMKilled，而非宿主机内存耗尽。",
+       entities:["ExitCode 137","OOMKilled","cgroup"],relations:["超配额 → SIGKILL"],rel:94},
+      {id:2,type:"skill",badge:"运维 Skill",title:"docker-fault-diagnosis · resource_oom.md",
+       origin:"运维 Skill 库",url:"skill://docker-fault-diagnosis/references/resource_oom.md",
+       excerpt:"JVM 若未感知 cgroup 限制，会按宿主机物理内存设置堆，<em>-Xmx 大于容器 --memory 即必然被 OOMKill</em>；新版 JDK 需启用容器感知。",
+       entities:["JVM","-Xmx","--memory"],relations:["Xmx > limit → OOM"],rel:90}
+    ],
+    graph:{
+      nodes:[
+        {id:"JVM -Xmx",x:95,y:58,t:"ent"},
+        {id:"cgroup limit",x:255,y:62,t:"ent"},
+        {id:"OOMKilled",x:255,y:175,t:"ent"},
+        {id:"容器循环重启",x:95,y:185,t:"core"},
+        {id:"Exited(137)",x:120,y:275,t:"ent"}
+      ],
+      edges:[
+        {a:"JVM -Xmx",b:"cgroup limit",l:"超过"},
+        {a:"cgroup limit",b:"OOMKilled",l:"触发"},
+        {a:"OOMKilled",b:"Exited(137)",l:"SIGKILL"},
+        {a:"OOMKilled",b:"容器循环重启",l:"导致"}
+      ]
+    },
+    followups:[
+      "怎么让旧版 JDK 也能感知 cgroup 内存限制？",
+      "如何批量巡检容器 Xmx 与 memory 限制是否匹配？"
+    ]
+  }
+};
+
+/* fallback：未命中知识库时仍演示带引用的回答 */
+const FALLBACK = {
+  question:null,
+  retrieval:{low:["关键词实体抽取","知识库向量召回"],high:["运维问题归类"]},
+  answer:`<p>已在知识库中检索与你问题最相关的资料。下面是综合多个来源的回答（请结合现场核实）：</p>
+<p>建议按「先定位、再恢复、后加固」的顺序处理：先用对应命令确认现象与根因<span class="cite" data-cite="1">1</span>，再执行最小化恢复操作，最后补齐预防措施<span class="cite" data-cite="1">1</span>。如需更精确的答案，可补充具体报错信息或日志片段。</p>`,
+  sources:[
+    {id:1,type:"kb",badge:"知识库",title:"运维通用排查方法论 · 定位/恢复/加固",
+     origin:"内部知识库",url:"kb.internal/handbook/triage-method",
+     excerpt:"通用排查三段式：<em>先定位（验证现象+锁定根因）→ 再恢复（最小化操作）→ 后加固（消除复发条件）</em>，避免在未定位时盲目重启。",
+     entities:["排查方法论"],relations:["定位 → 恢复 → 加固"],rel:72}
+  ],
+  graph:{nodes:[
+    {id:"问题",x:95,y:90,t:"core"},{id:"定位",x:255,y:55,t:"ent"},
+    {id:"恢复",x:265,y:150,t:"ent"},{id:"加固",x:160,y:255,t:"ent"}],
+   edges:[{a:"问题",b:"定位",l:"先"},{a:"定位",b:"恢复",l:"再"},{a:"恢复",b:"加固",l:"后"}]},
+  followups:["能帮我把这个问题整理成故障工单吗？","有没有相关的历史故障案例？"]
+};
+
+/* ---------------- state & els ---------------- */
+const streamInner=document.getElementById('streamInner');
+const stream=document.getElementById('stream');
+const evScroll=document.getElementById('evScroll');
+const evCount=document.getElementById('evCount');
+const ta=document.getElementById('ta');
+const sendBtn=document.getElementById('sendBtn');
+const suggestRow=document.getElementById('suggestRow');
+let currentData=null;       // 当前展示在右栏的问答数据
+let currentTab='src';
+let busy=false;
+
+/* suggested chips in composer */
+const SUGGESTS=[
+  {k:"q1",label:"firewalld reload 后容器断网"},
+  {k:"q2",label:"升级 docker 后容器全部启动失败"},
+  {k:"q3",label:"Java 容器 Exited(137) 反复重启"}
+];
+SUGGESTS.forEach(s=>{
+  const b=document.createElement('button');
+  b.className='schip';b.textContent='＋ '+s.label;
+  b.onclick=()=>ask(KB[s.k]);
+  suggestRow.appendChild(b);
+});
+
+/* ---------------- render helpers ---------------- */
+function esc(s){return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
+
+function addUser(text){
+  const d=document.createElement('div');
+  d.className='msg user fade-in';
+  d.innerHTML='<div class="bubble">'+esc(text)+'</div>';
+  streamInner.appendChild(d);
+  scrollDown();
+}
+
+function addAI(data){
+  const wrap=document.createElement('div');
+  wrap.className='msg ai fade-in';
+  wrap.innerHTML=`<div class="ai-av">e</div><div class="ai-body"></div>`;
+  const body=wrap.querySelector('.ai-body');
+
+  /* retrieval trace */
+  const lowChips=data.retrieval.low.map(x=>{
+    const isRel=x.includes('→');
+    return `<span class="gchip ${isRel?'rel':'ent'}">${esc(x)}</span>`;
+  }).join('');
+  const highChips=data.retrieval.high.map(x=>`<span class="gchip">${esc(x)}</span>`).join('');
+  const nSrc=data.sources.length;
+  const trace=document.createElement('div');
+  trace.className='trace';
+  trace.innerHTML=`
+    <div class="trace-head">
+      <span class="tg">▶</span>
+      <span class="spin"></span>
+      <span class="lab" style="display:none">检索过程 · 双层图谱检索</span>
+      <span class="lab-loading lab">正在检索知识图谱…</span>
+      <span class="meta" style="display:none">命中 ${nSrc} 处来源</span>
+    </div>
+    <div class="trace-body">
+      <div class="rlevel">
+        <div class="rl-head"><span class="rl-tag rl-low">低层检索 Local</span><span class="desc">精确实体与关系</span></div>
+        <div class="chips">${lowChips}</div>
+      </div>
+      <div class="rlevel">
+        <div class="rl-head"><span class="rl-tag rl-high">高层检索 Global</span><span class="desc">主题与概念</span></div>
+        <div class="chips">${highChips}</div>
+      </div>
+    </div>`;
+  body.appendChild(trace);
+
+  /* answer (filled after delay) */
+  const ans=document.createElement('div');
+  ans.className='answer';
+  body.appendChild(ans);
+
+  /* footer (actions + followups) filled after answer */
+  const foot=document.createElement('div');
+  foot.className='ai-foot';
+  body.appendChild(foot);
+
+  streamInner.appendChild(wrap);
+  scrollDown();
+
+  /* simulate dual-level retrieval → then reveal answer */
+  setTimeout(()=>{
+    const head=trace.querySelector('.trace-head');
+    head.querySelector('.spin').remove();
+    head.querySelector('.lab-loading').remove();
+    head.querySelector('.lab').style.display='';
+    head.querySelector('.meta').style.display='';
+    head.onclick=()=>{head.classList.toggle('open');trace.querySelector('.trace-body').classList.toggle('open');};
+
+    ans.innerHTML=data.answer;
+    ans.classList.add('fade-in');
+    // wire inline citations
+    ans.querySelectorAll('.cite').forEach(c=>{
+      c.onclick=()=>{showEvidence(data);focusSource(parseInt(c.dataset.cite,10),c);};
+    });
+
+    foot.innerHTML=`
+      <div class="act-row">
+        <button class="iact bt-good">▲ 有用</button>
+        <button class="iact bt-bad">▼ 不准</button>
+        <button class="iact bt-copy">⧉ 复制</button>
+        <button class="iact bt-src">◳ 查看 ${nSrc} 处来源</button>
+      </div>
+      <div class="followups">
+        <div class="fu-label">建议追问</div>
+      </div>`;
+    const fuBox=foot.querySelector('.followups');
+    data.followups.forEach(q=>{
+      const b=document.createElement('button');
+      b.className='fu';
+      b.innerHTML=`<span>${esc(q)}</span><span class="ar">→</span>`;
+      b.onclick=()=>{ask(findByQuestion(q)||makeFallback(q));};
+      fuBox.appendChild(b);
+    });
+    foot.querySelector('.bt-good').onclick=e=>{e.target.classList.add('done');e.target.textContent='✓ 已标记有用';};
+    foot.querySelector('.bt-bad').onclick=e=>{e.target.classList.add('done');e.target.textContent='✓ 已反馈';};
+    foot.querySelector('.bt-copy').onclick=e=>{
+      navigator.clipboard&&navigator.clipboard.writeText(ans.innerText);
+      e.target.textContent='✓ 已复制';setTimeout(()=>e.target.textContent='⧉ 复制',1400);
+    };
+    foot.querySelector('.bt-src').onclick=()=>{showEvidence(data);focusSource(1);};
+
+    showEvidence(data);
+    scrollDown();
+    busy=false;sendBtn.disabled=false;
+  }, 1100);
+}
+
+function findByQuestion(q){
+  for(const k in KB){if(KB[k].question===q)return KB[k];}
+  return null;
+}
+function makeFallback(q){const f=JSON.parse(JSON.stringify(FALLBACK));f.question=q;return f;}
+
+/* ---------------- evidence panel ---------------- */
+function showEvidence(data){
+  currentData=data;
+  evCount.textContent=data.sources.length+' 处来源';
+  renderEvidence();
+}
+function renderEvidence(){
+  if(!currentData){return;}
+  if(currentTab==='src'){renderSources();}else{renderGraph();}
+}
+function renderSources(){
+  const d=currentData;
+  evScroll.innerHTML='';
+  d.sources.forEach(s=>{
+    const badgeCls={doc:'b-doc',kb:'b-kb',inc:'b-inc',skill:'b-skill'}[s.type]||'b-kb';
+    const ents=s.entities.map(e=>`<span class="gchip ent">${esc(e)}</span>`).join('');
+    const rels=s.relations.map(r=>`<span class="gchip rel">${esc(r)}</span>`).join('');
+    const card=document.createElement('div');
+    card.className='src';card.id='src-'+s.id;
+    card.innerHTML=`
+      <div class="src-top">
+        <div class="src-idx">${s.id}</div>
+        <div class="src-hd">
+          <span class="src-badge ${badgeCls}">${esc(s.badge)}</span>
+          <div class="src-title">${esc(s.title)}</div>
+        </div>
+      </div>
+      <div class="src-origin"><span class="ic">⌖ 出处</span><a href="#" onclick="return false">${esc(s.url)}</a></div>
+      <div class="src-excerpt">${s.excerpt}</div>
+      <div class="src-kg">
+        <div class="kg-lab">关联实体 / 关系（来自知识图谱）</div>
+        <div class="chips">${ents}${rels}</div>
+      </div>
+      <div class="src-foot">
+        <a href="#" onclick="return false">↗ 打开原文</a>
+        <span class="relevance">相关度 ${s.rel}% <span class="relbar"><i style="width:${s.rel}%"></i></span></span>
+      </div>`;
+    evScroll.appendChild(card);
+  });
+}
+function renderGraph(){
+  const d=currentData;const g=d.graph;
+  const W=360,H=330;
+  const pos={};g.nodes.forEach(n=>pos[n.id]={x:n.x,y:n.y});
+  let edges='',labels='';
+  g.edges.forEach(e=>{
+    const a=pos[e.a],b=pos[e.b];if(!a||!b)return;
+    edges+=`<line x1="${a.x}" y1="${a.y}" x2="${b.x}" y2="${b.y}" stroke="#cfd8e2" stroke-width="1.5"/>`;
+    const mx=(a.x+b.x)/2,my=(a.y+b.y)/2;
+    labels+=`<rect x="${mx-e.l.length*4.4-4}" y="${my-9}" width="${e.l.length*8.8+8}" height="16" rx="4" fill="#fff" stroke="#e6ebf1"/>
+             <text x="${mx}" y="${my+3}" text-anchor="middle" font-size="10" fill="#7659c4" font-family="var(--font-mono)">${esc(e.l)}</text>`;
+  });
+  let nodes='';
+  g.nodes.forEach(n=>{
+    const fill=n.t==='core'?'#0d8b80':(n.t==='ent'?'#e6f0f9':'#fff');
+    const stroke=n.t==='core'?'#0a6e65':'#2f6fb0';
+    const tcol=n.t==='core'?'#fff':'#2f6fb0';
+    const w=n.id.length*8+22;
+    nodes+=`<g>
+      <rect x="${n.x-w/2}" y="${n.y-13}" width="${w}" height="26" rx="13" fill="${fill}" stroke="${stroke}" stroke-width="1.5"/>
+      <text x="${n.x}" y="${n.y+4}" text-anchor="middle" font-size="11.5" fill="${tcol}" font-weight="600">${esc(n.id)}</text>
+    </g>`;
+  });
+  evScroll.innerHTML=`
+    <div class="graph-wrap">
+      <div class="graph-cap">本次回答检索到的子图：实体（节点）经由关系（边）连接，回答正是沿这些路径组织而成。</div>
+      <svg viewBox="0 0 ${W} ${H}" width="100%" style="display:block">
+        ${edges}${labels}${nodes}
+      </svg>
+      <div class="graph-legend">
+        <span><i class="lg-dot" style="background:#0d8b80"></i>问题核心</span>
+        <span><i class="lg-dot" style="background:#9fc4ea"></i>实体</span>
+        <span><i class="lg-dot" style="background:#7659c4"></i>关系</span>
+      </div>
+    </div>`;
+}
+function focusSource(id,marker){
+  if(currentTab!=='src'){switchTab('src');}
+  document.querySelectorAll('.cite.active').forEach(c=>c.classList.remove('active'));
+  if(marker)marker.classList.add('active');
+  // open evidence drawer on mobile
+  document.getElementById('evidence').classList.add('show');
+  setTimeout(()=>{
+    const card=document.getElementById('src-'+id);
+    if(!card)return;
+    card.scrollIntoView({behavior:'smooth',block:'start'});
+    card.classList.add('flash');
+    setTimeout(()=>card.classList.remove('flash'),1600);
+  },currentTab!=='src'?60:0);
+}
+
+/* tabs */
+document.getElementById('evClose').onclick=()=>document.getElementById('evidence').classList.remove('show');
+document.querySelectorAll('.ev-tab').forEach(t=>{
+  t.onclick=()=>switchTab(t.dataset.tab);
+});
+function switchTab(tab){
+  currentTab=tab;
+  document.querySelectorAll('.ev-tab').forEach(x=>x.classList.toggle('active',x.dataset.tab===tab));
+  renderEvidence();
+}
+
+/* ---------------- ask flow ---------------- */
+function ask(data){
+  if(busy)return;
+  busy=true;sendBtn.disabled=true;
+  addUser(data.question);
+  addAI(data);
+}
+function scrollDown(){requestAnimationFrame(()=>{stream.scrollTop=stream.scrollHeight;});}
+
+/* composer */
+function submit(){
+  const v=ta.value.trim();if(!v||busy)return;
+  ta.value='';autosize();
+  const hit=findByQuestion(v)||keywordMatch(v);
+  if(hit){ask(Object.assign({},hit,{question:v}));}
+  else{ask(makeFallback(v));}
+}
+function keywordMatch(v){
+  const map=[["firewalld","q1"],["reload","q1"],["断网","q1"],["overlay","q2"],["ftype","q2"],["启动失败","q2"],["137","q3"],["oom","q3"],["重启","q3"],["xmx","q3"]];
+  const low=v.toLowerCase();
+  for(const[k,id]of map){if(low.includes(k.toLowerCase()))return KB[id];}
+  return null;
+}
+sendBtn.onclick=submit;
+ta.addEventListener('keydown',e=>{
+  if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();submit();}
+});
+function autosize(){ta.style.height='auto';ta.style.height=Math.min(ta.scrollHeight,120)+'px';}
+ta.addEventListener('input',autosize);
+
+/* ---------------- seed one example exchange ---------------- */
+(function seed(){
+  // show a completed example so the citation pattern is visible immediately
+  addUser(KB.q1.question);
+  const wrap=document.createElement('div');
+  wrap.className='msg ai';
+  wrap.innerHTML=`<div class="ai-av">e</div><div class="ai-body"></div>`;
+  const body=wrap.querySelector('.ai-body');
+  const lowChips=KB.q1.retrieval.low.map(x=>`<span class="gchip ${x.includes('→')?'rel':'ent'}">${esc(x)}</span>`).join('');
+  const highChips=KB.q1.retrieval.high.map(x=>`<span class="gchip">${esc(x)}</span>`).join('');
+  body.innerHTML=`
+    <div class="trace">
+      <div class="trace-head">
+        <span class="tg">▶</span>
+        <span class="lab">检索过程 · 双层图谱检索</span>
+        <span class="meta">命中 ${KB.q1.sources.length} 处来源</span>
+      </div>
+      <div class="trace-body">
+        <div class="rlevel"><div class="rl-head"><span class="rl-tag rl-low">低层检索 Local</span><span class="desc">精确实体与关系</span></div><div class="chips">${lowChips}</div></div>
+        <div class="rlevel"><div class="rl-head"><span class="rl-tag rl-high">高层检索 Global</span><span class="desc">主题与概念</span></div><div class="chips">${highChips}</div></div>
+      </div>
+    </div>
+    <div class="answer">${KB.q1.answer}</div>
+    <div class="ai-foot">
+      <div class="act-row">
+        <button class="iact bt-good">▲ 有用</button>
+        <button class="iact bt-bad">▼ 不准</button>
+        <button class="iact bt-copy">⧉ 复制</button>
+        <button class="iact bt-src">◳ 查看 ${KB.q1.sources.length} 处来源</button>
+      </div>
+      <div class="followups"><div class="fu-label">建议追问</div></div>
+    </div>`;
+  streamInner.appendChild(wrap);
+
+  // wire trace toggle
+  const head=body.querySelector('.trace-head');
+  head.onclick=()=>{head.classList.toggle('open');body.querySelector('.trace-body').classList.toggle('open');};
+  // wire citations
+  body.querySelectorAll('.cite').forEach(c=>{
+    c.onclick=()=>{showEvidence(KB.q1);focusSource(parseInt(c.dataset.cite,10),c);};
+  });
+  // followups
+  const fuBox=body.querySelector('.followups');
+  KB.q1.followups.forEach(q=>{
+    const b=document.createElement('button');b.className='fu';
+    b.innerHTML=`<span>${esc(q)}</span><span class="ar">→</span>`;
+    b.onclick=()=>{ask(findByQuestion(q)||makeFallback(q));};
+    fuBox.appendChild(b);
+  });
+  body.querySelector('.bt-good').onclick=e=>{e.target.classList.add('done');e.target.textContent='✓ 已标记有用';};
+  body.querySelector('.bt-bad').onclick=e=>{e.target.classList.add('done');e.target.textContent='✓ 已反馈';};
+  body.querySelector('.bt-copy').onclick=e=>{const t=body.querySelector('.answer').innerText;navigator.clipboard&&navigator.clipboard.writeText(t);e.target.textContent='✓ 已复制';setTimeout(()=>e.target.textContent='⧉ 复制',1400);};
+  body.querySelector('.bt-src').onclick=()=>{showEvidence(KB.q1);focusSource(1);};
+
+  showEvidence(KB.q1);
+})();
+</script>
+</body>
+</html>

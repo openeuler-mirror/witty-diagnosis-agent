@@ -69,6 +69,13 @@ export const AGENT_MODEL_REQUIREMENTS: Record<string, ModelRequirement> = {
       { providers: ["opencode"], model: "minimax-m2.5-free" },
     ],
   },
+  "taiyi": {
+    fallbackChain: [
+      { providers: ["opencode"], model: "deepseek-v3", variant: "medium" },
+      { providers: ["zai-coding-plan", "opencode"], model: "glm-5" },
+      { providers: ["opencode"], model: "minimax-m2.5-free" },
+    ],
+  },
 }
 
 export const CATEGORY_MODEL_REQUIREMENTS: Record<string, ModelRequirement> = {
