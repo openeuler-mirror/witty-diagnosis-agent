@@ -12,6 +12,11 @@ COPY ./diagnose_slab_leak.sh /skills/memory-leak-diagnosis/
 COPY ./diagnose_vmalloc_leak.sh /skills/memory-leak-diagnosis/
 COPY ./diagnose_kmalloc_leak.sh /skills/memory-leak-diagnosis/
 COPY ./diagnose_memcg_leak.sh /skills/memory-leak-diagnosis/
+COPY ./diagnose_fragmentation.sh /skills/memory-leak-diagnosis/
+COPY ./diagnose_large_object.sh /skills/memory-leak-diagnosis/
+COPY ./diagnose_numa_affinity.sh /skills/memory-leak-diagnosis/
+COPY ./diagnose_false_sharing.sh /skills/memory-leak-diagnosis/
+COPY ./analyze_heap_trend.py /skills/memory-leak-diagnosis/
 COPY ./run_all_mem_tests.sh /skills/memory-leak-diagnosis/
 COPY ./fault_heap_leak.c /test/
 COPY ./fault_heap_leak_v2.py /test/

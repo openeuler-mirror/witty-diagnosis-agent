@@ -1,0 +1,13 @@
+main;handleRequest;parseJSON;strcmp 500
+main;handleRequest;parseJSON;atoi 300
+main;handleRequest;processData;matrixMultiply 2000
+main;handleRequest;processData;sort 1500
+main;handleRequest;processData;compress 800
+main;handleRequest;encrypt;AES_encrypt 1200
+main;handleRequest;encrypt;SHA256_hash 900
+main;handleRequest;render;formatOutput 400
+main;handleRequest;render;escapeHTML 300
+main;handleRequest;auth;verifyToken 600
+main;handleRequest;auth;checkPermission 200
+main;handleRequest;log;writeLog 100
+main;handleRequest;log;formatTime 50

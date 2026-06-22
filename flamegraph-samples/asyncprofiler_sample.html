@@ -1,0 +1,24 @@
+<html>
+<head><title>Flame Graph</title></head>
+<body>
+<h2>Flame Graph</h2>
+<div class="chart" id="chart"></div>
+<pre id="data" style="display:none">
+---
+  java;com/example/MyService;process 50
+  java;com/example/MyService;writeBytes 30
+  java;com/example/MyController;handle 20
+  java;com/example/MyService;process;java/io/FileOutputStream;writeBytes 30
+  java;com/example/MyService;process;java/io/FileOutputStream;open 10
+</pre>
+<script type="text/javascript">
+var data = [
+  "java;com/example/MyService;process 50",
+  "java;com/example/MyService;writeBytes 30",
+  "java;com/example/MyController;handle 20",
+  "java;com/example/MyService;process;java/io/FileOutputStream;writeBytes 30",
+  "java;com/example/MyService;process;java/io/FileOutputStream;open 10"
+];
+</script>
+</body>
+</html>
