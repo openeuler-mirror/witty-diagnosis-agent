@@ -1,259 +1,377 @@
-# Why Memory High - 内存分配/泄漏分析剧本
+# Why Memory High — 内存分析综合排查手册
 
-## 触发条件
+> 版本: v1.0 | 适用: Linux 系统 (CentOS/EulerOS/Ubuntu)
 
-用户问题包含以下关键词：
-- "内存高"、"内存占用高"、"RSS 高"
-- "内存泄漏"、"memory leak"
-- "OOM"、"OutOfMemoryError"
-- "内存抖动"、"频繁 GC"
-- "分配速率高"、"alloc profile"
-- "eden space"、"young gen"
+## 总览
 
-## 场景说明
+当系统或进程内存占用异常偏高时，按本手册分步排查。涵盖 5 类场景：
 
-内存问题在火焰图中有两种表现形式，需区分对待：
-- **分配速率高（高 GC 压力）**：在 [gc-pressure.md](gc-pressure.md) 中已部分覆盖，本剧本从分配源头角度补充
-- **驻留集高（疑似泄漏）**：同样函数持续在跑，但堆不断增长
+1. 内存泄漏追踪（堆快照对比 + 增长趋势分析）
+2. 内存碎片化检测（分配大小分布、Slab 利用率）
+3. 大对象分配热点识别（> 阈值对象的分配路径追踪）
+4. NUMA 不亲和检测（跨 NUMA 访问开销分析）
+5. False sharing 模式识别（缓存行竞争检测）
 
-本剧本侧重：
-- 定位**分配热点**（哪段代码在疯狂 `malloc` / `new`）
-- 识别**潜在泄漏**（即便 GC 也回收不掉的对象类型）
-- 关联**页错误**（页错误/换入见 [page-fault-swap.md](page-fault-swap.md)）
+---
 
-## 分析流程
+## 第一节：初始信息收集
 
-### Step 1: 确认采样类型
+```bash
+# 系统级内存概览
+free -h
+cat /proc/meminfo | head -30
+vmstat -s
 
-内存问题需要不同的事件类型：
+# 进程级 TOP 内存使用者
+ps aux --sort=-%mem | head -20
 
-| 数据源 | 事件 | 工具 |
+# Slab 使用概览
+slabtop -s c -o | head -30
+cat /proc/slabinfo | head -5
+
+# 页面信息
+cat /proc/zoneinfo | grep -E "Node|active|inactive|free|dirty|writeback"
+
+# NUMA 信息
+numactl --hardware 2>/dev/null || echo "numactl not installed"
+numastat 2>/dev/null || echo "numastat not available"
+```
+
+---
+
+## 第二节：内存泄漏追踪
+
+### 2.1 症状识别
+
+| 信号 | 指示 |
+|------|------|
+| RSS 持续增长不回落 | 用户态泄漏 |
+| `SUnreclaim` 持续增长 | Slab 泄漏 |
+| `VmallocUsed` 持续增长 | vmalloc 泄漏 |
+| Memcg 计数 > 进程 RSS 总和 | memcg 泄漏 |
+
+### 2.2 堆快照对比（基线 vs 当前）
+
+```bash
+# 基线快照（怀疑异常时记录）
+# /proc/[pid]/smaps 详细解析
+PID=<target_pid>
+cat /proc/$PID/status | grep -E "VmRSS|VmSize|VmPeak"
+grep -E "^[0-9a-f]+\-" /proc/$PID/maps | awk '{print $NF}' | sort | uniq -c | sort -rn
+
+# Heap 段增长
+grep "\[heap\]" /proc/$PID/smaps
+cat /proc/$PID/smaps | grep -A 10 "\[heap\]" | grep -E "Size|Rss|Pss|Anon"
+
+# Anonymous 页增长 (匿名映射为堆/栈/bss)
+cat /proc/$PID/status | grep Vm
+grep -E "anonymous|stack|heap" /proc/$PID/smaps 2>/dev/null
+
+# mmap 文件备份的匿名页
+grep "Anonymous:" /proc/$PID/status
+```
+
+### 2.3 增长趋势分析
+
+```bash
+# 间隔采样 (每 10 秒记录 RSS)
+for i in {1..6}; do
+  echo "$(date +%H:%M:%S) $(ps -p $PID -o rss= --no-headers 2>/dev/null || echo 0)"
+  sleep 10
+done
+
+# 带 GC 语言 (Java/Python/Go) 额外检查
+# Java: jstat -gcutil $PID 10000 6
+# Python: gc.get_objects() via debugger
+# Go: runtime.ReadMemStats() via pprof
+```
+
+### 2.4 泄漏根因定位
+
+```bash
+# 用户态: valgrind massif
+valgrind --tool=massif --pages-as-heap=yes ./program
+ms_print massif.out.* | head -80
+
+# 内核态: kmemleak
+echo scan > /sys/kernel/debug/kmemleak
+cat /sys/kernel/debug/kmemleak | head -100
+
+# Slab 泄漏详情
+for cache in $(cat /proc/slabinfo | awk 'NR>2 {print $1}'); do
+  active=$(grep "^$cache " /proc/slabinfo | awk '{print $2}')
+  limit=$(grep "^$cache " /proc/slabinfo | awk '{print $4}')
+  if [ "$active" -gt "$limit" ] 2>/dev/null; then
+    echo "$cache: active=$active limit=$limit (OVER)"
+  fi
+done
+```
+
+---
+
+## 第三节：内存碎片化检测
+
+### 3.1 外部碎片检测
+
+```bash
+# 页块信息 (外部碎片 = MAX_ORDER 不可用连续页)
+cat /proc/buddyinfo
+# 分析: 如果最高 order 的 free pages 接近 0 且低 order 大量碎片, 则碎片化严重
+
+# 碎片指数计算 (简化版)
+# 从 buddyinfo 提取
+# 碎片率 ≈ 1 - (最大连续块大小 / 总空闲内存)
+# > 30% 认为碎片化严重
+```
+
+### 3.2 分配大小分布
+
+```bash
+# Slab 分配大小分布
+slabtop -s c -o | awk 'NR>2 {print $2, $3, $4, $5}' | sort -n -k1 | head -30
+
+# 页分配分布
+cat /proc/pagetypeinfo | grep -E "Node|DMA|Normal" | head -20
+
+# 用户态分配大小 (需要 strace 或 perf)
+# strace -e trace=brk,mmap -p $PID -o /tmp/alloc.log
+# awk '{sum+=$NF} END {print "total alloc:", sum}' /tmp/alloc.log
+```
+
+### 3.3 Slab 利用率分析
+
+```bash
+# 查看 Slab 整体利用率
+echo "Slab 利用率:"
+awk 'NR>2 {a+=$2*$3; u+=$3*$4} END {printf "%.1f%% (%d/%d KB)\n", u/a*100, u/1024, a/1024}' /proc/slabinfo
+
+# 查找利用率低的缓存 (分配了但未使用)
+cat /proc/slabinfo | awk 'NR>2 {if ($3>0 && $4/$3 < 0.3) print $1, $2, $3, $4, $3-$4}' | sort -k5 -rn | head -20
+```
+
+### 3.4 碎片化等级判定
+
+| 碎片率 | 等级 | 建议 |
 |--------|------|------|
-| alloc 采样 | `mem_alloc` / `heap` | async-profiler `-e alloc` / perf `kmem` |
-| page fault | `page-faults` / `minor-faults` | perf `-e page-faults` |
-| 高分配速率 | 周期采样（on-CPU 即可） | `perf record -F 999` |
+| < 10% | 正常 | 无需处理 |
+| 10% ~ 30% | 轻度 | 监控趋势 |
+| > 30% | 严重 | 触发碎片整理 |
+| > 50% | 危急 | 需重启或迁移 |
 
-如果只有 on-CPU 采样，可继续分析但置信度需标注为 Medium。
+---
 
-### Step 2: 分配模式检测
+## 第四节：大对象分配热点识别
 
-```bash
-python scripts/analyzers/pattern_match.py --input folded.folded --json
-```
-
-重点匹配（来自 `analysis-patterns.md` 第 2、8 类）：
-
-| 模式 | 特征函数/符号 | 权重 |
-|------|-------------|------|
-| C 堆分配 | `malloc`, `free`, `realloc`, `calloc`, `jemalloc_*` | 0.5 |
-| C++ new | `operator new`, `operator new[]`, `operator delete` | 0.5 |
-| Java 分配 | `AllocObject`, `AllocateInOldGen`, `eden_alloc`, `newinstance` | 0.6 |
-| Go 分配 | `runtime.mallocgc`, `runtime.newobject`, `runtime.makeslice`, `runtime.makechan` | 0.7 |
-| V8 分配 | `v8::internal::Heap::AllocateRaw`, `v8::internal::Factory::New` | 0.7 |
-| 字节码生成 | `Blackbird`, `LambdaForm`, `BytecodeGenerator` | 0.6 |
-| mmap 分配 | `mmap`, `mremap`, `munmap` | 0.5 |
-
-### Step 3: 分配热点分析
+### 4.1 默认阈值的配置
 
 ```bash
-python scripts/analyzers/hotspot.py --input folded.folded --top 30 --json
+# 默认阈值: 1MB (可配置)
+THRESHOLD=${THRESHOLD:-1048576}  # 字节
 ```
 
-按"叶帧是分配函数的栈"聚合：
-
-```
-allocservice.processRequest      35%
-├─ MyRequest.<init>              20%   ← 每次请求创建大对象
-├─ new byte[8192]                12%   ← 缓冲区未复用
-└─ ArrayList.add                  3%
-```
-
-### Step 4: 泄漏模式识别
-
-针对**驻留集持续增长**场景，关注：
-
-| 信号 | 检测方法 |
-|------|---------|
-| 同一类型对象数量随时间单调增长 | jcmd `GC.class_histogram` 对比两个时间点 |
-| 大对象频繁进入老年代 | GC 日志中的 `promotion` 速率 |
-| 引用链中存在"静态集合" | 在火焰图中搜 `HashMap.put` / `ArrayList.add` 的调用栈 |
-| 监听器/回调未注销 | 在火焰图中搜 `addListener` / `register` 的调用栈 |
-
-## 输出结构
-
-```
-## 内存分析
-
-### 分配速率
-- 总分配函数占比: XX%（含 malloc/new/runtime.mallocgc）
-- 单位时间分配次数（估算）: XX K/s
-- 分配热点函数 Top 5: [列表]
-
-### 分配类型分布
-| 类别 | 帧 | 占比 | 备注 |
-|------|-----|------|------|
-| 短命小对象 | new String | 40% | 高 GC 压力 |
-| 中等对象 | DTO.<init> | 25% | 视生命周期 |
-| 大对象 | byte[8192] | 15% | 警惕直接进老年代 |
-| 长期存活 | 缓存 put | 5% | 疑似泄漏 |
-
-### 潜在泄漏点
-| 位置 | 帧 | 嫌疑等级 | 证据 |
-|------|-----|----------|------|
-| CacheManager | ConcurrentHashMap.put | 高 | 静态 Map 持续增长 |
-| ListenerRegistry | addListener | 中 | 未见对称 remove |
-
-### 建议
-- 对象池复用: [热点函数列表]
-- 改值类型: [装箱/拆箱热点]
-- 警惕大对象: [分配大数组的路径]
-```
-
-## 阈值标准
-
-| 指标 | 阈值 | 严重度 |
-|------|------|--------|
-| 分配函数（malloc/new/alloc）总占比 | > 10% | 高（GC 压力来源） |
-| 分配函数总占比 | > 30% | 严重（业务线程大半在做分配） |
-| 单类型对象实例数增长 | > 1%/分钟 | 警告（潜在泄漏） |
-| eden 区填满速度 | < 5 秒/次 | 高（minor GC 频繁） |
-| Full GC 频率 | < 60 秒/次 | 严重（老年代压力大） |
-
-## 典型场景
-
-### 场景 1: 短命对象风暴
-
-**症状**：
-- 火焰图底层 `runtime.mallocgc` / `newinstance` 占比 > 30%
-- young GC 频繁（每秒数次）
-- 但接口 P99 尚可
-
-**根因**：
-每次请求/循环都创建大量临时对象，主要来源是字符串拼接、JSON 解析、集合操作。
-
-**修复**：
-- 字符串拼接改用 `StringBuilder` / `string.Join`
-- JSON 解析用流式 API（`Gson.stream` / Jackson `JsonParser`）
-- 集合预分配容量（`new ArrayList<>(N)`）
-- 引入对象池（特别是大对象）
-
-### 场景 2: 大对象直接进老年代
-
-**症状**：
-- 火焰图有 `byte[]` / `large object` 分配热点
-- GC 日志 `humongous allocation` 频繁
-- Full GC 间隔短
-
-**根因**：
-单次分配大块内存（如读取大文件、加载大 JSON），超过 G1 region size 50%，直接进老年代。
-
-**修复**：
-- 拆分大对象读取（流式）
-- 调大 `-XX:G1HeapRegionSize`（如 32M）
-- 调整 `-XX:InitiatingHeapOccupancyPercent`
-
-### 场景 3: 静态集合无界增长（典型泄漏）
-
-**症状**：
-- 火焰图中 `ConcurrentHashMap.put` / `HashMap.put` 在业务路径上反复出现
-- 同一根帧下分配的总字节数随时间持续增长
-- GC 后堆大小不下降
-
-**根因**：
-缓存、监听器注册表等静态 Map 缺少淘汰机制（或淘汰不充分），键只增不减。
-
-**修复**：
-- 引入 LRU + 最大容量限制
-- 使用 `WeakHashMap` / `Caffeine` / `Guava Cache`
-- 监听器场景加对称 `remove` 路径
-- Go 场景警惕全局 `var cache = make(map[string]*Obj)`
-
-### 场景 4: ThreadLocal 泄漏
-
-**症状**：
-- 火焰图中 `ThreadLocal.set` 频繁
-- 线程池场景下，线程复用导致 ThreadLocal 累计
-
-**修复**：
-- 用 `try-finally` 显式 `remove`
-- 改用 `ScopedValue`（Java 21+）或栈局部变量
-
-### 场景 5: 闭包/回调持有大对象
-
-**症状**：
-- 火焰图底层是 lambda 创建，但栈上层仍存在大对象引用
-- GC Roots 分析显示 lambda 持有意外引用
-
-**修复**：
-- 显式解引用
-- 拆分 lambda，让大对象超出闭包捕获范围
-
-## 与其他剧本的协同
-
-| 关联剧本 | 协同方式 |
-|---------|---------|
-| [gc-pressure.md](gc-pressure.md) | 分配热点直接推高 GC，合并触发可定位"分配→GC"因果链 |
-| [io-wait.md](io-wait.md) | 读大文件→大对象→大对象 GC，关联分析 |
-| [page-fault-swap.md](page-fault-swap.md) | 内存不足时触发 swap，page fault 飙升 |
-
-## 优化建议
-
-### 1. 减少分配
-
-- **对象池**：复用短生命周期对象（线程、连接、缓冲区、解析器）
-- **基本类型替代包装类型**：`int` 替代 `Integer`
-- **避免循环内分配**：把 `new` 提到循环外
-- **字符串拼接**：`StringBuilder` / `+` 编译为 `invokedynamic`（JDK 9+）
-
-### 2. 优化对象大小
-
-- 扁平类（Java `record` / Go struct 顺序）
-- 压缩指针：`-XX:+UseCompressedOops`
-- 字段重排：把同类字段放一起提升压缩效率
-
-### 3. 生命周期管理
-
-- 用 `try-with-resources` 管理 `Closeable`
-- 注册监听器对称解注册
-- ThreadLocal 用完 `remove`
-- 定时清理过期缓存
-
-### 4. 选型与配置
-
-- 选择合适 GC：低延迟选 ZGC/Shenandoah，吞吐选 G1/Parallel
-- 调整堆大小：避免堆过大导致单次 GC 长
-- 调 `-XX:MaxTenuringThreshold` 平衡晋升速率
-
-### 5. 监控与告警
-
-- RSS / heap usage 增长趋势
-- GC 频率与暂停时间
-- 各类对象实例数（`jcmd <pid> GC.class_histogram`）
-- Native memory: `pmap` / jemalloc stats
-
-## 配套工具命令
+### 4.2 大对象检测
 
 ```bash
-# Java 堆直方图
-jcmd <pid> GC.class_histogram
+# /proc/pid/maps 中查找大块映射
+grep -E "^\s*[0-9a-f]+[-\s]" /proc/$PID/maps | \
+  awk '{
+    split($1, addr, "-");
+    size = strtonum("0x" addr[2]) - strtonum("0x" addr[1]);
+    if (size > 1048576) print size/1024/1024 " MB", $0;
+  }' | sort -rn | head -20
 
-# Native 内存跟踪
-jcmd <pid> VM.native_memory summary
-
-# Go 内存
-go tool pprof -alloc_objects http://host/debug/pprof/heap
-
-# 通用：分配追踪
-perf mem record -t alloc -p <pid>
-perf mem report
-
-# async-profiler 分配采样
-./asprof -e alloc -f alloc.html -d 30 <pid>
+# THP (透明大页) 使用
+grep "AnonHugePages:" /proc/$PID/smaps 2>/dev/null | awk '{s+=$2} END {print "THP:", s, "KB"}'
 ```
 
-## 常见误判
+### 4.3 分配路径追踪
 
-- **"GC 频繁" 不等于"泄漏"**：分配速率本身就高，GC 是健康反应
-- **"堆大" 不等于"泄漏"**：缓存预热是正常的大堆场景
-- **"RSS 高" 不一定在堆**：可能是 native 内存、jemalloc arena、thread stack
-- **泄漏不一定在火焰图上显现**：泄漏的是引用关系，需要 GC Roots 分析
+```bash
+# 使用 ftrace 追踪大页分配
+echo function_graph > /sys/kernel/debug/tracing/current_tracer
+echo __alloc_pages_nodemask > /sys/kernel/debug/tracing/set_ftrace_filter
+echo 1 > /sys/kernel/debug/tracing/tracing_on
+sleep 5
+echo 0 > /sys/kernel/debug/tracing/tracing_on
+cat /sys/kernel/debug/tracing/trace > /tmp/large_alloc_trace.log
+
+# 使用 perf 追踪大对象分配 (需要调试符号)
+perf record -e syscalls:sys_enter_brk -p $PID --sleep 10
+perf script > /tmp/brk_trace.log
+```
+
+### 4.4 大对象分类
+
+| 大小范围 | 典型场景 | 处理建议 |
+|----------|----------|---------|
+| 1MB ~ 10MB | 缓存、内存池 | 检查缓存策略 |
+| 10MB ~ 100MB | 大文件映射、堆扩展 | 检查 mmap 使用 |
+| > 100MB | 共享内存、大数组 | 检查共享内存配置 |
+
+---
+
+## 第五节：NUMA 不亲和检测
+
+### 5.1 NUMA 配置检查
+
+```bash
+# 硬件拓扑
+numactl --hardware
+lscpu | grep -E "NUMA|Socket|Core"
+
+# 当前策略
+numactl --show
+cat /sys/devices/system/node/has_normal_memory
+
+# 进程绑定
+taskset -pc $PID 2>/dev/null
+cat /proc/$PID/numa_maps | head -20
+```
+
+### 5.2 跨 NUMA 访问检测
+
+```bash
+# 跨节点内存访问比例
+numastat -p $PID 2>/dev/null || cat /proc/$PID/numa_maps | \
+  awk '{for(i=1;i<=NF;i++) if($i ~ /^N[0-9]=/) {split($i,a,"="); node[a[1]]+=a[2]}} END {for(n in node) print n, node[n]}'
+
+# 本地访问率计算
+# 理想值: local_alloc ≈ total_alloc (接近 100%)
+# /proc/vmstat 中的 numa_hit / numa_foreign
+awk '{if($1=="numa_hit") h=$2; if($1=="numa_foreign") f=$2} END {printf "本地访问率: %.1f%%\n", (h/(h+f))*100}' /proc/vmstat
+```
+
+### 5.3 节点内存均衡度
+
+```bash
+# 各节点内存使用
+for node in /sys/devices/system/node/node*/meminfo; do
+  node_name=$(echo $node | grep -oP 'node\d+')
+  total=$(grep "MemTotal" $node | awk '{print $2}')
+  free=$(grep "MemFree" $node | awk '{print $2}')
+  used=$((total-free))
+  echo "$node_name: total=${total}KB used=${used}KB ($((used*100/total))%)"
+done
+```
+
+### 5.4 优化建议输出
+
+| 检测结果 | 建议 |
+|----------|------|
+| 本地访问率 < 70% | 使用 `numactl --membind` 绑定节点 |
+| 节点内存使用偏差 > 30% | 调整 `numa_balancing` 或迁移进程 |
+| 跨节点延迟 > 20% | 开启 `AutoNUMA` 或手动 pin CPU |
+| 进程跨 Socket | 使用 `taskset` 绑定同一 socket 的 CPU 和内存 |
+
+---
+
+## 第六节：False Sharing 检测
+
+### 6.1 症状识别
+
+| 信号 | 指示 |
+|------|------|
+| 多线程性能不随核心数线性扩展 | 可能 false sharing |
+| `perf stat` 显示高 cache-misses | 缓存行竞争 |
+| VTune 报告 `False Sharing` 事件 | 确认 false sharing |
+
+### 6.2 perf c2c 分析
+
+```bash
+# 需要 Linux 4.10+ 和特定硬件支持
+perf c2c record -a -- sleep 10
+perf c2c report --stats | head -40
+perf c2c report | head -20
+
+# 查看热点缓存行
+perf c2c report -c pid,iaddr | head -30
+```
+
+### 6.3 缓存行热变量定位
+
+```bash
+# 使用 perf mem
+perf mem record -a -- sleep 10
+perf mem report | head -30
+
+# 查看特定地址的缓存行竞争
+# 从 perf c2c 输出中提取竞争地址
+perf c2c report | grep -E "0x[0-9a-f]+" | awk '{print $1}' | head -10
+
+# 反查变量 (需要调试符号)
+# addr2line -e /path/to/binary -f -C <address>
+```
+
+### 6.4 代码级检测脚本
+
+```bash
+# 检测特定函数内的 cache miss 率
+perf stat -e cache-misses,cache-references -p $PID --sleep 10 2>&1 | \
+  awk '/cache-misses/ {miss=$1} /cache-references/ {ref=$1} END {printf "Cache miss rate: %.1f%%\n", miss/ref*100}'
+
+# 如果 miss rate > 10% 且多线程, 建议检查 false sharing
+```
+
+### 6.5 修复建议
+
+| 检测结果 | 建议 |
+|----------|------|
+| 确认 false sharing | 对热点变量添加 `__attribute__((aligned(64)))` 填充 |
+| 疑似 false sharing | 使用 `pread`/`pwrite` 替代全局锁 |
+| 结构体内存布局不当 | 重新排列字段: 读频繁字段分开到不同缓存行 |
+| 原子操作频繁 | 使用 `__sync_fetch_and_add` 替代锁 |
+
+---
+
+## 综合分析流程
+
+```
+用户报 "内存高"
+      │
+      ▼
+初始信息收集 (free, meminfo, slabtop, numastat)
+      │
+      ├── RSS 持续增长? ──→ 内存泄漏追踪 (第二节)
+      │                        │
+      │                        ├── 堆快照对比
+      │                        ├── 增长趋势分析
+      │                        └── 根因定位 (valgrind/kmemleak/slab)
+      │
+      ├── 碎片率高? ──→ 内存碎片化检测 (第三节)
+      │                        │
+      │                        ├── 外部碎片检测 (buddyinfo)
+      │                        ├── 分配大小分布
+      │                        └── Slab 利用率
+      │
+      ├── 大块分配? ──→ 大对象热点识别 (第四节)
+      │                        │
+      │                        ├── 映射大小扫描
+      │                        ├── 分配路径追踪
+      │                        └── 阈值分析 (默认 1MB)
+      │
+      ├── 多 NUMA 节点? ──→ NUMA 不亲和检测 (第五节)
+      │                        │
+      │                        ├── 跨节点访问比例
+      │                        ├── 节点内存均衡
+      │                        └── 优化建议
+      │
+      └── 多线程扩展差? ──→ False sharing 检测 (第六节)
+                             │
+                             ├── perf c2c 分析
+                             ├── 缓存行定位
+                             └── 修复建议
+```
+
+---
+
+## 配套脚本
+
+| 脚本 | 对应章节 | 功能 |
+|------|---------|------|
+| `diagnose_rss_growth.sh` | 第二节 | RSS 增长趋势分析 |
+| `diagnose_anon_page.sh` | 第二节 | 匿名页泄漏诊断 |
+| `diagnose_fragmentation.sh` | 第三节 | 内存碎片化检测 |
+| `diagnose_large_object.sh` | 第四节 | 大对象热点识别 |
+| `diagnose_numa_affinity.sh` | 第五节 | NUMA 不亲和检测 |
+| `diagnose_false_sharing.sh` | 第六节 | False sharing 检测 |
+| `analyze_heap_trend.py` | 第二节 | 堆增长趋势分析 |
