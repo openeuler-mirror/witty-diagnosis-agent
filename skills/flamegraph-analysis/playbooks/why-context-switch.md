@@ -1,226 +1,256 @@
-# Why Context Switch High - 上下文切换分析剧本
+# Why Context Switch — 并发/并行问题综合排查手册
 
-## 触发条件
+> 版本: v1.0 | 适用: Linux 系统 (CentOS/EulerOS/Ubuntu)
 
-用户问题包含以下关键词：
-- "上下文切换高"、"切换频繁"
-- "context switch"、"cs"
-- "CPU 利用率高但跑不满"
-- "sys% 高"、"系统调用占比高"
-- "线程数过多"、"线程爆炸"
-- "调度抖动"
+## 总览
 
-## 场景说明
+当系统出现性能瓶颈、响应延迟、CPU 利用率不足等问题时，按本手册分步排查。涵盖 5 类场景：
 
-上下文切换（Context Switch）本身不消耗业务逻辑，但当其频率异常时，会带来两类问题：
-- **直接开销**：`schedule` / `context_switch` / `switch_to` 等内核函数占 CPU
-- **间接开销**：缓存（CPU cache / TLB）被冲刷，CPU 流水线被打断，导致"CPU 看着忙但活干得少"
+1. 线程池饱和检测（队列积压、拒绝率分析）
+2. Work stealing 不均衡分析（任务分布偏差检测）
+3. 任务队列积压分析（生产消费速率差分析）
+4. 并行度不足识别（可用核心未充分利用检测）
+5. Cache coherence 开销分析（缓存一致性流量检测）
 
-典型症状：
-- `vmstat 1` 中 `cs` 列 > 50,000/s
-- `top` 中 `%sys` 占比 > 20%
-- 火焰图中 `schedule`、`__schedule`、`context_switch` 出现明显宽度
-- CPU 核数多但吞吐量增长缓慢（不可扩展）
+---
 
-## 分析流程
-
-### Step 1: 数据准备
-
-1. 优先使用包含 `sched` 事件的 perf 采样：`perf record -e sched:sched_switch -g`
-2. 转换后调用 `scripts/analyzers/stats.py` 看 `schedule` / `__schedule` / `context_switch` / `switch_to` 等帧的总占比
-
-### Step 2: 上下文切换帧检测
+## 第一节：初始信息收集
 
 ```bash
-python scripts/analyzers/pattern_match.py --input folded.folded --json
-```
+# 系统级并发概览
+ps -eo pid,tid,comm,psr,%cpu | sort -k4 -n | tail -30
+top -b -n1 -H | head -40
 
-重点匹配（来自 `analysis-patterns.md` 第 4 类）：
-
-| 模式 | 特征函数/符号 | 权重 |
-|------|-------------|------|
-| 调度器 | `schedule`, `__schedule`, `scheduler`, `pick_next_task`, `pick_next_task_fair` | 0.6 |
-| 上下文切换 | `context_switch`, `__context_switch`, `switch_to`, `finish_task_switch` | 0.5 |
-| 进程创建 | `fork`, `clone`, `do_fork`, `runtime.newproc` | 0.4 |
-| 线程创建 | `pthread_create`, `CreateThread`, `java.lang.Thread.start` | 0.4 |
-
-### Step 3: 切换源头定位
-
-```bash
-python scripts/analyzers/hotspot.py --input folded.folded --top 30 --json
-```
-
-按"切换发生的栈"聚合，区分两类源头：
-- **主动让出 CPU**：`nanosleep` / `usleep` / `pthread_cond_wait` / `select` 之后回到 `schedule`
-- **被动抢占**：被更高优先级任务抢占，根栈是 `schedule` 而非业务
-
-### Step 4: 多线程/进程统计
-
-```bash
-python scripts/analyzers/attribution.py --input folded.folded --json
-```
-
-观察：
-- 同一根帧下子线程数量
-- 是否存在线程数随时间线性增长（线程泄漏）
-
-## 输出结构
-
-```
-## 上下文切换分析
-
-### 切换相关占比
-- schedule / __schedule: XX%
-- context_switch / switch_to: XX%
-- 合计: XX%（直接消耗）
-- 间接影响: 缓存命中率下降 XX%
-
-### 切换源头 Top 5
-| 源头类型 | 帧 | 切换次数 | 占比 |
-|----------|-----|----------|------|
-| 主动 sleep | handle_request;usleep | 12345 | 35% |
-| 锁竞争 | futex_wait | 8765 | 25% |
-| 时间片耗尽 | schedule;pick_next_task | 5432 | 15% |
-| 线程创建 | pthread_create | 2345 | 7% |
-| 未知 | ... | 1234 | 4% |
-
-### 线程/进程数
-- 活跃线程数: XXX
-- 是否存在线程泄漏: 是/否
-- 线程创建热点: [Top 3 线程创建栈]
-
-### 调度模式判定
-- 主动让出 vs 被动抢占
-- 短任务抢占长任务（反调度模式）
-```
-
-## 阈值标准
-
-| 指标 | 阈值 | 严重度 |
-|------|------|--------|
-| `schedule` 直接占比 | > 5% | 高（系统已感知开销） |
-| `schedule` 直接占比 | > 15% | 严重（CPU 在反复调度） |
-| 每秒切换次数 | > 50,000 | 高（典型 web 服务线） |
-| 每秒切换次数 | > 200,000 | 严重（线程池过载） |
-| 线程数 | > CPU 核数 × 25 | 警告（调度开销上升拐点） |
-| 线程数 | > CPU 核数 × 100 | 严重（大量无用切换） |
-
-## 典型场景
-
-### 场景 1: 线程池配置过大
-
-**症状**：
-- 线程数 = 1000+（远超 CPU 核数）
-- `schedule` 占比 10%+
-- 实际活跃线程 < 10%
-
-**根因**：
-线程池 `coreSize` 过大或 `maxSize` 不设上限。每个线程即便空闲也会被调度器检查，浪费时钟周期。
-
-**修复**：
-- CPU 密集任务：`poolSize = CPU 核数 + 1`
-- I/O 密集任务：`poolSize = CPU 核数 × (1 + W/C)`，W=等待时间，C=计算时间
-- 引入弹性线程池（`SynchronousQueue` + `maxPoolSize` 限制）
-
-### 场景 2: 短生命周期线程频繁创建/销毁
-
-**症状**：
-- 火焰图中 `pthread_create` / `Go: newproc` 频繁出现
-- 同一业务逻辑每次执行都创建新线程
-
-**修复**：
-- 使用线程池复用
-- Go 场景考虑 goroutine 池（ants / tunny）
-- Java 场景注意 `new Thread().start()` 的反模式
-
-### 场景 3: 锁竞争导致被动切换
-
-**症状**：
-- 切换源头主要是 `futex_wait` 唤醒后的 `schedule`
-- 火焰图同时存在 [lock-contention.md](lock-contention.md) 的特征
-
-**修复**：
-- 见 `playbooks/lock-contention.md`
-- 减少临界区长度
-- 改用无锁结构
-
-### 场景 4: 自旋锁忙等
-
-**症状**：
-- 火焰图中 `__spin_lock` / `pthread_spin_lock` 占大量 CPU
-- `schedule` 看似不高但 CPU 满载、吞吐低
-
-**修复**：
-- 自旋锁改用互斥锁（高竞争场景）
-- 减少持锁时间
-
-### 场景 5: 大量 sleep/yield
-
-**症状**：
-- 火焰图中 `nanosleep` / `usleep` / `runtime.Gosched` 密集
-- 多出现于主动轮询（busy-poll）改 sleep 的过渡阶段
-
-**修复**：
-- 用事件驱动（epoll / io_uring / channel）替代 sleep 轮询
-
-## 与其他剧本的协同
-
-| 关联剧本 | 何时合并触发 |
-|---------|-------------|
-| [lock-contention.md](lock-contention.md) | 切换源头主要是 futex_wait |
-| [joint-on-off-cpu.md](joint-on-off-cpu.md) | 需同时看 On/Off 才能区分忙等 vs 真等待 |
-| [io-wait.md](io-wait.md) | 切换源头主要是 epoll_wait / select |
-
-## 优化建议
-
-### 1. 控制线程规模
-
-- 线程数 = `min(业务并发需求, CPU 核数 × 合理倍数)`
-- 避免线程数随请求量线性增长
-- 使用协程（goroutine / virtual thread）替代 OS 线程
-
-### 2. 减少主动让出
-
-- 用事件驱动替代 sleep 轮询
-- 合并小任务为批处理
-- 避免不必要的 `Thread.yield`
-
-### 3. 减少被动抢占
-
-- 缩短持锁时间 → 减少 [锁竞争](lock-contention.md)
-- 避免长循环不释放 CPU（可加 `runtime.Gosched()` 或时间片检查）
-
-### 4. 绑核（CPU affinity）
-
-- 高吞吐服务将工作线程绑核
-- 避免多线程跨核迁移（缓存失效）
-- 工具：`taskset` / `numactl` / Java `-XX:+UseContainerSupport` + `-XX:ActiveProcessorCount`
-
-### 5. 调整调度策略
-
-- 实时任务用 `SCHED_FIFO` / `SCHED_RR`
-- 普通服务保持 `SCHED_OTHER`（CFS）
-- 容器场景检查 cgroup CPU quota 是否过小（会导致频繁 throttling 切换）
-
-## 配套工具命令
-
-```bash
-# 系统层切换次数
-vmstat 1
-# 或
+# 上下文切换
 cat /proc/stat | grep ctxt
+vmstat 1 5
 
-# 进程级切换次数
-cat /proc/$PID/status | grep voluntary_ctxt_switches
-cat /proc/$PID/status | grep nonvoluntary_ctxt_switches
+# CPU 运行队列
+cat /proc/loadavg
+sar -q 1 3 2>/dev/null
 
-# perf 调度事件
-perf record -e sched:sched_switch -g -p $PID sleep 30
-perf script > cswitch.perf
+# 运行线程数
+ps -eo pid | wc -l
+cat /sys/devices/system/cpu/online
 ```
 
-## 常见误判
+---
 
-- **"%sys 高" 不一定是上下文切换**：也可能是 syscall（如 `read/write` 本身）或软中断
-- **"线程多" 不一定有害**：I/O 密集型任务需要更多线程，关键看 CPU 利用率
-- **"schedule 占比高" 也可能是合理让出**：协程调度器在用户态做 `schedule` 帧
+## 第二节：线程池饱和检测
+
+### 2.1 症状识别
+
+| 信号 | 指示 |
+|------|------|
+| 线程池任务队列持续增长 | 消费速度 < 生产速度 |
+| 任务拒绝率 > 0 | 线程池已满且队列已满 |
+| 活跃线程数 = 最大线程数 | 线程池资源耗尽 |
+
+### 2.2 检测方法
+
+```bash
+# Java 线程池 (需要通过 JMX 或 jstack 分析)
+jstack <pid> | grep -E "pool-|ThreadPool|ForkJoin" | head -20
+
+# 分析线程状态分布
+jstack <pid> | grep "java.lang.Thread.State" | sort | uniq -c | sort -rn
+
+# 通用线程数监控
+THREAD_COUNT=$(ls /proc/<pid>/task 2>/dev/null | wc -l)
+MAX_TASKS=$(cat /proc/sys/kernel/threads-max)
+echo "Threads: $THREAD_COUNT / $MAX_TASKS"
+
+# 线程状态分布
+for state in R S D T Z X; do
+  count=$(ps -eo stat | grep -c "^$state" 2>/dev/null || echo 0)
+  echo "State $state: $count"
+done
+```
+
+### 2.3 判定标准
+
+| 指标 | 正常 | 警告 | 严重 |
+|------|------|------|------|
+| 线程池使用率 | < 60% | 60-85% | > 85% |
+| 队列积压趋势 | 稳定或下降 | 缓慢增长 | 持续快速增长 |
+| 任务拒绝率 | 0% | < 1% | > 1% |
+
+---
+
+## 第三节：Work Stealing 不均衡分析
+
+### 3.1 检测方法
+
+```bash
+# 各 CPU 利用率分布
+mpstat -P ALL 1 3 | grep -v "CPU\|all" | awk '{print $3, $NF"%"}'
+
+# 各 CPU 运行队列长度
+for cpu in /sys/devices/system/cpu/cpu*/; do
+  cpu_name=$(basename $cpu)
+  queue=$(cat $cpu/run_queue 2>/dev/null || echo "N/A")
+  echo "$cpu_name: queue=$queue"
+done
+
+# 软中断分布
+cat /proc/softirqs | head -10
+
+# 硬中断分布
+cat /proc/interrupts | head -5
+```
+
+### 3.2 偏差计算
+
+```bash
+# CPU 利用率标准差（衡量不均衡度）
+mpstat -P ALL 1 1 | tail -n +4 | awk '{
+  sum+=$NF; vals[NR]=$NF
+} END {
+  avg=sum/NR
+  for(v in vals) sqdiff+=((vals[v]-avg)^2)
+  stddev=sqrt(sqdiff/NR)
+  printf "平均利用率: %.1f%%\n标准差: %.1f%%\n不均衡系数: %.2f\n", avg, stddev, stddev/avg
+}'
+```
+
+### 3.3 判定标准
+
+| 不均衡系数 | 等级 | 建议 |
+|-----------|------|------|
+| < 0.2 | 均衡 | 正常 |
+| 0.2 ~ 0.5 | 轻度不均衡 | 检查中断亲和性 |
+| > 0.5 | 严重不均衡 | 需调整绑核策略 |
+
+---
+
+## 第四节：任务队列积压分析
+
+### 4.1 生产消费速率分析
+
+```bash
+# 使用 perf 统计 syscall 频率 (模拟生产/消费速率)
+perf stat -e syscalls:sys_enter_write,syscalls:sys_enter_read -p <pid> --sleep 10 2>&1
+
+# 网络队列积压
+netstat -tn | wc -l
+ss -tn | wc -l
+ip -s link | grep -E "TX|RX" | head -10
+
+# disk 队列
+cat /sys/block/*/queue/nr_requests 2>/dev/null | head -5
+iostat -x 1 3 | tail -20
+```
+
+### 4.2 速率差计算
+
+```bash
+# 采样两次，计算生产消费速率差
+BEFORE=$(cat /proc/<pid>/io | grep "write_bytes" | awk '{print $2}')
+sleep 10
+AFTER=$(cat /proc/<pid>/io | grep "write_bytes" | awk '{print $2}')
+RATE=$(( (AFTER - BEFORE) / 10 ))
+echo "生产速率: $RATE bytes/s"
+```
+
+---
+
+## 第五节：并行度不足识别
+
+### 5.1 检测方法
+
+```bash
+# CPU 利用率 vs 可用核心
+CPU_CORES=$(nproc)
+CPU_IDLE=$(top -b -n1 | grep "%Cpu" | awk '{print $8}')
+CPU_USED=$((100 - ${CPU_IDLE%.*}))
+echo "可用核心: $CPU_CORES, CPU使用率: $CPU_USED%"
+echo "并行利用率: $((CPU_USED * 100 / (CPU_CORES * 100)))%"
+
+# 运行队列 vs 核心数
+LOAD=$(cat /proc/loadavg | awk '{print $1}')
+echo "运行队列长度: $LOAD (核心数: $CPU_CORES)"
+
+# 并行度判定
+if [ $(echo "$LOAD < $CPU_CORES * 0.5" | bc -l 2>/dev/null) -eq 1 ]; then
+  echo "⚠ 并行度不足: 运行队列 (${LOAD}) < 核心数 (${CPU_CORES}) 的一半"
+fi
+```
+
+### 5.2 判定标准
+
+| 条件 | 判定 |
+|------|------|
+| CPU 利用率 < 50% + 负载 < 核心数 | 并行度不足 |
+| CPU 利用率 > 80% + 负载 > 核心数*2 | CPU 饱和 |
+| GPU 利用率低 + CPU 利用率低 | 应用瓶颈不在计算 |
+
+---
+
+## 第六节：Cache Coherence 开销分析
+
+### 6.1 检测方法
+
+```bash
+# 需要 perf 支持 (Linux 4.10+)
+perf stat -e cache-misses,cache-references,LLC-loads,LLC-stores -a --sleep 5 2>&1
+
+# 缓存一致性流量 (特定硬件)
+perf stat -e rff03,rff01 -a --sleep 5 2>&1 || echo "HW counters not available"
+
+# snoop 流量 (Intel)
+perf list | grep -i "snoop\|coheren\|HITM" 2>/dev/null | head -10
+```
+
+### 6.2 判定标准
+
+| 指标 | 正常 | 警告 | 严重 |
+|------|------|------|------|
+| cache miss rate | < 5% | 5-15% | > 15% |
+| LLC load miss | < 10% | 10-30% | > 30% |
+| snoop/HITM 占比 | < 1% | 1-5% | > 5% |
+
+---
+
+## 综合分析流程
+
+```
+用户报 "并发性能差"
+      │
+      ▼
+初始信息收集 (ps, vmstat, loadavg)
+      │
+      ├── 线程池满/任务拒绝? ──→ 线程池饱和检测 (第二节)
+      │                              ├── 线程状态分布
+      │                              ├── 队列积压趋势
+      │                              └── 拒绝率分析
+      │
+      ├── CPU利用率不均衡? ──→ Work stealing 不均衡 (第三节)
+      │                              ├── 各CPU利用率
+      │                              ├── 软硬中断分布
+      │                              └── 不均衡系数
+      │
+      ├── 队列增长? ──→ 任务队列积压分析 (第四节)
+      │                        ├── 生产消费速率
+      │                        ├── 网络/磁盘队列
+      │                        └── 速率差判定
+      │
+      ├── CPU用不满? ──→ 并行度不足识别 (第五节)
+      │                        ├── 利用率 vs 核心数
+      │                        ├── 运行队列分析
+      │                        └── 负载判定
+      │
+      └── 多核扩展差? ──→ Cache coherence 开销 (第六节)
+                             ├── cache miss率
+                             ├── LLC miss率
+                             └── snoop/HITM 占比
+```
+
+## 配套脚本
+
+| 脚本 | 对应章节 | 功能 |
+|------|---------|------|
+| `diagnose_thread_pool.sh` | 第二节 | 线程池饱和检测 |
+| `diagnose_work_stealing.sh` | 第三节 | Work stealing 不均衡分析 |
+| `diagnose_task_queue.sh` | 第四节 | 任务队列积压分析 |
+| `diagnose_parallelism.sh` | 第五节 | 并行度不足识别 |
+| `diagnose_cache_coherence.sh` | 第六节 | Cache coherence 开销分析 |
