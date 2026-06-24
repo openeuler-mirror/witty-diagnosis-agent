@@ -1,0 +1,262 @@
+<?xml version="1.0" standalone="no"?>
+<!DOCTYPE svg PUBLIC "-//W3C//DTD SVG 1.1//EN" "http://www.w3.org/Graphics/SVG/1.1/DTD/svg11.dtd">
+<svg version="1.1" width="1200" height="376" onload="init(evt)" viewBox="0 0 1200 376" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
+<!-- Flame graph stack visualization. See https://github.com/brendangregg/FlameGraph -->
+<defs><linearGradient id="background" y1="0" y2="1" x1="0" x2="0"><stop stop-color="#eeeeee" offset="5%" /><stop stop-color="#eeeeb0" offset="95%" /></linearGradient></defs>
+<style type="text/css">text{font-family:Verdana;font-size:12px;fill:rgb(0,0,0)}#search,#ignorecase{opacity:0.1;cursor:pointer}#search:hover,#search.show,#ignorecase:hover,#ignorecase.show{opacity:1}#unzoom{cursor:pointer}#frames>*:hover{stroke:black;stroke-width:0.5;cursor:pointer}.hide{display:none}.parent{opacity:0.5}</style>
+<text id="title" x="600.0" y="12" font-size="17px" text-anchor="middle">Flame Graph</text>
+<text id="details" x="10" y="365" font-size="12px"> </text>
+<text id="matched" x="1190" y="365" font-size="12px" text-anchor="end"> </text>
+<text id="unzoom" class="hide" x="10" y="19" font-size="12px">Reset Zoom</text>
+<text id="search" class="hide" x="1145" y="19" font-size="12px">Search</text>
+<g id="frames">
+<g class="func_g" onmouseover="s('all (1,315 samples, 100.00%)')" onmouseout="c()" onclick="zoom(this)"><title>all (1,315 samples, 100.00%)</title><rect x="10.0" y="345" width="1180.0" height="15" fill="rgb(210,190,51)" rx="2" ry="2"/><text text-anchor="" x="13.0" y="355.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)">all</text></g>
+<g class="func_g" onmouseover="s('[libpthread-2.19.so] (1,222 samples, 92.93%)')" onmouseout="c()" onclick="zoom(this)"><title>[libpthread-2.19.so] (1,222 samples, 92.93%)</title><rect x="10.0" y="329" width="1096.5" height="15" fill="rgb(239,166,53)" rx="2" ry="2"/><text text-anchor="" x="13.0" y="339.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)">[libpthread-2.19.so]</text></g>
+<g class="func_g" onmouseover="s('start_thread (1,222 samples, 92.93%)')" onmouseout="c()" onclick="zoom(this)"><title>start_thread (1,222 samples, 92.93%)</title><rect x="10.0" y="313" width="1019.0" height="15" fill="rgb(242,128,15)" rx="2" ry="2"/><text text-anchor="" x="13.0" y="323.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)">start_thread</text></g>
+<g class="func_g" onmouseover="s('java_start (981 samples, 74.60%)')" onmouseout="c()" onclick="zoom(this)"><title>java_start (981 samples, 74.60%)</title><rect x="10.0" y="297" width="760.2" height="15" fill="rgb(236,80,0)" rx="2" ry="2"/><text text-anchor="" x="13.0" y="307.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)">java_start</text></g>
+<g class="func_g" onmouseover="s('JavaThread::run (956 samples, 72.70%)')" onmouseout="c()" onclick="zoom(this)"><title>JavaThread::run (956 samples, 72.70%)</title><rect x="10.0" y="281" width="552.6" height="15" fill="rgb(222,203,45)" rx="2" ry="2"/><text text-anchor="" x="13.0" y="291.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)">JavaThread::run</text></g>
+<g class="func_g" onmouseover="s('[libjvm.so] (956 samples, 72.70%)')" onmouseout="c()" onclick="zoom(this)"><title>[libjvm.so] (956 samples, 72.70%)</title><rect x="10.0" y="265" width="401.8" height="15" fill="rgb(223,205,4)" rx="2" ry="2"/><text text-anchor="" x="13.0" y="275.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)">[libjvm.so]</text></g>
+<g class="func_g" onmouseover="s('JavaThread::thread_main_inner (956 samples, 72.70%)')" onmouseout="c()" onclick="zoom(this)"><title>JavaThread::thread_main_inner (956 samples, 72.70%)</title><rect x="10.0" y="249" width="292.1" height="15" fill="rgb(215,103,46)" rx="2" ry="2"/><text text-anchor="" x="13.0" y="259.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)">JavaThread::thread_main_inner</text></g>
+<g class="func_g" onmouseover="s('thread_entry (956 samples, 72.70%)')" onmouseout="c()" onclick="zoom(this)"><title>thread_entry (956 samples, 72.70%)</title><rect x="10.0" y="233" width="212.3" height="15" fill="rgb(242,177,30)" rx="2" ry="2"/><text text-anchor="" x="13.0" y="243.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)">thread_entry</text></g>
+<g class="func_g" onmouseover="s('JavaCalls::call_virtual (956 samples, 72.70%)')" onmouseout="c()" onclick="zoom(this)"><title>JavaCalls::call_virtual (956 samples, 72.70%)</title><rect x="10.0" y="217" width="154.4" height="15" fill="rgb(239,211,44)" rx="2" ry="2"/><text text-anchor="" x="13.0" y="227.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)">JavaCalls::call_virt..</text></g>
+<g class="func_g" onmouseover="s('JavaCalls::call_virtual (956 samples, 72.70%)')" onmouseout="c()" onclick="zoom(this)"><title>JavaCalls::call_virtual (956 samples, 72.70%)</title><rect x="10.0" y="201" width="112.2" height="15" fill="rgb(239,211,44)" rx="2" ry="2"/><text text-anchor="" x="13.0" y="211.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)">JavaCalls::cal..</text></g>
+<g class="func_g" onmouseover="s('JavaCalls::call_helper (956 samples, 72.70%)')" onmouseout="c()" onclick="zoom(this)"><title>JavaCalls::call_helper (956 samples, 72.70%)</title><rect x="10.0" y="185" width="81.6" height="15" fill="rgb(237,7,26)" rx="2" ry="2"/><text text-anchor="" x="13.0" y="195.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)">JavaCalls:..</text></g>
+<g class="func_g" onmouseover="s('call_stub_[j] (956 samples, 72.70%)')" onmouseout="c()" onclick="zoom(this)"><title>call_stub_[j] (956 samples, 72.70%)</title><rect x="10.0" y="169" width="59.3" height="15" fill="rgb(230,156,45)" rx="2" ry="2"/><text text-anchor="" x="13.0" y="179.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)">call_st..</text></g>
+<g class="func_g" onmouseover="s('Interpreter_[j] (956 samples, 72.70%)')" onmouseout="c()" onclick="zoom(this)"><title>Interpreter_[j] (956 samples, 72.70%)</title><rect x="10.0" y="153" width="43.1" height="15" fill="rgb(220,1,22)" rx="2" ry="2"/><text text-anchor="" x="13.0" y="163.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)">Inter..</text></g>
+<g class="func_g" onmouseover="s('Interpreter_[j] (956 samples, 72.70%)')" onmouseout="c()" onclick="zoom(this)"><title>Interpreter_[j] (956 samples, 72.70%)</title><rect x="10.0" y="137" width="31.4" height="15" fill="rgb(220,1,22)" rx="2" ry="2"/><text text-anchor="" x="13.0" y="147.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)">Int..</text></g>
+<g class="func_g" onmouseover="s('Interpreter_[j] (956 samples, 72.70%)')" onmouseout="c()" onclick="zoom(this)"><title>Interpreter_[j] (956 samples, 72.70%)</title><rect x="10.0" y="121" width="22.8" height="15" fill="rgb(220,1,22)" rx="2" ry="2"/><text text-anchor="" x="13.0" y="131.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)">In..</text></g>
+<g class="func_g" onmouseover="s('io/netty/channel/nio/NioEventLoop:.processSelectedKeys_[j] (949 samples, 72.17%)')" onmouseout="c()" onclick="zoom(this)"><title>io/netty/channel/nio/NioEventLoop:.processSelectedKeys_[j] (949 samples, 72.17%)</title><rect x="10.0" y="105" width="16.4" height="15" fill="rgb(221,135,46)" rx="2" ry="2"/><text text-anchor="" x="13.0" y="115.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"></text></g>
+<g class="func_g" onmouseover="s('io/netty/channel/nio/NioEventLoop:.processSelectedKeysOptimized_[j] (949 samples, 72.17%)')" onmouseout="c()" onclick="zoom(this)"><title>io/netty/channel/nio/NioEventLoop:.processSelectedKeysOptimized_[j] (949 samples, 72.17%)</title><rect x="10.0" y="89" width="11.9" height="15" fill="rgb(207,202,49)" rx="2" ry="2"/><text text-anchor="" x="13.0" y="99.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"></text></g>
+<g class="func_g" onmouseover="s('io/netty/channel/nio/AbstractNioByteChannel$NioByteUnsafe:.read_[j] (939 samples, 71.41%)')" onmouseout="c()" onclick="zoom(this)"><title>io/netty/channel/nio/AbstractNioByteChannel$NioByteUnsafe:.read_[j] (939 samples, 71.41%)</title><rect x="10.0" y="73" width="8.5" height="15" fill="rgb(216,153,8)" rx="2" ry="2"/><text text-anchor="" x="13.0" y="83.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"></text></g>
+<g class="func_g" onmouseover="s('io/netty/channel/AbstractChannelHandlerContext:.fireChannelRead_[j] (637 samples, 48.44%)')" onmouseout="c()" onclick="zoom(this)"><title>io/netty/channel/AbstractChannelHandlerContext:.fireChannelRead_[j] (637 samples, 48.44%)</title><rect x="10.0" y="57" width="4.1" height="15" fill="rgb(254,9,17)" rx="2" ry="2"/><text text-anchor="" x="13.0" y="67.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"></text></g>
+<g class="func_g" onmouseover="s('io/netty/handler/codec/ByteToMessageDecoder:.channelRead_[j] (635 samples, 48.29%)')" onmouseout="c()" onclick="zoom(this)"><title>io/netty/handler/codec/ByteToMessageDecoder:.channelRead_[j] (635 samples, 48.29%)</title><rect x="10.0" y="41" width="2.0" height="15" fill="rgb(205,66,36)" rx="2" ry="2"/><text text-anchor="" x="13.0" y="51.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"></text></g>
+<g class="func_g" onmouseover="s('io/netty/channel/AbstractChannelHandlerContext:.fireChannelRead_[j] (562 samples, 42.74%)')" onmouseout="c()" onclick="zoom(this)"><title>io/netty/channel/AbstractChannelHandlerContext:.fireChannelRead_[j] (562 samples, 42.74%)</title><rect x="10.0" y="25" width="0.8" height="15" fill="rgb(254,9,17)" rx="2" ry="2"/><text text-anchor="" x="13.0" y="35.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"></text></g>
+<g class="func_g" onmouseover="s('io/netty/channel/AbstractChannelHandlerContext:.fireChannelReadComplete_[j] (242 samples, 18.40%)')" onmouseout="c()" onclick="zoom(this)"><title>io/netty/channel/AbstractChannelHandlerContext:.fireChannelReadComplete_[j] (242 samples, 18.40%)</title><rect x="15.7" y="57" width="1.6" height="15" fill="rgb(245,63,17)" rx="2" ry="2"/><text text-anchor="" x="18.7" y="67.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"></text></g>
+<g class="func_g" onmouseover="s('[libjvm.so] (25 samples, 1.90%)')" onmouseout="c()" onclick="zoom(this)"><title>[libjvm.so] (25 samples, 1.90%)</title><rect x="750.8" y="281" width="14.5" height="15" fill="rgb(223,205,4)" rx="2" ry="2"/><text text-anchor="" x="753.8" y="291.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"></text></g>
+<g class="func_g" onmouseover="s('thread_main (237 samples, 18.02%)')" onmouseout="c()" onclick="zoom(this)"><title>thread_main (237 samples, 18.02%)</title><rect x="828.0" y="297" width="183.7" height="15" fill="rgb(223,194,30)" rx="2" ry="2"/><text text-anchor="" x="831.0" y="307.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)">thread_main</text></g>
+<g class="func_g" onmouseover="s('aeMain (236 samples, 17.95%)')" onmouseout="c()" onclick="zoom(this)"><title>aeMain (236 samples, 17.95%)</title><rect x="828.0" y="281" width="33.0" height="15" fill="rgb(236,124,27)" rx="2" ry="2"/><text text-anchor="" x="831.0" y="291.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)">aeM..</text></g>
+<g class="func_g" onmouseover="s('aeProcessEvents (171 samples, 13.00%)')" onmouseout="c()" onclick="zoom(this)"><title>aeProcessEvents (171 samples, 13.00%)</title><rect x="828.0" y="265" width="4.3" height="15" fill="rgb(246,97,53)" rx="2" ry="2"/><text text-anchor="" x="831.0" y="275.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"></text></g>
+<g class="func_g" onmouseover="s('libc-2.19.so (61 samples, 4.64%)')" onmouseout="c()" onclick="zoom(this)"><title>libc-2.19.so (61 samples, 4.64%)</title><rect x="851.9" y="265" width="1.5" height="15" fill="rgb(222,63,4)" rx="2" ry="2"/><text text-anchor="" x="854.9" y="275.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"></text></g>
+<g class="func_g" onmouseover="s('[libjvm.so] (4 samples, 0.30%)')" onmouseout="c()" onclick="zoom(this)"><title>[libjvm.so] (4 samples, 0.30%)</title><rect x="1025.7" y="297" width="3.1" height="15" fill="rgb(223,205,4)" rx="2" ry="2"/><text text-anchor="" x="1028.7" y="307.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"></text></g>
+<g class="func_g" onmouseover="s('start_secondary_[k] (44 samples, 3.35%)')" onmouseout="c()" onclick="zoom(this)"><title>start_secondary_[k] (44 samples, 3.35%)</title><rect x="1106.5" y="329" width="39.5" height="15" fill="rgb(216,183,39)" rx="2" ry="2"/><text text-anchor="" x="1109.5" y="339.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)">star..</text></g>
+<g class="func_g" onmouseover="s('cpu_startup_entry_[k] (44 samples, 3.35%)')" onmouseout="c()" onclick="zoom(this)"><title>cpu_startup_entry_[k] (44 samples, 3.35%)</title><rect x="1106.5" y="313" width="1.3" height="15" fill="rgb(231,84,19)" rx="2" ry="2"/><text text-anchor="" x="1109.5" y="323.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"></text></g>
+<g class="func_g" onmouseover="s('x86_64_start_kernel_[k] (24 samples, 1.83%)')" onmouseout="c()" onclick="zoom(this)"><title>x86_64_start_kernel_[k] (24 samples, 1.83%)</title><rect x="1146.0" y="329" width="21.5" height="15" fill="rgb(241,67,5)" rx="2" ry="2"/><text text-anchor="" x="1149.0" y="339.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)">x8..</text></g>
+<g class="func_g" onmouseover="s('unknown (11 samples, 0.84%)')" onmouseout="c()" onclick="zoom(this)"><title>unknown (11 samples, 0.84%)</title><rect x="1167.6" y="329" width="9.9" height="15" fill="rgb(224,220,36)" rx="2" ry="2"/><text text-anchor="" x="1170.6" y="339.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"></text></g>
+<g class="func_g" onmouseover="s('[libc-2.19.so] (6 samples, 0.46%)')" onmouseout="c()" onclick="zoom(this)"><title>[libc-2.19.so] (6 samples, 0.46%)</title><rect x="1177.4" y="329" width="5.4" height="15" fill="rgb(222,185,14)" rx="2" ry="2"/><text text-anchor="" x="1180.4" y="339.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"></text></g>
+<g class="func_g" onmouseover="s('aeProcessEvents (3 samples, 0.23%)')" onmouseout="c()" onclick="zoom(this)"><title>aeProcessEvents (3 samples, 0.23%)</title><rect x="1182.8" y="329" width="2.7" height="15" fill="rgb(246,97,53)" rx="2" ry="2"/><text text-anchor="" x="1185.8" y="339.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"></text></g>
+<g class="func_g" onmouseover="s('native_write_msr_safe_[k] (3 samples, 0.23%)')" onmouseout="c()" onclick="zoom(this)"><title>native_write_msr_safe_[k] (3 samples, 0.23%)</title><rect x="1185.5" y="329" width="2.7" height="15" fill="rgb(206,145,48)" rx="2" ry="2"/><text text-anchor="" x="1188.5" y="339.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"></text></g>
+<g class="func_g" onmouseover="s('__switch_to_[k] (1 samples, 0.08%)')" onmouseout="c()" onclick="zoom(this)"><title>__switch_to_[k] (1 samples, 0.08%)</title><rect x="1188.2" y="329" width="0.9" height="15" fill="rgb(209,76,28)" rx="2" ry="2"/><text text-anchor="" x="1191.2" y="339.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"></text></g>
+<g class="func_g" onmouseover="s('native_load_tls_[k] (1 samples, 0.08%)')" onmouseout="c()" onclick="zoom(this)"><title>native_load_tls_[k] (1 samples, 0.08%)</title><rect x="1189.1" y="329" width="0.9" height="15" fill="rgb(222,171,33)" rx="2" ry="2"/><text text-anchor="" x="1192.1" y="339.5" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"></text></g>
+</g>
+<script type="text/ecmascript">
+<![CDATA[
+"use strict";
+var details, searchbtn, unzoombtn, matchedtxt, svg, searching, currentSearchTerm, ignorecase, ignorecaseBtn;
+function init(evt) {
+    details = document.getElementById("details").firstChild;
+    searchbtn = document.getElementById("search");
+    ignorecaseBtn = document.getElementById("ignorecase");
+    unzoombtn = document.getElementById("unzoom");
+    matchedtxt = document.getElementById("matched");
+    svg = document.getElementsByTagName("svg")[0];
+    searching = 0;
+    currentSearchTerm = null;
+    var params = get_params();
+    if (params.x && params.y)
+        zoom(find_group(document.querySelector('[x="' + params.x + '"][y="' + params.y + '"]')));
+    if (params.s) search(params.s);
+}
+window.addEventListener("click", function(e) {
+    var target = find_group(e.target);
+    if (target) {
+        if (target.nodeName == "a") {
+            if (e.ctrlKey === false) return;
+            e.preventDefault();
+        }
+        if (target.classList.contains("parent")) { unzoom(true); return; }
+        zoom(target);
+        if (!document.querySelector('.parent')) {
+            var params = get_params();
+            if (params.x) delete params.x;
+            if (params.y) delete params.y;
+            history.replaceState(null, null, parse_params(params));
+            unzoombtn.classList.add("hide");
+            return;
+        }
+        var el = target.querySelector("rect");
+        if (el && el.attributes && el.attributes.y && el.attributes._orig_x) {
+            var params = get_params();
+            params.x = el.attributes._orig_x.value;
+            params.y = el.attributes.y.value;
+            history.replaceState(null, null, parse_params(params));
+        }
+    }
+    else if (e.target.id == "unzoom") clearzoom();
+    else if (e.target.id == "search") search_prompt();
+    else if (e.target.id == "ignorecase") toggle_ignorecase();
+}, false);
+window.addEventListener("mouseover", function(e) {
+    var target = find_group(e.target);
+    if (target) details.nodeValue = "Function: " + g_to_text(target);
+}, false);
+window.addEventListener("mouseout", function(e) {
+    var target = find_group(e.target);
+    if (target) details.nodeValue = ' ';
+}, false);
+window.addEventListener("keydown",function (e) {
+    if (e.keyCode === 114 || (e.ctrlKey && e.keyCode === 70)) { e.preventDefault(); search_prompt(); }
+    else if (e.ctrlKey && e.keyCode === 73) { e.preventDefault(); toggle_ignorecase(); }
+}, false);
+
+function get_params() {
+    var params = {};
+    var paramsarr = window.location.search.substr(1).split('&');
+    for (var i = 0; i < paramsarr.length; ++i) {
+        var tmp = paramsarr[i].split("=");
+        if (!tmp[0] || !tmp[1]) continue;
+        params[tmp[0]] = decodeURIComponent(tmp[1]);
+    }
+    return params;
+}
+function parse_params(params) {
+    var uri = "?";
+    for (var key in params) { uri += key + '=' + encodeURIComponent(params[key]) + '&'; }
+    if (uri.slice(-1) == "&") uri = uri.substring(0, uri.length - 1);
+    if (uri == '?') uri = window.location.href.split('?')[0];
+    return uri;
+}
+function find_child(node, selector) {
+    var children = node.querySelectorAll(selector);
+    if (children.length) return children[0];
+}
+function find_group(node) {
+    var parent = node.parentElement;
+    if (!parent) return;
+    if (parent.id == "frames") return node;
+    return find_group(parent);
+}
+function orig_save(e, attr, val) {
+    if (e.attributes["_orig_" + attr] != undefined) return;
+    if (e.attributes[attr] == undefined) return;
+    if (val == undefined) val = e.attributes[attr].value;
+    e.setAttribute("_orig_" + attr, val);
+}
+function orig_load(e, attr) {
+    if (e.attributes["_orig_"+attr] == undefined) return;
+    e.attributes[attr].value = e.attributes["_orig_" + attr].value;
+    e.removeAttribute("_orig_"+attr);
+}
+function g_to_text(e) {
+    return find_child(e, "title").firstChild.nodeValue;
+}
+function g_to_func(e) {
+    var func = g_to_text(e);
+    if (func != null) func = func.replace(/ .*/, "");
+    return func;
+}
+function update_text(e) {
+    var r = find_child(e, "rect");
+    var t = find_child(e, "text");
+    var w = parseFloat(r.attributes["width"].value) - 3;
+    var txt = find_child(e, "title").textContent.replace(/\([^(]*\)/,"");
+    t.attributes["x"].value = parseFloat(r.attributes["x"].value) + 3;
+    if (w < 2*12*0.59) { t.textContent = ""; return; }
+    t.textContent = txt;
+    if (/^ *$/.test(txt) || t.getSubStringLength(0, txt.length) < w) return;
+    for (var x=txt.length-2; x>0; x--) {
+        if (t.getSubStringLength(0, x+2) <= w) { t.textContent = txt.substring(0,x) + ".."; return; }
+    }
+    t.textContent = "";
+}
+function zoom_reset(e) {
+    if (e.attributes != undefined) { orig_load(e, "x"); orig_load(e, "width"); }
+    if (e.childNodes == undefined) return;
+    for(var i=0, c=e.childNodes; i<c.length; i++) zoom_reset(c[i]);
+}
+function zoom_child(e, x, ratio) {
+    if (e.attributes != undefined) {
+        if (e.attributes["x"] != undefined) {
+            orig_save(e, "x");
+            e.attributes["x"].value = (parseFloat(e.attributes["x"].value) - x - 10) * ratio + 10;
+            if(e.tagName == "text") e.attributes["x"].value = find_child(e.parentNode, "rect", "x") + 3;
+        }
+        if (e.attributes["width"] != undefined) {
+            orig_save(e, "width");
+            e.attributes["width"].value = parseFloat(e.attributes["width"].value) * ratio;
+        }
+    }
+    if (e.childNodes == undefined) return;
+    for(var i=0, c=e.childNodes; i<c.length; i++) zoom_child(c[i], x-10, ratio);
+}
+function zoom_parent(e) {
+    if (e.attributes) {
+        if (e.attributes["x"] != undefined) { orig_save(e, "x"); e.attributes["x"].value = 10; }
+        if (e.attributes["width"] != undefined) {
+            orig_save(e, "width");
+            e.attributes["width"].value = parseInt(svg.width.baseVal.value) - (10*2);
+        }
+    }
+    if (e.childNodes == undefined) return;
+    for(var i=0, c=e.childNodes; i<c.length; i++) zoom_parent(c[i]);
+}
+function zoom(node) {
+    var attr = find_child(node, "rect").attributes;
+    if (!attr) return;
+    var width = parseFloat(attr["width"].value);
+    if (width == svg.width.baseVal.value) return; // already zoomed all the way
+    var xmin = parseFloat(attr["x"].value);
+    var xmax = parseFloat(xmin + width);
+    var ymin = parseFloat(attr["y"].value);
+    var ratio = (svg.width.baseVal.value - 2*10) / width;
+    unzoombtn.classList.remove("hide");
+    searchbtn.classList.remove("hide");
+    var fudge = 0.0001;
+    var el = document.getElementById("frames");
+    zoom_parent(el);
+    zoom_child(el, xmin - 10 - fudge, ratio);
+    // update URL
+    var params = get_params();
+    params.v = xmin + "," + width + "," + ymin;
+    history.replaceState(null, null, parse_params(params));
+}
+function unzoom(noURL) {
+    unzoombtn.classList.add("hide");
+    var el = document.getElementById("frames");
+    zoom_reset(el);
+    if (!noURL) {
+        var params = get_params();
+        if (params.v) delete params.v;
+        history.replaceState(null, null, parse_params(params));
+    }
+}
+function clearzoom() { unzoom(false); }
+function search_prompt() {
+    if (!searching) {
+        var q = prompt("Enter regex search:");
+        if (q == null) return;
+        search(q);
+    } else {
+        search(currentSearchTerm);
+    }
+}
+function search(q) {
+    if (q == null || q == "") return;
+    currentSearchTerm = q;
+    searching = 1;
+    searchbtn.classList.remove("hide");
+    searchbtn.classList.add("show");
+    var r;
+    try { r = new RegExp(q); }
+    catch (e) { r = null; }
+    if (!r) return;
+    var count = 0;
+    var el = document.getElementById("frames").children;
+    for (var i=0; i<el.length; i++) {
+        var func = g_to_func(el[i]);
+        if (r.test(func)) { el[i].classList.remove("parent"); count++; }
+        else { el[i].classList.add("parent"); }
+    }
+    matchedtxt.textContent = count + " matches";
+}
+]]></script>
+</svg>

@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test"
 import { createBuiltinMcps } from "./index"
+import type { WittyDiagnosisAgentConfig } from "../config/schema"
 
 describe("createBuiltinMcps", () => {
   test("should return all MCPs when disabled_mcps is empty", () => {
@@ -89,7 +90,10 @@ describe("createBuiltinMcps", () => {
     const originalTavilyKey = process.env.TAVILY_API_KEY
     delete process.env.TAVILY_API_KEY
     const disabledMcps = ["websearch"]
-    const config = { websearch: { provider: "tavily" as const } }
+    const config = {
+      output_language: "zh" as const,
+      websearch: { provider: "tavily" as const },
+    } satisfies WittyDiagnosisAgentConfig
 
     try {
       // when
@@ -99,6 +103,7 @@ describe("createBuiltinMcps", () => {
       expect(createMcps).not.toThrow()
       const result = createMcps()
       expect(result).not.toHaveProperty("websearch")
+      expect(result).toHaveProperty("grep_app")
     } finally {
       if (originalTavilyKey) process.env.TAVILY_API_KEY = originalTavilyKey
     }

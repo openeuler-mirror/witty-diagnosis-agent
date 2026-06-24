@@ -262,13 +262,12 @@
       </div>
     </div>
     <div class="compare">
-      <div class="build base"><span class="lbl">基线</span><span class="v">v2.14.0 · 7d3f1a</span></div>
+      <div class="build base"><span class="lbl">基线</span><span class="v">{{BASELINE_VERSION}}</span></div>
       <div class="arrow">→</div>
-      <div class="build curr"><span class="lbl">当前</span><span class="v">v2.15.0 · b91c4e</span></div>
-    </div>
+      <div class="build curr"><span class="lbl">当前</span><span class="v">{{CURRENT_VERSION}}</span></div>
     <div class="top-right">
-      <span class="pill"><span class="dot"></span>CPU · on-CPU 采样</span>
-      <span>99 Hz · 30 秒窗口</span>
+      <span class="pill"><span class="dot"></span>{{EVENT_TYPE}}</span>
+      <span>{{SAMPLING_INFO}}</span>
     </div>
   </header>
 
@@ -308,7 +307,7 @@
             <div class="ends"><span style="color:var(--imp-bright)">− 更快</span><span style="color:var(--reg-bright)">+ 更慢</span></div>
           </div>
         </div>
-        <span class="meta" id="legendMeta">宽度 ∝ 当前采样数 · 颜色 ∝ 相对基线的 Δ</span>
+        <span class="meta" id="legendMeta">{{LEGEND_TEXT}}</span>
       </div>
     </section>
 
@@ -318,6 +317,18 @@
         <h3>性能剖析概览 <span class="tick"></span></h3>
         <div class="summary" id="summary"></div>
       </div>
+
+      <!-- 差分分析总结段落 -->
+      <div class="pblock">
+        <h3>差异分析总结 <span class="tick"></span></h3>
+        <div class="diff-summary" style="font-family:var(--sans);font-size:12.5px;color:var(--ink-dim);line-height:1.7">
+          <p style="margin-bottom:8px"><b>整体趋势：</b>{{SUMMARY_TREND}}</p>
+          <p style="margin-bottom:8px"><b>主要回退：</b>{{SUMMARY_REGRESSION}}</p>
+          <p style="margin-bottom:8px"><b>主要改善：</b>{{SUMMARY_IMPROVEMENT}}</p>
+          <p><b>根因分析：</b>{{SUMMARY_ROOT_CAUSE}}</p>
+        </div>
+      </div>
+
       <div class="pblock">
         <h3>主要性能回退 <span class="tick"></span></h3>
         <div class="rank" id="regList"></div>
@@ -335,7 +346,7 @@
 
   <!-- 状态栏 -->
   <footer class="statusbar">
-    <div class="s"><b>服务</b> api-gateway / request-handler</div>
+    <div class="s"><b>服务</b> {{SERVICE_NAME}}</div>
     <div class="s"><b>帧数</b> <span id="stFrames"></span></div>
     <div class="s"><b>深度</b> <span id="stDepth"></span></div>
     <div class="right">
@@ -358,48 +369,9 @@ function f(name, sb, sc, children){
   return {name, selfB:sb, selfC:sc, b:sb+cb, c:sc+cc, children};
 }
 
-const tree =
-f('all (api-gateway)',0,0,[
-  f('main',6,6,[
-    f('httpServer.listen',4,4,[
-      f('handleConnection',10,10,[
-        f('parseRequest',5,5,[
-          f('parseHeaders',18,17),
-          f('parseBody',6,6,[
-            f('JSON.parse',35,70)              // 回退：请求体变大
-          ])
-        ]),
-        f('router.match',22,20),
-        f('middleware.run',10,10,[
-          f('auth.verify',8,8,[
-            f('jwt.decode',25,22),
-            f('crypto.verifySignature',40,118)  // 回退：RSA2048→4096
-          ]),
-          f('rateLimit.check',5,5,[
-            f('redis.get',30,17)                // 改善：管道化
-          ])
-        ]),
-        f('controller.handle',8,8,[
-          f('userService.getProfile',10,10,[
-            f('db.query',15,15,[
-              f('pg.acquireConn',20,58),         // 回退：连接池耗尽
-              f('pg.execute',120,236)            // 回退：缺少索引
-            ]),
-            f('cache.lookup',92,11)              // 改善：新增缓存
-          ]),
-          f('render.template',12,12,[
-            f('compileTemplate',40,42),
-            f('interpolate',60,57)
-          ])
-        ]),
-        f('serialize.response',4,4,[
-          f('JSON.stringify',45,43)
-        ]),
-        f('sendResponse',15,14)
-      ])
-    ])
-  ])
-]);
+const tree = {{PROFILE_TREE}};
+
+/* 索引所有节点]);
 
 /* 索引所有节点并计算 delta */
 let allNodes=[], maxAbsDelta=0, maxDepth=0;

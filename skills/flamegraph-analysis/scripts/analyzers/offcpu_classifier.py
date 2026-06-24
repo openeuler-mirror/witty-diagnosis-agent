@@ -81,6 +81,35 @@ OFFCPU_PATTERNS = {
         'hugetlbfs_fault': 0.8, 'alloc_huge_page': 0.8,
         'out_of_memory': 0.9, 'pagefault_out_of_memory': 0.9,
         'kmem_cache_alloc': 0.5, '____slab_alloc': 0.5,
+        'kmem_cache_alloc': 0.5, '____slab_alloc': 0.5,
+    },
+    'signal_wait': {
+        'sigtimedwait': 1.0, 'sigwaitinfo': 1.0,
+        'do_sigtimedwait': 1.0, 'pause': 0.7,
+        'do_pause': 0.7, 'flush_signals': 0.6,
+        'signal_wakeup': 0.6,
+    },
+    'memory_wait': {
+        'alloc_pages': 1.0, 'alloc_pages_vma': 0.9,
+        'kswapd': 1.0, 'balance_pgdat': 0.9,
+        'wakeup_kswapd': 0.8, 'shrink_page_list': 0.8,
+        'reclaim_pages': 0.8, 'try_to_free_pages': 0.8,
+        'compaction_alloc': 0.7, 'compact_zone': 0.7,
+    },
+    'barrier': {
+        'pthread_barrier_wait': 1.0,
+        'cyclic_barrier': 0.9,
+        'java.util.concurrent.CyclicBarrier': 0.8,
+        'CountDownLatch': 0.7,
+    },
+    'rcu_wait': {
+        'synchronize_rcu': 1.0, 'rcu_barrier': 0.9,
+        'call_rcu': 0.9, 'rcu_gp_kthread': 0.8,
+    },
+    'net_io_detailed': {
+        'tcp_connect': 0.9, 'tls_handshake': 0.9,
+        'dns_query': 0.8, 'ssl_connect': 0.9,
+        'res_query': 0.8,
     },
 }
 
@@ -152,6 +181,11 @@ def main():
         'page_fault': 'Page Fault & Swap',
         'thread_mgmt': 'Thread Management',
         'memory_alloc': 'Memory Allocation',
+        'signal_wait': 'Signal Wait',
+        'memory_wait': 'Memory Wait (Alloc/Reclaim)',
+        'barrier': 'Barrier Synchronization',
+        'rcu_wait': 'RCU Wait',
+        'net_io_detailed': 'Network I/O (Detailed)',
         'unknown': 'Unknown/Other'
     }
 

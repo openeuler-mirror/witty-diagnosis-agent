@@ -5,6 +5,7 @@ import { getAgentDisplayName } from "../shared/agent-display-names";
 const CORE_FIRST_ORDER: string[] = [
   getAgentDisplayName("fuxi"),
   getAgentDisplayName("xuanyuan"),
+  getAgentDisplayName("taiyi"),
   getAgentDisplayName("dayu"),
   getAgentDisplayName("kuafu"),
   getAgentDisplayName("baize"),

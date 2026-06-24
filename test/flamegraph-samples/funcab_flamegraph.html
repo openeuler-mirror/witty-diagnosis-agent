@@ -1,0 +1,2338 @@
+﻿<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>火焰图 · order-service · 2024-05-03</title>
+<style>
+  :root {
+    --bg-page: #fafafa;
+    --bg-surface: #ffffff;
+    --bg-subtle: #f4f4f5;
+    --bg-hover: #f1f1f3;
+
+    --text-primary: #18181b;
+    --text-secondary: #52525b;
+    --text-tertiary: #71717a;
+    --text-muted: #a1a1aa;
+
+    --border-light: #e4e4e7;
+    --border-medium: #d4d4d8;
+    --border-strong: #a1a1aa;
+
+    --accent: #2563eb;
+    --accent-hover: #1d4ed8;
+    --accent-bg: #eff6ff;
+
+    --danger: #dc2626;
+    --warning: #d97706;
+    --success: #16a34a;
+    --info: #0891b2;
+
+    --color-lock-fill: #fde2e2;
+    --color-lock-stroke: #dc2626;
+    --color-lock-text: #7f1d1d;
+
+    --color-gc-fill: #ede9fe;
+    --color-gc-stroke: #7c3aed;
+    --color-gc-text: #4c1d95;
+
+    --color-io-fill: #dbeafe;
+    --color-io-stroke: #2563eb;
+    --color-io-text: #1e3a8a;
+
+    --color-syscall-fill: #e4e4e7;
+    --color-syscall-stroke: #71717a;
+    --color-syscall-text: #3f3f46;
+
+    --color-crypto-fill: #fef3c7;
+    --color-crypto-stroke: #d97706;
+    --color-crypto-text: #78350f;
+
+    --color-reflection-fill: #fce7f3;
+    --color-reflection-stroke: #db2777;
+    --color-reflection-text: #831843;
+
+    --color-compute-fill: #d1fae5;
+    --color-compute-stroke: #059669;
+    --color-compute-text: #064e3b;
+
+    --color-default-fill: #f4f4f5;
+    --color-default-stroke: #a1a1aa;
+    --color-default-text: #3f3f46;
+
+    --row-height: 22px;
+    --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.04);
+    --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.08);
+    --radius-sm: 4px;
+    --radius-md: 6px;
+    --radius-lg: 8px;
+  }
+
+  * {
+    box-sizing: border-box;
+  }
+
+  html, body {
+    margin: 0;
+    padding: 0;
+    background: var(--bg-page);
+    color: var(--text-primary);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+    font-size: 14px;
+    line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  body {
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .app-header {
+    background: var(--bg-surface);
+    border-bottom: 1px solid var(--border-light);
+    padding: 14px 24px;
+    display: flex;
+    align-items: center;
+    gap: 24px;
+    flex-shrink: 0;
+  }
+
+  .brand {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-weight: 600;
+    font-size: 15px;
+    color: var(--text-primary);
+  }
+
+  .brand-icon {
+    width: 24px;
+    height: 24px;
+    border-radius: var(--radius-sm);
+    background: linear-gradient(135deg, #f97316 0%, #dc2626 100%);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    font-size: 14px;
+    font-weight: 700;
+  }
+
+  .meta-bar {
+    display: flex;
+    gap: 16px;
+    font-size: 12px;
+    color: var(--text-secondary);
+    flex: 1;
+    flex-wrap: wrap;
+    align-items: center;
+  }
+
+  .meta-item {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .meta-label {
+    color: var(--text-tertiary);
+  }
+
+  .meta-value {
+    color: var(--text-primary);
+    font-weight: 500;
+  }
+
+  .meta-value.mono {
+    font-family: ui-monospace, SFMono-Regular, "SF Mono", Consolas, monospace;
+    font-size: 11px;
+    background: var(--bg-subtle);
+    padding: 2px 6px;
+    border-radius: var(--radius-sm);
+  }
+
+  .badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 2px 8px;
+    border-radius: 999px;
+    font-size: 11px;
+    font-weight: 500;
+    border: 1px solid;
+  }
+
+  .badge.confidence-high {
+    background: #dcfce7;
+    color: #166534;
+    border-color: #86efac;
+  }
+
+  .badge.confidence-medium {
+    background: #fef3c7;
+    color: #854d0e;
+    border-color: #fcd34d;
+  }
+
+  .badge.confidence-low {
+    background: #fee2e2;
+    color: #991b1b;
+    border-color: #fca5a5;
+  }
+
+  .summary-card {
+    background: var(--bg-surface);
+    border-bottom: 1px solid var(--border-light);
+    padding: 16px 24px;
+    display: flex;
+    gap: 24px;
+    align-items: flex-start;
+  }
+
+  .summary-icon {
+    width: 36px;
+    height: 36px;
+    border-radius: var(--radius-md);
+    background: #fee2e2;
+    color: var(--danger);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    font-weight: 600;
+  }
+
+  .summary-text {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .summary-title {
+    font-size: 13px;
+    color: var(--text-secondary);
+    margin: 0 0 4px;
+    font-weight: 500;
+  }
+
+  .summary-body {
+    font-size: 14px;
+    color: var(--text-primary);
+    margin: 0;
+    line-height: 1.55;
+  }
+
+  .summary-body strong {
+    font-weight: 600;
+  }
+
+  .summary-stats {
+    display: flex;
+    gap: 24px;
+    flex-shrink: 0;
+  }
+
+  .stat {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+
+  .stat-label {
+    font-size: 11px;
+    color: var(--text-tertiary);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    font-weight: 500;
+  }
+
+  .stat-value {
+    font-size: 18px;
+    font-weight: 600;
+    color: var(--text-primary);
+    font-feature-settings: "tnum";
+  }
+
+  .stat-value .unit {
+    font-size: 12px;
+    font-weight: 400;
+    color: var(--text-tertiary);
+    margin-left: 2px;
+  }
+
+  .toolbar {
+    background: var(--bg-surface);
+    border-bottom: 1px solid var(--border-light);
+    padding: 10px 24px;
+    display: flex;
+    gap: 12px;
+    align-items: center;
+    flex-wrap: wrap;
+    flex-shrink: 0;
+  }
+
+  .search-box {
+    position: relative;
+    flex: 1;
+    max-width: 320px;
+    min-width: 200px;
+  }
+
+  .search-box input {
+    width: 100%;
+    height: 32px;
+    padding: 0 32px 0 32px;
+    border: 1px solid var(--border-medium);
+    border-radius: var(--radius-md);
+    background: var(--bg-surface);
+    font-size: 13px;
+    color: var(--text-primary);
+    font-family: inherit;
+    outline: none;
+    transition: border-color 0.15s, box-shadow 0.15s;
+  }
+
+  .search-box input:focus {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+  }
+
+  .search-box input::placeholder {
+    color: var(--text-muted);
+  }
+
+  .search-icon {
+    position: absolute;
+    left: 10px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: var(--text-muted);
+    pointer-events: none;
+  }
+
+  .search-count {
+    position: absolute;
+    right: 10px;
+    top: 50%;
+    transform: translateY(-50%);
+    font-size: 11px;
+    color: var(--text-tertiary);
+    font-feature-settings: "tnum";
+    pointer-events: none;
+  }
+
+  .control-group {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 12px;
+    color: var(--text-secondary);
+  }
+
+  .control-label {
+    font-size: 12px;
+    color: var(--text-tertiary);
+    margin-right: 2px;
+  }
+
+  .seg-control {
+    display: inline-flex;
+    background: var(--bg-subtle);
+    border: 1px solid var(--border-light);
+    border-radius: var(--radius-md);
+    padding: 2px;
+    gap: 2px;
+  }
+
+  .seg-control button {
+    height: 26px;
+    padding: 0 10px;
+    border: none;
+    background: transparent;
+    color: var(--text-secondary);
+    font-size: 12px;
+    font-family: inherit;
+    cursor: pointer;
+    border-radius: 4px;
+    transition: background 0.12s, color 0.12s;
+  }
+
+  .seg-control button:hover:not(.active) {
+    background: var(--bg-hover);
+    color: var(--text-primary);
+  }
+
+  .seg-control button.active {
+    background: var(--bg-surface);
+    color: var(--text-primary);
+    box-shadow: var(--shadow-sm);
+    font-weight: 500;
+  }
+
+  .select {
+    height: 32px;
+    padding: 0 28px 0 10px;
+    border: 1px solid var(--border-medium);
+    border-radius: var(--radius-md);
+    background: var(--bg-surface);
+    color: var(--text-primary);
+    font-size: 12px;
+    font-family: inherit;
+    cursor: pointer;
+    outline: none;
+    appearance: none;
+    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'><path d='M3 4.5L6 7.5L9 4.5' stroke='%2371717a' stroke-width='1.5' fill='none' stroke-linecap='round' stroke-linejoin='round'/></svg>");
+    background-repeat: no-repeat;
+    background-position: right 8px center;
+  }
+
+  .select:focus {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+  }
+
+  .slider-control {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 12px;
+  }
+
+  .slider-control input[type="range"] {
+    width: 90px;
+  }
+
+  .slider-value {
+    font-feature-settings: "tnum";
+    color: var(--text-primary);
+    min-width: 36px;
+    font-size: 12px;
+  }
+
+  .btn {
+    height: 32px;
+    padding: 0 12px;
+    border: 1px solid var(--border-medium);
+    border-radius: var(--radius-md);
+    background: var(--bg-surface);
+    color: var(--text-primary);
+    font-size: 12px;
+    font-family: inherit;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    transition: background 0.12s, border-color 0.12s;
+  }
+
+  .btn:hover {
+    background: var(--bg-hover);
+    border-color: var(--border-strong);
+  }
+
+  .btn:active {
+    transform: scale(0.98);
+  }
+
+  .btn-primary {
+    background: var(--accent);
+    color: white;
+    border-color: var(--accent);
+  }
+
+  .btn-primary:hover {
+    background: var(--accent-hover);
+    border-color: var(--accent-hover);
+  }
+
+  .toolbar-spacer {
+    flex: 1;
+  }
+
+  .main {
+    flex: 1;
+    display: flex;
+    overflow: hidden;
+    min-height: 0;
+  }
+
+  .flame-area {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    background: var(--bg-surface);
+    border-right: 1px solid var(--border-light);
+    min-width: 0;
+    overflow: hidden;
+  }
+
+  .breadcrumb {
+    padding: 8px 16px;
+    border-bottom: 1px solid var(--border-light);
+    background: var(--bg-subtle);
+    font-size: 12px;
+    color: var(--text-secondary);
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    flex-wrap: wrap;
+    min-height: 36px;
+  }
+
+  .breadcrumb-item {
+    color: var(--accent);
+    cursor: pointer;
+    padding: 2px 6px;
+    border-radius: 3px;
+    transition: background 0.1s;
+    font-family: ui-monospace, SFMono-Regular, "SF Mono", Consolas, monospace;
+    font-size: 11px;
+  }
+
+  .breadcrumb-item:hover {
+    background: var(--accent-bg);
+  }
+
+  .breadcrumb-item.current {
+    color: var(--text-primary);
+    cursor: default;
+    font-weight: 500;
+  }
+
+  .breadcrumb-item.current:hover {
+    background: transparent;
+  }
+
+  .breadcrumb-sep {
+    color: var(--text-muted);
+    font-size: 10px;
+  }
+
+  .flame-canvas {
+    flex: 1;
+    overflow: auto;
+    position: relative;
+    background:
+      linear-gradient(var(--border-light) 1px, transparent 1px),
+      linear-gradient(90deg, transparent 0, transparent 100%);
+    background-size: 100% 22px;
+  }
+
+  .flame-svg {
+    display: block;
+    width: 100%;
+  }
+
+  .frame {
+    cursor: pointer;
+    transition: opacity 0.15s;
+  }
+
+  .frame rect {
+    transition: stroke-width 0.12s, filter 0.12s;
+  }
+
+  .frame:hover rect {
+    stroke-width: 1.5;
+    filter: brightness(0.95);
+  }
+
+  .frame.dimmed {
+    opacity: 0.25;
+  }
+
+  .frame.search-match rect {
+    stroke: #ec4899 !important;
+    stroke-width: 2 !important;
+  }
+
+  .frame.finding-highlight rect {
+    stroke: #dc2626 !important;
+    stroke-width: 2 !important;
+  }
+
+  .frame.pulse rect {
+    animation: pulse-anim 1.5s ease-out;
+  }
+
+  @keyframes pulse-anim {
+    0%, 100% { stroke-width: 2; }
+    25%, 75% { stroke-width: 4; }
+    50% { stroke-width: 5; }
+  }
+
+  .frame text {
+    pointer-events: none;
+    font-family: ui-monospace, SFMono-Regular, "SF Mono", Consolas, monospace;
+    font-size: 11px;
+    user-select: none;
+  }
+
+  .tooltip {
+    position: absolute;
+    background: #18181b;
+    color: white;
+    padding: 8px 12px;
+    border-radius: var(--radius-md);
+    font-size: 12px;
+    pointer-events: none;
+    z-index: 1000;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.18);
+    max-width: 360px;
+    line-height: 1.5;
+    opacity: 0;
+    transition: opacity 0.1s;
+  }
+
+  .tooltip.visible {
+    opacity: 1;
+  }
+
+  .tooltip-name {
+    font-family: ui-monospace, SFMono-Regular, "SF Mono", Consolas, monospace;
+    font-size: 12px;
+    font-weight: 500;
+    margin-bottom: 6px;
+    word-break: break-all;
+    color: #fff;
+  }
+
+  .tooltip-row {
+    display: flex;
+    justify-content: space-between;
+    gap: 16px;
+    font-size: 11px;
+    color: #d4d4d8;
+  }
+
+  .tooltip-row strong {
+    color: #fff;
+    font-feature-settings: "tnum";
+    font-weight: 500;
+  }
+
+  .tooltip-tags {
+    margin-top: 6px;
+    padding-top: 6px;
+    border-top: 1px solid #3f3f46;
+    display: flex;
+    gap: 4px;
+    flex-wrap: wrap;
+  }
+
+  .tooltip-tag {
+    background: #3f3f46;
+    color: #e4e4e7;
+    padding: 1px 6px;
+    border-radius: 3px;
+    font-size: 10px;
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+  }
+
+  .tooltip-tag.finding {
+    background: #7f1d1d;
+    color: #fecaca;
+  }
+
+  .tooltip-hint {
+    margin-top: 6px;
+    padding-top: 6px;
+    border-top: 1px solid #3f3f46;
+    font-size: 10px;
+    color: #a1a1aa;
+  }
+
+  .tooltip-calc-hint {
+    margin-top: 4px;
+    font-size: 10px;
+    color: #71717a;
+    font-style: italic;
+  }
+
+  .findings-panel {
+    width: 360px;
+    background: var(--bg-surface);
+    overflow-y: auto;
+    flex-shrink: 0;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .panel-header {
+    padding: 14px 16px 10px;
+    border-bottom: 1px solid var(--border-light);
+    flex-shrink: 0;
+  }
+
+  .panel-title {
+    font-size: 13px;
+    font-weight: 600;
+    margin: 0 0 2px;
+    color: var(--text-primary);
+  }
+
+  .panel-subtitle {
+    font-size: 11px;
+    color: var(--text-tertiary);
+    margin: 0;
+  }
+
+  .panel-section {
+    padding: 12px 16px;
+    border-bottom: 1px solid var(--border-light);
+  }
+
+  .panel-section:last-child {
+    border-bottom: none;
+  }
+
+  .section-label {
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--text-tertiary);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    margin: 0 0 10px;
+  }
+
+  .finding {
+    padding: 12px;
+    border: 1px solid var(--border-light);
+    border-radius: var(--radius-md);
+    margin-bottom: 8px;
+    cursor: pointer;
+    transition: border-color 0.12s, background 0.12s, transform 0.08s;
+    background: var(--bg-surface);
+  }
+
+  .finding:hover {
+    border-color: var(--border-strong);
+    background: var(--bg-subtle);
+  }
+
+  .finding.active {
+    border-color: var(--accent);
+    background: var(--accent-bg);
+    box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.08);
+  }
+
+  .finding-head {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 6px;
+  }
+
+  .finding-id {
+    font-family: ui-monospace, SFMono-Regular, "SF Mono", Consolas, monospace;
+    font-size: 10px;
+    color: var(--text-tertiary);
+    font-weight: 500;
+  }
+
+  .severity {
+    font-size: 10px;
+    font-weight: 600;
+    padding: 2px 6px;
+    border-radius: 3px;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+  }
+
+  .severity.high {
+    background: #fee2e2;
+    color: var(--danger);
+  }
+
+  .severity.medium {
+    background: #fef3c7;
+    color: var(--warning);
+  }
+
+  .severity.low {
+    background: #dbeafe;
+    color: var(--info);
+  }
+
+  .finding-title {
+    font-size: 13px;
+    font-weight: 600;
+    margin: 0 0 4px;
+    color: var(--text-primary);
+    line-height: 1.4;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .finding-desc {
+    font-size: 12px;
+    color: var(--text-secondary);
+    margin: 0 0 8px;
+    line-height: 1.5;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .finding-evidence {
+    background: var(--bg-subtle);
+    padding: 6px 8px;
+    border-radius: var(--radius-sm);
+    font-family: ui-monospace, SFMono-Regular, "SF Mono", Consolas, monospace;
+    font-size: 11px;
+    color: var(--text-secondary);
+    margin-bottom: 6px;
+    overflow-x: auto;
+    white-space: nowrap;
+  }
+
+  .finding-meta {
+    display: flex;
+    gap: 12px;
+    font-size: 11px;
+    color: var(--text-tertiary);
+    margin-top: 8px;
+    align-items: center;
+  }
+
+  .finding-meta-item {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+  }
+
+  .finding-meta-item strong {
+    color: var(--text-primary);
+    font-weight: 600;
+    font-feature-settings: "tnum";
+  }
+
+  .finding-meta-hint {
+    font-size: 12px;
+    opacity: 0.6;
+    cursor: help;
+    transition: opacity 0.2s;
+  }
+
+  .finding-meta-hint:hover {
+    opacity: 1;
+  }
+
+  .category-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 8px;
+    font-size: 12px;
+  }
+
+  .category-row:last-child {
+    margin-bottom: 0;
+  }
+
+  .category-swatch {
+    width: 12px;
+    height: 12px;
+    border-radius: 2px;
+    border: 1px solid;
+    flex-shrink: 0;
+  }
+
+  .category-name {
+    flex: 1;
+    color: var(--text-primary);
+    font-weight: 500;
+  }
+
+  .category-bar {
+    flex: 1;
+    height: 6px;
+    background: var(--bg-subtle);
+    border-radius: 3px;
+    overflow: hidden;
+  }
+
+  .category-bar-fill {
+    height: 100%;
+    border-radius: 3px;
+    transition: width 0.3s;
+  }
+
+  .category-pct {
+    color: var(--text-secondary);
+    font-feature-settings: "tnum";
+    font-size: 11px;
+    min-width: 36px;
+    text-align: right;
+  }
+
+  .legend-row {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 11px;
+    color: var(--text-secondary);
+    margin-bottom: 4px;
+  }
+
+  .legend-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 2px;
+    border: 1px solid;
+    flex-shrink: 0;
+  }
+
+  .empty-state {
+    padding: 24px 16px;
+    text-align: center;
+    font-size: 12px;
+    color: var(--text-tertiary);
+  }
+
+  .footer-bar {
+    padding: 8px 24px;
+    border-top: 1px solid var(--border-light);
+    background: var(--bg-subtle);
+    font-size: 11px;
+    color: var(--text-tertiary);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-shrink: 0;
+  }
+
+  .footer-bar a {
+    color: var(--accent);
+    text-decoration: none;
+    font-weight: 500;
+  }
+
+  .footer-bar a:hover {
+    text-decoration: underline;
+  }
+
+  .kbd {
+    display: inline-block;
+    padding: 1px 5px;
+    background: var(--bg-surface);
+    border: 1px solid var(--border-medium);
+    border-radius: 3px;
+    font-family: ui-monospace, SFMono-Regular, "SF Mono", Consolas, monospace;
+    font-size: 10px;
+    color: var(--text-secondary);
+    margin: 0 2px;
+  }
+
+  @media (max-width: 1100px) {
+    .findings-panel {
+      width: 320px;
+    }
+    .summary-stats {
+      gap: 16px;
+    }
+  }
+
+  @media (max-width: 900px) {
+    .findings-panel {
+      width: 280px;
+    }
+    .summary-stats .stat:nth-child(n+3) {
+      display: none;
+    }
+  }
+</style>
+</head>
+<body>
+<header class="app-header">
+  <div class="brand">
+    <div class="brand-icon">F</div>
+    <span>Witty智能诊断Agent-火焰图分析器</span>
+  </div>
+  <div class="meta-bar">
+    <span class="meta-item">
+      <span class="meta-label">文件</span>
+      <span class="meta-value mono">order-service-2024-05-03.perf</span>
+    </span>
+    <span class="meta-item">
+      <span class="meta-label">格式</span>
+      <span class="meta-value">perf script</span>
+    </span>
+    <span class="meta-item">
+      <span class="meta-label">事件</span>
+      <span class="meta-value">cpu-cycles</span>
+    </span>
+    <span class="meta-item">
+      <span class="meta-label">采样数</span>
+      <span class="meta-value">100,000</span>
+    </span>
+    <span class="meta-item">
+      <span class="meta-label">采样时长</span>
+      <span class="meta-value">30s</span>
+    </span>
+    <span class="badge confidence-high">● 高置信度</span>
+  </div>
+</header>
+
+<section class="summary-card">
+  <div class="summary-icon">!</div>
+  <div class="summary-text">
+    <p class="summary-title">根因总结</p>
+    <p class="summary-body">
+      Database connection pool lock contention is the primary bottleneck —
+      <strong>17.5% of total CPU time</strong> is spent in <code style="font-family:ui-monospace,monospace;font-size:12px;background:var(--bg-subtle);padding:1px 4px;border-radius:3px">futex_wait</code>
+      under <code style="font-family:ui-monospace,monospace;font-size:12px;background:var(--bg-subtle);padding:1px 4px;border-radius:3px">ConnectionPool.acquire</code>.
+      G1 garbage collection contributes a secondary <strong>24.5% overhead</strong> from concurrent marking and evacuation.
+    </p>
+  </div>
+  <div class="summary-stats">
+    <div class="stat">
+      <span class="stat-label">发现数</span>
+      <span class="stat-value">4</span>
+    </div>
+    <div class="stat">
+      <span class="stat-label">热点函数</span>
+      <span class="stat-value">17.5<span class="unit">%</span></span>
+    </div>
+    <div class="stat">
+      <span class="stat-label">栈帧数</span>
+      <span class="stat-value">75</span>
+    </div>
+    <div class="stat">
+      <span class="stat-label">最大深度</span>
+      <span class="stat-value">11</span>
+    </div>
+  </div>
+</section>
+
+<div class="toolbar">
+  <div class="search-box">
+    <svg class="search-icon" width="14" height="14" viewBox="0 0 14 14" fill="none">
+      <circle cx="6" cy="6" r="4.5" stroke="currentColor" stroke-width="1.5"/>
+      <path d="M9.5 9.5L12 12" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+    </svg>
+    <input type="text" id="search" placeholder="搜索函数（支持正则表达式）..." autocomplete="off" spellcheck="false"/>
+    <span class="search-count" id="search-count"></span>
+  </div>
+
+  <div class="control-group">
+    <span class="control-label">方向</span>
+    <div class="seg-control" id="direction-control">
+      <button class="active" data-value="flame">火焰 ↑</button>
+      <button data-value="icicle">冰柱 ↓</button>
+    </div>
+  </div>
+
+  <div class="control-group">
+    <span class="control-label">配色</span>
+    <select class="select" id="color-mode">
+      <option value="semantic">Semantic (category)</option>
+      <option value="module">Module</option>
+      <option value="hot">Hot (classic)</option>
+    </select>
+  </div>
+
+  <div class="control-group slider-control">
+    <span class="control-label">帧过滤阈值</span>
+    <input type="range" id="minwidth" min="0" max="50" step="1" value="2"/>
+    <span class="slider-value" id="minwidth-value">0.2%</span>
+  </div>
+
+  <div class="toolbar-spacer"></div>
+
+  <button class="btn" id="reset-btn" title="重置缩放 (Esc)">
+    <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+      <path d="M2 6a4 4 0 1 0 1.17-2.83M2 2v3h3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+    </svg>
+    重置
+  </button>
+  <button class="btn" id="export-btn" title="导出为 PNG">
+    <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+      <path d="M6 1v7m0 0L3 5m3 3l3-3M2 9v2h8V9" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+    </svg>
+    导出
+  </button>
+  <button class="btn" id="export-svg-btn" title="导出为 SVG 矢量图">
+    <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+      <path d="M2 2h8v2l-1 1v5H3V5L2 4V2zm4 3v4m0-4c0-1 .5-1 1-1s1 0 1 1m-2 0c0-1-.5-1-1-1s-1 0-1 1" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/>
+    </svg>
+    SVG
+  </button>
+</div>
+
+<main class="main">
+  <div class="flame-area">
+    <div class="breadcrumb" id="breadcrumb"></div>
+    <div class="flame-canvas" id="flame-canvas">
+      <svg class="flame-svg" id="flame-svg" xmlns="http://www.w3.org/2000/svg"></svg>
+    </div>
+  </div>
+
+  <aside class="findings-panel">
+    <div class="panel-header">
+      <p class="panel-title">发现</p>
+      <p class="panel-subtitle">点击任一发现项可定位到火焰图中的证据位置</p>
+    </div>
+
+    <div class="panel-section">
+      <p class="section-label">检测到的问题</p>
+      <div id="findings-list"></div>
+    </div>
+
+    <div class="panel-section">
+
+    </div>
+
+    <div class="panel-section">
+      <p class="section-label">颜色图例</p>
+      <div id="legend"></div>
+    </div>
+  </aside>
+</main>
+
+<div class="footer-bar">
+  <span>
+    <span class="kbd">点击</span> 钻入 ·
+    <span class="kbd">Esc</span> 重置 ·
+    <span class="kbd">/</span> 搜索
+  </span>
+  <span>由 <a href="#">flamegraph-analysis</a> 生成 · 2024-05-03 14:32 UTC</span>
+</div>
+
+<div class="tooltip" id="tooltip"></div>
+
+<script id="profile-data" type="application/json">{"name":"all","value":169,"self_value":0,"module":"root","category":null,"finding_ids":[],"children":[{"name":"[libc-2.19.so]","value":169,"self_value":0,"module":"library","category":"compute","finding_ids":[],"children":[{"name":"__libc_start_main","value":169,"self_value":0,"module":"user-code","category":"compute","finding_ids":[],"children":[{"name":"main","value":169,"self_value":0,"module":"user-code","category":"compute","finding_ids":[],"children":[{"name":"func_b","value":88,"self_value":0,"module":"unknown","category":"compute","finding_ids":[],"children":[{"name":"func_ab","value":88,"self_value":88,"module":"unknown","category":"compute","finding_ids":[],"children":[],"annotations":{"kernel":false,"jit":false,"inline":false,"user":false},"is_kernel":false,"is_jit":false,"is_inline":false}],"annotations":{"kernel":false,"jit":false,"inline":false,"user":false},"is_kernel":false,"is_jit":false,"is_inline":false},{"name":"func_a","value":81,"self_value":0,"module":"unknown","category":"compute","finding_ids":[],"children":[{"name":"func_ab","value":81,"self_value":81,"module":"unknown","category":"compute","finding_ids":[],"children":[],"annotations":{"kernel":false,"jit":false,"inline":false,"user":false},"is_kernel":false,"is_jit":false,"is_inline":false}],"annotations":{"kernel":false,"jit":false,"inline":false,"user":false},"is_kernel":false,"is_jit":false,"is_inline":false}],"annotations":{"kernel":false,"jit":false,"inline":false,"user":false},"is_kernel":false,"is_jit":false,"is_inline":false}],"annotations":{"kernel":false,"jit":false,"inline":false,"user":false},"is_kernel":false,"is_jit":false,"is_inline":false}],"annotations":{"kernel":false,"jit":false,"inline":false,"user":false},"is_kernel":false,"is_jit":false,"is_inline":false}],"annotations":{},"metadata":{"total_samples":169,"unique_stacks":2,"category_distribution":[{"name":"compute","value":581}],"module_distribution":[{"name":"unknown","value":338},{"name":"user-code","value":162},{"name":"library","value":81}]}}</script>
+
+<script id="findings-data" type="application/json">[{"id":"F-001","severity":"critical","title":"func_ab CPU \u4f7f\u7528\u7387\u9ad8","description":"func_ab \u6d88\u8017\u4e86 100.0% \u7684 CPU \u65f6\u95f4\u3002","evidence_path":["all","func_b","func_ab"],"evidence_leaf":"func_ab","evidence_stack":[{"indent":"","frame":"all","spaces":"                                               ","percent":"","annotation":""},{"indent":"  ","frame":"func_b","spaces":"                                            ","percent":"","annotation":""},{"indent":"    ","frame":"func_ab","spaces":"                                           ","percent":"(100.0%)","annotation":"\u2190 evidence"}],"metrics":{"samples":169,"percent":100.0},"business_impact":["\u8be5\u51fd\u6570\u6d88\u8017\u4e86 100.0% \u7684 CPU\uff0c\u53ef\u80fd\u662f\u6027\u80fd\u74f6\u9888\u3002"],"recommendations":[{"priority_marker":"\u2460","label":"\u5206\u6790\u70ed\u70b9","detail":"\u4f7f\u7528\u706b\u7130\u56fe\u5b9a\u4f4d\u5177\u4f53\u7684\u70ed\u70b9\u4ee3\u7801\u8def\u5f84\u3002"},{"priority_marker":"\u2461","label":"\u5ba1\u67e5\u7b97\u6cd5","detail":"\u68c0\u67e5\u6b64\u51fd\u6570\u662f\u5426\u53ef\u4ee5\u4f18\u5316\u6216\u7f13\u5b58\u3002"}],"detection_explanation":"\u901a\u8fc7\u81ea\u5e95\u5411\u4e0a\u5206\u6790\u68c0\u6d4b\u5230\u7684\u53f6\u8282\u70b9 CPU \u6d88\u8017\u8005\u3002","one_sentence":"func_ab \u6d88\u8017\u4e86 100.0% \u7684 CPU \u65f6\u95f4\u3002","severity_icon":"\ud83d\udd34","severity_label":"Critical"}]</script>
+
+<script>
+(function() {
+  'use strict';
+
+  const ROW_HEIGHT = 22;
+  const ROW_GAP = 0;
+  const PADDING_X = 0;
+  const FONT_PX = 11;
+  const CHAR_W = 6.4;
+
+  const profileData = JSON.parse(document.getElementById('profile-data').textContent);
+  const findings = JSON.parse(document.getElementById('findings-data').textContent);
+
+  const state = {
+    direction: 'flame',
+    colorMode: 'semantic',
+    minWidthPct: 0.2,
+    focusPath: ['all'],
+    searchQuery: '',
+    searchRegex: null,
+    activeFindingId: null,
+    hoveredFrame: null
+  };
+
+  const COLORS = {
+    lock:       { fill: '#fde2e2', stroke: '#dc2626', text: '#7f1d1d' },
+    gc:         { fill: '#ede9fe', stroke: '#7c3aed', text: '#4c1d95' },
+    io:         { fill: '#dbeafe', stroke: '#2563eb', text: '#1e3a8a' },
+    syscall:    { fill: '#e4e4e7', stroke: '#71717a', text: '#3f3f46' },
+    crypto:     { fill: '#fef3c7', stroke: '#d97706', text: '#78350f' },
+    reflection: { fill: '#fce7f3', stroke: '#db2777', text: '#831843' },
+    compute:    { fill: '#d1fae5', stroke: '#059669', text: '#064e3b' },
+    null:       { fill: '#f4f4f5', stroke: '#a1a1aa', text: '#3f3f46' }
+  };
+
+  const CATEGORY_LABELS = {
+    lock: 'Lock contention',
+    gc: 'Garbage collection',
+    io: 'I/O',
+    syscall: 'System call',
+    crypto: 'Cryptography',
+    reflection: 'Reflection',
+    compute: 'Compute',
+    null: 'Uncategorized'
+  };
+
+  function hashString(s) {
+    let h = 0;
+    for (let i = 0; i < s.length; i++) {
+      h = ((h << 5) - h) + s.charCodeAt(i);
+      h |= 0;
+    }
+    return Math.abs(h);
+  }
+
+  const MODULE_PALETTE = [
+    { fill: '#dbeafe', stroke: '#2563eb', text: '#1e3a8a' },
+    { fill: '#d1fae5', stroke: '#059669', text: '#064e3b' },
+    { fill: '#fef3c7', stroke: '#d97706', text: '#78350f' },
+    { fill: '#ede9fe', stroke: '#7c3aed', text: '#4c1d95' },
+    { fill: '#fce7f3', stroke: '#db2777', text: '#831843' },
+    { fill: '#fde2e2', stroke: '#dc2626', text: '#7f1d1d' },
+    { fill: '#e0f2fe', stroke: '#0284c7', text: '#0c4a6e' },
+    { fill: '#fef2f2', stroke: '#ef4444', text: '#7f1d1d' }
+  ];
+
+  function getColor(node) {
+    if (state.colorMode === 'semantic') {
+      const cat = node.category || 'null';
+      return COLORS[cat] || COLORS['null'];
+    }
+    if (state.colorMode === 'module') {
+      const idx = hashString(node.module || '') % MODULE_PALETTE.length;
+      return MODULE_PALETTE[idx];
+    }
+    if (state.colorMode === 'hot') {
+      const intensity = Math.min(1, (node.value / profileData.value));
+      const hue = 30 - (intensity * 30);
+      const sat = 70 + (intensity * 25);
+      const light = 75 - (intensity * 25);
+      return {
+        fill: `hsl(${hue}, ${sat}%, ${light}%)`,
+        stroke: `hsl(${hue}, ${Math.min(100, sat + 10)}%, ${Math.max(20, light - 30)}%)`,
+        text: `hsl(${hue}, ${sat}%, 18%)`
+      };
+    }
+    return COLORS['null'];
+  }
+
+  function findNodeByPath(root, path) {
+    if (path.length === 0 || path[0] !== root.name) return null;
+    let node = root;
+    for (let i = 1; i < path.length; i++) {
+      if (!node.children) return null;
+      const next = node.children.find(c => c.name === path[i]);
+      if (!next) return null;
+      node = next;
+    }
+    return node;
+  }
+
+  function getAncestors(root, path) {
+    const ancestors = [];
+    let node = root;
+    ancestors.push(node);
+    for (let i = 1; i < path.length; i++) {
+      if (!node.children) break;
+      node = node.children.find(c => c.name === path[i]);
+      if (!node) break;
+      ancestors.push(node);
+    }
+    return ancestors;
+  }
+
+  function layoutNode(node, x, y, width, depth, maxDepth, output, focusDepth) {
+    if (width < 0.1) return;
+    output.push({ node, x, y, width, depth: depth - focusDepth });
+    if (!node.children || node.children.length === 0) return;
+
+    let cumX = x;
+    const childSum = node.children.reduce((s, c) => s + c.value, 0);
+    const childScale = childSum > 0 ? width / childSum : 0;
+
+    for (const child of node.children) {
+      const childWidth = child.value * childScale;
+      const nextY = state.direction === 'flame' ? y - ROW_HEIGHT : y + ROW_HEIGHT;
+      layoutNode(child, cumX, nextY, childWidth, depth + 1, maxDepth, output, focusDepth);
+      cumX += childWidth;
+    }
+  }
+
+  function getMaxDepth(node, d = 0) {
+    if (!node.children || node.children.length === 0) return d;
+    return Math.max(...node.children.map(c => getMaxDepth(c, d + 1)));
+  }
+
+  function truncateText(text, maxWidth) {
+    const charBudget = Math.floor((maxWidth - 8) / CHAR_W);
+    if (charBudget <= 2) return '';
+    if (text.length <= charBudget) return text;
+    if (charBudget < 4) return text.substring(0, charBudget);
+    return text.substring(0, charBudget - 1) + '…';
+  }
+
+  function findingMatchesNode(finding, nodePath) {
+    const ep = finding.evidence_path;
+    
+    // 找到 fireChannelRead_[j] 在 evidence_path 中的位置
+    const targetFrameIndex = ep.findIndex(frame => frame.includes('fireChannelRead_[j]'));
+    
+    if (targetFrameIndex === -1) {
+      // 如果没有找到 fireChannelRead_[j]，使用原始逻辑（前缀匹配）
+      const minLen = Math.min(nodePath.length, ep.length);
+      for (let i = 0; i < minLen; i++) {
+        if (nodePath[i] !== ep[i]) return false;
+      }
+      return true;
+    }
+    
+    // 只高亮 fireChannelRead_[j] 及其子节点
+    // 获取从 fireChannelRead_[j] 开始的路径
+    const targetPath = ep.slice(targetFrameIndex);
+    
+    // 检查 nodePath 是否以 targetPath 的内容结尾（即 nodePath 包含 targetPath 作为后缀）
+    if (nodePath.length < targetPath.length) return false;
+    
+    const startIndex = nodePath.length - targetPath.length;
+    for (let i = 0; i < targetPath.length; i++) {
+      if (nodePath[startIndex + i] !== targetPath[i]) return false;
+    }
+    return true;
+  }
+
+  function nodePathFromTree(target, current = profileData, path = []) {
+    const newPath = [...path, current.name];
+    if (current === target) return newPath;
+    if (!current.children) return null;
+    for (const child of current.children) {
+      const r = nodePathFromTree(target, child, newPath);
+      if (r) return r;
+    }
+    return null;
+  }
+
+  function render() {
+    const svg = document.getElementById('flame-svg');
+    const canvas = document.getElementById('flame-canvas');
+    const containerWidth = Math.max(400, canvas.clientWidth);
+
+    const focused = findNodeByPath(profileData, state.focusPath);
+    if (!focused) {
+      state.focusPath = ['all'];
+      return render();
+    }
+
+    const ancestors = getAncestors(profileData, state.focusPath);
+    const focusDepth = ancestors.length - 1;
+    const maxDepth = getMaxDepth(focused);
+    const ancestorRows = ancestors.length - 1;
+    const totalRows = maxDepth + 1 + ancestorRows;
+    const totalHeight = totalRows * ROW_HEIGHT + 4;
+
+    const minPx = (state.minWidthPct / 100) * containerWidth;
+
+    const allFrames = [];
+
+    if (state.direction === 'flame') {
+      const baseY = maxDepth * ROW_HEIGHT;
+      layoutNode(focused, 0, baseY, containerWidth, focusDepth, totalRows, allFrames, focusDepth);
+      for (let i = 0; i < ancestors.length - 1; i++) {
+        const anc = ancestors[i];
+        const yPos = baseY + (focusDepth - i) * ROW_HEIGHT;
+        allFrames.push({
+          node: anc, x: 0, y: yPos, width: containerWidth,
+          depth: -(focusDepth - i), isAncestor: true
+        });
+      }
+    } else {
+      for (let i = 0; i < ancestors.length - 1; i++) {
+        const anc = ancestors[i];
+        allFrames.push({
+          node: anc, x: 0, y: i * ROW_HEIGHT, width: containerWidth,
+          depth: -(focusDepth - i), isAncestor: true
+        });
+      }
+      const baseY = focusDepth * ROW_HEIGHT;
+      layoutNode(focused, 0, baseY, containerWidth, focusDepth, totalRows, allFrames, focusDepth);
+    }
+
+    const visible = allFrames.filter(f => f.width >= Math.max(minPx, 0.5));
+
+    svg.setAttribute('viewBox', `0 0 ${containerWidth} ${totalHeight}`);
+    svg.setAttribute('width', containerWidth);
+    svg.setAttribute('height', totalHeight);
+    svg.style.height = totalHeight + 'px';
+
+    while (svg.firstChild) svg.removeChild(svg.firstChild);
+
+    let activeFinding = null;
+    if (state.activeFindingId) {
+      activeFinding = findings.find(f => f.id === state.activeFindingId);
+    }
+
+    for (const frame of visible) {
+      const nodePath = nodePathFromTree(frame.node);
+      const g = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+      g.setAttribute('class', 'frame');
+      g.setAttribute('data-name', frame.node.name);
+
+      let dimmed = false;
+      let searchMatch = false;
+      let findingHighlight = false;
+
+      if (state.searchRegex) {
+        if (state.searchRegex.test(frame.node.name)) {
+          searchMatch = true;
+        } else {
+          dimmed = true;
+        }
+      }
+
+      if (activeFinding && nodePath) {
+        if (findingMatchesNode(activeFinding, nodePath)) {
+          findingHighlight = true;
+          dimmed = false;
+        } else if (!searchMatch) {
+          dimmed = true;
+        }
+      }
+
+      if (frame.isAncestor) {
+        g.classList.add('ancestor');
+      }
+
+      if (dimmed) g.classList.add('dimmed');
+      if (searchMatch) g.classList.add('search-match');
+      if (findingHighlight) g.classList.add('finding-highlight');
+
+      const colors = getColor(frame.node);
+      const rect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+      rect.setAttribute('x', frame.x);
+      rect.setAttribute('y', frame.y);
+      rect.setAttribute('width', Math.max(0, frame.width - 0.5));
+      rect.setAttribute('height', ROW_HEIGHT - 1);
+      rect.setAttribute('fill', frame.isAncestor ? colors.fill : colors.fill);
+      rect.setAttribute('stroke', colors.stroke);
+      rect.setAttribute('stroke-width', '0.5');
+      rect.setAttribute('rx', '2');
+      if (frame.isAncestor) {
+        rect.setAttribute('opacity', '0.5');
+      }
+      g.appendChild(rect);
+
+      const labelText = truncateText(frame.node.name, frame.width);
+      if (labelText) {
+        const text = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+        text.setAttribute('x', frame.x + 5);
+        text.setAttribute('y', frame.y + ROW_HEIGHT / 2 + 0.5);
+        text.setAttribute('dominant-baseline', 'middle');
+        text.setAttribute('fill', colors.text);
+        text.setAttribute('font-size', FONT_PX);
+        text.textContent = labelText;
+        g.appendChild(text);
+      }
+
+      g.addEventListener('mouseenter', e => onFrameHover(e, frame.node, nodePath));
+      g.addEventListener('mousemove', e => updateTooltipPosition(e));
+      g.addEventListener('mouseleave', onFrameLeave);
+      g.addEventListener('click', e => onFrameClick(e, frame.node, nodePath));
+
+      svg.appendChild(g);
+    }
+
+    updateBreadcrumb();
+    updateSearchCount();
+  }
+
+  function updateBreadcrumb() {
+    const bc = document.getElementById('breadcrumb');
+    bc.innerHTML = '';
+    state.focusPath.forEach((name, idx) => {
+      const item = document.createElement('span');
+      item.className = 'breadcrumb-item' + (idx === state.focusPath.length - 1 ? ' current' : '');
+      item.textContent = name;
+      if (idx < state.focusPath.length - 1) {
+        item.addEventListener('click', () => {
+          state.focusPath = state.focusPath.slice(0, idx + 1);
+          render();
+        });
+      }
+      bc.appendChild(item);
+      if (idx < state.focusPath.length - 1) {
+        const sep = document.createElement('span');
+        sep.className = 'breadcrumb-sep';
+        sep.textContent = '›';
+        bc.appendChild(sep);
+      }
+    });
+  }
+
+  function onFrameHover(e, node, nodePath) {
+    state.hoveredFrame = node;
+    const total = profileData.value;
+    const pct = (node.value / total * 100).toFixed(2);
+    const selfPct = (node.self_value / total * 100).toFixed(2);
+    let html = '<div class="tooltip-name">' + escapeHtml(node.name) + '</div>';
+    html += '<div class="tooltip-row"><span>样本数</span><strong>' + node.value.toLocaleString() + ' (' + pct + '%)</strong></div>';
+    html += '<div class="tooltip-row"><span>自身样本</span><strong>' + node.self_value.toLocaleString() + ' (' + selfPct + '%)</strong></div>';
+    html += '<div class="tooltip-row"><span>模块</span><strong>' + escapeHtml(node.module || '—') + '</strong></div>';
+    
+    const isRootLevel = state.focusPath.length <= 1;
+    const calcDesc = isRootLevel ? '（占全局样本百分比）' : '（占当前路径样本百分比）';
+    html += '<div class="tooltip-calc-hint">' + calcDesc + '</div>';
+
+    const tags = [];
+
+    if (node.finding_ids && node.finding_ids.length > 0) {
+      node.finding_ids.forEach(fid => {
+        tags.push('<span class="tooltip-tag finding">' + escapeHtml(fid) + '</span>');
+      });
+    }
+    if (tags.length > 0) {
+      html += '<div class="tooltip-tags">' + tags.join('') + '</div>';
+    }
+    html += '<div class="tooltip-hint">点击钻入</div>';
+
+    const tooltip = document.getElementById('tooltip');
+    tooltip.innerHTML = html;
+    tooltip.classList.add('visible');
+    updateTooltipPosition(e);
+  }
+
+  function updateTooltipPosition(e) {
+    const tooltip = document.getElementById('tooltip');
+    const padding = 12;
+    const tw = tooltip.offsetWidth;
+    const th = tooltip.offsetHeight;
+    let x = e.pageX + padding;
+    let y = e.pageY + padding;
+    if (x + tw > window.innerWidth - 8 + window.scrollX) x = e.pageX - tw - padding;
+    if (y + th > window.innerHeight - 8 + window.scrollY) y = e.pageY - th - padding;
+    tooltip.style.left = x + 'px';
+    tooltip.style.top = y + 'px';
+  }
+
+  function onFrameLeave() {
+    const tooltip = document.getElementById('tooltip');
+    tooltip.classList.remove('visible');
+  }
+
+  function focusToPath(path, options = {}) {
+    const {
+      findingId = null,
+      checkFinding = false,
+      triggerPulse = false,
+    } = options;
+
+    state.focusPath = path;
+
+    if (findingId) {
+      state.activeFindingId = findingId;
+    } else if (checkFinding && state.activeFindingId) {
+      const f = findings.find(x => x.id === state.activeFindingId);
+      if (f && !findingMatchesNode(f, path)) {
+        clearActiveFinding();
+      }
+    }
+
+    render();
+
+    if (triggerPulse && findingId) {
+      setTimeout(() => {
+        const matchedFrames = document.querySelectorAll('.frame.finding-highlight');
+        matchedFrames.forEach(f => {
+          f.classList.remove('pulse');
+          void f.offsetWidth;
+          f.classList.add('pulse');
+        });
+      }, 50);
+    }
+  }
+
+  function onFrameClick(e, node, nodePath) {
+    if (!nodePath) return;
+    focusToPath(nodePath, { checkFinding: true });
+  }
+
+  function activateFinding(id) {
+    const finding = findings.find(f => f.id === id);
+    if (!finding) return;
+
+    document.querySelectorAll('.finding').forEach(c => {
+      c.classList.toggle('active', c.dataset.id === id);
+    });
+
+    if (state.activeFindingId === id) {
+      clearActiveFinding();
+      render();
+      return;
+    }
+
+    const ep = finding.evidence_path || [];
+    const evidenceLeaf = finding.evidence_leaf || '';
+    let focusPath = null;
+
+    // 方法1：尝试在 evidence_path 中找到 evidence_leaf 的位置
+    if (ep.length > 0 && evidenceLeaf) {
+      const leafIndex = ep.indexOf(evidenceLeaf);
+      if (leafIndex !== -1) {
+        const candidatePath = ep.slice(0, leafIndex + 1);
+        // 检查这个路径在火焰图中是否存在
+        if (findNodeByPath(profileData, candidatePath)) {
+          focusPath = candidatePath;
+        }
+      }
+    }
+
+    // 方法2：如果方法1失败，尝试在火焰图中搜索包含 evidence_leaf 的完整路径
+    if (!focusPath && evidenceLeaf) {
+      const fullPath = findFullPathToLeaf(profileData, evidenceLeaf);
+      if (fullPath) {
+        focusPath = fullPath;
+      }
+    }
+
+    // 方法3：尝试从 evidence 字段中提取函数名进行搜索
+    if (!focusPath && finding.evidence) {
+      const match = finding.evidence.match(/func_[a-zA-Z0-9_]+/);
+      if (match) {
+        const fullPath = findFullPathToLeaf(profileData, match[0]);
+        if (fullPath) {
+          focusPath = fullPath;
+        }
+      }
+    }
+
+    // 方法4：最后备选：使用根节点或 evidence_path 的前半部分
+    if (!focusPath) {
+      focusPath = ep.length > 0 ? ep.slice(0, Math.max(1, ep.length - 1)) : ['all'];
+    }
+
+    history.replaceState(null, '', '#finding=' + id);
+
+    // 先清除 activeFindingId，再聚焦路径，避免 findingMatchesNode 筛选导致部分帧变灰
+    state.activeFindingId = null;
+    focusToPath(focusPath);
+  }
+
+  // 辅助函数：在树中搜索到目标叶子节点的完整路径
+  function findFullPathToLeaf(root, targetName) {
+    const stack = [{ node: root, path: [root.name] }];
+    
+    while (stack.length > 0) {
+      const { node, path } = stack.pop();
+      
+      if (node.name === targetName) {
+        return path;
+      }
+      
+      if (node.children) {
+        for (let i = node.children.length - 1; i >= 0; i--) {
+          stack.push({
+            node: node.children[i],
+            path: [...path, node.children[i].name]
+          });
+        }
+      }
+    }
+    
+    return null;
+  }
+
+  function clearActiveFinding() {
+    state.activeFindingId = null;
+    document.querySelectorAll('.finding').forEach(c => c.classList.remove('active'));
+    history.replaceState(null, '', window.location.pathname);
+  }
+
+  function escapeHtml(s) {
+    const div = document.createElement('div');
+    div.textContent = String(s);
+    return div.innerHTML;
+  }
+
+  function setupSearch() {
+    const input = document.getElementById('search');
+    let debounce;
+    input.addEventListener('input', () => {
+      clearTimeout(debounce);
+      debounce = setTimeout(() => {
+        const q = input.value.trim();
+        state.searchQuery = q;
+        if (q === '') {
+          state.searchRegex = null;
+        } else {
+          try {
+            state.searchRegex = new RegExp(q, 'i');
+          } catch {
+            state.searchRegex = new RegExp(q.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i');
+          }
+        }
+        render();
+      }, 120);
+    });
+
+    document.addEventListener('keydown', e => {
+      if (e.key === '/' && document.activeElement !== input) {
+        e.preventDefault();
+        input.focus();
+      }
+      if (e.key === 'Escape') {
+        if (document.activeElement === input) {
+          input.blur();
+        } else {
+          state.focusPath = ['all'];
+          clearActiveFinding();
+          render();
+        }
+      }
+    });
+  }
+
+  function updateSearchCount() {
+    const counter = document.getElementById('search-count');
+    if (!state.searchRegex) {
+      counter.textContent = '';
+      return;
+    }
+    let matched = 0;
+    let totalSamples = 0;
+    function walk(node) {
+      if (state.searchRegex.test(node.name)) {
+        matched++;
+        totalSamples += node.self_value;
+      }
+      if (node.children) node.children.forEach(walk);
+    }
+    walk(profileData);
+    const pct = (totalSamples / profileData.value * 100).toFixed(1);
+    counter.textContent = matched + ' · ' + pct + '%';
+  }
+
+  function setupControls() {
+    document.querySelectorAll('#direction-control button').forEach(btn => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('#direction-control button').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        state.direction = btn.dataset.value;
+        render();
+      });
+    });
+
+    document.getElementById('color-mode').addEventListener('change', e => {
+      state.colorMode = e.target.value;
+      render();
+    });
+
+    const minSlider = document.getElementById('minwidth');
+    const minLabel = document.getElementById('minwidth-value');
+    minSlider.addEventListener('input', () => {
+      const v = parseInt(minSlider.value, 10) / 10;
+      state.minWidthPct = v;
+      minLabel.textContent = v.toFixed(1) + '%';
+      render();
+    });
+
+    document.getElementById('reset-btn').addEventListener('click', () => {
+      state.focusPath = ['all'];
+      clearActiveFinding();
+      document.getElementById('search').value = '';
+      state.searchQuery = '';
+      state.searchRegex = null;
+      render();
+    });
+
+    document.getElementById('export-btn').addEventListener('click', exportPng);
+    document.getElementById('export-svg-btn').addEventListener('click', exportSvg);
+  }
+
+  function exportPng() {
+    const svg = document.getElementById('flame-svg');
+    const xml = new XMLSerializer().serializeToString(svg);
+    const svgBlob = new Blob([xml], { type: 'image/svg+xml;charset=utf-8' });
+    const url = URL.createObjectURL(svgBlob);
+    const img = new Image();
+    img.onload = () => {
+      const canvas = document.createElement('canvas');
+      canvas.width = svg.clientWidth * 2;
+      canvas.height = svg.clientHeight * 2;
+      const ctx = canvas.getContext('2d');
+      ctx.fillStyle = '#ffffff';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+      URL.revokeObjectURL(url);
+      var ts = new Date().toISOString().replace(/[:.]/g, '-').replace('T', '_').replace('Z', '');
+      var a = document.createElement('a');
+      a.download = 'flamegraph_' + ts + '.png';
+      a.href = canvas.toDataURL('image/png');
+      a.click();
+    };
+    img.src = url;
+  }
+
+  function exportSvg() {
+    var root = profileData;
+    if (!root || !root.value) { alert('No profile data'); return; }
+    var total = root.value;
+    var W = 1600, XPAD = 10, FPAD = 1;
+    var FONT = 'Verdana', FONTSZ = 12;
+    var FRAMEH = 16, YPAD1 = 24, YPAD2 = 34;
+
+    // hot color palette (matching flamegraph.pl)
+    function sum_namehash(name) {
+      var h = 0;
+      for (var i = 0; i < name.length; i++) {
+        h = (h + name.charCodeAt(i)) | 0; // 32-bit overflow like Perl unpack
+      }
+      return h >>> 0; // unsigned
+    }
+    // mulberry32 seeded PRNG (deterministic, matching flamegraph.pl's srand+rand)
+    function mulberry32(a) {
+      return function() {
+        a |= 0; a = a + 0x6D2B79F5 | 0;
+        var t = Math.imul(a ^ a >>> 15, 1 | a);
+        t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t;
+        return ((t ^ t >>> 14) >>> 0) / 4294967296;
+      }
+    }
+    function hotColor(name) {
+      var seed = sum_namehash(name);
+      var rng = mulberry32(seed);
+      var v1 = rng(), v2 = rng(), v3 = rng();
+      var r = 205 + Math.floor(50 * v3);
+      var g = 0 + Math.floor(230 * v1);
+      var b = 0 + Math.floor(55 * v2);
+      return r+','+g+','+b;
+    }
+
+    function esc(s){ return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+
+    // walk tree to collect frames
+    var frames = [];
+    function walk(n, x, d, pw) {
+      var v = n.value || 0;
+      if (!v) return;
+      var w = pw * (v / total);
+      if (w < 0.5) return;
+      frames.push({name:n.name||'', x:x, depth:d, width:w, samples:v, pct:v/total*100});
+      var ch = n.children || [];
+      if (!ch.length) return;
+      var ct = ch.reduce(function(s,c){return s+(c.value||0);},0);
+      var cx = x;
+      for (var i=0; i<ch.length; i++) {
+        var cv = ch[i].value||0;
+        var cw = w * (cv / ct);
+        if (cw < 0.5) continue;
+        walk(ch[i], cx, d+1, w);
+        cx += cw;
+      }
+    }
+    walk(root, 0, 0, W - 2*XPAD);
+    if (!frames.length) { alert('No frames'); return; }
+
+    var maxD = 0;
+    for (var i=0; i<frames.length; i++) if (frames[i].depth > maxD) maxD = frames[i].depth;
+    var imgH = (maxD + 1) * FRAMEH + YPAD1 + YPAD2;
+
+    // Build SVG string
+    var bg1='#eeeeee', bg2='#eeeeb0';
+    var s = '<?xml version="1.0" standalone="no"?>\n';
+    s += '<!DOCTYPE svg PUBLIC "-//W3C//DTD SVG 1.1//EN" "http://www.w3.org/Graphics/SVG/1.1/DTD/svg11.dtd">\n';
+    s += '<svg version="1.1" width="'+W+'" height="'+imgH+'" onload="init(evt)" viewBox="0 0 '+W+' '+imgH+'" style="max-width:100%;display:block;" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">\n';
+    s += '<!-- Flame graph stack visualization. See https://github.com/brendangregg/FlameGraph -->\n';
+    s += '<style type="text/css">\n\ttext { font-family:'+FONT+'; font-size:'+FONTSZ+'px; fill:rgb(0,0,0); }\n\t#search, #ignorecase { opacity:0.1; cursor:pointer; }\n\t#search:hover, #search.show, #ignorecase:hover, #ignorecase.show { opacity:1; }\n\t#subtitle { text-anchor:middle; font-color:rgb(160,160,160); }\n\t#title { text-anchor:middle; font-size:'+(FONTSZ+5)+'px}\n\t#unzoom { cursor:pointer; }\n\t#frames > *:hover { stroke:black; stroke-width:0.5; cursor:pointer; }\n\t.hide { display:none; }\n\t.parent { opacity:0.5; }\n</style>\n';
+    s += '<rect x="0.0" y="0" width="'+W+'.0" height="'+imgH+'.0" fill="url(#background)"  />\n';
+    s += '<text id="title" x="'+(W/2).toFixed(2)+'" y="24" font-size="'+(FONTSZ+5)+'px" font-family="'+FONT+'" fill="rgb(0,0,0)" text-anchor="middle">Flame Graph</text>\n';
+    s += '<text id="details" x="'+XPAD+'.00" y="'+(imgH-YPAD2/2)+'" font-size="'+FONTSZ+'px" font-family="'+FONT+'" fill="rgb(0,0,0)" text-anchor=""> </text>\n';
+    s += '<text id="unzoom" class="hide" x="'+XPAD+'.00" y="24" font-size="'+FONTSZ+'px" font-family="'+FONT+'" fill="rgb(0,0,0)" text-anchor="">Reset Zoom</text>\n';
+    s += '<text id="search" x="'+(W-XPAD-100)+'.00" y="24" font-size="'+FONTSZ+'px" font-family="'+FONT+'" fill="rgb(0,0,0)" text-anchor="">Search</text>\n';
+    s += '<text id="ignorecase" x="'+(W-XPAD-16)+'.00" y="24" font-size="'+FONTSZ+'px" font-family="'+FONT+'" fill="rgb(0,0,0)" text-anchor="">ic</text>\n';
+    s += '<text id="matched" class="hide" x="'+(W-XPAD-100)+'.00" y="'+(imgH-YPAD2/2)+'" font-size="'+FONTSZ+'px" font-family="'+FONT+'" fill="rgb(0,0,0)" text-anchor=""> </text>\n';
+    s += '<g id="frames">\n';
+
+    for (var i=0; i<frames.length; i++) {
+      var f = frames[i];
+      var rgb = hotColor(f.name);
+      var x1 = XPAD + f.x;
+      var y1 = imgH - YPAD2 - (f.depth + 1) * FRAMEH + FPAD;
+      var y2 = imgH - YPAD2 - f.depth * FRAMEH;
+      var w = f.width;
+      var h = FRAMEH - FPAD;
+      var samples = Math.max(1, Math.round(f.samples));
+      var stxt = samples.toLocaleString();
+      var info = (f.name==''&&f.depth==0)?('all ('+stxt+' samples, 100%)'):(f.name+' ('+stxt+' samples, '+f.pct.toFixed(2)+'%)');
+      var dn = f.name.replace(/\_\[kwij\]$/,'');
+      var chars = Math.floor(w / (FONTSZ * 0.59));
+      var txt = esc(dn)||'';
+      if (chars >= 3 && txt.length > chars) txt = txt.substring(0,chars-1)+'..';
+      else if (chars < 3) txt = '';
+      var yc = 3 + (y1 + y2) / 2;
+      s += '<g>';
+      s += '<title>'+esc(info)+'</title>';
+      s += '<rect x="'+x1.toFixed(1)+'" y="'+y1+'" width="'+Math.max(0.5,w).toFixed(1)+'" height="'+h+'" fill="rgb('+rgb+')" rx="2" ry="2"/>';
+      s += '<text text-anchor="" x="'+(x1+3).toFixed(1)+'" y="'+yc.toFixed(1)+'" font-size="'+FONTSZ+'" font-family="'+FONT+'" fill="rgb(0,0,0)">'+txt+'</text>';
+      s += '</g>\n';
+    }
+
+    s += '</g>\n';
+
+    // JavaScript (from flamegraph.pl) - embed interactive SVG JS
+    var is = [
+      '	"use strict";',
+      '	var details, searchbtn, unzoombtn, matchedtxt, svg, searching, currentSearchTerm, ignorecase, ignorecaseBtn;',
+      '	function init(evt) {',
+      '		details = document.getElementById("details").firstChild;',
+      '		searchbtn = document.getElementById("search");',
+      '		ignorecaseBtn = document.getElementById("ignorecase");',
+      '		unzoombtn = document.getElementById("unzoom");',
+      '		matchedtxt = document.getElementById("matched");',
+      '		svg = document.getElementsByTagName("svg")[0];',
+      '		searching = 0;',
+      '		currentSearchTerm = null;',
+      '		// use GET parameters to restore a flamegraphs state.',
+      '		var params = get_params();',
+      '		if (params.x && params.y)',
+      '			zoom(find_group(document.querySelector(\'[x="\' + params.x + \'"][y="\' + params.y + \'"]\')));',
+      '                if (params.s) search(params.s);',
+      '	}',
+      '	// event listeners',
+      '	window.addEventListener("click", function(e) {',
+      '		var target = find_group(e.target);',
+      '		if (target) {',
+      '			if (target.nodeName == "a") {',
+      '				if (e.ctrlKey === false) return;',
+      '				e.preventDefault();',
+      '			}',
+      '			if (target.classList.contains("parent")) unzoom(true);',
+      '			zoom(target);',
+      '			if (!document.querySelector(\'.parent\')) {',
+      '				// we have basically done a clearzoom so clear the url',
+      '				var params = get_params();',
+      '				if (params.x) delete params.x;',
+      '				if (params.y) delete params.y;',
+      '				history.replaceState(null, null, parse_params(params));',
+      '				unzoombtn.classList.add("hide");',
+      '				return;',
+      '			}',
+      '			// set parameters for zoom state',
+      '			var el = target.querySelector("rect");',
+      '			if (el && el.attributes && el.attributes.y && el.attributes._orig_x) {',
+      '				var params = get_params()',
+      '				params.x = el.attributes._orig_x.value;',
+      '				params.y = el.attributes.y.value;',
+      '				history.replaceState(null, null, parse_params(params));',
+      '			}',
+      '		}',
+      '		else if (e.target.id == "unzoom") clearzoom();',
+      '		else if (e.target.id == "search") search_prompt();',
+      '		else if (e.target.id == "ignorecase") toggle_ignorecase();',
+      '	}, false)',
+      '	// mouse-over for info',
+      '	// show',
+      '	window.addEventListener("mouseover", function(e) {',
+      '		var target = find_group(e.target);',
+      '		if (target) details.nodeValue = "Function: " + g_to_text(target);',
+      '	}, false)',
+      '	// clear',
+      '	window.addEventListener("mouseout", function(e) {',
+      '		var target = find_group(e.target);',
+      '		if (target) details.nodeValue = \' \';',
+      '	}, false)',
+      '	// ctrl-F for search',
+      '	// ctrl-I to toggle case-sensitive search',
+      '	window.addEventListener("keydown",function (e) {',
+      '		if (e.keyCode === 114 || (e.ctrlKey && e.keyCode === 70)) {',
+      '			e.preventDefault();',
+      '			search_prompt();',
+      '		}',
+      '		else if (e.ctrlKey && e.keyCode === 73) {',
+      '			e.preventDefault();',
+      '			toggle_ignorecase();',
+      '		}',
+      '	}, false)',
+      '	// functions',
+      '	function get_params() {',
+      '		var params = {};',
+      '		var paramsarr = window.location.search.substr(1).split(\'&\');',
+      '		for (var i = 0; i < paramsarr.length; ++i) {',
+      '			var tmp = paramsarr[i].split("=");',
+      '			if (!tmp[0] || !tmp[1]) continue;',
+      '			params[tmp[0]]  = decodeURIComponent(tmp[1]);',
+      '		}',
+      '		return params;',
+      '	}',
+      '	function parse_params(params) {',
+      '		var uri = "?";',
+      '		for (var key in params) {',
+      '			uri += key + \'=\' + encodeURIComponent(params[key]) + \'&\';',
+      '		}',
+      '		if (uri.slice(-1) == "&")',
+      '			uri = uri.substring(0, uri.length - 1);',
+      '		if (uri == \'?\')',
+      '			uri = window.location.href.split(\'?\')[0];',
+      '		return uri;',
+      '	}',
+      '	function find_child(node, selector) {',
+      '		var children = node.querySelectorAll(selector);',
+      '		if (children.length) return children[0];',
+      '	}',
+      '	function find_group(node) {',
+      '		var parent = node.parentElement;',
+      '		if (!parent) return;',
+      '		if (parent.id == "frames") return node;',
+      '		return find_group(parent);',
+      '	}',
+      '	function orig_save(e, attr, val) {',
+      '		if (e.attributes["_orig_" + attr] != undefined) return;',
+      '		if (e.attributes[attr] == undefined) return;',
+      '		if (val == undefined) val = e.attributes[attr].value;',
+      '		e.setAttribute("_orig_" + attr, val);',
+      '	}',
+      '	function orig_load(e, attr) {',
+      '		if (e.attributes["_orig_"+attr] == undefined) return;',
+      '		e.attributes[attr].value = e.attributes["_orig_" + attr].value;',
+      '		e.removeAttribute("_orig_"+attr);',
+      '	}',
+      '	function g_to_text(e) {',
+      '		var text = find_child(e, "title").firstChild.nodeValue;',
+      '		return (text)',
+      '	}',
+      '	function g_to_func(e) {',
+      '		var func = g_to_text(e);',
+      '		// if there\'s any manipulation we want to do to the function',
+      '		// name before it\'s searched, do it here before returning.',
+      '		return (func);',
+      '	}',
+      '	function update_text(e) {',
+      '		var r = find_child(e, "rect");',
+      '		var t = find_child(e, "text");',
+      '		var w = parseFloat(r.attributes.width.value) -3;',
+      '		var txt = find_child(e, "title").textContent.replace(/\\([^(]*\\)$/,"");',
+      '		t.attributes.x.value = parseFloat(r.attributes.x.value) + 3;',
+      '		// Smaller than this size won\'t fit anything',
+      '		if (w < 2 * 12 * 0.59) {',
+      '			t.textContent = "";',
+      '			return;',
+      '		}',
+      '		t.textContent = txt;',
+      '		var sl = t.getSubStringLength(0, txt.length);',
+      '		// check if only whitespace or if we can fit the entire string into width w',
+      '		if (/^ *$/.test(txt) || sl < w)',
+      '			return;',
+      '		// this isn\'t perfect, but gives a good starting point',
+      '		// and avoids calling getSubStringLength too often',
+      '		var start = Math.floor((w/sl) * txt.length);',
+      '		for (var x = start; x > 0; x = x-2) {',
+      '			if (t.getSubStringLength(0, x + 2) <= w) {',
+      '				t.textContent = txt.substring(0, x) + "..";',
+      '				return;',
+      '			}',
+      '		}',
+      '		t.textContent = "";',
+      '	}',
+      '	// zoom',
+      '	function zoom_reset(e) {',
+      '		if (e.attributes != undefined) {',
+      '			orig_load(e, "x");',
+      '			orig_load(e, "width");',
+      '		}',
+      '		if (e.childNodes == undefined) return;',
+      '		for (var i = 0, c = e.childNodes; i < c.length; i++) {',
+      '			zoom_reset(c[i]);',
+      '		}',
+      '	}',
+      '	function zoom_child(e, x, ratio) {',
+      '		if (e.attributes != undefined) {',
+      '			if (e.attributes.x != undefined) {',
+      '				orig_save(e, "x");',
+      '				e.attributes.x.value = (parseFloat(e.attributes.x.value) - x - 10) * ratio + 10;',
+      '				if (e.tagName == "text")',
+      '					e.attributes.x.value = find_child(e.parentNode, "rect[x]").attributes.x.value + 3;',
+      '			}',
+      '			if (e.attributes.width != undefined) {',
+      '				orig_save(e, "width");',
+      '				e.attributes.width.value = parseFloat(e.attributes.width.value) * ratio;',
+      '			}',
+      '		}',
+      '		if (e.childNodes == undefined) return;',
+      '		for (var i = 0, c = e.childNodes; i < c.length; i++) {',
+      '			zoom_child(c[i], x - 10, ratio);',
+      '		}',
+      '	}',
+      '	function zoom_parent(e) {',
+      '		if (e.attributes) {',
+      '			if (e.attributes.x != undefined) {',
+      '				orig_save(e, "x");',
+      '				e.attributes.x.value = 10;',
+      '			}',
+      '			if (e.attributes.width != undefined) {',
+      '				orig_save(e, "width");',
+      '				e.attributes.width.value = parseInt(svg.width.baseVal.value) - (10 * 2);',
+      '			}',
+      '		}',
+      '		if (e.childNodes == undefined) return;',
+      '		for (var i = 0, c = e.childNodes; i < c.length; i++) {',
+      '			zoom_parent(c[i]);',
+      '		}',
+      '	}',
+      '	function zoom(node) {',
+      '		var attr = find_child(node, "rect").attributes;',
+      '		var width = parseFloat(attr.width.value);',
+      '		var xmin = parseFloat(attr.x.value);',
+      '		var xmax = parseFloat(xmin + width);',
+      '		var ymin = parseFloat(attr.y.value);',
+      '		var ratio = (svg.width.baseVal.value - 2 * 10) / width;',
+      '		// XXX: Workaround for JavaScript float issues (fix me)',
+      '		var fudge = 0.0001;',
+      '		unzoombtn.classList.remove("hide");',
+      '		var el = document.getElementById("frames").children;',
+      '		for (var i = 0; i < el.length; i++) {',
+      '			var e = el[i];',
+      '			var a = find_child(e, "rect").attributes;',
+      '			var ex = parseFloat(a.x.value);',
+      '			var ew = parseFloat(a.width.value);',
+      '			var upstack;',
+      '			// Is it an ancestor',
+      '			if (0 == 0) {',
+      '				upstack = parseFloat(a.y.value) > ymin;',
+      '			} else {',
+      '				upstack = parseFloat(a.y.value) < ymin;',
+      '			}',
+      '			if (upstack) {',
+      '				// Direct ancestor',
+      '				if (ex <= xmin && (ex+ew+fudge) >= xmax) {',
+      '					e.classList.add("parent");',
+      '					zoom_parent(e);',
+      '					update_text(e);',
+      '				}',
+      '				// not in current path',
+      '				else',
+      '					e.classList.add("hide");',
+      '			}',
+      '			// Children maybe',
+      '			else {',
+      '				// no common path',
+      '				if (ex < xmin || ex + fudge >= xmax) {',
+      '					e.classList.add("hide");',
+      '				}',
+      '				else {',
+      '					zoom_child(e, xmin, ratio);',
+      '					update_text(e);',
+      '				}',
+      '			}',
+      '		}',
+      '		search();',
+      '		try { document.getElementById("frames").scrollIntoView({behavior:"smooth",block:"start"}); } catch(e) {}',
+      '	}',
+      '	function unzoom(dont_update_text) {',
+      '		unzoombtn.classList.add("hide");',
+      '		var el = document.getElementById("frames").children;',
+      '		for(var i = 0; i < el.length; i++) {',
+      '			el[i].classList.remove("parent");',
+      '			el[i].classList.remove("hide");',
+      '			zoom_reset(el[i]);',
+      '			if(!dont_update_text) update_text(el[i]);',
+      '		}',
+      '		search();',
+      '	}',
+      '	function clearzoom() {',
+      '		unzoom();',
+      '		// remove zoom state',
+      '		var params = get_params();',
+      '		if (params.x) delete params.x;',
+      '		if (params.y) delete params.y;',
+      '		history.replaceState(null, null, parse_params(params));',
+      '	}',
+      '	// search',
+      '	function toggle_ignorecase() {',
+      '		ignorecase = !ignorecase;',
+      '		if (ignorecase) {',
+      '			ignorecaseBtn.classList.add("show");',
+      '		} else {',
+      '			ignorecaseBtn.classList.remove("show");',
+      '		}',
+      '		reset_search();',
+      '		search();',
+      '		try { document.getElementById("frames").scrollIntoView({behavior:"smooth",block:"start"}); } catch(e) {}',
+      '	}',
+      '	function reset_search() {',
+      '		var el = document.querySelectorAll("#frames rect");',
+      '		for (var i = 0; i < el.length; i++) {',
+      '			orig_load(el[i], "fill")',
+      '		}',
+      '		var params = get_params();',
+      '		delete params.s;',
+      '		history.replaceState(null, null, parse_params(params));',
+      '	}',
+      '	function search_prompt() {',
+      '		if (!searching) {',
+      '			var term = prompt("Enter a search term (regexp " +',
+      '			    "allowed, eg: ^ext4_)"',
+      '			    + (ignorecase ? ", ignoring case" : "")',
+      '			    + "\\nPress Ctrl-i to toggle case sensitivity", "");',
+      '			if (term != null) search(term);',
+      '		} else {',
+      '			reset_search();',
+      '			searching = 0;',
+      '			currentSearchTerm = null;',
+      '			searchbtn.classList.remove("show");',
+      '			searchbtn.firstChild.nodeValue = "Search"',
+      '			matchedtxt.classList.add("hide");',
+      '			matchedtxt.firstChild.nodeValue = ""',
+      '		}',
+      '	}',
+      '	function search(term) {',
+      '		if (term) currentSearchTerm = term;',
+      '		if (currentSearchTerm === null) return;',
+      '		var re = new RegExp(currentSearchTerm, ignorecase ? \'i\' : \'\');',
+      '		var el = document.getElementById("frames").children;',
+      '		var matches = new Object();',
+      '		var maxwidth = 0;',
+      '		for (var i = 0; i < el.length; i++) {',
+      '			var e = el[i];',
+      '			var func = g_to_func(e);',
+      '			var rect = find_child(e, "rect");',
+      '			if (func == null || rect == null)',
+      '				continue;',
+      '			// Save max width. Only works as we have a root frame',
+      '			var w = parseFloat(rect.attributes.width.value);',
+      '			if (w > maxwidth)',
+      '				maxwidth = w;',
+      '			if (func.match(re)) {',
+      '				// highlight',
+      '				var x = parseFloat(rect.attributes.x.value);',
+      '				orig_save(rect, "fill");',
+      '				rect.attributes.fill.value = "rgb(230,0,230)";',
+      '				// remember matches',
+      '				if (matches[x] == undefined) {',
+      '					matches[x] = w;',
+      '				} else {',
+      '					if (w > matches[x]) {',
+      '						// overwrite with parent',
+      '						matches[x] = w;',
+      '					}',
+      '				}',
+      '				searching = 1;',
+      '			}',
+      '		}',
+      '		if (!searching)',
+      '			return;',
+      '		var params = get_params();',
+      '		params.s = currentSearchTerm;',
+      '		history.replaceState(null, null, parse_params(params));',
+      '		searchbtn.classList.add("show");',
+      '		searchbtn.firstChild.nodeValue = "Reset Search";',
+      '		// calculate percent matched, excluding vertical overlap',
+      '		var count = 0;',
+      '		var lastx = -1;',
+      '		var lastw = 0;',
+      '		var keys = Array();',
+      '		for (k in matches) {',
+      '			if (matches.hasOwnProperty(k))',
+      '				keys.push(k);',
+      '		}',
+      '		// sort the matched frames by their x location',
+      '		// ascending, then width descending',
+      '		keys.sort(function(a, b){',
+      '			return a - b;',
+      '		});',
+      '		// Step through frames saving only the biggest bottom-up frames',
+      '		// thanks to the sort order. This relies on the tree property',
+      '		// where children are always smaller than their parents.',
+      '		var fudge = 0.0001;	// JavaScript floating point',
+      '		for (var k in keys) {',
+      '			var x = parseFloat(keys[k]);',
+      '			var w = matches[keys[k]];',
+      '			if (x >= lastx + lastw - fudge) {',
+      '				count += w;',
+      '				lastx = x;',
+      '				lastw = w;',
+      '			}',
+      '		}',
+      '		// display matched percent',
+      '		matchedtxt.classList.remove("hide");',
+      '		var pct = 100 * count / maxwidth;',
+      '		if (pct != 100) pct = pct.toFixed(1)',
+      '		matchedtxt.firstChild.nodeValue = "Matched: " + pct + "%";',
+      '	}',
+    ].join('\n');
+
+    s += '<script type="text/ecmascript"><![CDATA[\n'+is+'\n]]><\/script>\n';
+    s += '</svg>';
+
+    var ts = new Date().toISOString().replace(/[:.]/g, '-').replace('T', '_').replace('Z', '');
+    var blob = new Blob([s], {type:'image/svg+xml;charset=utf-8'});
+    var url = URL.createObjectURL(blob);
+    var a = document.createElement('a');
+    a.download = 'flamegraph_' + ts + '.svg'; a.href = url;
+    try { a.click(); } catch(e) {
+      // fallback for file:// protocol and other restrictions
+      var win = window.open('data:image/svg+xml;charset=utf-8,'+encodeURIComponent(s));
+      if (!win) alert('SVG export requires opening via HTTP server. Use: python -m http.server 8000');
+    }
+    URL.revokeObjectURL(url);
+  }
+
+  function renderFindings() {
+    const list = document.getElementById('findings-list');
+    list.innerHTML = '';
+    findings.forEach(f => {
+      const card = document.createElement('div');
+      card.className = 'finding';
+      card.dataset.id = f.id;
+      const percent = f.metrics ? f.metrics.percent : 'N/A';
+      const samples = f.metrics ? f.metrics.samples.toLocaleString() : 'N/A';
+      const evidencePath = f.evidence_path ? f.evidence_path : [];
+      const evidenceLeaf = f.evidence_leaf || '';
+      const evidenceDisplay = evidencePath.length > 0 
+        ? `… ${escapeHtml(evidencePath[evidencePath.length - 1])} → ${escapeHtml(evidenceLeaf)}`
+        : (f.evidence ? escapeHtml(f.evidence).substring(0, 50) + '…' : '');
+      card.innerHTML = `
+        <div class="finding-head">
+          <span class="finding-id">${f.id}</span>
+          <span class="severity ${f.severity}">${f.severity}</span>
+        </div>
+        <h3 class="finding-title" title="${escapeHtml(f.title)}">${escapeHtml(f.title)}</h3>
+        <p class="finding-desc" title="${escapeHtml(f.description)}">${escapeHtml(f.description)}</p>
+        <div class="finding-evidence" title="${evidenceDisplay}">${evidenceDisplay}</div>
+        <div class="finding-meta">
+          <span class="finding-meta-item">
+            <strong>${percent}%</strong> CPU
+            <span class="finding-meta-hint" title="基于全局样本的聚合占比，可能包含多个相关栈帧">📊</span>
+          </span>
+          <span class="finding-meta-item"><strong>${samples}</strong> 样本</span>
+        </div>
+      `;
+      card.addEventListener('click', () => activateFinding(f.id));
+      list.appendChild(card);
+    });
+  }
+
+  function renderLegend() {
+    const legend = document.getElementById('legend');
+    legend.innerHTML = '';
+    Object.entries(COLORS).forEach(([cat, colors]) => {
+      if (cat === 'null') return;
+      const row = document.createElement('div');
+      row.className = 'legend-row';
+      row.innerHTML = `
+        <span class="legend-dot" style="background:${colors.fill};border-color:${colors.stroke};"></span>
+        <span>${CATEGORY_LABELS[cat]}</span>
+      `;
+      legend.appendChild(row);
+    });
+  }
+
+  function checkUrlHash() {
+    const hash = window.location.hash;
+    const match = hash.match(/finding=([^&]+)/);
+    if (match) {
+      setTimeout(() => activateFinding(match[1]), 100);
+    }
+  }
+
+  let resizeTimeout;
+  window.addEventListener('resize', () => {
+    clearTimeout(resizeTimeout);
+    resizeTimeout = setTimeout(render, 100);
+  });
+
+  setupSearch();
+  setupControls();
+  renderFindings();
+  renderLegend();
+  render();
+  checkUrlHash();
+})();
+
+</script>
+
+
+
+</body>
+</html>

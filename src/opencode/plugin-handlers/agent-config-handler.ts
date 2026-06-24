@@ -23,6 +23,7 @@ import { buildKuafuAgentConfig } from "./kuafu-agent-config-builder";
 import { buildBaizeAgentConfig } from "./baize-agent-config-builder";
 import { buildNuwaAgentConfig } from "./nuwa-agent-config-builder";
 import { buildNuwaSubAgentConfig } from "./nuwa-sub-agent-config-builder";
+import { buildTaiyiAgentConfig } from "./taiyi-agent-config-builder";
 
 type AgentConfigRecord = Record<string, Record<string, unknown> | undefined> & {
   build?: Record<string, unknown>;
@@ -229,6 +230,16 @@ export async function applyAgentConfig(params: {
 
   agentConfig["kuafu"] = await buildKuafuAgentConfig({
     pluginKuafuOverride: kuafuOverride,
+    currentModel,
+    outputLanguage,
+  });
+
+  const taiyiOverride = params.pluginConfig.agents?.["taiyi"] as
+    | (Record<string, unknown> & { prompt_append?: string })
+    | undefined;
+
+  agentConfig["taiyi"] = await buildTaiyiAgentConfig({
+    pluginTaiyiOverride: taiyiOverride,
     currentModel,
     outputLanguage,
   });
