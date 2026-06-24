@@ -1,6 +1,6 @@
 # 功能列表 (Features)
 
-本项目按 OS 全栈（硬件层 → 内核层 → 系统服务层）梳理故障模式并分层构建诊断能力，目前已支持 38 个故障诊断 Skill（用户态 14、内核 15、硬件 9），并将随场景丰富与方案迭代持续演进。
+本项目按 OS 全栈（硬件层 → 内核层 → 系统服务层）梳理故障模式并分层构建诊断能力，目前已支持 40 个故障诊断 Skill（用户态 14、内核 17、硬件 9），并将随场景丰富与方案迭代持续演进。
 
 > 故障层说明：**用户态** — 进程/服务/应用层故障；**内核** — 内核子系统/驱动/系统调用层故障；**硬件** — 物理设备/固件/链路层故障
 
@@ -46,6 +46,8 @@
 | 27  | kernel-fuse-diagnosis               | FUSE（用户态文件系统）内核端故障诊断。覆盖 FUSE daemon 崩溃后 EIO、请求队列阻塞与 D 状态、max_read/max_write 配置不当导致性能退化、writeback cache 一致性问题、多线程 daemon 死锁、/dev/fuse 设备权限问题、内核 FUSE 模块 Bug、混合复杂 FUSE 故障等场景。采用"系统层 → 类型层 → 代码根因层"三层下钻模型，支持 FUSE 全链路诊断。                   | 内核  |
 | 28  | netfilter-conntrack-diagnosis       | Netfilter / iptables / conntrack 防火墙与连接跟踪深度诊断。覆盖 nf_conntrack 表满、iptables/nftables 规则误命中导致 DROP/REJECT、NAT 映射异常、conntrack 状态丢包（INVALID/UNREPLIED）、TCP window tracking 异常、ct timeout 超时、helper/ALG 协议辅助模块异常、ipset 匹配失效等场景。采用"规则链分析 + conntrack 分析"并行双轨模型并交叉验证。   | 内核  |
 | 29  | nfs-client-diagnosis                | NFS 客户端故障诊断。覆盖 mount 挂载失败/hung、stale file handle、NFSv4 lease 过期/state 恢复失败、rpc.statd/lockd 异常、性能退化（rtt 飙升）、soft/hard mount 超时行为差异等场景。采用"系统状态逆向 + NFS 协议正向"并行双轨模型，交叉验证定位客户端或服务端问题。                                                                              | 内核  |
+| 30  | block-dm-raid-diagnosis            | 块设备 / Device-Mapper / 软 RAID / LVM / multipath 诊断技能。覆盖 LVM 层（thin pool 满、PV/VG/LV 缺失、snapshot 溢出）、md 软 RAID 降级/重建/mismatch、multipath 路径失效/抖动与 failover、块设备 IO 错误传播（EIO）、IO 调度器异常、request queue 卡死、设备只读切换等场景。采用"块层 → DM/MD 映射栈 → 物理设备"自上而下定位。                                                                                                                               | 内核  |
+| 31  | page-writeback-reclaim-diagnosis   | 页缓存 / 脑页回写 / 内存回收诊断技能。覆盖脏页回写异常（dirty_ratio、throttle）、kswapd/direct reclaim 高 CPU、page cache 反复回收抖动、慢设备拖垮回写（IO 背压）、min_free_kbytes 不足、mmap writeback 停顿、vfs_cache_pressure 误配等场景。采用"现场指标 + 内核回收语义"双轨分析，通过 /proc/vmstat、/proc/meminfo、tracepoint/perf 等指标定位回收瓶颈。                                                    | 内核  |
 
 ---
 
@@ -53,15 +55,15 @@
 
 | 序号  | skill 名称                                 | 能力                                                                                                                                                                                                              | 故障层 |
 |:---:|:---------------------------------------- |:--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |:---:|
-| 30  | disk-health-diagnosis                    | 服务器磁盘健康全栈诊断与故障预测。基于"现状、趋势、背景"三视角，覆盖 L1~L6 六层检测体系（盘本体 SMART → 控制器/链路 → 文件系统/OS → 业务服务层）。支持 iBMC 带外日志（华为/浪潮/H3C）、OS infocollect 包、系统日志三类日志来源。输出风险评分与 P0~P3 风险等级及分级处置建议。                                           | 硬件  |
-| 31  | grub-ibmc-diagnosis                      | 基于 iBMC 带外管理日志的服务器 GRUB 启动故障深度诊断。覆盖华为、浪潮、新华三三大厂商服务器，针对服务器上电后无法进入 OS、卡在 GRUB rescue、Kernel Panic、initramfs 失败、磁盘不识别、BIOS/UEFI 启动异常、RAID 故障无法启动等启动链故障。通过厂商识别与自动化脚本从海量 iBMC 日志中提取关键故障线索。                           | 硬件  |
-| 32  | offline-CPU-fault-diagnosis              | 基于离线日志（iBMC/OS Messages/InfoCollect）的 CPU 硬件故障诊断。重点诊断 CPU 过热（Overheating）、降频（Throttling）、MCE 硬件错误、缓存错误（Cache Error）、UPI/QPI 链路不稳定等物理级故障，以及内核 Panic 或 Soft Lockup 的底层 CPU 根因溯源。                                  | 硬件  |
-| 33  | offline-disk-fault-diagnosis             | 基于离线日志（iBMC/OS Messages/InfoCollect）的磁盘硬件故障诊断。重点诊断磁盘坏道（Bad Sector）、RAID 掉盘/降级（Offline/Degraded）、I/O 超时（Timeout/Blocked）、磁盘巡检错误（Predictive Failure/SMART Error）、SAS/SATA/NVMe 链路不稳定、物理槽位异常等场景，以及文件系统只读的底层存储根因溯源。 | 硬件  |
-| 34  | offline-GPU-fault-diagnosis              | 基于离线日志（iBMC/OS Messages/InfoCollect）的 GPU 硬件故障诊断。重点诊断 GPU 掉卡（Fallen off the bus）、XID 错误、显存不可纠正错误（Uncorrectable ECC）、GPU 维度过温、PCIe 链路问题、驱动异常等物理及软件驱动层面的故障。                                                       | 硬件  |
-| 35  | offline-memory-fault-diagnosis           | 基于离线日志（iBMC/OS Messages/InfoCollect）的内存硬件故障诊断。重点诊断内存 ECC 错误（CE/UCE）、MCE 报错、内存巡检告警、内存在位异常、内存热插拔、内存主板插槽故障等物理级故障，以及内存泄漏/耗竭引发的系统挂起或业务异常的多维根因溯源。                                                                     | 硬件  |
-| 36  | offline-network-hardware-fault-diagnosis | 基于离线日志（iBMC/OS Messages/InfoCollect）的网络硬件故障诊断。重点诊断网卡硬件错误、PCIe 致命错误、网口 Link Down、丢包/错包/延时大、Bond 切换、网卡驱动 Panic 或固件加载失败等网络硬件及物理链路层故障，提供底层物理坐标定位。                                                                   | 硬件  |
-| 37  | offline-NPU-fault-diagnosis              | 基于离线日志（iBMC/OS Messages/InfoCollect）的 NPU 硬件故障诊断。重点诊断 NPU（如华为昇腾 Ascend 系列）掉卡、HBM（高带宽内存）故障、AER 链路错误、驱动加载失败、Acl Error、温度过高保护等 NPU 及关联 PCIe 链路/固件/存储子系统的故障。                                                        | 硬件  |
-| 38  | offline-power-fault-diagnosis            | 基于离线日志（iBMC/OS Messages/InfoCollect）的电源硬件故障诊断。重点诊断电源掉电（Power Loss/Off）、电源模块故障（PSU Fault）、电压异常（Voltage Over-range）、冗余丢失（Redundancy Lost）、电源过载（Overload）以及服务器无法上电等电源供电链路及冗余异常的物理级故障。                              | 硬件  |
+| 32  | disk-health-diagnosis                    | 服务器磁盘健康全栈诊断与故障预测。基于"现状、趋势、背景"三视角，覆盖 L1~L6 六层检测体系（盘本体 SMART → 控制器/链路 → 文件系统/OS → 业务服务层）。支持 iBMC 带外日志（华为/浪潮/H3C）、OS infocollect 包、系统日志三类日志来源。输出风险评分与 P0~P3 风险等级及分级处置建议。                                           | 硬件  |
+| 33  | grub-ibmc-diagnosis                      | 基于 iBMC 带外管理日志的服务器 GRUB 启动故障深度诊断。覆盖华为、浪潮、新华三三大厂商服务器，针对服务器上电后无法进入 OS、卡在 GRUB rescue、Kernel Panic、initramfs 失败、磁盘不识别、BIOS/UEFI 启动异常、RAID 故障无法启动等启动链故障。通过厂商识别与自动化脚本从海量 iBMC 日志中提取关键故障线索。                           | 硬件  |
+| 34  | offline-CPU-fault-diagnosis              | 基于离线日志（iBMC/OS Messages/InfoCollect）的 CPU 硬件故障诊断。重点诊断 CPU 过热（Overheating）、降频（Throttling）、MCE 硬件错误、缓存错误（Cache Error）、UPI/QPI 链路不稳定等物理级故障，以及内核 Panic 或 Soft Lockup 的底层 CPU 根因溯源。                                  | 硬件  |
+| 35  | offline-disk-fault-diagnosis             | 基于离线日志（iBMC/OS Messages/InfoCollect）的磁盘硬件故障诊断。重点诊断磁盘坏道（Bad Sector）、RAID 掉盘/降级（Offline/Degraded）、I/O 超时（Timeout/Blocked）、磁盘巡检错误（Predictive Failure/SMART Error）、SAS/SATA/NVMe 链路不稳定、物理槽位异常等场景，以及文件系统只读的底层存储根因溯源。 | 硬件  |
+| 36  | offline-GPU-fault-diagnosis              | 基于离线日志（iBMC/OS Messages/InfoCollect）的 GPU 硬件故障诊断。重点诊断 GPU 掉卡（Fallen off the bus）、XID 错误、显存不可纠正错误（Uncorrectable ECC）、GPU 维度过温、PCIe 链路问题、驱动异常等物理及软件驱动层面的故障。                                                       | 硬件  |
+| 37  | offline-memory-fault-diagnosis           | 基于离线日志（iBMC/OS Messages/InfoCollect）的内存硬件故障诊断。重点诊断内存 ECC 错误（CE/UCE）、MCE 报错、内存巡检告警、内存在位异常、内存热插拔、内存主板插槽故障等物理级故障，以及内存泄漏/耗竭引发的系统挂起或业务异常的多维根因溯源。                                                                     | 硬件  |
+| 38  | offline-network-hardware-fault-diagnosis | 基于离线日志（iBMC/OS Messages/InfoCollect）的网络硬件故障诊断。重点诊断网卡硬件错误、PCIe 致命错误、网口 Link Down、丢包/错包/延时大、Bond 切换、网卡驱动 Panic 或固件加载失败等网络硬件及物理链路层故障，提供底层物理坐标定位。                                                                   | 硬件  |
+| 39  | offline-NPU-fault-diagnosis              | 基于离线日志（iBMC/OS Messages/InfoCollect）的 NPU 硬件故障诊断。重点诊断 NPU（如华为昇腾 Ascend 系列）掉卡、HBM（高带宽内存）故障、AER 链路错误、驱动加载失败、Acl Error、温度过高保护等 NPU 及关联 PCIe 链路/固件/存储子系统的故障。                                                        | 硬件  |
+| 40  | offline-power-fault-diagnosis            | 基于离线日志（iBMC/OS Messages/InfoCollect）的电源硬件故障诊断。重点诊断电源掉电（Power Loss/Off）、电源模块故障（PSU Fault）、电压异常（Voltage Over-range）、冗余丢失（Redundancy Lost）、电源过载（Overload）以及服务器无法上电等电源供电链路及冗余异常的物理级故障。                              | 硬件  |
 
 **诊断方式**：
 
