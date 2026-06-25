@@ -6,6 +6,7 @@ import {
   addPluginToOpenCodeConfig,
   addProviderConfig,
   detectCurrentConfig,
+  ensureConfigContextInitialized,
   getOpenCodeVersion,
   isOpenCodeInstalled,
   writeWittyConfig,
@@ -32,6 +33,11 @@ export async function runTuiInstaller(args: InstallArgs, version: string): Promi
     return 1
   }
   spinner.stop(`Ansible ${ansibleCheck.version ?? "installed"} ${color.green("[OK]")}`)
+
+  // Detect OpenCode and initialize the config context before anything reads
+  // config paths, so detectCurrentConfig() resolves against the real binary
+  // instead of falling back to defaults.
+  await ensureConfigContextInitialized()
 
   const detected = detectCurrentConfig()
   const isUpdate = detected.isInstalled

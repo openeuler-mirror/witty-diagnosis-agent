@@ -326,8 +326,10 @@ if ! command -v ansible &> /dev/null; then
   echo -e "   ${ARROW} Install guide: https://docs.ansible.com/ansible/latest/installation_guide/"
   exit 1
 fi
-ANSIBLE_VERSION=$(ansible --version | head -n 1 | awk '{print $2}')
-print_success "Ansible $ANSIBLE_VERSION detected"
+# Extract just the version number. Handles both new format
+# "ansible [core 2.20.3]" and legacy "ansible 2.9.27".
+ANSIBLE_VERSION=$(ansible --version | head -n 1 | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -n 1)
+print_success "Ansible ${ANSIBLE_VERSION:-detected}"
 
 ANSIBLE_USER_CFG="${HOME}/.ansible.cfg"
 if [ ! -f "$ANSIBLE_USER_CFG" ]; then

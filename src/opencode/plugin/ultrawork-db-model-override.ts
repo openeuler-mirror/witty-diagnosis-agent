@@ -1,8 +1,17 @@
-import Database from "better-sqlite3"
+import type Database from "better-sqlite3"
 import { join } from "node:path"
 import { existsSync } from "node:fs"
 import { getDataDir } from "../shared/data-path"
 import { log } from "../shared"
+
+// `better-sqlite3` is a native (.node) addon. Importing it eagerly forces the
+// binary to be resolved/loaded the moment this module is first required, which
+// happens via the plugin entry import chain (index -> chat-message ->
+// ultrawork-model-override -> here) and therefore on every OpenCode startup.
+// The DB is only ever touched inside scheduleDeferredModelOverride, so we load
+// the module lazily there to keep startup fast. `import type` above is erased
+// at build time and adds no runtime cost.
+type DatabaseInstance = InstanceType<typeof Database>
 
 function getDbPath(): string {
   return join(getDataDir(), "opencode", "opencode.db")
@@ -11,7 +20,7 @@ function getDbPath(): string {
 const MAX_MICROTASK_RETRIES = 10
 
 function tryUpdateMessageModel(
-  db: InstanceType<typeof Database>,
+  db: DatabaseInstance,
   messageId: string,
   targetModel: { providerID: string; modelID: string },
   variant?: string,
@@ -30,7 +39,7 @@ function tryUpdateMessageModel(
 }
 
 function retryViaMicrotask(
-  db: InstanceType<typeof Database>,
+  db: DatabaseInstance,
   messageId: string,
   targetModel: { providerID: string; modelID: string },
   variant: string | undefined,
@@ -112,15 +121,18 @@ export function scheduleDeferredModelOverride(
   targetModel: { providerID: string; modelID: string },
   variant?: string,
 ): void {
-  queueMicrotask(() => {
+  queueMicrotask(async () => {
     const dbPath = getDbPath()
     if (!existsSync(dbPath)) {
       log("[ultrawork-db-override] DB not found, skipping deferred override")
       return
     }
 
-    let db: InstanceType<typeof Database>
+    let db: DatabaseInstance
     try {
+      // Lazy-load the native module only when we actually have a DB to update,
+      // so the addon binary is never touched on the startup import path.
+      const { default: Database } = await import("better-sqlite3")
       db = new Database(dbPath)
     } catch (error) {
       log("[ultrawork-db-override] Failed to open DB, skipping deferred override", {

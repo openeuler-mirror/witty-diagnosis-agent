@@ -31,7 +31,13 @@ function getFallbackPaths(binaryName: string): string[] {
   ]
 }
 
-async function findOpenCodeBinaryWithVersion(): Promise<OpenCodeBinaryResult | null> {
+// Detecting the OpenCode binary spawns `opencode --version`, so cache the
+// result for the lifetime of the process. This both avoids redundant spawns
+// (isOpenCodeInstalled + getOpenCodeVersion previously probed twice) and lets
+// the config context be initialized exactly once, up front.
+let detectionPromise: Promise<OpenCodeBinaryResult | null> | null = null
+
+async function detectOpenCodeBinary(): Promise<OpenCodeBinaryResult | null> {
   for (const binary of OPENCODE_BINARIES) {
     const pathsToCheck = [binary, ...getFallbackPaths(binary)]
     for (const binPath of pathsToCheck) {
@@ -52,7 +58,27 @@ async function findOpenCodeBinaryWithVersion(): Promise<OpenCodeBinaryResult | n
       }
     }
   }
+  // No OpenCode binary found: still initialize the context with sane defaults
+  // so that callers relying on config paths (e.g. detectCurrentConfig) resolve
+  // consistently instead of triggering the "called before init" fallback.
+  initConfigContext("opencode", null)
   return null
+}
+
+function findOpenCodeBinaryWithVersion(): Promise<OpenCodeBinaryResult | null> {
+  if (!detectionPromise) {
+    detectionPromise = detectOpenCodeBinary()
+  }
+  return detectionPromise
+}
+
+/**
+ * Eagerly detect OpenCode and initialize the config context. Idempotent and
+ * safe to call multiple times. Call this at the start of an install flow,
+ * before anything reads config paths (detectCurrentConfig, etc.).
+ */
+export async function ensureConfigContextInitialized(): Promise<void> {
+  await findOpenCodeBinaryWithVersion()
 }
 
 export async function isOpenCodeInstalled(): Promise<boolean> {
