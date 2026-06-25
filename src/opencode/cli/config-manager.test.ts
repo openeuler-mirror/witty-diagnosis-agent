@@ -277,7 +277,7 @@ describe("generateWittyConfig - model fallback system", () => {
     const result = generateWittyConfig(config)
 
     // #then Sisyphus is omitted (requires all fallback providers)
-    expect(result.$schema).toBe("https://raw.githubusercontent.com/code-yeongyu/witty-diagnosis-agent/dev/assets/witty-diagnosis-agent.schema.json")
+    expect(result.$schema).toBe("https://raw.gitcode.com/openeuler/witty-diagnosis-agent/raw/master/assets/witty-diagnosis-agent.schema.json")
     expect((result.agents as Record<string, { model: string }>).sisyphus).toBeUndefined()
   })
 
