@@ -12,7 +12,7 @@ export { addPluginToOpenCodeConfig } from "./config-manager/add-plugin-to-openco
 export { generateWittyConfig } from "./config-manager/generate-witty-config"
 export { writeWittyConfig } from "./config-manager/write-witty-config"
 
-export { isOpenCodeInstalled, getOpenCodeVersion } from "./config-manager/opencode-binary"
+export { isOpenCodeInstalled, getOpenCodeVersion, ensureConfigContextInitialized } from "./config-manager/opencode-binary"
 
 export { fetchLatestVersion, addAuthPlugins } from "./config-manager/auth-plugins"
 export { ANTIGRAVITY_PROVIDER_CONFIG } from "./config-manager/antigravity-provider-configuration"

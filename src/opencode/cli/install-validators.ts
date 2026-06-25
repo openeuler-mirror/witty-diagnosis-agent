@@ -208,7 +208,11 @@ export async function checkAnsibleInstalled(): Promise<{
     const proc = spawnWithWindowsHide(["ansible", "--version"], { stdout: "pipe", stderr: "pipe" })
     const output = await new Response(proc.stdout).text()
     await proc.exited
-    const version = proc.exitCode === 0 ? (output.trim().split("\n")[0] ?? null) : null
+    // Extract just the version number. Handles both the new format
+    // "ansible [core 2.20.3]" and the legacy "ansible 2.9.27".
+    const firstLine = output.trim().split("\n")[0] ?? ""
+    const version =
+      proc.exitCode === 0 ? (firstLine.match(/\d+\.\d+\.\d+/)?.[0] ?? null) : null
     return { installed: true, version, path }
   } catch {
     return { installed: false, version: null, path: null }
