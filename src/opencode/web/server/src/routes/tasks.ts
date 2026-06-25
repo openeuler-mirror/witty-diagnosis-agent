@@ -1,4 +1,9 @@
+import { execSync } from "node:child_process";
+import crypto from "node:crypto";
+import path from "node:path";
+import os from "node:os";
 import fs from "node:fs";
+import { config } from "../config.js";
 import type { FastifyInstance } from "fastify";
 import { requireUser } from "../auth.js";
 import * as repo from "../repositories.js";
@@ -22,11 +27,81 @@ export function registerTaskRoutes(app: FastifyInstance): void {
       reply.code(400);
       return { ok: false, reason: "缺少主机 IP / 账号 / 密码" };
     }
-    // 骨架：模拟探测（真实实现为 ansible ping / SSH 探测，独立于完整诊断）
-    await new Promise((r) => setTimeout(r, 600));
-    return { ok: true };
-  });
+    // TASK_DRIVER=mock ? 模拟探测（联调用）: 真实 SSH 探测
+    if (config.task.driver === "mock") {
+      await new Promise((r) => setTimeout(r, 600));
+      return { ok: true };
+    }
 
+    const host = b.hostIp;
+    const port = b.sshPort || 22;
+    const sshUser = b.sshUser;
+
+    // 第一步：快速检查 TCP 端口是否开放（3s 内判定）
+    let portOpen = false;
+    try {
+      execSync("timeout 3 nc -zv -w 2 " + host + " " + port + " 2>&1",
+        { timeout: 5000, encoding: "utf8" });
+      portOpen = true;
+    } catch {
+      try {
+        execSync("timeout 2 bash -c 'echo >/dev/tcp/" + host + "/" + port + "' 2>&1",
+          { timeout: 4000, encoding: "utf8" });
+        portOpen = true;
+      } catch {
+        portOpen = false;
+      }
+    }
+    if (!portOpen) {
+      // 快速 DNS 检查
+      try {
+        execSync("getent hosts " + host + " 2>/dev/null || host " + host + " 2>/dev/null || nslookup " + host + " 2>/dev/null",
+          { timeout: 3000, encoding: "utf8" });
+        return { ok: false, reason: "目标主机 " + host + " SSH 端口(" + port + ")未开放或无响应" };
+      } catch {
+        return { ok: false, reason: "无法解析主机名 " + host + "，请检查地址" };
+      }
+    }
+
+    // 第二步：端口已通，检测 sshpass 并验证凭据
+    try {
+      execSync("which sshpass", { encoding: "utf8" });
+    } catch {
+      return { ok: false, reason: "主机可达(端口已开放)，但缺少 sshpass 无法验证密码。请安装: sudo apt-get install sshpass" };
+    }
+
+    const tmpFile = path.join(os.tmpdir(), "conn-" + crypto.randomUUID() + ".ini");
+    let controlPath = "";
+    // ansible 对 127.0.0.1 会切 local 绕过 SSH，改用 127.0.0.2
+    const invHost = host === "127.0.0.1" ? "127.0.0.2" : host;
+    const invContent = "[test]\n" + invHost + " ansible_user=" + sshUser + " ansible_port=" + port + " ansible_password=" + b.sshPassword + " ansible_connection=ssh";
+    try {
+      fs.writeFileSync(tmpFile, invContent, { mode: 0o600 });
+      controlPath = "/tmp/ansible-conn-" + crypto.randomUUID() + ".sock";
+      const out = execSync(
+        "ansible -i \"" + tmpFile + "\" test -m ping -o --ssh-common-args='-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ControlMaster=no -o ControlPath=" + controlPath + "'",
+        { timeout: 8000, encoding: "utf8", stdio: ["pipe", "pipe", "pipe"] });
+      if (out.includes("SUCCESS")) {
+        return { ok: true };
+      }
+      return { ok: false, reason: "SSH 连接失败，请检查凭据" };
+    } catch (err) {
+      const stderr = (err && typeof err === "object" && "stderr" in err) ? (err as {stderr:string}).stderr : "";
+      const stdout = (err && typeof err === "object" && "stdout" in err) ? (err as {stdout:string}).stdout : "";
+      const msg = [stderr, stdout, err instanceof Error ? err.message : ""].filter(Boolean).join(" | ");
+      let reason = msg.includes("Permission denied") || msg.includes("Authentication failure") || msg.includes("authentication") ? "认证失败，请检查账号和密码"
+        : msg.includes("UNREACHABLE") ? "目标主机不可达"
+        : msg.includes("sshpass") ? "需要安装 sshpass 才能验证密码"
+        : "";
+      if (!reason) {
+        reason = "连接失败: " + msg.slice(0, 200).replace(/\n/g, " ");
+      }
+      return { ok: false, reason };
+    } finally {
+      try { fs.unlinkSync(tmpFile); } catch { /* ignore */ }
+      try { fs.unlinkSync(controlPath); } catch { /* ignore */ }
+    }
+  });
   // ---- 创建任务 IF-N02 ----
   app.post("/api/tasks", async (req, reply) => {
     const user = await requireUser(req, reply);

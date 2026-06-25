@@ -1,3 +1,4 @@
+import { execSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
 import * as repo from "./repositories.js";
@@ -151,17 +152,27 @@ export async function run(taskId: string): Promise<void> {
     }
   } finally {
     clearTimeout(timer);
-    // 终态强制擦除凭据（BC-004 用完即焚）
-    vault.wipe(taskId);
+    // 仅成功时擦除凭据；取消、失败、超时都保留（重试时复用连接信息）
+    if (gotReport) {
+      vault.wipe(taskId);
+    }
     // 真实路径：擦除每任务 HOME（连同会话存储/采集中间产物）
     if (config.task.driver === "opencode") wipeTaskHome(taskHome);
     running.delete(taskId);
   }
 }
 
-/** 取消运行中任务：abort 驱动（真实路径会随之 kill opencode server）。 */
+/** 取消运行中任务：立即 kill opencode serve 进程 + 发 abort 信号。
+ * 必须 kill 子进程，否则端口 4096 仍被占用，重试会报 Server exited with code 1。 */
 export function cancel(taskId: string): void {
-  running.get(taskId)?.abort.abort();
+  const handle = running.get(taskId);
+  if (!handle) return;
+  // 先 kill opencode serve 进程（释放端口），再发 abort 信号
+  // 匹配 "opencode serve"（含 serve 参数），不杀用户 TUI 的 "opencode"（无 serve 参数）
+  try {
+    execSync("pkill -f 'opencode serve' 2>/dev/null || true", { timeout: 3000 });
+  } catch { /* ignore */ }
+  handle.abort.abort();
 }
 
 export function isRunning(taskId: string): boolean {

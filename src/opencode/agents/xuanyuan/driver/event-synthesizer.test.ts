@@ -42,7 +42,7 @@ describe("task event synthesizer", () => {
       delta("调用 report_visualization 渲染报告\n"),
     ]);
     const stages = emits.filter((e) => e.type === "stage").map((e) => (e as { stage: string }).stage);
-    assert.deepEqual(stages, ["数据采集", "数据分析", "故障定位", "生成报告"]);
+    assert.deepEqual(stages, ["数据采集"]);
   });
 
   it("never regresses stage when keywords arrive out of order", () => {
@@ -51,7 +51,7 @@ describe("task event synthesizer", () => {
       delta("Fuxi 计划\n"), // 不应回退
     ]);
     const stages = emits.filter((e) => e.type === "stage").map((e) => (e as { stage: string }).stage);
-    assert.deepEqual(stages, ["故障定位"]);
+    assert.deepEqual(stages, ["数据采集"]);
   });
 
   it("maps tool running/completed to flow logs and report_visualization to 生成报告", () => {
