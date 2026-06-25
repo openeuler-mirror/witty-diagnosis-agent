@@ -515,7 +515,7 @@ describe("generateModelConfig", () => {
 
       // #then should include correct schema URL
       expect(result.$schema).toBe(
-        "https://raw.githubusercontent.com/code-yeongyu/witty-diagnosis-agent/dev/assets/witty-diagnosis-agent.schema.json"
+        "https://raw.gitcode.com/openeuler/witty-diagnosis-agent/raw/master/assets/witty-diagnosis-agent.schema.json"
       )
     })
   })
