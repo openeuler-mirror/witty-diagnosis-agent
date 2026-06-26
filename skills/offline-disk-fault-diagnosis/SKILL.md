@@ -1,6 +1,6 @@
 ---
 name: offline-disk-fault-diagnosis
-description: 通过分析服务器离线日志（iBMC、OS Messages、InfoCollect）诊断离线磁盘硬件、RAID 控制器及存储链路故障并定位物理级根因。当用户提供日志并询问磁盘坏道（Bad Sector）、RAID 掉盘/降级（Offline/Degraded）、I/O 超时（Timeout/Blocked）、磁盘巡检错误（Predictive Failure/SMART Error）、SAS/SATA/NVMe 链路不稳定、物理槽位异常，以及当文件系统因底层存储故障自动切换为只读（Read-only）需要进行底层根因溯源时，调用本技能。
+description: 通过分析服务器的【系统级离线日志】——iBMC/SEL 带外日志（磁盘在位/热插拔/错误事件）、OS 系统日志（dmesg、syslog、messages）、InfoCollect 采集日志（SMART 信息/RAID 卡日志/性能数据）——诊断离线磁盘硬件、RAID 控制器及存储链路故障，做多源时序对齐与物理级根因溯源。当用户提供 ibmc_logs / messages（dmesg、syslog）/ infocollect_logs 等服务器日志包，或询问 RAID 掉盘降级（Offline/Degraded）、I/O 超时阻塞（Timeout/Blocked）、SAS/SATA/NVMe 链路不稳定（PHY Reset/ICRC）、物理槽位异常、磁盘巡检/SMART 告警、以及文件系统因底层存储故障切只读（Read-only）需要从 OS+iBMC 日志反查底层根因时，调用本技能。本技能以系统级日志为分析主体；其中希捷 FARM 底层日志（farmlog）仅作为可选的 Step 5 收敛环节。**若用户只提供希捷 FARM 底层日志（farmlog / openSeaChest .json / 华为 disktool .txt，按 IP 目录组织），而无 OS/iBMC/InfoCollect 系统日志，应改用 `seagate-farm-disktool-health-analysis` 技能。**
 ---
 
 # 离线磁盘故障诊断
@@ -20,7 +20,7 @@ offline-disk-fault-diagnosis/
 │   ├── diagnose_infocollect.py       # Step 2: InfoCollect/磁盘专项分析脚本
 │   ├── diagnose_messages.py          # Step 2: OS消息日志分析脚本
 │   ├── diagnose_health_rules.py      # Step 3: 健康度评估与规则匹配脚本
-│   └── analyze_sm2.py                # Step 5（可选）: SM2/FARM底层日志分析脚本
+│   └── analyze_farm.py               # Step 5（可选）: FARM 底层日志分析脚本（json 优先/txt 兜底）
 └── references/                       # 参考资料目录
     ├── DISK_fault_scenarios.md       # 磁盘故障场景分类表
     ├── DISK_scenario_analysis.md     # 磁盘故障场景专项分析指南
@@ -30,8 +30,8 @@ offline-disk-fault-diagnosis/
     ├── huawei_ibmc.md                # 华为iBMC分析指南
     ├── h3c_ibmc.md                   # H3C iBMC分析指南
     ├── Inspur_ibmc.md                # Inspur iBMC分析指南
-    ├── sm2_analysis.md               # SM2/FARM底层诊断指南
-    └── sm2_field_reference.md        # SM2字段与指标参考字典
+    ├── farm_analysis.md              # FARM 底层诊断指南（单快照 · 8 类故障部位）
+    └── farm_field_reference.md       # FARM 字段与指标参考字典（json↔txt↔SMART 三方映射）
 ```
 
 ## 输入日志目录结构与对应诊断脚本
@@ -48,8 +48,8 @@ offline-disk-fault-diagnosis/
 │   └── (SMART信息/RAID卡日志/性能数据) -> 使用 scripts/diagnose_infocollect.py
 ├── messages/                   # 操作系统层面的系统日志
 │   └── (dmesg, syslog, messages) -> 使用 scripts/diagnose_messages.py
-└── sm2_log/                    # SM2 底层日志目录 (可选)
-    └── (SN_<时间戳>_SLog.txt, ..._head0.txt, ..._head1.txt, ..._headN.txt) -> 使用 scripts/analyze_sm2.py
+└── farmlog/                    # FARM 底层日志目录 (可选)
+    └── (<SN>_FARM_<时间戳>_<IP>_<设备名>.json [openSeaChest, 优先], <SN>_FARM_disktool_<时间戳>_<IP>_<设备名>.txt [华为 disktool, 兜底]) -> 使用 scripts/analyze_farm.py
 ```
 
 ## ⚠️ 强制执行流程
@@ -57,7 +57,7 @@ offline-disk-fault-diagnosis/
 **必须严格按以下顺序执行，禁止跳过或乱序：**
 
 ```
-Step 0 (故障日志采集) → Step 1 (场景分类) → Step 2 (深入分析) → Step 3 (健康度评估与规则匹配) → Step 4 (根因反思与证据双向校验) → [Step 5 (SM2底层诊断，可选)] → Step 6 (界面输出分析报告)
+Step 0 (故障日志采集) → Step 1 (场景分类) → Step 2 (深入分析) → Step 3 (健康度评估与规则匹配) → Step 4 (根因反思与证据双向校验) → [Step 5 (FARM底层诊断，可选)] → Step 6 (界面输出分析报告)
 ```
 
 **执行规则：**
@@ -73,7 +73,7 @@ Step 0 (故障日志采集) → Step 1 (场景分类) → Step 2 (深入分析) 
 - Step 2：输出物理级精准定位、传导链及初步根因
 - Step 3：输出每块涉事磁盘的基础元数据、判定结论及标准化对象
 - Step 4：输出根因证据校验表、原生日志证据及置信度定性
-- Step 5（可选）：输出 SM2 逐磁头分析表、8 类故障部位评级与处置建议
+- Step 5（可选）：输出 FARM 逐磁头分析表、8 类故障部位评级与处置建议
 - Step 6：在界面上按固定结构输出最终的分析报告（**严禁生成独立文件**）
 
 ---
@@ -87,7 +87,7 @@ Step 0 (故障日志采集) → Step 1 (场景分类) → Step 2 (深入分析) 
 | **Step 2** 深入分析 | 构建起止 T0 的传导链并执行诊断 | 使用 `diagnose_ibmc.py/diagnose_infocollect.py/diagnose_messages.py` 获取多维证据 |
 | **Step 3** 健康度评估与规则匹配 | 对每块涉事磁盘按 SAS/SATA 规则集做客观判定与存活概率计算 | `diagnose_health_rules.py <log_dir> [--format md/json/table]` 配合 [disk_health_rules.md](references/disk_health_rules.md) |
 | **Step 4** 根因反思与证据双向校验 | 交叉质询证据链，执行证据双向校验（含 E4 规则一致性） | 对比 iBMC/内核/系统日志的一致性 + 规则评估结果，防止结论发散 |
-| **Step 5** SM2/FARM 底层深度诊断（可选） | 将故障收敛至磁头/盘面级别，定界 8 类故障部位 | `analyze_sm2.py <sm2_log_dir>`，结合 `sm2_analysis.md` / `sm2_field_reference.md` 判读 |
+| **Step 5** FARM 底层深度诊断（可选） | 将故障收敛至磁头/盘面级别，定界 8 类故障部位 | `analyze_farm.py <log_dir>/farmlog`（json 优先/txt 兜底），结合 `farm_analysis.md` / `farm_field_reference.md` 判读 |
 | **Step 6** 界面输出分析报告 | 汇总证据链与确认根因，在界面直接输出报告内容 | 结构化输出：结论 + 故障链条 + 规则评估 + 根因 + 修复建议 |
 
 ---
@@ -380,36 +380,51 @@ python3 scripts/diagnose_health_rules.py <log_dir> --include-passed
 4. ✅ E4 维度明确给出规则评估结论与因果链推断的一致性判断（一致 / 部分一致 / 冲突）；冲突时采取更保守的处置策略。
 
 ---
-## Step 5：SM2/FARM 底层深度诊断 (可选环节)
+## Step 5：FARM 底层深度诊断 (可选环节)
 
-**触发条件**：在前置步骤中已经识别出是某物理磁盘存在问题，并且当前的日志包内有对应的 `sm2_log` 或以该 SN 命名的底层日志目录结构。
+**触发条件**（须**同时满足**）：
+1. 在前置步骤中已经识别出是某物理磁盘存在问题；
+2. 当前的日志包内有 `farmlog/` 目录，其中含以该 SN 命名的 FARM 日志（json 优先/txt 兜底）。
 
 **目标**：不再局限于"哪块盘坏了"，而是探究**"这块盘的内部哪里坏了"**，将其归类至 8 类部位（如：纯粹个别磁头退化、马达供电异常等）。
 
+> [!IMPORTANT]
+> **FARM 是单帧快照，没有 `poh` 时间序列。严禁套用"旧→新趋势/活跃增长 vs 暂稳"这类趋势话术。** 活跃度改用 **`Reallocated Candidate Sectors`（候选坏道数）** 近似：候选 > 0 = 退化进行中，候选 = 0 = 暂稳。
+
 ### 5.1 运行分析引擎
 ```bash
-# 执行对底层日志的自动化统计计算
-python3 scripts/analyze_sm2.py <sm2_log_dir>
+# 默认 json 优先、txt 兜底（推荐）
+python3 scripts/analyze_farm.py <log_dir>/farmlog
+
+# 只用 json / 强制只用 txt（测试降级路径）
+python3 scripts/analyze_farm.py <log_dir>/farmlog --source json
+python3 scripts/analyze_farm.py <log_dir>/farmlog --source txt
 ```
+
+> [!WARNING]
+> **先确认数据源是 json 还是 txt！** json（openSeaChest）字段最全，能做逐头定位、逐头不可恢复读、Flash LED/Depop 判定；txt（华为 disktool）仅约 40% 字段，第 2/7 类及逐头明细会降级，故障常只能判到"整盘介质退化（未定位到磁头）"。报告"数据源"列已标注，结论关键时应索取该盘 json 重新分析。
 
 ### 5.2 结合指南定界病因
 依据以上输出结果并参考指南进行专业判读：
-> 📖 [SM2 日志诊断指南](references/sm2_analysis.md)
-> 📖 [SM2 字段与指标参考字典](references/sm2_field_reference.md)
+> 📖 [FARM 底层诊断指南](references/farm_analysis.md)
+> 📖 [FARM 字段与指标参考字典](references/farm_field_reference.md)
 
 **重点关注**：
-1. **种群相对法**：对比同一硬盘内的不同磁头，找到 `FAFH`（飞高）与 `iter`（译码）高得离谱、或 `amp` 极低的"离群磁头"。
-2. **趋势判断**：确认 `g_list` 和 `vis_rd_err` 等核心报错是活跃增长状态还是暂稳。
+1. **种群相对法**：对比同一硬盘内的不同磁头，挑出 `FAFH`（飞高 clearance delta）离群、`MRR`=0xFFFF（磁头开路）或 `H2SAT` 信号劣化的"离群磁头"。
+2. **候选数活跃度**（替代 SM2 的趋势判断）：用 `Reallocated Candidate`（整盘或逐头）判定退化进行中（>0）还是暂稳（=0）。
+3. **整盘↔逐头对账**：用逐头重分配数把整盘坏道定位到具体磁头；逐头全 0 而整盘很大时，诚实标注"无法定位到磁头"。
+4. **FAFH 谨慎**：飞高 clearance delta 逐头校准差异天然大，单独离群只算"关注"，须与同头坏道共振才升级为"退化"。
+5. **组合研判**：第 1 类（重分配/坏扇区）+ 第 2 类（不可恢复读）同时非零时，故障概率升至约 76%——最优先备份换盘。
 
 **Step 5 完成标志**：
-1. ✅ 输出 SM2 逐磁头分析表，标注离群磁头及关键异常指标。
-2. ✅ 给出 8 类故障部位评级（如：磁头退化 / 马达异常 / 盘片划伤等）及其置信度。
-3. ✅ 输出处置建议，并将 SM2 诊断结论整合至 Step 6 的报告中。
+1. ✅ 输出 FARM 逐磁头分析表（重分配/候选/不可恢复读/FAFH(O/M/I)/MRR/离群标记），标注离群磁头及数据源覆盖度。
+2. ✅ 给出 8 类故障部位评级（如：磁头退化 / 整盘介质退化 / 接口异常 / 固件硬件级失效等）及其置信度。
+3. ✅ 用候选数判定活跃度（退化进行中 / 暂稳），输出处置建议，并将 FARM 诊断结论整合至 Step 6 的报告中。
 
 ---
 ## Step 6：界面输出分析报告
 
-汇总 Step 0～5 的所有分析结果（若执行了 Step 5 SM2 诊断，须将其结论并入报告），直接在当前对话界面输出结构化的诊断报告。**禁止生成任何额外的文档或报告文件。**
+汇总 Step 0～5 的所有分析结果（若执行了 Step 5 FARM 诊断，须将其逐磁头结论、8 类部位评级与候选数活跃度并入报告），直接在当前对话界面输出结构化的诊断报告。**禁止生成任何额外的文档或报告文件。**
 
 ### 6.1 报告结构 (五大章节)
 
@@ -468,7 +483,7 @@ python3 scripts/analyze_sm2.py <sm2_log_dir>
 * [Huawei iBMC 分析](references/huawei_ibmc.md)
 * [H3C iBMC 分析](references/h3c_ibmc.md)
 * [Inspur iBMC 分析](references/Inspur_ibmc.md)
-* [SM2/FARM 底层诊断指南](references/sm2_analysis.md)
-* [SM2 字段与指标参考字典](references/sm2_field_reference.md)
+* [FARM 底层诊断指南](references/farm_analysis.md)
+* [FARM 字段与指标参考字典](references/farm_field_reference.md)
 
 ---
