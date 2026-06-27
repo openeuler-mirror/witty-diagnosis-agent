@@ -1,6 +1,6 @@
 # 功能列表 (Features)
 
-本项目按 OS 全栈（硬件层 → 内核层 → 系统服务层）梳理故障模式并分层构建诊断能力，目前已支持 40 个故障诊断 Skill（用户态 14、内核 17、硬件 9），并将随场景丰富与方案迭代持续演进。
+本项目按 OS 全栈（硬件层 → 内核层 → 系统服务层）梳理故障模式并分层构建诊断能力，目前已支持 41 个故障诊断 Skill（用户态 14、内核 17、硬件 10），并将随场景丰富与方案迭代持续演进。
 
 > 故障层说明：**用户态** — 进程/服务/应用层故障；**内核** — 内核子系统/驱动/系统调用层故障；**硬件** — 物理设备/固件/链路层故障
 
@@ -64,6 +64,7 @@
 | 38  | offline-network-hardware-fault-diagnosis | 基于离线日志（iBMC/OS Messages/InfoCollect）的网络硬件故障诊断。重点诊断网卡硬件错误、PCIe 致命错误、网口 Link Down、丢包/错包/延时大、Bond 切换、网卡驱动 Panic 或固件加载失败等网络硬件及物理链路层故障，提供底层物理坐标定位。                                                                   | 硬件  |
 | 39  | offline-NPU-fault-diagnosis              | 基于离线日志（iBMC/OS Messages/InfoCollect）的 NPU 硬件故障诊断。重点诊断 NPU（如华为昇腾 Ascend 系列）掉卡、HBM（高带宽内存）故障、AER 链路错误、驱动加载失败、Acl Error、温度过高保护等 NPU 及关联 PCIe 链路/固件/存储子系统的故障。                                                        | 硬件  |
 | 40  | offline-power-fault-diagnosis            | 基于离线日志（iBMC/OS Messages/InfoCollect）的电源硬件故障诊断。重点诊断电源掉电（Power Loss/Off）、电源模块故障（PSU Fault）、电压异常（Voltage Over-range）、冗余丢失（Redundancy Lost）、电源过载（Overload）以及服务器无法上电等电源供电链路及冗余异常的物理级故障。                              | 硬件  |
+| 41  | seagate-farm-disktool-health-analysis  | 希捷（Seagate）硬盘 FARM 单帧底层遥测日志健康分析。日志按 IP 目录组织，每盘有两种来源：openSeaChest .json（字段最全，优先）与华为 disktool .txt（仅关键字段，兜底）。基于 FARM 逐磁头遥测，按 8 类故障部位（盘片坏扇区/磁头读写通道 ECC/机械马达伺服/接口传输/温度环境振动/寿命工况/固件服务区/SSD 磨损）定位问题、收敛到具体磁头，并给出机群级处置建议。 | 硬件  |
 
 **诊断方式**：
 
