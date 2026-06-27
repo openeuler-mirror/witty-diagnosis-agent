@@ -96,6 +96,11 @@ bash install.sh
 
 1. 启动 \*\*OpenCode \*\*。
 
+2. 完成模型相关配置：
+   - 第一步：执行 `/model` 命令调出模型配置面板；
+   - 第二步：按下快捷键 Ctrl + A 选择模型提供商，粘贴填写模型服务商提供的密钥；
+   - 第三步：从列表中选中目标服务商对应的模型。
+
 2. 执行`/agents`命令，选择`Xuanyuan`Agent。
    
    ![选择Xuanyuan Agent](docs/assets/select_xuanyuan.png)
