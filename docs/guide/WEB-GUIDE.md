@@ -176,7 +176,7 @@ curl http://127.0.0.1:8787/api/health
 | ✅ 连通成功     | 可以开始诊断                                   |
 | ❌ 连接失败     | 检查 IP / 端口 / 账号密码是否正确              |
 | ❌ 端口未开放   | 目标主机 SSH 服务未启动或防火墙拦截            |
-| ❌ 缺少 sshpass | 请在诊断机安装：`sudo apt-get install sshpass` |
+| ❌ 缺少 sshpass | **诊断主机**（运行 witty-diagnosis-agent 的机器）未安装 sshpass，执行：`sudo apt-get install sshpass` |
 
 示例：
 
