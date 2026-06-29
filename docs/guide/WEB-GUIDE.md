@@ -16,9 +16,22 @@
 - [七、任务操作：取消 / 重试 / 删除](#七任务操作取消--重试--删除)
 - [八、常见问题排查](#八常见问题排查)
 
-## 一、服务启停
+## 前置操作
 
-### 1.1 一键启动
+首次使用前，需先安装项目依赖：
+
+```bash
+cd ~/witty-diagnosis-agent
+bash install.sh
+```
+
+> `install.sh` 会安装项目全部依赖（包括 `@opencode-ai/sdk` 等核心包）。安装完成后即可启动服务。
+
+默认启动为 **模拟诊断模式（mock）**。如需使用**真实诊断模式**，启动前编辑 `.env.example` 文件，将 `TASK_DRIVER=mock` 改为 `TASK_DRIVER=opencode`。
+
+![1782714636954](images/WEB-GUIDE/1782714636954.png)
+
+前置操作已完成（`bash install.sh`）后，启动服务：
 
 ```bash
 cd ~/witty-diagnosis-agent/src/opencode/web
@@ -46,17 +59,22 @@ bash start.sh
 ### 1.2 环境变量
 
 
-| 变量                       | 默认值 | 说明                                                 |
-| -------------------------- | ------ | ---------------------------------------------------- |
-| `PORT`                     | `8787` | 后端 API 端口                                        |
-| `TASK_DRIVER`              | `mock` | `mock` = 模拟诊断（快速体验），`opencode` = 真实诊断 |
-| `TASK_MODEL`               | （空） | opencode 使用的模型，留空走平台默认                  |
-| `SCHEDULER_MAX_CONCURRENT` | `4`    | 最大并发诊断任务数                                   |
+| 变量                       | 默认值 | 说明                                                                 |
+| -------------------------- | ------ | -------------------------------------------------------------------- |
+| `PORT`                     | `8787` | 后端 API 端口                                                        |
+| `TASK_DRIVER`              | `mock` | 诊断模式：`mock` = 模拟诊断（默认，快速体验），`opencode` = 真实诊断 |
+| `TASK_MODEL`               | （空） | opencode 使用的模型，留空走平台默认                                  |
+| `SCHEDULER_MAX_CONCURRENT` | `4`    | 最大并发诊断任务数                                                   |
 
-示例：使用真实诊断引擎启动
+`.env` 文件中的 `TASK_DRIVER` 字段控制诊断模式：
+
+- `TASK_DRIVER=mock`（默认）：模拟诊断，无需模型/opencode，快速体验全流程
+- `TASK_DRIVER=opencode`：真实诊断，连接 opencode 驱动 xuanyuan 全链路
+
+示例：切换到模拟诊断模式
 
 ```bash
-TASK_DRIVER=opencode bash start.sh
+TASK_DRIVER=mock bash start.sh
 ```
 
 ### 1.3 停止服务
@@ -93,7 +111,6 @@ curl http://127.0.0.1:8787/api/health
 
 浏览器打开 **http://localhost:5173**，自动跳转至登录页面。
 
-
 ![登录页面](images/WEB-GUIDE/web_login.png)
 
 ### 2.2 登录操作
@@ -113,11 +130,8 @@ curl http://127.0.0.1:8787/api/health
 侧边栏底部提供 **「退出登录」** 按钮：
 
 1. 点击侧边栏底部的退出图标 + 「退出登录」文字
-
 2. 系统清除当前会话，自动跳转回登录页面
-
 3. 重新登录可查看自己的任务，不同用户之间完全隔离
-
 
 ![退出登录](images/WEB-GUIDE/web_logout.png)
 
@@ -128,7 +142,6 @@ curl http://127.0.0.1:8787/api/health
 ### 3.1 进入新建向导
 
 在任务列表页面，点击 **「新建诊断」** 按钮，进入任务创建向导。
-
 
 ![新建任务 - 在线模式](images/WEB-GUIDE/web_new_task_online.png)
 
@@ -167,7 +180,6 @@ curl http://127.0.0.1:8787/api/health
 
 示例：
 
-
 ![连通性测试成功](images/WEB-GUIDE/web_connectivity_ok.png)
 
 ### 3.4 离线分析模式
@@ -182,7 +194,6 @@ curl http://127.0.0.1:8787/api/health
 2. 点击文件选择框，选择一个或多个日志文件（支持 `.log`、`.txt`、`.zip` 等格式）
 3. 文件自动上传，上传完成后显示文件名和大小
 
-
 ![新建任务 - 离线上传](images/WEB-GUIDE/web_new_task_offline_upload.png)
 
 #### 方式二：指定服务器路径
@@ -193,13 +204,11 @@ curl http://127.0.0.1:8787/api/health
 
 > **注意**：路径方式要求诊断服务有权限读取该路径。
 
-
 ![新建任务 - 离线路径](images/WEB-GUIDE/web_new_task_offline_path.png)
 
 ### 3.5 启动诊断
 
 确认信息无误后，点击 **「开始诊断」**（在线）或 **「开始分析」**（离线）按钮。任务进入排队状态，系统自动调度执行。
-
 
 ![任务已启动](images/WEB-GUIDE/web_task_started.png)
 
@@ -295,7 +304,6 @@ curl http://127.0.0.1:8787/api/health
 - 切换到其他页面后返回，进度自动恢复（通过 SSE snapshot 机制）
 - 浏览器刷新后，首次加载即获取完整历史日志快照
 
-
 ![任务详情 - 运行中](images/WEB-GUIDE/web_task_running.png)
 
 ---
@@ -310,16 +318,17 @@ curl http://127.0.0.1:8787/api/health
 
 报告包含以下章节：
 
-| 章节 | 内容 |
-|------|------|
-| 故障概述 | 故障现象、影响范围、故障时间 |
+
+| 章节            | 内容                                   |
+| --------------- | -------------------------------------- |
+| 故障概述        | 故障现象、影响范围、故障时间           |
 | 根因分析（RCA） | 证据链、SMART 数据、系统日志、根因结论 |
-| 修复建议 | 紧急处置、长期预防 |
-| 附录 | 原始数据采集记录 |
+| 修复建议        | 紧急处置、长期预防                     |
+| 附录            | 原始数据采集记录                       |
+
 ### 6.3 下载 HTML
 
 点击报告区域的 **「下载 HTML」** 按钮，可将报告保存为本地 HTML 文件，离线查看。
-
 
 ![下载 HTML 按钮](images/WEB-GUIDE/web_download_html.png)
 
@@ -327,16 +336,13 @@ curl http://127.0.0.1:8787/api/health
 
 报告底部提供评分功能：选择 **1-5 星**，可选填写备注后提交。
 
-
 ![评分区域](images/WEB-GUIDE/web_rating.png)
 
 ### 6.5 诊断报告示例
 
 **磁盘故障诊断报告**：
 
-
 ![磁盘故障诊断报告](images/WEB-GUIDE/web_report_disk.png)
-
 
 ## 七、任务操作：取消 / 重试 / 删除
 
@@ -350,7 +356,6 @@ curl http://127.0.0.1:8787/api/health
 
 > **说明**：取消后立即释放端口资源，无需等待超时。
 
-
 ![取消任务](images/WEB-GUIDE/web_task_cancel.png)
 
 ### 7.2 重试任务
@@ -360,7 +365,6 @@ curl http://127.0.0.1:8787/api/health
 1. 在任务详情页，点击 **「重试」** 按钮
 2. 任务重新进入排队状态
 3. **凭据自动复用**：在线诊断的 SSH 凭据从加密保险箱中恢复，无需重新填写
-
 
 ![重试任务](images/WEB-GUIDE/web_task_retry.png)
 
@@ -373,10 +377,8 @@ curl http://127.0.0.1:8787/api/health
 
 > **限制**：运行中的任务无法删除（返回 409 冲突），需先取消再删除。
 
-
-
 ![删除任务](images/WEB-GUIDE/web_task_delete.png)
----
+-------------------------------------------------
 
 ## 八、常见问题排查
 
@@ -416,3 +418,24 @@ SSE 断线重连机制会自动恢复。如仍未恢复，刷新页面即可获�
 ### Q6：在线诊断超时
 
 默认启动看门狗 180s、任务超时由调度器控制。如目标主机网络延迟较高，可适当增大 `serverTimeoutMs` 配置。
+
+### Q7：诊断失败，提示 "Cannot find package '@opencode-ai/sdk'"
+
+**原因**：`@opencode-ai/sdk` 未安装。`TASK_DRIVER=opencode` 时会动态加载该包，但 web/server 目录下未安装此依赖。
+**解决（二选一）**：
+
+**方案一**：在项目根目录执行一键安装（会安装全部依赖）
+
+```bash
+cd ~/witty-diagnosis-agent
+bash install.sh
+```
+
+**方案二**：单独安装 SDK 包
+
+```bash
+cd ~/witty-diagnosis-agent/src/opencode/web/server
+npm install @opencode-ai/sdk
+```
+
+重新执行 `bash start.sh` 即可。
