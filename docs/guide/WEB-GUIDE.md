@@ -27,27 +27,42 @@ bash install.sh
 
 > `install.sh` 会安装项目全部依赖（包括 `@opencode-ai/sdk` 等核心包）。安装完成后即可启动服务。
 
-默认启动为 **模拟诊断模式（mock）**。如需使用**真实诊断模式**，启动前编辑 `.env.example` 文件，将 `TASK_DRIVER=mock` 改为 `TASK_DRIVER=opencode`。
+默认启动为 **真实诊断模式（opencode）**。如需使用**模拟诊断模式**（快速体验，无需模型），编辑 `.env.example` 文件，将 `TASK_DRIVER=opencode` 改为 `TASK_DRIVER=mock`。
 
 ![web_env](images/WEB-GUIDE/web_env.png)
 
-前置操作已完成（`bash install.sh`）后，启动服务：
+前置操作已完成后，进入 web 目录操作：
 
 ```bash
 cd ~/witty-diagnosis-agent/src/opencode/web
+```
+
+**首次启动**，先执行环境初始化（装依赖 + 建库）：
+
+```bash
+bash init.sh
+```
+
+**每次启动服务**，执行：
+
+```bash
 bash start.sh
 ```
 
-`start.sh` 自动完成以下步骤：
-
+`start.sh` 步骤如下：
 
 | 步骤 | 说明                                     |
 | ---- | ---------------------------------------- |
-| 1/4  | 安装后端依赖（`npm install`）            |
-| 2/4  | 初始化数据库（Knex migrate，幂等可重入） |
-| 3/4  | 启动后端服务，监听**8787** 端口          |
-| 4/4  | 启动前端开发服务器，监听**5173** 端口    |
+| 1/2  | 启动后端服务，监听**8787** 端口          |
+| 2/2  | 启动前端开发服务器，监听**5173** 端口    |
 
+启动成功后终端输出：
+
+```
+后端就绪：http://127.0.0.1:8787/api/health
+```
+
+> **注意**：`init.sh` 只需执行一次（或依赖/数据库变更时重跑），后续直接 `bash start.sh` 即可。
 启动成功后终端输出：
 
 ```
@@ -62,15 +77,13 @@ bash start.sh
 | 变量                       | 默认值 | 说明                                                                 |
 | -------------------------- | ------ | -------------------------------------------------------------------- |
 | `PORT`                     | `8787` | 后端 API 端口                                                        |
-| `TASK_DRIVER`              | `mock` | 诊断模式：`mock` = 模拟诊断（默认，快速体验），`opencode` = 真实诊断 |
+| `TASK_DRIVER`              | `opencode` | 诊断模式：`opencode` = 真实诊断（默认），`mock` = 模拟诊断（快速体验） |
 | `TASK_MODEL`               | （空） | opencode 使用的模型，留空走平台默认                                  |
 | `SCHEDULER_MAX_CONCURRENT` | `4`    | 最大并发诊断任务数                                                   |
 
-`.env` 文件中的 `TASK_DRIVER` 字段控制诊断模式：
-
-- `TASK_DRIVER=mock`（默认）：模拟诊断，无需模型/opencode，快速体验全流程
-- `TASK_DRIVER=opencode`：真实诊断，连接 opencode 驱动 xuanyuan 全链路
-
+.env 文件中的 `TASK_DRIVER` 字段控制诊断模式：
+- `TASK_DRIVER=opencode`（默认）：真实诊断，连接 opencode 驱动 xuanyuan 全链路
+- `TASK_DRIVER=mock`：模拟诊断，无需模型/opencode，快速体验全流程
 示例：切换到模拟诊断模式
 
 ```bash

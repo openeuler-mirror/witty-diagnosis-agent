@@ -42,7 +42,7 @@ describe("task event synthesizer", () => {
       delta("调用 report_visualization 渲染报告\n"),
     ]);
     const stages = emits.filter((e) => e.type === "stage").map((e) => (e as { stage: string }).stage);
-    assert.deepEqual(stages, ["数据采集"]);
+    assert.deepEqual(stages, ["计划构建"]);
   });
 
   it("never regresses stage when keywords arrive out of order", () => {
@@ -51,7 +51,7 @@ describe("task event synthesizer", () => {
       delta("Fuxi 计划\n"), // 不应回退
     ]);
     const stages = emits.filter((e) => e.type === "stage").map((e) => (e as { stage: string }).stage);
-    assert.deepEqual(stages, ["数据采集"]);
+    assert.deepEqual(stages, ["计划构建"]);
   });
 
   it("maps tool running/completed to flow logs and report_visualization to 生成报告", () => {
@@ -64,8 +64,8 @@ describe("task event synthesizer", () => {
     assert.ok(logs.some((l) => l.includes("子代理 fuxi-sub")));
     assert.ok(logs.some((l) => l.includes("✓ task 完成")));
     const stages = emits.filter((e) => e.type === "stage").map((e) => (e as { stage: string }).stage);
-    assert.ok(stages.includes("数据采集")); // fuxi-sub
-    assert.ok(stages.includes("生成报告")); // report_visualization
+    assert.ok(stages.includes("计划构建")); // fuxi-sub
+    assert.ok(stages.includes("报告生成")); // report_visualization
     void state;
   });
 

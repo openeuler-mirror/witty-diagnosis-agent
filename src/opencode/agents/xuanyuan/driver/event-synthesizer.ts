@@ -1,24 +1,3 @@
-
-/** 过滤 agent 内部思考噪音，仅保留有信息量的诊断日志。 */
-function isNoiseLine(line: string): boolean {
-  const t = line.trim();
-  if (t.length < 5) return true;
-  if (/^[\d.:\-\s]+$/.test(t)) return true;
-  const lower = t.toLowerCase();
-  const noise = [
-    "let me", "i need", "i should", "i will", "i can", "i must", "i want",
-    "i think", "i have", "actually,", "however,", "but the", "but i",
-    "now let", "so let", "ok, let", "the user", "the skill",
-    "the system", "the task", "the workflow", "the rule",
-    "i'll", "i'm thinking", "let's start", "now i",
-    "note:", "wait,", "first,", "second,", "third,",
-  ];
-  for (const p of noise) {
-    if (lower.startsWith(p)) return true;
-  }
-  return false;
-}
-
 /**
  * 故障运维诊断 · opencode 事件 → 任务域事件 合成器（真实路径专用，零外部依赖、可单测）。
  *
@@ -39,22 +18,23 @@ export const REPORT_PATH_MARKERS = ["RCA报告路径：", "报告已写入："] 
 
 /** 阶段关键词 → 阶段。命中即把阶段推进到不低于该阶段（forward-only）。 */
 const STAGE_KEYWORDS: { stage: Stage; words: string[] }[] = [
-  // 文本关键词只保留最基础的「数据采集」阶段，用于 agent 开场白后即推进。
-  // 「数据分析」「故障定位」「生成报告」全部依赖工具调用事件推进
+  // 文本关键词只保留最基础的「计划构建」阶段，用于 agent 开场白后即推进。
+  // 「数据采集」「根因分析」「报告生成」全部依赖工具调用事件推进
   // （SUBAGENT_STAGE / TOOL_STAGE），避免计划文本中包含的 agent 名导致过早跳阶段。
-  { stage: "数据采集", words: ["fuxi", "伏羲", "诊断计划", "计划构建", "排查方案"] },
+  { stage: "计划构建", words: ["fuxi", "伏羲", "诊断计划", "计划构建", "排查方案"] },
 ];
 
 /** 工具名 → 触达的阶段（部分工具能直接标定阶段）。 */
 const TOOL_STAGE: Record<string, Stage> = {
-  report_visualization: "生成报告",
+  report_visualization: "报告生成",
 };
 
 /** 子代理类型 → 触达的阶段（比文本关键词更可靠，避免计划文本误匹配）。 */
 const SUBAGENT_STAGE: Record<string, Stage> = {
-  "fuxi-sub": "数据采集",
-  "dayu": "数据分析",
-  "baize": "故障定位",
+  "fuxi-sub": "计划构建",
+  "dayu":     "数据采集",
+  "kuafu":    "数据采集",
+  "baize":    "根因分析",
 };
 
 export interface TaskSynthState {
@@ -67,7 +47,7 @@ export interface TaskSynthState {
 }
 
 export function initTaskSynthState(): TaskSynthState {
-  // 起点为「排队中」，使首个「数据采集」阶段也能作为一次切换被吐出。
+  // 起点为「排队中」，使首个「计划构建」阶段也能作为一次切换被吐出。
   return { stageIndex: STAGE_ORDER.indexOf("排队中"), lineBuf: "", reportPath: null };
 }
 
@@ -110,7 +90,7 @@ function pushTextDelta(state: TaskSynthState, delta: string, emits: TaskDriverEv
   while ((nl = state.lineBuf.indexOf("\n")) >= 0) {
     const line = state.lineBuf.slice(0, nl).trim();
     state.lineBuf = state.lineBuf.slice(nl + 1);
-    if (line && !isNoiseLine(line)) emits.push({ type: "log", text: line });
+    if (line) emits.push({ type: "log", text: line });
   }
 }
 
@@ -149,6 +129,13 @@ export function reduceTaskEvent(state: TaskSynthState, ev: OpencodeEventPayload)
       const out = p.part.state?.output;
       if (typeof out === "string" && out) {
         scanText(state, out, emits);
+        // 输出子代理内部执行内容（仅 task 工具，按行拆分）
+        if (tool === "task") {
+          for (const line of out.split("\n")) {
+            const t = line.trim();
+            if (t) emits.push({ type: "log", text: `  ${t}` });
+          }
+        }
         // 捕获 report_visualization 工具产出的 HTML 路径
         // 其输出格式为: "Successfully converted to HTML: /path/to/file.html"
         if (tool.toLowerCase() === "report_visualization") {
@@ -172,6 +159,6 @@ export function flushTaskSynth(state: TaskSynthState): TaskDriverEvent[] {
   const emits: TaskDriverEvent[] = [];
   const rest = state.lineBuf.trim();
   state.lineBuf = "";
-  if (rest && !isNoiseLine(rest)) emits.push({ type: "log", text: rest });
+  if (rest) emits.push({ type: "log", text: rest });
   return emits;
 }

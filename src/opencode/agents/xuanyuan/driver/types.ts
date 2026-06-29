@@ -15,16 +15,16 @@
  */
 
 /** 进度阶段标签（与前端 stepper / server STAGES 一致）。 */
-export const STAGE_ORDER = ["排队中", "数据采集", "数据分析", "故障定位", "生成报告", "完成"] as const;
+export const STAGE_ORDER = ["排队中", "计划构建", "数据采集", "根因分析", "报告生成", "完成"] as const;
 export type Stage = (typeof STAGE_ORDER)[number];
 
 /** 每个阶段对应的进度百分比（单调递增，与 stepper 节点对齐）。 */
 export const STAGE_PROGRESS: Record<Stage, number> = {
-  排队中: 4,
-  数据采集: 25,
-  数据分析: 55,
-  故障定位: 78,
-  生成报告: 92,
+  排队中: 5,
+  计划构建: 25,
+  数据采集: 45,
+  根因分析: 65,
+  报告生成: 85,
   完成: 100,
 };
 

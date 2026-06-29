@@ -40,7 +40,7 @@ export default function HtmlReportView({ report }: { report: HtmlReport }) {
         title="诊断报告"
         srcDoc={report.html}
         onLoad={fit}
-        sandbox="allow-same-origin"
+        sandbox="allow-same-origin allow-scripts"
         style={{ width: "100%", border: "1px solid var(--line, #e2e8f0)", borderRadius: 10, background: "#fff" }}
       />
     </div>
