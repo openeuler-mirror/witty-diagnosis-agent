@@ -5,6 +5,12 @@ set -euo pipefail
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 SERVER_DIR="$HERE/server"
 FRONTEND_DIR="$HERE/frontend"
+LOG_DIR="$HOME/.witty-diagnosis-agent"
+LOG_FILE="$LOG_DIR/web-server.log"
+
+mkdir -p "$LOG_DIR"
+# 所有输出同时打印到终端和日志文件
+exec > >(tee "$LOG_FILE") 2>&1
 
 # ---------- 前置检查 ----------
 
@@ -45,6 +51,8 @@ echo "    后端 PID=$SERVER_PID"
 # ---------- 等待健康检查 ----------
 
 echo "    等待 /api/health ..."
+# 等后端初始化完成再开始检查
+sleep 2
 HEALTH_OK=false
 FIRST_FAIL=""
 LAST_FAIL=""
@@ -52,7 +60,7 @@ for i in $(seq 1 60); do
   # 检查后端进程是否还活着
   if ! kill -0 "$SERVER_PID" 2>/dev/null; then
     echo "    ⚠ 后端进程已异常退出"
-    echo "    查看后端输出以获取详细错误信息"
+    echo "    查看日志：$LOG_FILE"
     exit 1
   fi
 
@@ -61,6 +69,7 @@ for i in $(seq 1 60); do
     echo "    后端就绪：http://127.0.0.1:${PORT}/api/health"
     break
   } || {
+    echo "    curl 失败(#$i): $OUTPUT"
     [ -z "$FIRST_FAIL" ] && FIRST_FAIL="$OUTPUT"
     LAST_FAIL="$OUTPUT"
   }
@@ -71,6 +80,7 @@ if [ "$HEALTH_OK" = false ]; then
   echo "    ⚠ 后端启动失败"
   echo "    首次错误：$FIRST_FAIL"
   echo "    最后错误：$LAST_FAIL"
+  echo "    查看日志：$LOG_FILE"
   exit 1
 fi
 
