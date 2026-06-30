@@ -7,6 +7,25 @@ HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 SERVER_DIR="$HERE/server"
 FRONTEND_DIR="$HERE/frontend"
 
+# ---------- 系统依赖检查 ----------
+
+if command -v ansible &>/dev/null; then
+  echo "    ✅ Ansible 已安装"
+else
+  echo "    ⚠ 未检测到 Ansible，在线诊断需要此工具"
+  echo "    安装命令：sudo apt-get install ansible"
+  echo "    或参考：https://docs.ansible.com/ansible/latest/installation_guide/"
+  echo "    （如果仅使用离线诊断模式，可忽略此提示）"
+fi
+
+if command -v sshpass &>/dev/null; then
+  echo "    ✅ sshpass 已安装"
+else
+  echo "    ⚠ 未检测到 sshpass，在线诊断连通性测试需要此工具"
+  echo "    安装命令：sudo apt-get install sshpass"
+  echo "    （如果仅使用离线诊断模式，可忽略此提示）"
+fi
+
 echo "==> [1/3] 安装后端依赖"
 cd "$SERVER_DIR"
 [ -f .env ] || cp .env.example .env
