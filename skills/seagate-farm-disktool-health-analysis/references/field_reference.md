@@ -24,11 +24,14 @@
 
 **FARM = Field-Accessible Reliability Metrics**,希捷专有"现场可读可靠性指标",比标准 SMART (CrystalDiskInfo 约 30 项) 详细得多,关键差异是**把指标拆到每个磁头**。
 
-本技能处理的是 **FARM (ATA/SATA) 日志的单帧导出**,按 IP 目录组织,每盘两种来源:
+本技能处理的是 **FARM (ATA/SATA) 日志的单帧导出**,按子目录组织 (每盘一个目录,目录名不限——脚本递归遍历、只认里面的 `*_FARM_*.{json,txt}`,IP/SN 从文件名解析而非目录名),每盘两种来源 (文件名以现场主流的时间戳前置格式列出;SN 前置的旧格式脚本亦兼容):
 | 文件 | 工具 | 规模 | 内容 |
 |---|---|---|---|
-| `<SN>_FARM_<ts>_<ip>_<dev>.json` | openSeaChest_LogParser | ~1178 行 | **最全**:整盘 + 完整逐头通道/H2SAT/FAFH/逐头不可恢复读/Flash LED 事件/Depop |
-| `<SN>_FARM_disktool_<ts>_<ip>_<dev>.txt` | 华为 disktool | ~590 行 | **关键子集 (约 40%)**:整盘指标 + 部分逐头块 (飞高/MRR/TMD/DOS刷新),无逐头重分配/不可恢复读、无 Flash LED、无型号/Depop |
+| `<ts>_<SN>_FARM_<ip>_<dev>.json` | openSeaChest_LogParser | ~1178 行 | **最全**:整盘 + 完整逐头通道/H2SAT/FAFH/逐头不可恢复读/Flash LED 事件/Depop |
+| `<ts>_<SN>_FARM_<ip>_<dev>_disktool.txt` | 华为 disktool | ~590 行 | **关键子集 (约 40%)**:整盘指标 + 部分逐头块 (飞高/MRR/TMD/DOS刷新),无逐头重分配/不可恢复读、无 Flash LED、无型号/Depop |
+
+> [!NOTE]
+> 父目录 (如 `log/`) 下除盘目录外,可能还混有其它非 FARM 内容 (如主机 OS 日志、采集脚本目录)——脚本递归遍历所有子目录、只认 `*_FARM_*.{json,txt}`,其余自动跳过;盘目录名不限,IP/SN 均从**文件名**解析而非目录名。
 
 > [!NOTE]
 > **与 SM2 日志的根本区别**:SM2 是**时间序列** (每磁头一个约 1000 条按 `poh` 排序的 CSV);FARM 是**单帧快照** (一份 `copy 0`)。FARM 的 JSON 里虽出现多个同名 "copy 0" 键,实为重复键,Python 解析后只保留一份——**没有第二帧可对比趋势**。因此本技能不做"时间方向"判定。
@@ -58,7 +61,7 @@
 |---|---|---|---|---|
 | 1 | **盘片表面 / 坏扇区** | `5`,`197`,`198` | `Reallocated Sectors`、`Reallocated Candidate`、`Unrecoverable Read Errors`、逐头 `Reallocated Sectors by Head`、逐头 `Reallocation Candidate by Head`、`Cum Lifetime Unrecoverable by head {Unique,Repeating}` | ✅ 优于标准 (逐头) |
 | 2 | **磁头 / 读写通道 / ECC** | `1`,`187`,`195` | 逐头 `Fly height clearance delta {outer,middle,inner}` (飞高/TFC)、`MR Head Resistance`+`Second MR Head Resistance` (MRR)、`Current H2SAT {amplitude,iterations,asymmetry,bits in error}`、`Bit Error Rate by Head` | ✅ 远优于标准 (逐头逐区) |
-| 3 | **机械 / 马达 / 伺服** | `3`,`4`,`10`,`192` | `Mechanical Start Failures`、`Spin Retry Count`、`Helium Pressure Threshold Tripped`、`Current Motor Power`、`Servo Status`、逐头 `Number of TMD`、`Velocity Observer`、`High Priority Unload Events` | ⚠️ 部分 (无 spin-up time 序列) |
+| 3 | **机械 / 马达 / 伺服** | `3`,`4`,`10`,`192` | `Mechanical Start Failures`、`Spin Retry Count`、`Helium Pressure Threshold Tripped`、`Current Motor Power`、`Servo Status`、逐头 `Number of TMD`、`Velocity Observer`、`High Priority Unload Events`、逐头 `DOS Write Refresh Count`+`DOS Write Count Threshold`(→"磁头/组件退化"确定性规则,见第 6/7/9 章) | ⚠️ 部分 (无 spin-up time 序列) |
 | 4 | **接口 / 传输 / 线缆** | `188`,`199` | `Interface CRC Errors` (≈`199`,**ATA 有**)、`CTO Count Total`+`Over 5s`+`Over 7.5s` (≈`188`)、`Hardware Reset count` | ✅ 优于 SAS (含 CRC) |
 | 5 | **温度 / 环境 / 振动** | `190`,`191`,`194` | `Current/Highest/Lowest Temperature`、`Time In Over Temperature`、`Over-Limit Shock Events`、`Current Relative Humidity`、`High Fly Write Count`、`RV Absolute Mean` | ✅ 优于标准 (含湿度) |
 | 6 | **寿命 / 工况** | `9`,`12`,`241`,`242` | `Power on Hour`、`Power Cycle count`、`Rated Workload %`、`Total Read/Write Commands`、`Logical Sectors Read/Written`、`Head Load Events` | ✅ |
@@ -95,11 +98,20 @@
 | `h_cum_uniq[i]` | `Cum Lifetime Unrecoverable by head i → Unique` | — | ❌ | — |
 | `h_mrr[i]` | `MR Head Resistance from Head i` | `MR Head Resistance ... by Head` 块 | ✅ | — |
 | `h_fafh_{od,md,id}[i]` | `Fly height clearance delta {outer,middle,inner} by Head i` | `Applied fly height clearance delta ... Diameter {0-Outer,2-Middle,1-Inner}` 块 | ✅ | 189 |
-| `h_dos_refresh[i]` | `DOS Write Refresh Count by Head i` | `DOS Write Refresh Count` 块 | ✅ | — |
-| `h_tmd[i]` | `Number of TMD by Head i` | `Number of TMD ... by Head` 块 | ✅ | — |
+| `h_dos_refresh[i]` | `DOS Write Refresh Count by Head i` | `#DOS Write Refresh Count` 块(标题**不含** "by Head") | ✅ | — |
+| `h_dos_thresh[i]` | `DOS Write Count Threshold by Head i`(已核对真实键名) | `#DOS Write Count Threshold` 块 | ⚠️ 常缺失 | — |
+| `h_velobs[i]` | `Velocity Observer by Head i` | `#Velocity Observer over last 3 SMART Summary Frames by Head` 块 | ✅ | — |
+| `h_tmd[i]` | `Number of TMD by Head i` | `#Number of TMD over last 3 SMART Summary Frames by Head` 块 | ✅ | — |
 
 > [!NOTE]
 > **单位/进制清洗** (脚本已自动处理):TXT 湿度为 `.1%` 需除以 10;部分 RAW 值为十六进制字符串 (`0x...`) 需转十进制;数值字段可能带引号 (`'42.00'`)。
+
+> [!WARNING]
+> **`DOS Write Count Threshold` 常缺失**:真实 dump 中该逐头字段**并非总是存在**——JSON 里部分盘有、部分盘无;disktool TXT 则**普遍不含**此块。缺失时用户规则中 "DOS Write Count Threshold 非0 且 DOS Write Refresh Count > 1000×Threshold" 这一半**无法评判**(脚本静默跳过该头这一判据,不误触发也不报错),此时组件退化判定只能靠 `Velocity Observer > 200` 那一半。因此**同一块盘 JSON 与 TXT 的组件退化占比可能不同**(JSON 有阈值→占比更全,TXT 无阈值→常偏低);JSON 优先即为此。
+>
+> **TXT 逐头块解析**:disktool TXT 的逐头块是"一行 `#块标题`(无冒号值)+ 若干 `headN : 值` 行"。绝大多数块标题含 "by Head",但 `#DOS Write Refresh Count` **不含**——脚本 `load_txt()` 已改为"任何无值的 `#标题` 行都开启逐头块",故此块能正确捕获。
+>
+> **FAFH 单位差异**:disktool TXT 的飞高值单位为"千分之一埃",与 JSON 已换算值**量纲不同**(TXT 数量级更大);因 FAFH 只做**同盘逐头相对离群**(中位×2.0),量纲差异不影响判定,两源各自内部比较即可,不可跨源比绝对值。
 
 ---
 
@@ -130,7 +142,9 @@
 | `Fly height clearance delta {outer,middle,inner}` | 飞高/TFC 间隙偏移 (外/中/内圈) | ⚠️ **出厂校准量,逐头天然差异大** (种群中位 43~323 不等)。**单独离群只算关注**,须与同头坏道共振才升退化 |
 | `MR Head Resistance` / `Second MR Head Resistance` | 磁阻读头电阻 (MRR) | `0xFFFF` = 磁头开路 (硬故障);偏离种群中位为边缘磁头。注:本批 dump 中常为 0 (未填充) |
 | `Current H2SAT {amplitude,iterations,asymmetry}` | 读通道译码努力/信号 | 有值时:幅度偏低/迭代偏高 = 读通道劣化。本批 dump 中多为 0 |
-| `DOS Write Refresh Count` / `Number of TMD` / `Velocity Observer` | 后台刷新 / 热机械抖动 / 速度观测 | 辅助佐证该磁头的工作压力与伺服状态 |
+| `DOS Write Refresh Count` / `Number of TMD` | 后台刷新 / 热机械抖动 | 辅助佐证该磁头的工作压力与伺服状态 |
+| `Velocity Observer` | 磁头速度观测(伺服) | ⚠️ **确定性规则**:> 200 直接判该头"组件退化"(见第 6/7/9 章),不属于种群相对/关注-升级模式,是绝对阈值 |
+| `DOS Write Count Threshold` | 该磁头 DOS 写刷新次数门限 | ⚠️ **确定性规则**:非 0 且 `DOS Write Refresh Count` > 1000×该值 → 判该头"组件退化"(见第 6/7/9 章) |
 
 > [!NOTE]
 > **判读心法 —— 种群相对法**
@@ -153,6 +167,9 @@
 | 逐头 `FAFH` 偏移 | 处于同族中位附近 | 超出中位 × 2.0 (`OUTLIER_HI`,**仅关注**) | 与同头坏道共振 → 退化 |
 | `MR Head Resistance` | 处于同盘正常区间 | 偏离正常范围 | `= 0xFFFF` (磁头开路) |
 | `Flash LED Assert` / `Helium Tripped` | 0 | — | **任意 > 0 → 失效级** |
+| 逐头 `Velocity Observer` | ≤ 200 | — | **> 200 (`VELOBS_WARN`) → 该头"组件退化"(绝对阈值,非关注)** |
+| 逐头 `DOS Write Refresh Count` | ≤ 1000×`Threshold` | — | **`Threshold` 非0 且 `Refresh Count` > 1000×`Threshold` (`DOS_THRESH_MULT`) → 该头"组件退化"** |
+| 组件退化磁头占比(占全盘磁头数) | 0% | — | **≥ 50% (`HEAD_DEGRADE_RATIO_CRIT`) → 终态"损坏",覆盖其它类别;<50%(且>0)→ 终态"健康"+DEPOP处置(见第 9 章)** |
 
 > [!NOTE]
 > 阈值集中定义在 `scripts/analyze_farm.py` 顶部 (如 `TEMP_*`、`SHOCK_WARN`、`CTO_WARN`、`OUTLIER_HI`、`HEAD_REALLOC_WARN`),针对不同机型分析时可按需微调。
@@ -172,6 +189,7 @@
 | **整盘介质退化 (未定位到磁头)** | 整盘重分配/不可恢复读很大,但逐头数全 0 (本帧未填充逐头分布,或为 txt 来源) | 退化 | 备份数据;候选>0 倾向换盘,候选=0 可加强监控 |
 | **某类别异常** | 无具体磁头失效,但盘级某项分类 (如接口 CRC、温度) 达"退化" | 严重异常 | 按故障类别特定处置 (改环境/换线) |
 | **固件/硬件级失效** | `Flash LED Assert` > 0 / `Helium Tripped` > 0 / ≥ 2 头 MRR=0xFFFF | 失效 | **低**,优先带外重启 + 备份 + 换盘 |
+| **磁头/组件退化(确定性规则,覆盖以上所有行)** | 存在 `Velocity Observer`>200 或 `DOS Write Refresh Count`>1000×`Threshold` 的磁头 | 占比≥50% → **损坏**;占比<50%(且>0) → **健康** | 不是"可行性评估",是固定处置文案:见第 9 章。命中时**直接作为终态结论输出,不再综合本表以上其它行的判定** |
 
 > [!NOTE]
 > **"退化进行中 vs 暂稳"判据 (单快照近似,替代 SM2 的趋势)**
@@ -211,6 +229,23 @@
 - **温度 / 振动类异常**:改善机柜散热、优化减震后重测,通常不是盘体本身坏道。
 - **固件 / 硬件级失效** (Flash LED Assert / 氦气泄漏 / 多头开路):磁盘多已无响应,通过 IPMI/带外管理电源重启,恢复后备份并换盘,排查是否需升级固件。
 - **机群级处置优先级**:按"机群汇总表""差 → 好"顺序处理。脚本同评级下按"不可恢复读 + 整盘重分配 + 候选×10 + 退化头数×1000 + 活跃×5000"加权排序,优先处置失效与退化活跃度高、受影响磁头多的磁盘。
+- **磁头/组件退化(确定性规则,占比≥50%,判定"损坏")**:不建议修复,建议备份数据后报废更换硬盘。
+- **磁头/组件退化(确定性规则,占比<50%,判定"健康")**:
+  1. 建议重新挂载硬盘:
+     ```bash
+     # 按设备名卸载
+     umount /dev/sdx
+     # 重新挂载 mount,格式:mount 设备路径 挂载目录
+     mount /dev/sdx /mnt/data
+     ```
+  2. 建议将退化的磁头通过 DEPOP 隔离:
+     ```bash
+     # 设备待机、磁头归位
+     seachest_power --standbyImmediate -d /dev/sdb
+     # 休眠锁磁头
+     seachest_power --sleepImmediate -d /dev/sdb
+     ```
+  上述两条为固定处置文案(脚本 `ACTION_COMPONENT_SCRAP` / `ACTION_COMPONENT_DEPOP` 常量),命中时**直接作为该盘的最终结论与处置建议输出,覆盖本章其它按类别给出的处置方法**。
 
 ---
 

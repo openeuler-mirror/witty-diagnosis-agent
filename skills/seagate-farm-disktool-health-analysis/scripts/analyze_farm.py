@@ -44,6 +44,9 @@ HUMID_WARN = 80.0
 CTO_WARN = 1                            # 命令超时累计 >=1 即关注(单帧无趋势,保守取关注)
 OUTLIER_HI = 2.00          # 种群相对:abs(delta) > 中位 × 2.0 视为偏高离群(FAFH 飞高偏移用)
 HEAD_REALLOC_WARN = 1      # 逐头重分配 >=1 即记为坏道
+VELOBS_WARN = 200                       # 逐头 Velocity Observer > 200 视为该头组件退化
+DOS_THRESH_MULT = 1000                  # 逐头 DOS Write Refresh Count > 1000×该头 Threshold 视为组件退化
+HEAD_DEGRADE_RATIO_CRIT = 0.5           # 组件退化磁头占比 >= 该值 -> 终态判"损坏"(覆盖其它类别结论)
 
 SEV_LABEL = {0: "健康", 1: "关注", 2: "退化", 3: "失效"}
 COV_FULL, COV_PART, COV_NA = "可分析(≥标准SMART)", "部分可分析", "不适用"
@@ -89,18 +92,40 @@ def median(vals):
 
 
 # --------------------------------------------------------------------------- discover & pair
-def discover_disks(root, source):
-    """扫描 root,按目录(IP)+SN 分盘,选定每盘的数据源文件。
-    返回 list[dict(sn, dirpath, json, txt, use, ip)]。use ∈ {'json','txt'}。"""
-    pat = re.compile(
+# 两种在实际现场观察到的文件名格式,顺序即匹配优先级(先到先得,命中第一个就不再试第二个):
+#   A) 标准格式(采集脚本 step8_batch_collect_seagate_farm 系列产出,现场多数目录用这种):
+#      <SN>_FARM_[disktool_]<ts>_<ip>_<dev>.{json,txt}
+#   B) 时间戳前置格式(个别目录/工具产出,disktool 标记挪到文件名末尾而非紧跟 FARM_):
+#      <ts>_<SN>_FARM_<ip>_<dev>[_disktool].{json,txt}
+FARM_NAME_PATTERNS = [
+    re.compile(
         r"(?P<sn>[^_/\\]+)_FARM_(?:(?P<disktool>disktool)_)?"
         r"(?P<ts>\d{8}T\d{6})_(?P<ip>[\d.]+)_(?P<dev>[^.]+)\.(?P<ext>json|txt)$",
-        re.I)
+        re.I),
+    re.compile(
+        r"(?P<ts>\d{8}T\d{6})_(?P<sn>[^_/\\]+)_FARM_(?P<ip>[\d.]+)_"
+        r"(?P<dev>[^.]+?)(?:_(?P<disktool>disktool))?\.(?P<ext>json|txt)$",
+        re.I),
+]
+
+
+def _match_farm_name(name):
+    for pat in FARM_NAME_PATTERNS:
+        m = pat.match(name)
+        if m:
+            return m
+    return None
+
+
+def discover_disks(root, source):
+    """扫描 root,按目录(IP)+SN 分盘,选定每盘的数据源文件。
+    返回 list[dict(sn, dirpath, json, txt, use, ip)]。use ∈ {'json','txt'}。
+    文件名依次尝试 FARM_NAME_PATTERNS 中的每种格式(见其注释),兼容现场不同采集工具的命名差异。"""
     # group by (dirpath, sn)
     groups = {}
     for dirpath, _dirs, files in os.walk(root):
         for name in files:
-            m = pat.match(name)
+            m = _match_farm_name(name)
             if not m:
                 continue
             key = (dirpath, m.group("sn"))
@@ -143,6 +168,15 @@ def _heads_from_flat(section, n_heads):
             arr.extend([None] * (idx + 1 - len(arr)))
         arr[idx] = v
     return out
+
+
+def _hf_pick(hf, n_heads, *names):
+    """在反聚合结果 hf 中按多个候选字段名(原始拼写可能不同)依次尝试取逐头数组,取第一个命中的。"""
+    for name in names:
+        arr = hf.get(name)
+        if arr and any(v is not None for v in arr):
+            return arr
+    return [None] * n_heads
 
 
 def load_json(path):
@@ -233,6 +267,8 @@ def load_json(path):
         "h_fafh_id": [to_float(x) for x in hf.get("Fly height clearance delta inner", [None] * n)],
         "h_h2sat_amp": [to_int(x) for x in hf.get("Current H2SAT amplitude", [None] * n)],
         "h_dos_refresh": [to_int(x) for x in hf.get("DOS Write Refresh Count", [None] * n)],
+        "h_dos_thresh": [to_int(x) for x in _hf_pick(
+            hf, n, "DOS Write Count Threshold", "DOS Write Refresh Count Threshold", "DOS Write Threshold")],
         "h_tmd": [to_int(x) for x in hf.get("Number of TMD", [None] * n)],
         "h_velobs": [to_int(x) for x in hf.get("Velocity Observer", [None] * n)],
     }
@@ -265,9 +301,11 @@ def load_txt(path):
             # a "#Title by Head" line opens a per-head block
             cur_block = key if re.search(r"by (Drive )?Head", key) else None
             continue
-        # a "#Title" with no value but per-head rows follow (e.g. fly height delta)
+        # a "#Title" with NO colon/value is always a block header in disktool TXT; the
+        # following "headN : v" rows attach to it. Some real blocks (如 "#DOS Write Refresh
+        # Count") don't spell out "by Head", so open on any value-less #Title, not just those.
         mt = re.match(r"^#\s*(.+?)\s*$", ln)
-        if mt and ("per head" in mt.group(1).lower() or "by head" in mt.group(1).lower()):
+        if mt:
             cur_block = mt.group(1).strip()
 
     def sc(key, default=None):
@@ -344,6 +382,9 @@ def load_txt(path):
         "h_fafh_id": [to_float(x) for x in (harr("Diameter 1-Inner") or [None] * n)],
         "h_h2sat_amp": [None] * n,
         "h_dos_refresh": [to_int(x) for x in (harr("DOS Write Refresh") or [None] * n)],
+        "h_dos_thresh": [to_int(x) for x in (
+            harr("DOS Write Count Threshold") or harr("DOS Write Refresh Count Threshold")
+            or harr("DOS Write Threshold") or [None] * n)],
         "h_tmd": [to_int(x) for x in (harr("Number of TMD") or [None] * n)],
         "h_velobs": [to_int(x) for x in (harr("Velocity Observer over") or [None] * n)],
     }
@@ -364,6 +405,23 @@ def fafh_outliers(m):
     med = statistics.median(present)
     out = {i for i, v in pairs if v is not None and med and v > med * OUTLIER_HI}
     return out, med
+
+
+def component_degraded_heads(m):
+    """磁头/组件退化判据(用户规则,归入类3 机械/马达/伺服):
+    逐头满足以下任一即判该头组件退化 —— (a) Velocity Observer > VELOBS_WARN;
+    (b) 该头 DOS Write Count Threshold 非0,且 DOS Write Refresh Count > DOS_THRESH_MULT × Threshold。
+    返回退化磁头下标列表;磁盘级占比由调用方(classify)按此结果 ÷ 总头数计算。"""
+    n = m["heads"]
+    bad = []
+    for i in range(n):
+        v = m["h_velobs"][i]
+        velobs_bad = v is not None and v > VELOBS_WARN
+        t, r = m["h_dos_thresh"][i], m["h_dos_refresh"][i]
+        dos_bad = t not in (None, 0) and r is not None and r > DOS_THRESH_MULT * t
+        if velobs_bad or dos_bad:
+            bad.append(i)
+    return bad
 
 
 # --------------------------------------------------------------------------- 8 categories
@@ -446,6 +504,22 @@ def categorize(m):
         f.append("伺服状态码 servo_status=%d" % m["servo_status"]); sev = max(sev, 1)
     if m["motor_power"] is not None:
         f.append("主轴马达功率 motor_power=%s" % m["motor_power"])
+    comp_bad = component_degraded_heads(m)
+    if comp_bad:
+        ratio = len(comp_bad) / n if n else 0.0
+        detail = []
+        for i in comp_bad:
+            v = m["h_velobs"][i]
+            t, r = m["h_dos_thresh"][i], m["h_dos_refresh"][i]
+            reasons = []
+            if v is not None and v > VELOBS_WARN:
+                reasons.append("VelocityObserver=%s>%d" % (v, VELOBS_WARN))
+            if t not in (None, 0) and r is not None and r > DOS_THRESH_MULT * t:
+                reasons.append("DOSWriteRefresh=%s>%d×Threshold(%s)" % (r, DOS_THRESH_MULT, t))
+            detail.append("H%d(%s)" % (i, "; ".join(reasons)))
+        f.append("磁头/组件退化判据触发,占比 %d/%d=%.0f%%: %s" % (
+            len(comp_bad), n, ratio * 100, "; ".join(detail)))
+        sev = max(sev, 3 if ratio >= HEAD_DEGRADE_RATIO_CRIT else 2)
     cats.append({"cat": 3, "name": "机械/马达/伺服", "coverage": COV_PART, "severity": sev,
                  "findings": f or ["主轴/伺服/机械启动无明显异常"]})
 
@@ -505,11 +579,39 @@ def categorize(m):
     # ---- 8 SSD ----
     cats.append({"cat": 8, "name": "SSD磨损(本盘为HDD)", "coverage": COV_NA, "severity": 0,
                  "findings": ["本盘有磁头/飞高/主轴,判定为机械硬盘,SSD 磨损类不适用"]})
-    return cats, surf, chan, fafh_med
+    return cats, surf, chan, fafh_med, comp_bad
 
 
-def classify(m, cats, surf, chan):
+ACTION_COMPONENT_SCRAP = "不建议修复,建议备份数据后报废更换硬盘。"
+ACTION_COMPONENT_DEPOP = (
+    "1.建议重新挂载硬盘:\n"
+    "# 按设备名卸载\n"
+    "umount /dev/sdx\n"
+    "# 重新挂载 mount,格式:mount 设备路径 挂载目录\n"
+    "mount /dev/sdx /mnt/data\n"
+    "2.建议将退化的磁头通过DEPOP隔离:\n"
+    "# 设备待机、磁头归位\n"
+    "seachest_power --standbyImmediate -d /dev/sdb\n"
+    "# 休眠锁磁头\n"
+    "seachest_power --sleepImmediate -d /dev/sdb")
+
+
+def classify(m, cats, surf, chan, comp_bad):
     n = m["heads"]
+    # 用户规则(类3 磁头/组件退化,Velocity Observer / DOS Write 阈值):一旦触发,
+    # 结论按固定规则表直接给出,覆盖其它类别的发现——不再由模型自由判断处置意见。
+    if comp_bad:
+        ratio = len(comp_bad) / n if n else 0.0
+        if ratio >= HEAD_DEGRADE_RATIO_CRIT:
+            mode = "多磁头组件退化(Velocity Observer/DOS Write 超限,占比%.0f%%≥50%%)" % (ratio * 100)
+            return {"mode": mode, "verdict": "损坏", "severity": 3, "action": ACTION_COMPONENT_SCRAP,
+                    "bad_heads": comp_bad, "active": True,
+                    "weight": 10_000_000 + len(comp_bad), "top_cat": "3 机械/马达/伺服"}
+        else:
+            mode = "磁头组件退化(Velocity Observer/DOS Write 超限,占比%.0f%%<50%%)" % (ratio * 100)
+            return {"mode": mode, "verdict": "健康", "severity": 0, "action": ACTION_COMPONENT_DEPOP,
+                    "bad_heads": comp_bad, "active": False,
+                    "weight": len(comp_bad), "top_cat": "3 机械/马达/伺服"}
     # "退化磁头"判据:有介质损伤(类1 surf>=2)或磁头硬故障(通道 sev3,如 MRR 开路)。
     # 仅 FAFH 校准离群(chan==1)不算退化头,避免把出厂校准差异误判成失效。
     bad = [i for i in range(n) if surf[i] >= 2 or chan[i] >= 3]
@@ -561,10 +663,10 @@ def analyze_disk(g):
     m = load_json(g["json"]) if g["use"] == "json" else load_txt(g["txt"])
     m["sn"] = m.get("sn") or g["sn"]
     m["ip"] = g["ip"]
-    cats, surf, chan, fafh_med = categorize(m)
-    summary = classify(m, cats, surf, chan)
+    cats, surf, chan, fafh_med, comp_bad = categorize(m)
+    summary = classify(m, cats, surf, chan, comp_bad)
     return {"m": m, "cats": cats, "surf": surf, "chan": chan,
-            "fafh_med": fafh_med, "summary": summary}
+            "fafh_med": fafh_med, "comp_bad": comp_bad, "summary": summary}
 
 
 # --------------------------------------------------------------------------- render
@@ -578,10 +680,11 @@ def render(root, results):
     for r in order:
         m, sm = r["m"], r["summary"]
         bh = ("H" + ", H".join(map(str, sm["bad_heads"]))) if sm["bad_heads"] else "-"
+        act_cell = sm["action"].replace("\n", "<br>")  # 多行处置命令在表格单元格内需转 <br>,避免破坏 markdown 表格
         L.append("| %s | %s | %s | %s | %s | %s | **%s** | %s | %s | %s | %s |" % (
             m.get("ip", "-"), m["sn"], m.get("model") or "-", m.get("firmware") or "-",
             m["heads"], m["source"], SEV_LABEL[sm["severity"]], sm["mode"],
-            sm["top_cat"], bh, sm["action"]))
+            sm["top_cat"], bh, act_cell))
     L.append("")
 
     for r in order:
@@ -606,21 +709,27 @@ def render(root, results):
 
         # 逐头明细(仅 JSON 有完整逐头;TXT 标注)
         L += ["", "### 逐磁头明细", ""]
-        if any(v is not None for v in m["h_realloc"]) or any(v is not None for v in m["h_fafh_od"]):
-            L += ["| Head | 表面 | 通道 | 重分配 | 候选 | 不可恢复读(uniq) | FAFH(O/M/I) | MRR | DOS刷新 | TMD |",
-                  "|---|---|---|---|---|---|---|---|---|---|"]
+        if (any(v is not None for v in m["h_realloc"]) or any(v is not None for v in m["h_fafh_od"])
+                or any(v is not None for v in m["h_velobs"]) or any(v is not None for v in m["h_dos_thresh"])):
+            comp_set = set(r["comp_bad"])
+            L += ["| Head | 表面 | 通道 | 重分配 | 候选 | 不可恢复读(uniq) | FAFH(O/M/I) | MRR | DOS刷新 | DOS阈值 | VelObs | 组件退化 |",
+                  "|---|---|---|---|---|---|---|---|---|---|---|---|"]
             for i in range(m["heads"]):
                 fafh = "%s/%s/%s" % (m["h_fafh_od"][i], m["h_fafh_md"][i], m["h_fafh_id"][i])
-                L.append("| H%d | %s | %s | %s | %s | %s | %s | %s | %s | %s |" % (
+                L.append("| H%d | %s | %s | %s | %s | %s | %s | %s | %s | %s | %s | %s |" % (
                     i, SEV_LABEL[r["surf"][i]], SEV_LABEL[r["chan"][i]],
                     m["h_realloc"][i] if m["h_realloc"][i] is not None else "-",
                     m["h_cand"][i] if m["h_cand"][i] is not None else "-",
                     m["h_cum_uniq"][i] if m["h_cum_uniq"][i] is not None else "-",
                     fafh, m["h_mrr"][i] if m["h_mrr"][i] is not None else "-",
                     m["h_dos_refresh"][i] if m["h_dos_refresh"][i] is not None else "-",
-                    m["h_tmd"][i] if m["h_tmd"][i] is not None else "-"))
+                    m["h_dos_thresh"][i] if m["h_dos_thresh"][i] is not None else "-",
+                    m["h_velobs"][i] if m["h_velobs"][i] is not None else "-",
+                    "是" if i in comp_set else "否"))
             if r["fafh_med"]:
                 L.append("\n_FAFH 同族中位偏移≈%.0f;离群阈值=中位×%.1f_" % (r["fafh_med"], OUTLIER_HI))
+            if r["comp_bad"]:
+                L.append("\n_组件退化判据:VelObs>%d,或 DOS阈值非0 且 DOS刷新>%d×阈值_" % (VELOBS_WARN, DOS_THRESH_MULT))
         else:
             L.append("_本数据源无逐头明细(TXT 仅含部分逐头块);逐头定位见类1发现_")
 
