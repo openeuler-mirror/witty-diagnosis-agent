@@ -1,6 +1,6 @@
 ---
 name: seagate-farm-disktool-health-analysis
-description: 专门分析希捷 (Seagate) 硬盘的 FARM (Field-Accessible Reliability Metrics) 【单帧底层遥测日志】——这是本技能唯一的输入,不涉及 OS/iBMC/RAID 卡系统日志。日志按 IP 目录组织,每盘有两种来源:openSeaChest_LogParser 导出的 .json (字段最全,优先) 与华为 disktool 导出的 .txt (仅关键字段,约 40%,兜底)。基于 FARM 逐磁头遥测,判定磁盘健康、按 8 类故障部位 (盘片坏扇区 / 磁头读写通道 ECC / 机械马达伺服 / 接口传输 / 温度环境振动 / 寿命工况 / 固件服务区 / SSD 磨损) 定位问题、收敛到具体磁头,并给出机群级处置建议。当用户提供 log 下 IP 目录里的 FARM 日志、openSeaChest / disktool 导出的硬盘 .json/.txt 文件,或要做希捷盘 FARM 级健康巡检/多盘体检、定位磁头退化、坏扇区/重分配、不可恢复读、命令超时 (CTO)、飞高 (FAFH) 异常、Mach.2 双致动器 (如 Exos 2X18 / ST20000NM002H) 磁盘诊断时,必须使用本技能。**本技能只读 FARM 单帧遥测,不分析 OS dmesg/syslog/messages、iBMC SEL 或 RAID 卡日志;若需结合服务器系统日志做存储链路/RAID/文件系统只读的时序根因溯源,请改用 `offline-disk-fault-diagnosis` 技能。**
+description: 专门分析希捷 (Seagate) 硬盘的 FARM (Field-Accessible Reliability Metrics) 【单帧底层遥测日志】——这是本技能唯一的输入,不涉及 OS/iBMC/RAID 卡系统日志。基于 FARM 逐磁头遥测,判定磁盘健康、按 8 类故障部位 (盘片坏扇区 / 磁头读写通道 ECC / 机械马达伺服 / 接口传输 / 温度环境振动 / 寿命工况 / 固件服务区 / SSD 磨损) 定位问题、收敛到具体磁头,并给出机群级处置建议。当用户要做希捷盘 FARM 级健康巡检/多盘体检、定位磁头退化、坏扇区/重分配、不可恢复读、命令超时 (CTO)、飞高 (FAFH) 异常、Mach.2 双致动器 (如 Exos 2X18 / ST20000NM002H) 磁盘诊断时,必须使用本技能。**本技能只读 FARM 单帧遥测,不分析 OS dmesg/syslog/messages、iBMC SEL 或 RAID 卡日志;若需结合服务器系统日志做存储链路/RAID/文件系统只读的时序根因溯源,请改用 `offline-disk-fault-diagnosis` 技能。**
 ---
 
 # 希捷 FARM 底层日志磁盘健康分析 (多盘 · 8 类故障部位)
@@ -28,20 +28,21 @@ seagate-farm-disktool-health-analysis/
 
 ## 输入日志目录结构
 
-一个父目录 (通常名为 `log/`),其下每个 **IP 子目录**存放该服务器上**一块盘**的 FARM 日志,每盘有两种来源文件:
+一个父目录,其下每个**子目录**存放该服务器上**一块盘**的 FARM 日志,每盘有两种来源文件。**子目录名不固定** ——脚本递归遍历所有子目录、只认里面的 `*_FARM_*.{json,txt}` 文件,不依赖目录名:
 
 ```
-log/
-├── <IP-A>/
-│   ├── <SN>_FARM_<时间戳>_<IP-A>_<设备名>.json           # openSeaChest 导出,字段最全(优先)
-│   └── <SN>_FARM_disktool_<时间戳>_<IP-A>_<设备名>.txt   # 华为 disktool 导出,关键字段(兜底)
-├── <IP-B>/
-│   ├── <SN>_FARM_<时间戳>_<IP-B>_<设备名>.json
-│   └── <SN>_FARM_disktool_<时间戳>_<IP-B>_<设备名>.txt
+目录/
+├── <任意子目录>/                                           # 目录名不限;每目录一块盘
+│   ├── <时间戳>_<SN>_FARM_<IP>_<设备名>.json               # openSeaChest 导出,字段最全(优先)
+│   └── <时间戳>_<SN>_FARM_<IP>_<设备名>_disktool.txt       # 华为 disktool 导出,关键字段(兜底)
+├── <另一子目录>/
+│   └── ...
 └── ...
 ```
 
-- 文件名格式:`<SN>_FARM_[disktool_]<时间戳>_<IP>_<设备名>.{json,txt}`,带 `disktool` 的为华为 TXT。
+- **文件名格式**:现场主流为时间戳前置的 `<时间戳>_<SN>_FARM_<IP>_<设备名>[_disktool].{json,txt}`,末尾带 `_disktool` 的为华为 TXT;脚本 `discover_disks()` 另兼容 SN 前置的旧格式 `<SN>_FARM_[disktool_]<时间戳>_<IP>_<设备名>.{json,txt}`(细节见 `references/field_reference.md`)。
+  > [!NOTE]
+  > **IP/SN 及分盘均从文件名解析,与目录名无关** (目录名可任意);脚本递归遍历父目录下所有子目录,父目录下若混有非 FARM 内容 (主机 OS 日志、采集脚本等非 `*_FARM_*.{json,txt}` 文件) 会被自动跳过。若脚本报"未找到 FARM 日志"但目录里确实有 FARM 文件,多为文件名格式未被收录,应扩展 `discover_disks()` 的正则,而非绕过脚本手工分析(手工数字未经 8 类判定与确定性规则计算,不能作为最终结论)。
 - **数据源优选**:同盘同时有 json/txt 时**只用 json**;只有 txt 时降级用 txt,并在报告中标注覆盖度下降。json (openSeaChest_LogParser) 是 txt (华为 disktool) 的**超集**——txt 字段量约为 json 的 40%,大量字段仅 json 有,包括整段逐头通道/H2SAT 明细、逐头不可恢复读 (`Cum Lifetime Unrecoverable by head`)、Flash LED 事件、Depop 状态、CTO 5s/7.5s 分档等。
 
 ## 8 类故障部位 (本技能的分析框架)
@@ -52,12 +53,39 @@ log/
 |---|---|---|---|
 | 1 | 盘片表面 / 坏扇区 | ✅ 优于标准 (逐磁头) | `Reallocated Sectors` / `Reallocated Candidate` / `Unrecoverable Read Errors` / 逐头 `Reallocated Sectors by Head` / `Cum Lifetime Unrecoverable by head` |
 | 2 | 磁头 / 读写通道 / ECC | ✅ 远优于标准 | 逐头 `Fly height clearance delta` (飞高 FAFH) / `MR Head Resistance` (MRR) / `H2SAT amplitude·iterations·asymmetry` / `Bit Error Rate by Head` |
-| 3 | 机械 / 马达 / 伺服 | ⚠️ 部分覆盖 | `Mechanical Start Failures` / `Spin Retry` / `Helium Pressure Tripped` / `Motor Power` / 逐头 `TMD` / `Velocity Observer` |
+| 3 | 机械 / 马达 / 伺服 | ⚠️ 部分覆盖 | `Mechanical Start Failures` / `Spin Retry` / `Helium Pressure Tripped` / `Motor Power` / 逐头 `TMD` / `Velocity Observer` / `DOS Write Refresh Count` / `DOS Write Count Threshold`(见下方"磁头/组件退化确定性规则") |
 | 4 | 接口 / 传输 | ✅ 优于 SAS | `Interface CRC Errors` (ATA 有) / `CTO Count Total·5s·7.5s` / `Hardware Reset` |
 | 5 | 温度 / 环境 / 振动 | ✅ 优于标准 | `Highest Temperature` / `Time In Over Temperature` / `Over-Limit Shock` / `Humidity` / `High Fly Write` |
 | 6 | 寿命 / 工况 | ✅ 相当 | `Power on Hour` / `Power Cycle` / `Rated Workload %` / 读写命令与扇区量 |
 | 7 | 固件 / 服务区 | ⚠️ 部分覆盖 (TXT 降级) | `Flash LED (Assert) Events` 及事件表 / `Has Drive been Depopped` / `Depopulation Head Mask` / `Uncorrectable errors` |
 | 8 | SSD 磨损 | ❌ 不适用 | HDD 机械硬盘不适用 |
+
+## 磁头/组件退化确定性规则 (类 3,固定判据 + 固定处置文案)
+
+> [!IMPORTANT]
+> 这是一条**确定性规则**:命中条件后,故障模式、健康结论与处置建议**直接由规则表给出**,不再由模型自由发挥措辞,也**优先于/覆盖**其它 8 类框架下的所有发现。脚本已在 `analyze_farm.py` 的 `component_degraded_heads()` + `classify()` 中实现。
+
+**逐头判据**(满足任一即判该磁头"组件退化"):
+- `Velocity Observer` > 200;或
+- 该头 `DOS Write Count Threshold` 非 0,且 `DOS Write Refresh Count` > 1000 × `DOS Write Count Threshold`。
+
+**磁盘级判定**(按退化磁头数 ÷ 总磁头数的占比):
+
+| 占比 | 结论 | 处置建议(固定文案,原样输出) |
+|---|---|---|
+| ≥ 50% | **损坏** | 不建议修复,建议备份数据后报废更换硬盘。 |
+| < 50%(且 > 0) | **健康** | 1.建议重新挂载硬盘:`umount /dev/sdx` 后 `mount /dev/sdx /mnt/data`;<br>2.建议将退化的磁头通过 DEPOP 隔离:`seachest_power --standbyImmediate -d /dev/sdb`(设备待机、磁头归位)后 `seachest_power --sleepImmediate -d /dev/sdb`(休眠锁磁头)。完整命令见脚本输出或 `references/field_reference.md`。 |
+
+> [!CAUTION]
+> **命中本规则时,报告结论必须逐字复制脚本输出,严禁改判(硬约束)。** 脚本 `classify()` 已算好"健康判定 / 故障模式 / 处置建议"三项;报告里这三项**只能等于脚本输出的原文**,不得由模型另行改写、升级或降级。
+> - **判定占比只看退化磁头数占比这一个量**:占比 < 50% ⇒ **健康**(重新挂载 + DEPOP 隔离);占比 ≥ 50% ⇒ **损坏**(报废换盘)。除此之外**没有第三条路径**。
+> - **严禁用其它现象反向覆盖本规则**:即使同盘同时存在**重分配候选扇区 > 0、不可恢复读 > 0、固件不可纠正错误 > 0** 等第 1/7 类异常,只要退化磁头占比 < 50%,健康判定就**仍是"健康"**,处置就**仍是"重新挂载 + DEPOP 隔离"**——**不得**因这些现象升级为"损坏 / 报废换盘 / P1 Critical"。本规则**优先于/覆盖**其它 8 类发现,方向是"规则覆盖现象",不是"现象覆盖规则"。
+> - **反例(真实踩坑)**:某 18 头盘退化磁头 3 个(占比 17% < 50%),另有 728 个候选扇区 + 33 次不可恢复读。脚本正确判"健康 + DEPOP隔离",但模型被坏扇区带偏、改判成"损坏 / 报废换盘"——这是**错误**的,正是本约束要禁止的。候选扇区/不可恢复读只写进第 1 类"关键发现"用于描述,**不参与**本规则的健康判定。
+
+> [!WARNING]
+> **`DOS Write Count Threshold` 字段常缺失(已核对真实样例)**:该逐头字段的真实键名为 `DOS Write Count Threshold by Head N`(JSON 扁平键 / TXT `#DOS Write Count Threshold` 块),但**并非每块盘都有**——真实 dump 中 JSON 部分盘有部分盘无,**disktool TXT 普遍不含**。缺失时"DOS 阈值"这一半判据无法评判,脚本静默跳过该头(不误触发、不报错),组件退化只能靠 `Velocity Observer > 200` 那一半。**后果**:同一块盘 JSON 与 TXT 的组件退化占比可能不同(JSON 有阈值→占比更全),这也是 json 优先的原因之一。
+>
+> **TXT 逐头块解析已适配真实格式**:disktool TXT 逐头块为"一行 `#块标题`(无冒号值)+ 多行 `headN : 值`";多数标题含 "by Head",但 `#DOS Write Refresh Count` **不含**。脚本 `load_txt()` 已改为"任何无值 `#标题` 行都开启逐头块",确保该块及 Velocity Observer / MRR / FAFH 等逐头块全部正确捕获。
 
 ## 专家判读方法论 (判断逻辑 · 依据 · 流程)
 
@@ -95,7 +123,7 @@ log/
 ### C. 分析流程 (怎么走)
 
 ```
-①归集分组:按 IP 目录(或文件名 SN)分盘;每盘选数据源(json 优先, txt 兜底)
+①归集分组:递归遍历所有子目录,按文件名(SN/IP)分盘(与目录名无关);每盘选数据源(json 优先, txt 兜底);非 `*_FARM_*.{json,txt}` 内容自动跳过
 ②身份识别:读型号/固件/磁头数;18 磁头 + ST20000NM002H = Mach.2 双致动器
 ③逐头体检:每块盘 N 个磁头横向互比,挑出离群头(种群相对法)
 ④整盘↔逐头对账:用逐头数把整盘坏道定位到具体磁头;定不到则诚实标注
@@ -156,7 +184,10 @@ FARM 数据仅反映磁盘内部的物理及遥测指标。若需要论证磁头
 
 ## 报告输出结构
 
-向用户交付报告时,推荐使用以下格式 (脚本的默认输出已基本符合该结构,分析人员只需在结论处补全判读和机群处置意见即可):
+向用户交付报告时,推荐使用以下格式 (脚本的默认输出已基本符合该结构,分析人员只需在结论处补全判读和机群处置意见即可)。
+
+> [!CAUTION]
+> **命中「磁头/组件退化确定性规则」的盘,报告的"健康判定 / 故障级别 / 处置建议"三项只能逐字等于脚本输出,不得因坏扇区/不可恢复读/固件不可纠正错误等其它现象改判为"损坏 / 报废换盘 / P1 Critical"(详见「磁头/组件退化确定性规则」一节的硬约束)。** 此处"补全判读"仅指补充因果链叙述与机群排序,**不包括**改动这三项确定性结论。
 
 ```markdown
 # 希捷 FARM 多盘健康分析报告
@@ -181,10 +212,11 @@ FARM 数据仅反映磁盘内部的物理及遥测指标。若需要论证磁头
 |---|---|---|---|---|---|---|---|---|
 
 ### 4. 研判结论与处置建议
-- **故障模式**:单磁头退化 / 多磁头退化 / 整盘介质退化 / 接口异常 / 固件硬件级失效等
-- **健康判定**:健康 / 亚健康 / 退化 / 失效
+> 命中确定性规则时,下列"故障模式 / 健康判定 / 处置建议"三项**逐字复制脚本输出**,只按占比二选一(<50%→健康+DEPOP隔离;≥50%→损坏+报废换盘),**不得因坏扇区/不可恢复读等其它现象改判**。
+- **故障模式**:单磁头退化 / 多磁头退化 / 整盘介质退化 / 接口异常 / 固件硬件级失效 / 磁头组件退化(确定性规则)等
+- **健康判定**:健康 / 亚健康 / 退化 / 失效 / 损坏(命中"磁头/组件退化"确定性规则时**仅按退化磁头占比**二选一:<50%→健康、≥50%→损坏,见该节硬约束;不受候选扇区/不可恢复读影响)
 - **活跃度**:退化进行中 (候选>0) / 暂稳 (候选=0)
-- **处置建议**:保留监控 / 磁头级降级 / 立即换盘 / 更换线缆等
+- **处置建议**:保留监控 / 磁头级降级 / 立即换盘 / 更换线缆 / (命中确定性规则时)报废换盘或"重新挂载+DEPOP隔离"固定命令等
 
 ## 三、 主机 OS 日志关联分析 (如有)
 - 触发时间对齐 / 主机端报错 (Medium Error / 文件系统只读) / 文件系统修复动作与业务恢复结论
@@ -201,3 +233,4 @@ FARM 数据仅反映磁盘内部的物理及遥测指标。若需要论证磁头
 - **种群相对**:同盘磁头横向互比寻找离群磁头,比绝对阈值更灵敏。
 - **覆盖度要诚实**:第 3/7 类为部分覆盖,第 8 类 (SSD) 对 HDD 不适用,结论中必须明确说明。
 - **结论边界**:FARM 仅能证明磁盘内部物理及通道的退化,对业务的具体影响需结合主机操作系统日志 (如 SCSI Error / XFS 报错) 进行闭环佐证。
+- **磁头/组件退化规则是确定性的,报告须逐字复制、严禁改判**:`Velocity Observer > 200` 或 `DOS Write Refresh Count > 1000×Threshold` 命中的磁头占比 ≥50%/<50%,**仅凭这一个占比**直接决定"损坏/报废换盘"或"健康/DEPOP隔离";健康判定/故障级别/处置三项逐字等于脚本输出,即使同盘有坏扇区/不可恢复读/固件不可纠正错误也**不得**改判为损坏,**覆盖**其它 8 类发现而非被其覆盖(见「磁头/组件退化确定性规则」一节硬约束)。
