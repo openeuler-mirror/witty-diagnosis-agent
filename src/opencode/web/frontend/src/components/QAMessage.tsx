@@ -1,72 +1,50 @@
-import { useState, type ReactNode } from "react";
+import { useState, useRef, useEffect } from "react";
 import type { QaMessage } from "../types";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
+import rehypeRaw from "rehype-raw";
 
 /**
  * 单条消息渲染（FR-001/002/003）：
  *  - user：右侧气泡
- *  - assistant：检索 trace 折叠卡片 + 流式答复（[n] 引用角标 / 行内 code / **bold** / 有序列表）
+ *  - assistant：检索 trace 折叠卡片 + 流式答复（完整 Markdown 渲染）
  *    + 操作行（复制 / 有用·不准 / 查看来源）+ 建议追问
- * 答复用受控 React 渲染（不 dangerouslySetInnerHTML），[n] 角标可点击定位右侧证据。
+ * 答复用 react-markdown 渲染，[n] 角标可点击定位右侧证据。
  */
 
-// 行内：把 [n] / `code` / **bold** 解析为元素，其余为纯文本
-function renderInline(s: string, onCite: (n: number) => void, keyBase: string): ReactNode[] {
-  const out: ReactNode[] = [];
-  const re = /(\[\d+\])|(`[^`]+`)|(\*\*[^*]+\*\*)/g;
-  let last = 0;
-  let m: RegExpExecArray | null;
-  let i = 0;
-  while ((m = re.exec(s)) !== null) {
-    if (m.index > last) out.push(s.slice(last, m.index));
-    const tok = m[0];
-    if (m[1]) {
-      const n = parseInt(tok.slice(1, -1), 10);
-      out.push(
-        <span key={`${keyBase}-c${i}`} className="cite" onClick={() => onCite(n)}>
-          {n}
-        </span>,
-      );
-    } else if (m[2]) {
-      out.push(
-        <code key={`${keyBase}-k${i}`}>{tok.slice(1, -1)}</code>,
-      );
-    } else if (m[3]) {
-      out.push(<strong key={`${keyBase}-b${i}`}>{tok.slice(2, -2)}</strong>);
-    }
-    last = re.lastIndex;
-    i++;
-  }
-  if (last < s.length) out.push(s.slice(last));
-  return out;
+/** 用 react-markdown 渲染 AI 答复，[n] 角标转为可点击的 <cite> 元素。 */
+function MarkdownAnswer({ text, onCite }: { text: string; onCite: (n: number) => void }) {
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const handler = (e: MouseEvent) => {
+      const citeEl = (e.target as HTMLElement).closest("[data-cite]");
+      if (citeEl) {
+        const n = parseInt(citeEl.getAttribute("data-cite")!, 10);
+        if (Number.isFinite(n)) onCite(n);
+      }
+    };
+    el.addEventListener("click", handler);
+    return () => el.removeEventListener("click", handler);
+  }, [onCite]);
+
+  // 把 [n] 转为可点击的 HTML <cite>（rehype-raw 将其解析为真实 DOM 元素）
+  const processed = text.replace(/\[(\d+)\]/g, '<cite class="cite" data-cite="$1">$1</cite>');
+
+  return (
+    <div ref={ref} className="markdown-answer">
+      <ReactMarkdown
+        remarkPlugins={[remarkGfm]}
+        rehypePlugins={[rehypeRaw]}
+      >
+        {processed}
+      </ReactMarkdown>
+    </div>
+  );
 }
 
-function renderAnswer(text: string, onCite: (n: number) => void): ReactNode[] {
-  const blocks: ReactNode[] = [];
-  let list: ReactNode[] = [];
-  const flush = () => {
-    if (list.length) {
-      blocks.push(
-        <ol key={`ol${blocks.length}`}>{list}</ol>,
-      );
-      list = [];
-    }
-  };
-  text.split("\n").forEach((ln, idx) => {
-    if (!ln.trim()) {
-      flush();
-      return;
-    }
-    const lm = ln.match(/^(\d+)\.\s+(.*)$/);
-    if (lm) {
-      list.push(<li key={`li${idx}`}>{renderInline(lm[2], onCite, `li${idx}`)}</li>);
-    } else {
-      flush();
-      blocks.push(<p key={`p${idx}`}>{renderInline(ln, onCite, `p${idx}`)}</p>);
-    }
-  });
-  flush();
-  return blocks;
-}
 
 function Trace({ message }: { message: QaMessage }) {
   const [open, setOpen] = useState(false);
@@ -167,7 +145,7 @@ export default function QAMessage({
           {failed && message.text === "" ? (
             <div className="qa-degraded">⚠ 知识检索服务暂不可用，请稍后重试。</div>
           ) : (
-            renderAnswer(message.text, (n) => onCite(message.id, n))
+            <MarkdownAnswer text={message.text} onCite={(n) => onCite(message.id, n)} />
           )}
           {generating && <span className="qa-caret" />}
         </div>
