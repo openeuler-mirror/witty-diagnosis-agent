@@ -106,6 +106,13 @@ export const config = {
   },
   auth: {
     provider: process.env.AUTH_PROVIDER || "dev",
+    /**
+     * 临时关闭鉴权（仅供本地/联调）。AUTH_DISABLED=true 时：所有请求无需 Cookie
+     * 即被当作默认用户（AUTH_DEV_USER，缺省 demo-user），/api/auth/me 恒返回 200。
+     * 不设或 =false 时恢复正常 Cookie 鉴权。切勿在生产开启（NFR-003 越权隔离将失效）。
+     */
+    disabled: envBool("AUTH_DISABLED", false),
+    devUser: process.env.AUTH_DEV_USER || "demo-user",
   },
   /**
    * 已知问题对话查询（QA）可选模块（对应 02 §6.3）。

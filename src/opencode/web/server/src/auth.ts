@@ -1,4 +1,5 @@
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
+import { config } from "./config.js";
 import * as repo from "./repositories.js";
 
 /**
@@ -17,6 +18,14 @@ export interface SessionUser {
 }
 
 export async function getUser(req: FastifyRequest): Promise<SessionUser | null> {
+  // 临时关闭鉴权（AUTH_DISABLED=true）：无 Cookie 也当作默认用户放行（仅供本地/联调）。
+  if (config.auth.disabled) {
+    const subject = config.auth.devUser;
+    const displayName = subject.split("@")[0];
+    const id = await repo.ensureUser(subject, displayName);
+    return { id, subject, displayName };
+  }
+
   const raw = req.cookies?.[COOKIE];
   if (!raw) return null;
   const unsigned = req.unsignCookie(raw);
