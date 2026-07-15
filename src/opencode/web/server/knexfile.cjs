@@ -46,12 +46,20 @@ if (client === "mysql") {
   // 确保 SQLite 数据目录存在（knex CLI 不会自建，否则 SQLITE_CANTOPEN）BC-011
   fs.mkdirSync(path.dirname(filename), { recursive: true });
   config = {
-    client: "sqlite3",
+    // 纯 JS 分发的原生绑定，装包即用；免去 node-gyp/python 现场编译（避开 Node 24 + Py 3.14 组合坑）
+    client: "better-sqlite3",
     connection: { filename },
     useNullAsDefault: true,
     pool: {
-      // SQLite 外键约束默认关闭，逐连接开启
-      afterCreate: (conn, done) => conn.run("PRAGMA foreign_keys = ON", done),
+      // better-sqlite3 是同步 API：conn.pragma 直接执行，无 done 回调
+      afterCreate: (conn, done) => {
+        try {
+          conn.pragma("foreign_keys = ON");
+          done(null, conn);
+        } catch (err) {
+          done(err, conn);
+        }
+      },
     },
     migrations,
   };
