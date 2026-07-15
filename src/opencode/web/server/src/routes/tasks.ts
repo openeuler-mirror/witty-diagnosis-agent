@@ -216,7 +216,13 @@ export function registerTaskRoutes(app: FastifyInstance): void {
       reply.code(404);
       return { error: "report not ready" };
     }
-    return report;
+    const { fixable, fixPlan } = extractFixInfo(report);
+    return {
+      ...report,
+      fixable,
+      fixPlan,
+      reportUrl: `${req.protocol}://${req.hostname}/api/tasks/${id}/report`,
+    };
   });
 
   // ---- 评分 IF-N04e ----
@@ -239,3 +245,118 @@ export function registerTaskRoutes(app: FastifyInstance): void {
     return { stars };
   });
 }
+
+/**
+ * 从报告中抽取「能否修复 / 修复方案」。
+ *  - HTML 报告（Baize 产出）：切出「修复方案」章节，剥掉所有 HTML 标签，返回纯文本字符串
+ *    （保留标题、子节 4.1/4.2、表格的每行内容，行间以换行分隔）。
+ *  - 结构化报告（mock/历史）：把命中章节的 blocks 拼成纯文本。
+ *  - fixable：命中且抽到非空文本 → "能修复"；否则 "不能修复"。
+ */
+function extractFixInfo(report: import("../types.js").ReportPayload): { fixable: "能修复" | "不能修复"; fixPlan: string } {
+  const kind = (report as { kind?: string }).kind;
+  const rawHtml = kind === "html"
+    ? extractFixSectionHtml((report as { html: string }).html)
+    : renderStructuredFixSection(report as import("../types.js").ReportDTO);
+  const plan = htmlToPlainText(rawHtml);
+  return { fixable: plan ? "能修复" : "不能修复", fixPlan: plan };
+}
+
+/**
+ * 把「修复方案」章节的 HTML 片段转成可读纯文本：
+ *  - 块级标签（h/p/li/tr/table/…）→ 换行分隔；
+ *  - 表格的 <td>/<th> 之间 → 两个空格；
+ *  - 剥掉所有标签，去多余空白，去空行。
+ */
+function htmlToPlainText(html: string): string {
+  if (!html) return "";
+  let s = html
+    .replace(/<\s*br\s*\/?>/gi, "\n")
+    .replace(/<\/(t[dh])>/gi, "  ")           // 表格单元格之间用双空格
+    .replace(/<\/(tr|table|thead|tbody|li|p|h[1-6]|div|blockquote|section|article|hr|ul|ol)>/gi, "\n")
+    .replace(/<[^>]+>/g, "")
+    .replace(/&nbsp;/g, " ")
+    .replace(/&amp;/g, "&")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'");
+  return s
+    .split("\n")
+    .map((line) => line.replace(/[ \t]+/g, " ").trim())
+    .filter(Boolean)
+    .join("\n");
+}
+
+function stripHtml(s: string): string {
+  return s.replace(/<[^>]+>/g, "").replace(/&nbsp;/g, " ").replace(/&amp;/g, "&").replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/\s+/g, " ").trim();
+}
+
+// Baize 报告实际使用的多套「修复」章节标题；越靠前优先级越高。
+const FIX_HEADING_RE = /修复方案|修复计划|处置建议|修复建议|处置方案|行动建议/;
+// 排除章节：这些标题里也可能带「修复」字样，但不是我们要的方案正文
+const FIX_HEADING_EXCLUDE_RE = /自查|质量|说明|概览|时间线|排查过程|因果链|逻辑树/;
+
+/**
+ * 切出「修复方案」章节的原始 HTML（从命中的 <hN> 到下一个同级/更高级 <hN>，含标题本身）。
+ * 用于前端 v-html / innerHTML 直接渲染 —— 保留 Baize 的表格、层级、样式。
+ */
+function extractFixSectionHtml(html: string): string {
+  if (!html) return "";
+  const headings: { level: number; text: string; start: number; end: number }[] = [];
+  const headingRe = /<h([1-6])[^>]*>([\s\S]*?)<\/h\1>/gi;
+  let hm: RegExpExecArray | null;
+  while ((hm = headingRe.exec(html))) {
+    headings.push({
+      level: Number(hm[1]),
+      text: stripHtml(hm[2] ?? ""),
+      start: hm.index,
+      end: headingRe.lastIndex,
+    });
+  }
+  for (let i = 0; i < headings.length; i++) {
+    const h = headings[i]!;
+    if (!FIX_HEADING_RE.test(h.text) || FIX_HEADING_EXCLUDE_RE.test(h.text)) continue;
+    let endIdx = html.length;
+    for (let j = i + 1; j < headings.length; j++) {
+      if (headings[j]!.level <= h.level) {
+        endIdx = headings[j]!.start;
+        break;
+      }
+    }
+    // 从标题起点开始截，含标题本体；normalize 空白但保留结构
+    return html.slice(h.start, endIdx).trim();
+  }
+  return "";
+}
+
+/** 结构化报告（mock/历史）里把「修复方案」相关 section 的 blocks 拼成 HTML。 */
+function renderStructuredFixSection(report: import("../types.js").ReportDTO): string {
+  for (const sec of report.sections ?? []) {
+    if (!FIX_HEADING_RE.test(sec.label ?? "") || FIX_HEADING_EXCLUDE_RE.test(sec.label ?? "")) continue;
+    const parts: string[] = [`<h2>${escapeHtml(sec.label)}</h2>`];
+    for (const b of sec.blocks ?? []) {
+      const rendered = renderBlockToHtml(b);
+      if (rendered) parts.push(rendered);
+    }
+    if (parts.length > 1) return parts.join("\n");
+  }
+  return "";
+}
+
+function escapeHtml(s: string): string {
+  return s.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c] as string);
+}
+
+function renderBlockToHtml(b: import("../types.js").ReportBlock): string {
+  switch (b.t) {
+    case "p": return `<p>${b.html}</p>`;
+    case "ol": return `<ol>${b.items.map((x) => `<li>${escapeHtml(x)}</li>`).join("")}</ol>`;
+    case "ul": return `<ul>${b.items.map((x) => `<li>${escapeHtml(x)}</li>`).join("")}</ul>`;
+    case "table": return `<table><thead><tr>${b.head.map((h) => `<th>${escapeHtml(h)}</th>`).join("")}</tr></thead><tbody>${b.rows.map((r) => `<tr>${r.map((c) => `<td>${escapeHtml(c)}</td>`).join("")}</tr>`).join("")}</tbody></table>`;
+    case "code": return `<pre><code>${escapeHtml(b.text)}</code></pre>`;
+    case "tone": return `<div class="tone ${b.tone}">${b.html}</div>`;
+    default: return "";
+  }
+}
+
