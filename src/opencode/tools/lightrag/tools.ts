@@ -26,6 +26,7 @@ import { tool } from "@opencode-ai/plugin/tool"
 import {
   createLightragClient,
   LightragUnavailableError,
+  autoLayoutGraph,
   type LightragClientConfig,
   type LightragQueryMode,
 } from "../../agents/taiyi/lightrag/client"
@@ -71,14 +72,14 @@ export function createLightragTool(): Record<string, ToolDefinition> {
       if (!question) {
         return JSON.stringify({ error: "question is required" })
       }
-      const client = createLightragClient(readLightragConfig()) // lazy：此处不触发网络
+      const client = createLightragClient(readLightragConfig())
       try {
         const res = await client.query({
           question,
-          mode: (args.mode as LightragQueryMode) ?? "hybrid",
+          mode: (args.mode as LightragQueryMode) ?? readLightragConfig().defaultMode ?? "mix",
         })
-        // 结构化结果以 JSON 字符串承载（后端 JSON.parse + 校验 + 降级）
-        return JSON.stringify(res)
+        let result = res
+        return JSON.stringify(result)
       } catch (err) {
         const message =
           err instanceof LightragUnavailableError ? err.message : "知识检索服务暂不可用"

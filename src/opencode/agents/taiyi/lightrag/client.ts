@@ -9,7 +9,7 @@
  * 本文件零外部依赖（仅 node 内置 fetch，Node ≥20），供 web/server 直接 import。
  */
 
-import { normalizeLightragResult, type Citation, type LightragResult } from "./schema.js";
+import { normalizeLightragResult, type Citation, type LightragResult, type GraphNode, type GraphEdge } from "./schema.js";
 
 export type LightragQueryMode = "hybrid" | "local" | "global" | "naive" | "mix" | "bypass";
 
@@ -32,6 +32,8 @@ export interface LightragClientConfig {
 
 export interface LightragQueryInput {
   question: string;
+  signal?: AbortSignal;
+  /** Signal for aborting the request (stop button / timeout). */
   /** 双层检索模式提示；real 路径据此选择 LightRAG mode。 */
   mode?: LightragQueryMode;
   /** 会话标识：mock 客户端据此保留多轮上下文（real 路径忽略，上下文由 opencode session 续跑承载）。 */
@@ -235,8 +237,59 @@ class MockLightragClient implements LightragClient {
 }
 
 // ----------------------------------------------------------------------------
-// Real LightRAG REST 客户端（桥接 /query）。本期 mock 优先，真实路径供后续联调。
 // ----------------------------------------------------------------------------
+/** 将 entities + relationships 自动布局为图谱子图（圆形布局，坐标归一化到 360x330）。
+ * LightRAG API 不返回节点坐标，需要前端自行布局。
+ * 基于度中心性（degree centrality）排序筛选：统计每个实体参与的关系数量，按度数降序取 Top-8，
+ * 过滤孤立节点（度数为0），边缘数量限制为15，确保图谱清晰可读。
+ */
+function isInternalTableId(name: string): boolean {
+  return /^(tb-|table_|tbl_|doc_)[a-zA-Z0-9_-]+$/.test(name) || 
+         /^[a-f0-9]{8,}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$/.test(name);
+}
+
+export function autoLayoutGraph(
+  entities: Array<{entity_name: string; entity_type?: string; description?: string}> | undefined,
+  relationships: Array<{src_id: string; tgt_id: string; description?: string}> | undefined,
+): { nodes: GraphNode[]; edges: GraphEdge[] } | undefined {
+  if (!entities || entities.length === 0) return undefined;
+  const MAX_ENTITIES = 8;
+  const MAX_EDGES = 12;
+  const filteredEntities = entities.filter((e) => !isInternalTableId(e.entity_name));
+  if (filteredEntities.length === 0) return undefined;
+  const entityMap = new Map(filteredEntities.map((e) => [e.entity_name, e]));
+  const degrees = new Map<string, number>();
+  for (const r of relationships || []) {
+    if (entityMap.has(r.src_id)) degrees.set(r.src_id, (degrees.get(r.src_id) || 0) + 1);
+    if (entityMap.has(r.tgt_id)) degrees.set(r.tgt_id, (degrees.get(r.tgt_id) || 0) + 1);
+  }
+  const sortedEntityNames = [...entityMap.keys()]
+    .filter((name) => (degrees.get(name) || 0) > 0)
+    .sort((a, b) => {
+      const degA = degrees.get(a) || 0;
+      const degB = degrees.get(b) || 0;
+      if (degB !== degA) return degB - degA;
+      return filteredEntities.findIndex((e) => e.entity_name === a) - filteredEntities.findIndex((e) => e.entity_name === b);
+    });
+  const topEntityNames = sortedEntityNames.slice(0, MAX_ENTITIES);
+  const W = 400, H = 360;
+  const cx = W / 2, cy = H / 2;
+  const baseRadius = Math.min(W, H) * 0.35;
+  const goldenAngle = (1 + Math.sqrt(5)) / 2 * Math.PI;
+  const nodes: GraphNode[] = topEntityNames.map((name, i) => {
+    if (i === 0) return { id: name, x: cx, y: cy, t: "core" as const };
+    const angle = ((i - 1) * goldenAngle) % (2 * Math.PI) - Math.PI / 2;
+    const radiusVariation = baseRadius * (0.85 + 0.15 * ((i - 1) % 3));
+    return { id: name, x: Math.round(cx + radiusVariation * Math.cos(angle)), y: Math.round(cy + radiusVariation * Math.sin(angle)), t: "ent" as const };
+  });
+  const validEdges = (relationships || [])
+    .filter((r) => topEntityNames.includes(r.src_id) && topEntityNames.includes(r.tgt_id));
+  const edges: GraphEdge[] = validEdges.slice(0, MAX_EDGES)
+    .map((r) => ({ a: r.src_id, b: r.tgt_id, l: r.description || "" }));
+  if (edges.length === 0 && nodes.length <= 1) return undefined;
+  return { nodes, edges };
+}
+
 
 class RestLightragClient implements LightragClient {
   constructor(private readonly cfg: LightragClientConfig) {}
@@ -244,9 +297,12 @@ class RestLightragClient implements LightragClient {
   async query(input: LightragQueryInput): Promise<LightragResult> {
     const endpoint = this.cfg.endpoint?.replace(/\/+$/, "");
     if (!endpoint) throw new LightragUnavailableError("LIGHTRAG_ENDPOINT 未配置");
-    const url = `${endpoint}/query`;
     const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), this.cfg.timeoutMs ?? 30000);
+    const timer = setTimeout(() => controller.abort(), (this.cfg.timeoutMs ?? 30000) * 2);
+    if (input.signal) {
+      if (input.signal.aborted) { controller.abort(); }
+      else { input.signal.addEventListener("abort", () => controller.abort(), { once: true }); }
+    }
     const body = JSON.stringify({
       query: input.question,
       mode: resolveQueryMode(input.mode, this.cfg.defaultMode),
@@ -256,11 +312,126 @@ class RestLightragClient implements LightragClient {
       response_type: this.cfg.responseType ?? "Multiple Paragraphs",
     });
     try {
-      const res = await fetchWithAuthFallback(url, body, this.cfg, controller.signal);
-      if (!res.ok) throw new LightragUnavailableError(await formatHttpError(res));
-      const raw = (await res.json()) as unknown;
-      // 兼容 LightRAG 0312+ 常见契约：{ response, references[] }。
-      return normalizeLightragResult(mapRestResponse(raw));
+      const dataBody = JSON.stringify({ query: input.question, mode: resolveQueryMode(input.mode, this.cfg.defaultMode), top_k: 20 });
+      // 并行请求 /query 和 /query/data，各用独立 timeout
+      const dataCtrl = new AbortController();
+      const dataTimer = setTimeout(() => dataCtrl.abort(), (this.cfg.timeoutMs ?? 30000) * 2);
+      const [queryRes, dataResRaw] = await Promise.all([
+        fetchWithAuthFallback(endpoint + "/query", body, this.cfg, controller.signal),
+        fetchWithAuthFallback(endpoint + "/query/data", dataBody, this.cfg, dataCtrl.signal).catch(() => null),
+      ]);
+      clearTimeout(dataTimer);
+      let dataRes = dataResRaw;
+      if (!queryRes.ok) throw new LightragUnavailableError(await formatHttpError(queryRes));
+      if (!queryRes.ok) throw new LightragUnavailableError(await formatHttpError(queryRes));
+      const queryJson = (await queryRes.json()) as Record<string, unknown>;
+      const answerContext = (queryJson.response || queryJson.answer_context || queryJson.answer || "") as string;
+      const rawReferences = Array.isArray(queryJson.references) ? queryJson.references : [];
+      const mappedSources = mapReferences(rawReferences);
+
+      let retrievalData = { low: [] as string[], high: [] as string[] };
+      let entitiesData: any[] | undefined;
+      let relationshipsData: any[] | undefined;
+      if (dataRes && dataRes.ok) {
+        try {
+          const dataJson = (await dataRes.json()) as Record<string, unknown>;
+          const meta = dataJson.metadata as Record<string, unknown> | undefined;
+          const kw = meta?.keywords as Record<string, unknown> | undefined;
+          if (kw) {
+            retrievalData = {
+              low: Array.isArray(kw.low_level) ? (kw.low_level as string[]) : [],
+              high: Array.isArray(kw.high_level) ? (kw.high_level as string[]) : [],
+            };
+          }
+          const dd = dataJson.data as Record<string, unknown> | undefined;
+          if (dd) {
+            const rawEntities = Array.isArray(dd.entities) ? (dd.entities as any[]) : [];
+            const rawRelationships = Array.isArray(dd.relationships) ? (dd.relationships as any[]) : [];
+            entitiesData = rawEntities;
+            relationshipsData = rawRelationships;
+            // 为每个引用来源匹配关联的实体和关系（通过 chunk_id）
+            const chunks = Array.isArray(dd.chunks) ? (dd.chunks as any[]) : [];
+            if (chunks.length > 0 && mappedSources.length > 0) {
+              const chunkEntities = new Map<string, string[]>();
+              const chunkRelations = new Map<string, string[]>();
+              for (const e of rawEntities) {
+                const srcId: string = e.source_id || "";
+                const match = srcId.match(/chunk-[0-9]+/);
+                if (match) {
+                  const ck = match[0];
+                  if (!chunkEntities.has(ck)) chunkEntities.set(ck, []);
+                  chunkEntities.get(ck)!.push(e.entity_name);
+                }
+              }
+              for (const r of rawRelationships) {
+                for (const [ck, ents] of chunkEntities) {
+                  if (ents.includes(r.src_id) || ents.includes(r.tgt_id)) {
+                    if (!chunkRelations.has(ck)) chunkRelations.set(ck, []);
+                    chunkRelations.get(ck)!.push(`${r.src_id} → ${r.tgt_id}`);
+                  }
+                }
+              }
+              chunks.forEach((ch: any, i: number) => {
+                if (!mappedSources[i]) return;
+                const ck = ch.chunk_id?.match(/chunk-[0-9]+/)?.[0];
+                if (!ck) return;
+                const ents = chunkEntities.get(ck);
+                if (ents) mappedSources[i].entities = ents;
+                const rels = chunkRelations.get(ck);
+                if (rels) mappedSources[i].relations = rels;
+              });
+            }
+            // 将 chunks 的原文内容映射到引用摘录（兼容 /query 不返回 content 的场景）
+            const chunkContentByRef = new Map<string, string>();
+            for (const ch of chunks) {
+              const refId = String(ch.reference_id ?? "");
+              const chunkText = typeof ch.content === "string" ? ch.content : "";
+              if (refId && chunkText && !chunkContentByRef.has(refId)) {
+                chunkContentByRef.set(refId, chunkText);
+              }
+            }
+            if (chunkContentByRef.size > 0) {
+              for (const src of mappedSources) {
+                if (!src.excerpt && chunkContentByRef.has(String(src.id))) {
+                  src.excerpt = chunkContentByRef.get(String(src.id))!;
+                }
+              }
+            }
+
+          }
+        } catch { /* /query/data 解析失败不阻塞 */ }
+      }
+
+
+      // §2.2.2 降级：主查询未返回分层关键词时，分别请求 local + global 补充
+      if (retrievalData.low.length === 0 && retrievalData.high.length === 0) {
+        try {
+          const fbBody = (mode: string) => JSON.stringify({ query: input.question, mode, include_references: false, top_k: 10 });
+          const [localRes, globalRes] = await Promise.all([
+            fetchWithAuthFallback(endpoint + "/query", fbBody("local"), this.cfg, controller.signal).catch(() => null),
+            fetchWithAuthFallback(endpoint + "/query", fbBody("global"), this.cfg, controller.signal).catch(() => null),
+          ]);
+          for (const res of [localRes, globalRes]) {
+            if (res && res.ok) {
+              const j = (await res.json()) as Record<string, unknown>;
+              const meta = j.metadata as Record<string, unknown> | undefined;
+              const kw = meta?.keywords as Record<string, unknown> | undefined;
+              if (kw) {
+                if (Array.isArray(kw.low_level) && kw.low_level.length > 0) retrievalData.low = kw.low_level as string[];
+                if (Array.isArray(kw.high_level) && kw.high_level.length > 0) retrievalData.high = kw.high_level as string[];
+              }
+            }
+          }
+        } catch { /* 降级失败不影响主回答 */ }
+      }
+
+      return normalizeLightragResult({
+        answer_context: answerContext,
+        retrieval: retrievalData,
+        sources: mappedSources,
+        graph: autoLayoutGraph(entitiesData, relationshipsData),
+        followups: [],
+      });
     } catch (err) {
       if (err instanceof LightragUnavailableError) throw err;
       throw new LightragUnavailableError("LightRAG 检索失败或超时", err);
@@ -345,25 +516,42 @@ function mapReferences(raw: unknown): Citation[] {
       if (!item || typeof item !== "object") return null;
       const ref = item as Record<string, unknown>;
       const path = typeof ref.file_path === "string" ? ref.file_path : "";
-      const title = path ? basenameLike(path) : `Reference ${index + 1}`;
       const content = Array.isArray(ref.content) ? ref.content.find((entry): entry is string => typeof entry === "string" && entry.trim() !== "") : undefined;
       const refId = typeof ref.reference_id === "string" || typeof ref.reference_id === "number" ? Number(ref.reference_id) : index + 1;
-
-      return {
+      return validateCitation({
         id: Number.isFinite(refId) ? refId : index + 1,
         type: "kb",
         badge: "LightRAG",
-        title,
+        title: path ? basenameLike(path) : `Reference ${index + 1}`,
         origin: inferOrigin(path),
         url: path,
         excerpt: content ?? "",
         entities: [],
         relations: [],
         rel: 0,
-      };
+      });
     })
     .filter((citation): citation is Citation => citation !== null);
 }
+
+
+/** 校验并规范化 Citation 字段，缺失/类型错误时置空不抛（S-009）。 */
+function validateCitation(c: Partial<Citation>): Citation {
+  const types = ["doc", "inc", "skill", "kb"] as const;
+  return {
+    id: typeof c.id === "number" && Number.isFinite(c.id) && c.id > 0 ? c.id : 0,
+    type: types.includes(c.type as any) ? (c.type as Citation["type"]) : "kb",
+    badge: typeof c.badge === "string" ? c.badge : "知识库",
+    title: typeof c.title === "string" ? c.title : "",
+    origin: typeof c.origin === "string" ? c.origin : "",
+    url: typeof c.url === "string" ? c.url : "",
+    excerpt: typeof c.excerpt === "string" ? c.excerpt : "",
+    entities: Array.isArray(c.entities) ? c.entities.filter((e): e is string => typeof e === "string") : [],
+    relations: Array.isArray(c.relations) ? c.relations.filter((r): r is string => typeof r === "string") : [],
+    rel: typeof c.rel === "number" && c.rel >= 0 && c.rel <= 100 ? c.rel : 0,
+  };
+}
+
 
 function basenameLike(path: string): string {
   const trimmed = path.replace(/[?#].*$/, "").replace(/\/+$/, "");

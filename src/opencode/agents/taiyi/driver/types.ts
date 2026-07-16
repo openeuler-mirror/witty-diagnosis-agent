@@ -45,7 +45,7 @@ export interface QaDriverInput {
 
 export interface QaDriver {
   /** 解析/新建会话，返回 opencode sessionId（mock 下为生成的占位 id）。 */
-  ensureSession(sessionId?: string): Promise<string>;
+  ensureSession(sessionId?: string): Promise<{ sessionId: string; contextReset: boolean }>;
   /** 发起一次问答，产出 opencode 同构事件流。 */
   run(input: QaDriverInput): AsyncGenerator<OpencodeEventPayload, void, unknown>;
 }

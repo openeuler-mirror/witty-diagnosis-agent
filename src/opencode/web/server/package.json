@@ -16,6 +16,7 @@
   "dependencies": {
     "@fastify/cookie": "^9.3.1",
     "@fastify/multipart": "^8.3.0",
+    "@opencode-ai/sdk": "^1.1.19",
     "fastify": "^4.28.1",
     "better-sqlite3": "^11.3.0",
     "knex": "^3.1.0",

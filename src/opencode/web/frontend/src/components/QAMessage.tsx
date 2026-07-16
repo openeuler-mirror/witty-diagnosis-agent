@@ -3,7 +3,6 @@ import type { QaMessage } from "../types";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import rehypeRaw from "rehype-raw";
-
 /**
  * 单条消息渲染（FR-001/002/003）：
  *  - user：右侧气泡
@@ -11,6 +10,21 @@ import rehypeRaw from "rehype-raw";
  *    + 操作行（复制 / 有用·不准 / 查看来源）+ 建议追问
  * 答复用 react-markdown 渲染，[n] 角标可点击定位右侧证据。
  */
+
+/** 修复 LLM 生成的路径重复问题：/docs/guide/docs/guide/... → /docs/guide/ */
+function fixDupPath(url: string): string {
+  try {
+    const u = new URL(url, "http://localhost");
+    const fixed = u.pathname.replace(/(\/[^/]+\/)(?:\1)+/g, "$1");
+    if (fixed !== u.pathname) {
+      u.pathname = fixed;
+      return u.toString();
+    }
+  } catch {
+    /* ignore invalid URLs */
+  }
+  return url;
+}
 
 /** 用 react-markdown 渲染 AI 答复，[n] 角标转为可点击的 <cite> 元素。 */
 function MarkdownAnswer({ text, onCite }: { text: string; onCite: (n: number) => void }) {
@@ -30,21 +44,33 @@ function MarkdownAnswer({ text, onCite }: { text: string; onCite: (n: number) =>
     return () => el.removeEventListener("click", handler);
   }, [onCite]);
 
-  // 把 [n] 转为可点击的 HTML <cite>（rehype-raw 将其解析为真实 DOM 元素）
-  const processed = text.replace(/\[(\d+)\]/g, '<cite class="cite" data-cite="$1">$1</cite>');
+  // 把 [n] 转为可点击的 HTML <cite>（跳过代码块和内联代码中的 [n]）
+  const processed = text.replace(/(```[\s\S]*?```|`[^`]*`)|\[(\d+)\]/g, (_, code, num) => {
+    if (code) return code; // 代码块/内联代码，原样返回
+    return `<cite class="cite" data-cite="${num}">${num}</cite>`;
+  });
 
   return (
     <div ref={ref} className="markdown-answer">
       <ReactMarkdown
         remarkPlugins={[remarkGfm]}
         rehypePlugins={[rehypeRaw]}
+        components={{
+          a: ({ href, children }) => {
+            const url = href ? fixDupPath(href) : "";
+            return (
+              <a href={url} target="_blank" rel="noopener noreferrer">
+                {children}
+              </a>
+            );
+          },
+        }}
       >
         {processed}
       </ReactMarkdown>
     </div>
   );
 }
-
 
 function Trace({ message }: { message: QaMessage }) {
   const [open, setOpen] = useState(false);
@@ -100,12 +126,14 @@ export default function QAMessage({
   onShowSources,
   onFollowup,
   onFeedback,
+  onRetry,
 }: {
   message: QaMessage;
   onCite: (messageId: string, n: number) => void;
   onShowSources: (messageId: string) => void;
   onFollowup: (text: string) => void;
   onFeedback: (messageId: string, feedback: "useful" | "inaccurate") => void;
+  onRetry?: (messageId: string) => void;
 }) {
   const [feedback, setFeedback] = useState<"useful" | "inaccurate" | null>(message.feedback);
   const [copied, setCopied] = useState(false);
@@ -126,8 +154,18 @@ export default function QAMessage({
   const generating = message.status === "generating";
   const failed = message.status === "failed";
   const aborted = message.status === "aborted";
-  const sourceCount = message.citations?.length ?? 0;
-  const hasTrace = message.status !== null; // assistant 一定有 trace 区
+  const maxCiteId = (message.citations ?? []).reduce((max, c) => Math.max(max, c.id), 0);
+  const citedIds = new Set<number>();
+  if (message.text && maxCiteId > 0) {
+    for (const m of message.text.matchAll(/\[(\d+)\]/g)) {
+      const id = Number(m[1]);
+      if (id >= 1 && id <= maxCiteId) citedIds.add(id);
+    }
+  }
+  const sourceCount = citedIds.size > 0
+    ? (message.citations ?? []).filter((c) => citedIds.has(c.id)).length
+    : (message.status === "generating" ? (message.citations?.length ?? 0) : 0);
+  const hasTrace = message.status !== null;
 
   const copy = () => {
     navigator.clipboard?.writeText(message.text).catch(() => {});
@@ -173,6 +211,11 @@ export default function QAMessage({
               {sourceCount > 0 && (
                 <button className="iact" onClick={() => onShowSources(message.id)}>
                   ◳ 查看 {sourceCount} 处来源
+                </button>
+              )}
+              {(failed || aborted) && onRetry && (
+                <button className="iact retry" onClick={() => onRetry(message.id)}>
+                  ↻ 重新生成
                 </button>
               )}
               {aborted && <span className="qa-stopped">· 已停止</span>}

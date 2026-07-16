@@ -59,10 +59,9 @@ export function createMockDriver(cfg: MockDriverConfig): QaDriver {
   const tokenIntervalMs = cfg.tokenIntervalMs ?? 22;
 
   return {
-    async ensureSession(sessionId?: string): Promise<string> {
-      return sessionId ?? `mock-${randomUUID()}`;
+    async ensureSession(sessionId?: string): Promise<{ sessionId: string; contextReset: boolean }> {
+      return { sessionId: sessionId ?? `mock-${randomUUID()}`, contextReset: false };
     },
-
     async *run(input: QaDriverInput): AsyncGenerator<OpencodeEventPayload> {
       const { signal } = input;
 
@@ -81,7 +80,7 @@ export function createMockDriver(cfg: MockDriverConfig): QaDriver {
       try {
         const result = await client.query({
           question: input.question,
-          mode: cfg.lightrag.defaultMode ?? "hybrid",
+          mode: cfg.lightrag.defaultMode ?? "mix",
           sessionId: input.sessionId,
         });
         outputJson = JSON.stringify(result);
