@@ -1,12 +1,37 @@
 # 磁盘故障场景分类
 
-磁盘诊断过程中，主要涉及以下六大核心故障场景：
+本技能采用**双层分类**：顶层是用户《故障根因分类表》定义的**故障域**（根因归属，权威），下层是**现象场景标签**（取证入口）。Step 1 先判故障域，再用现象标签锁定取证方向。
 
-| 场景标签 | 中文描述 | 主要特征与案例 |
-| :--- | :--- | :--- |
-| `DISK_HARDWARE_FAILURE` | 磁盘硬件故障 | ① **UNC/UF 坏道** (MEDIUM ERROR)；② **SMART 阈值超限** (Reallocated Sectors)；③ **WP 写保护** (WRITE PROTECTED)；④ **介质异常** (No Medium/Changed)；⑤ **Illegal Request** (不支持指令) |
-| `DISK_IO_PERFORMANCE` | I/O 性能问题 | ① **落盘缓慢** (Write Cache 刷盘延迟、await 升高)；② 业务压力过载；③ 块请求堆积；④ RAID 背景任务冲突 |
-| `DISK_RAID_ERROR` | RAID/控制器故障 | ① RAID 掉盘/离线；② 控制器 Cache 故障；③ 超级电容/电池告警；④ 阵列降级 (Degraded) |
-| `DISK_LINK_ISSUE` | 链路/背板故障 | ① **阵列断链/热插拔** (PHY Reset/COMRESET)；② **接口错误** (ICRC/ABRT/IDNF)；③ PCIe AER 错误；④ 背板供电电压波动 |
-| `STORAGE_INDUCED_FS_ERROR` | 存储诱发的文件系统故障 | ① 文件系统由于底层持续 I/O 错误被动切换为只读 (Remount RO)；② 元数据损坏 (由于介质故障) |
-| `DISK_SYSTEM_CONFIG` | 系统/配置与兼容性限制 | ① **盘符漂移** (未使用 UUID 导致 /dev/sdX 变化)；② **数量过载** (超过 HBA/内核枚举上限)；③ 指令集不兼容 |
+## 1. 故障域（权威顶层分类，以用户《故障根因分类表》为准）
+
+> 📖 每个故障域下的具体 R 码定界规则见 [root_cause_rules.md](root_cause_rules.md)。
+
+| 故障域 | 范围 | 覆盖 R 码 | 判域入口特征 | FARM 盘体侧表现 |
+| :--- | :--- | :--- | :--- | :--- |
+| **硬盘域** | 硬盘本体（磁头/介质/机械/固件） | R1 磁头信号退化 / R2 磁头飞行异常 / R3 盘片介质退化 / R4 振动致伤 / R5 硬盘固件异常 / R6 机械电机退化 | 单/多磁头退化、坏道/重分配、飞高异常、振动致伤、固件 Assert、主轴启旋异常 | **有异常**（DOS WR 倍率/VO/Realloc/H2SAT/Shock 等异常） |
+| **链路域** | 互联链路（PCIe + SAS/SATA） | R7 SAS/SATA 链路故障 / R8 PCIe 链路故障 | SAS 链路重置/降速、ICRC、DID_*、PCIe AER/降速降宽 | **盘体全健康**（问题在链路层） |
+| **RAID域** | RAID 卡（硬件/固件/驱动） | R9 RAID 卡单板损伤 / R10 RAID 卡固件/驱动故障 | RAID 卡离线/card error、固件挂死/驱动 Bug、整卡下挂盘同时受影响 | 不受影响（非硬盘侧） |
+| **EXP域** | EXP 背板（硬件/固件） | R11 EXP 背板固件异常 / R12 EXP 芯片故障 | 背板固件跑挂/命令超时/温控保护、背板芯片损伤，EXP 下挂盘全部不可见 | 不受影响（非硬盘侧） |
+| **OS域** | 操作系统/文件系统/内核 | R13 系统资源耗尽 / R14 OS IO 栈配置异常 / R15 文件系统损坏 / R16 内核 Bug | OOM/资源耗尽、IO 栈配置/慢盘、FS 元数据损坏切只读、内核 BUG/panic | 不受影响（或 R14/R15 可能伴随 R1 早期信号） |
+| **待定界** | —（数据不全） | TBD | FARM/OS 日志缺失、Per-Head 计数器异常、SMART 误采等，无法定界 | 无法采集或质量存疑 |
+
+> ⚠️ **判域三原则**：
+> 1. **FARM 盘体健康是分水岭**：盘体有磁头/介质/振动异常 → **硬盘域**；盘体全健康而 OS 有链路/RAID/背板/OS 侧证据 → 对应**链路/RAID/EXP/OS 域**。
+> 2. **影响面定位**：单盘异常 → 硬盘域/链路域（盘级）；整卡下挂盘同时受影响 → RAID域；整背板下挂盘全部不可见 → EXP域。
+> 3. **多域并发取主导**：如 R1（硬盘域）伴随 R7（链路域）时，取因果链起始点/主导域为主，其余标注为并发加速因子。
+
+## 2. 现象场景标签（取证入口层，映射到故障域）
+
+磁盘诊断过程中，主要涉及以下六大现象场景，用于快速锁定 Step 2 取证方向：
+
+| 场景标签 | 中文描述 | 主要特征与案例 | → 归属故障域 |
+| :--- | :--- | :--- | :--- |
+| `DISK_HARDWARE_FAILURE` | 磁盘硬件故障 | ① **UNC/UF 坏道** (MEDIUM ERROR)；② **SMART 阈值超限** (Reallocated Sectors)；③ **WP 写保护** (WRITE PROTECTED)；④ **介质异常** (No Medium/Changed)；⑤ **Illegal Request** (不支持指令) | **硬盘域** R1-R6（Illegal Request 可能 OS域 R13 配置类） |
+| `DISK_IO_PERFORMANCE` | I/O 性能问题 | ① **落盘缓慢** (Write Cache 刷盘延迟、await 升高)；② 业务压力过载；③ 块请求堆积；④ RAID 背景任务冲突 | **硬盘域** R1 早期 / **OS域** R14（慢盘拖累/IO 栈配置） |
+| `DISK_RAID_ERROR` | RAID/控制器故障 | ① RAID 掉盘/离线；② 控制器 Cache 故障；③ 超级电容/电池告警；④ 阵列降级 (Degraded) | **RAID域** R9-R10 |
+| `DISK_LINK_ISSUE` | 链路/背板故障 | ① **阵列断链/热插拔** (PHY Reset/COMRESET)；② **接口错误** (ICRC/ABRT/IDNF)；③ PCIe AER 错误；④ 背板供电电压波动 | **链路域** R7(SAS/SATA)/R8(PCIe) / **EXP域** R11-R12（背板级，下挂盘全受影响时） |
+| `STORAGE_INDUCED_FS_ERROR` | 存储诱发的文件系统故障 | ① 文件系统由于底层持续 I/O 错误被动切换为只读 (Remount RO)；② 元数据损坏 (由于介质故障) | **OS域** R15（后果）+ 底层**硬盘域/链路域**根因（主因） |
+| `DISK_SYSTEM_CONFIG` | 系统/配置与兼容性限制 | ① **盘符漂移** (未使用 UUID 导致 /dev/sdX 变化)；② **数量过载** (超过 HBA/内核枚举上限)；③ 指令集不兼容 | **OS域** R13（资源/配置类） |
+
+> [!NOTE]
+> 现象场景标签是"从表象快速切入"的取证工具，一个标签可能映射到多个故障域（如 `DISK_LINK_ISSUE` 既可能是链路域 R7/R8，也可能是 EXP 背板域 R11/R12）；最终归属须在 Step 2/Step 5 结合 FARM 盘体健康度与影响面确认。故障域 + R 码才是根因结论。

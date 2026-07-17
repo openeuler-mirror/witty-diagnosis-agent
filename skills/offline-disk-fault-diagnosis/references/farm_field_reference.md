@@ -95,11 +95,22 @@
 | `h_cum_uniq[i]` | `Cum Lifetime Unrecoverable by head i → Unique` | — | ❌ | — |
 | `h_mrr[i]` | `MR Head Resistance from Head i` | `MR Head Resistance ... by Head` 块 | ✅ | — |
 | `h_fafh_{od,md,id}[i]` | `Fly height clearance delta {outer,middle,inner} by Head i` | `Applied fly height clearance delta ... Diameter {0-Outer,2-Middle,1-Inner}` 块 | ✅ | 189 |
-| `h_dos_refresh[i]` | `DOS Write Refresh Count by Head i` | `DOS Write Refresh Count` 块 | ✅ | — |
-| `h_tmd[i]` | `Number of TMD by Head i` | `Number of TMD ... by Head` 块 | ✅ | — |
+| `h_dos_refresh[i]` | `DOS Write Refresh Count by Head i` | `#DOS Write Refresh Count` 块(标题**不含** "by Head") | ✅ | — |
+| `h_dos_thresh[i]` | `DOS Write Count Threshold by Head i` | `#DOS Write Count Threshold` 块 | ⚠️ 常缺失 | — |
+| `h_velobs[i]` | `Velocity Observer by Head i` | `#Velocity Observer over last 3 SMART Summary Frames by Head` 块 | ✅ | — |
+| `h_tmd[i]` | `Number of TMD by Head i` | `#Number of TMD over last 3 SMART Summary Frames by Head` 块 | ✅ | — |
+| `h_h2sat_iter[i]` | `Current H2SAT iterations to converge by Head i` | — | ❌ | — |
+| `h_h2sat_asym[i]` | `Current H2SAT asymmetry by Head i` | — | ❌ | — |
+| `h_h2sat_cw[i]` | `Current H2SAT percentage of codewords ... by Head i` | — | ❌ | — |
+| `h_ber[i]` | `Bit Error Rate ... by Head i`(常缺失) | — | ❌ | 1 |
+| `h_disc_slip[i]` | `Disc Slip ... by Head i`(常缺失) | — | ❌ | — |
 
 > [!NOTE]
 > **单位/进制清洗** (脚本已自动处理):TXT 湿度为 `.1%` 需除以 10;部分 RAW 值为十六进制字符串 (`0x...`) 需转十进制;数值字段可能带引号 (`'42.00'`)。
+
+> [!WARNING]
+> **`DOS Write Count Threshold` 常缺失**:真实 dump 中该逐头字段并非总是存在——JSON 里部分盘有、部分盘无;disktool TXT 普遍不含。缺失时 **DOS WR 倍率(R 码核心口径)与梯度比不可评**,R1/R4 的写侧判据降级为 VO/Realloc/H2SAT,脚本会在"数据覆盖度/特别提示"中声明。同一块盘 JSON 与 TXT 的 R 码判定完整度可能不同——json 优先即为此。
+> **H2SAT/BER/Disc Slip 仅 JSON 且常未填充**:缺失时读侧判据静默跳过,不误触发。
 
 ---
 
@@ -154,8 +165,21 @@
 | `MR Head Resistance` | 处于同盘正常区间 | 偏离正常范围 | `= 0xFFFF` (磁头开路) |
 | `Flash LED Assert` / `Helium Tripped` | 0 | — | **任意 > 0 → 失效级** |
 
+**冷存储 R 码定界专用阈值**(源自用户定义《故障根因分类表》,完整规则见 [root_cause_rules.md](root_cause_rules.md)):
+
+| 指标 | 健康 | 关注/监控 | 异常/判据 |
+|---|---|---|---|
+| DOS WR 倍率(逐头 refresh/threshold) | < 50× | 50–200×(正常老化) | **> 200× 退化告警(Depop候选);> 1000× 严重退化** |
+| 梯度比(最差头/最佳头 DOS WR 倍率) | — | 3–10× 中间区(结合 Shock) | **> 10× → R1;< 3× 且异常头占比>50% → R4** |
+| 逐头 `Velocity Observer` | ≤ 30(排除 R2) | 30–100 监控区 | **> 100 飞行异常(R2/R4 口径);> 500 重度 R2** |
+| \|FAFH delta\|(绝对口径,与种群相对法并行) | — | — | **> 200 飞高偏离(R2);> 500 重度** |
+| `Over-Limit Shock`(R 码口径) | < 1,000(排除 R4) | 1,000–10,000 | **> 10,000 振动异常;> 50,000 极端(确认 R4)** |
+| H2SAT(逐头) | %codewords=0 | — | **%codewords≠0 / 迭代>6 / BER>300 → 读侧退化** |
+| 候选(Pending, Realloc=0 时) | 0 | — | **> 500 → 早期介质退化(R3)** |
+| 异常磁头占比(Depop 分级) | — | — | **≤25% 可行 / 25–50% 边际 / >50% 换盘** |
+
 > [!NOTE]
-> 阈值集中定义在 `scripts/analyze_farm.py` 顶部 (如 `TEMP_*`、`SHOCK_WARN`、`CTO_WARN`、`OUTLIER_HI`、`HEAD_REALLOC_WARN`),针对不同机型分析时可按需微调。
+> 阈值集中定义在 `scripts/analyze_farm.py` 顶部 (8 类部位层:`TEMP_*`、`SHOCK_WARN`、`CTO_WARN`、`OUTLIER_HI`、`HEAD_REALLOC_WARN`;R 码层:`DOSWR_*`、`GRAD_*`、`VO_*`、`FAFH_*`、`SHOCK_R4/EXTREME/CLEAR`、`H2SAT_*`、`DEPOP_*`),针对不同机型分析时可按需微调。注意 8 类部位层的 `SHOCK_WARN=100000`(经验关注线)与 R 码层的 `SHOCK_R4=10000`(定界判据)是两套并行口径。
 
 ---
 
