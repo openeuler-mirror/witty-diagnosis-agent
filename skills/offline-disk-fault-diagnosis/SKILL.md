@@ -1,6 +1,6 @@
 ---
 name: offline-disk-fault-diagnosis
-description: 通过分析服务器的【系统级离线日志】——iBMC/SEL 带外日志（磁盘在位/热插拔/错误事件）、OS 系统日志（dmesg、syslog、messages）、InfoCollect 采集日志（SMART 信息/RAID 卡日志/性能数据）——诊断离线磁盘硬件、RAID 控制器及存储链路故障，做多源时序对齐与物理级根因溯源。当用户提供 ibmc_logs / messages（dmesg、syslog）/ infocollect_logs 等服务器日志包，或询问 RAID 掉盘降级（Offline/Degraded）、I/O 超时阻塞（Timeout/Blocked）、SAS/SATA/NVMe 链路不稳定（PHY Reset/ICRC）、物理槽位异常、磁盘巡检/SMART 告警、以及文件系统因底层存储故障切只读（Read-only）需要从 OS+iBMC 日志反查底层根因时，调用本技能。本技能以系统级日志为分析主体；其中希捷 FARM 底层日志（farmlog）仅作为可选的 Step 5 收敛环节。**若用户只提供希捷 FARM 底层日志（farmlog / openSeaChest .json / 华为 disktool .txt，按 IP 目录组织），而无 OS/iBMC/InfoCollect 系统日志，应改用 `seagate-farm-disktool-health-analysis` 技能。**
+description: 通过分析服务器的【系统级离线日志】——iBMC/SEL 带外日志（磁盘在位/热插拔/错误事件）、OS 系统日志（dmesg、syslog、messages）、InfoCollect 采集日志（SMART 信息/RAID 卡日志/性能数据）——并在日志包含有希捷 FARM 底层遥测日志（farmlog）时执行【OS+FARM 联合底层定界】，诊断离线磁盘硬件、RAID 控制器及存储链路故障，做多源时序对齐、物理级根因溯源与冷存储根因定界（R1-R16 R 码：磁头信号退化/磁头飞行异常/盘片介质退化/振动致伤/固件异常/机械电机退化/链路/RAID/EXP/OS 域）。当用户提供 ibmc_logs / messages（dmesg、syslog）/ infocollect_logs / farmlog 等服务器日志包（任意组合），或询问 RAID 掉盘降级（Offline/Degraded）、I/O 超时阻塞（Timeout/Blocked）、SAS/SATA/NVMe 链路不稳定（PHY Reset/ICRC）、物理槽位异常、磁盘巡检/SMART 告警、文件系统因底层存储故障切只读（Read-only）、磁头级退化定位与 Depop 延寿评估需要从日志反查底层根因时，调用本技能。**双模式**：仅有 OS/iBMC/InfoCollect 系统日志时按纯 OS 侧流程定界根因；同时存在 farmlog 时 Step 5 必须执行，输出结合 OS+FARM 的联合分析报告（逐磁头底层细节 + R 码根因定界）。**若用户只提供希捷 FARM 底层日志（farmlog / openSeaChest .json / 华为 disktool .txt），而无任何 OS/iBMC/InfoCollect 系统日志，应改用 `seagate-farm-disktool-health-analysis` 技能。**
 ---
 
 # 离线磁盘故障诊断
@@ -20,7 +20,7 @@ offline-disk-fault-diagnosis/
 │   ├── diagnose_infocollect.py       # Step 2: InfoCollect/磁盘专项分析脚本
 │   ├── diagnose_messages.py          # Step 2: OS消息日志分析脚本
 │   ├── diagnose_health_rules.py      # Step 3: 健康度评估与规则匹配脚本
-│   └── analyze_farm.py               # Step 5（可选）: FARM 底层日志分析脚本（json 优先/txt 兜底）
+│   └── analyze_farm.py               # Step 5: FARM 底层日志分析脚本（json 优先/txt 兜底 + 8 类部位 + 冷存储 R 码定界引擎）
 └── references/                       # 参考资料目录
     ├── DISK_fault_scenarios.md       # 磁盘故障场景分类表
     ├── DISK_scenario_analysis.md     # 磁盘故障场景专项分析指南
@@ -31,7 +31,8 @@ offline-disk-fault-diagnosis/
     ├── h3c_ibmc.md                   # H3C iBMC分析指南
     ├── Inspur_ibmc.md                # Inspur iBMC分析指南
     ├── farm_analysis.md              # FARM 底层诊断指南（单快照 · 8 类故障部位）
-    └── farm_field_reference.md       # FARM 字段与指标参考字典（json↔txt↔SMART 三方映射）
+    ├── farm_field_reference.md       # FARM 字段与指标参考字典（json↔txt↔SMART 三方映射）
+    └── root_cause_rules.md           # 冷存储故障根因定界规则 R1-R16（用户定义《故障根因分类表》,Step 5 权威规则集:六列规则/量化阈值/仲裁规则/决策树/修复能力矩阵）
 ```
 
 ## 输入日志目录结构与对应诊断脚本
@@ -48,16 +49,19 @@ offline-disk-fault-diagnosis/
 │   └── (SMART信息/RAID卡日志/性能数据) -> 使用 scripts/diagnose_infocollect.py
 ├── messages/                   # 操作系统层面的系统日志
 │   └── (dmesg, syslog, messages) -> 使用 scripts/diagnose_messages.py
-└── farmlog/                    # FARM 底层日志目录 (可选)
-    └── (<SN>_FARM_<时间戳>_<IP>_<设备名>.json [openSeaChest, 优先], <SN>_FARM_disktool_<时间戳>_<IP>_<设备名>.txt [华为 disktool, 兜底]) -> 使用 scripts/analyze_farm.py
+└── farmlog/                    # FARM 底层日志目录 (可选;存在时 Step 5 必须执行)
+    └── (<SN>_FARM_<时间戳>_<IP>_<设备名>.json [openSeaChest, 优先], <SN>_FARM_disktool_<时间戳>_<IP>_<设备名>.txt [华为 disktool, 兜底];
+         另兼容时间戳前置格式 <时间戳>_<SN>_FARM_<IP>_<设备名>[_disktool].{json,txt}) -> 使用 scripts/analyze_farm.py
 ```
+
+> **双模式声明**：本技能在**纯 OS 模式**（仅 ibmc_logs/messages/infocollect_logs 的任意组合）与 **OS+FARM 联合模式**（另有 farmlog/）下都必须给出根因结论。纯 OS 模式走 Step 0→4→6；联合模式额外强制执行 Step 5，报告必须体现磁头/盘面级底层细节与 R 码定界。
 
 ## ⚠️ 强制执行流程
 
 **必须严格按以下顺序执行，禁止跳过或乱序：**
 
 ```
-Step 0 (故障日志采集) → Step 1 (场景分类) → Step 2 (深入分析) → Step 3 (健康度评估与规则匹配) → Step 4 (根因反思与证据双向校验) → [Step 5 (FARM底层诊断，可选)] → Step 6 (界面输出分析报告)
+Step 0 (故障日志采集) → Step 1 (场景分类) → Step 2 (深入分析) → Step 3 (健康度评估与规则匹配) → Step 4 (根因反思与证据双向校验) → [Step 5 (FARM+OS 联合底层定界，farmlog 存在时必须执行)] → Step 6 (界面输出分析报告)
 ```
 
 **执行规则：**
@@ -66,14 +70,15 @@ Step 0 (故障日志采集) → Step 1 (场景分类) → Step 2 (深入分析) 
 3. **数据校验**：Step 4 必须通过证据矩阵校验后才能得出最终结论
 4. **文件适配**：日志文件不全时自动降级分析策略，但必须至少有一个日志文件
 5. **专注存储**：分析过程应锁定存储链路及介质，排查文件系统只读等现象的底层诱因。
+6. **FARM 分支强制**：Step 0 扫描时必须探测 `farmlog/` 目录（或散落的 `*_FARM_*.{json,txt}` 文件）是否存在——**存在则 Step 5 必须执行且不可省略**，最终报告必须是 OS+FARM 联合分析形态（含逐磁头底层细节与 R 码定界）；不存在则跳过 Step 5，按纯 OS 侧证据完成根因定界（仍应参考 [root_cause_rules.md](references/root_cause_rules.md) 的 OS 侧量化标准给出候选 R 码，并标注"无 FARM 数据，硬盘内部细节未验证"）。
 
 **每步完成标志：**
-- Step 0：输出日志文件时间范围、文件统计、错误关键词概览
+- Step 0：输出日志文件时间范围、文件统计、错误关键词概览、**是否存在 farmlog 的判定**
 - Step 1：确定故障场景（如 DISK_HARDWARE_FAILURE 等）
 - Step 2：输出物理级精准定位、传导链及初步根因
 - Step 3：输出每块涉事磁盘的基础元数据、判定结论及标准化对象
 - Step 4：输出根因证据校验表、原生日志证据及置信度定性
-- Step 5（可选）：输出 FARM 逐磁头分析表、8 类故障部位评级与处置建议
+- Step 5（farmlog 存在时必须执行）：输出 FARM 逐磁头分析表、8 类故障部位评级、**冷存储 R 码定界结论（含 OS 侧交叉验证闭环与 Depop 适用性）**及处置建议
 - Step 6：在界面上按固定结构输出最终的分析报告（**严禁生成独立文件**）
 
 ---
@@ -87,8 +92,8 @@ Step 0 (故障日志采集) → Step 1 (场景分类) → Step 2 (深入分析) 
 | **Step 2** 深入分析 | 构建起止 T0 的传导链并执行诊断 | 使用 `diagnose_ibmc.py/diagnose_infocollect.py/diagnose_messages.py` 获取多维证据 |
 | **Step 3** 健康度评估与规则匹配 | 对每块涉事磁盘按 SAS/SATA 规则集做客观判定与存活概率计算 | `diagnose_health_rules.py <log_dir> [--format md/json/table]` 配合 [disk_health_rules.md](references/disk_health_rules.md) |
 | **Step 4** 根因反思与证据双向校验 | 交叉质询证据链，执行证据双向校验（含 E4 规则一致性） | 对比 iBMC/内核/系统日志的一致性 + 规则评估结果，防止结论发散 |
-| **Step 5** FARM 底层深度诊断（可选） | 将故障收敛至磁头/盘面级别，定界 8 类故障部位 | `analyze_farm.py <log_dir>/farmlog`（json 优先/txt 兜底），结合 `farm_analysis.md` / `farm_field_reference.md` 判读 |
-| **Step 6** 界面输出分析报告 | 汇总证据链与确认根因，在界面直接输出报告内容 | 结构化输出：结论 + 故障链条 + 规则评估 + 根因 + 修复建议 |
+| **Step 5** FARM+OS 联合底层定界（farmlog 存在时必须执行） | 将故障收敛至磁头/盘面级别（8 类部位），并按冷存储 R1-R16 规则完成 R 码根因定界（FARM 侧判据 + OS 侧交叉验证闭环） | `analyze_farm.py <log_dir>/farmlog`（json 优先/txt 兜底，内置 R 码定界引擎），结合 `farm_analysis.md` / `farm_field_reference.md` / `root_cause_rules.md` 判读 |
+| **Step 6** 界面输出分析报告 | 汇总证据链与确认根因，在界面直接输出报告内容 | 结构化输出：结论 + 故障链条 + 规则评估 + 根因 + 修复建议（联合模式另含 FARM+OS 联合定界章节） |
 
 ---
 
@@ -111,6 +116,8 @@ python3 scripts/diagnose_summary.py <log_dir> -d "Mar 16"
 python3 scripts/diagnose_summary.py <log_dir> -s "2026-03-10 08:00:00" -e "2026-03-10 12:00:00"
 ```
 
+**FARM 日志探测（本步骤强制输出项）**：扫描的同时必须判定日志包内是否存在 `farmlog/` 目录或任何 `*_FARM_*.{json,txt}` 文件（如 `ls <log_dir>/farmlog/ 2>/dev/null; find <log_dir> -name "*_FARM_*" | head`），并在 Step 0 结论中明确声明分析模式：**纯 OS 模式** 或 **OS+FARM 联合模式**（后者 Step 5 必须执行）。
+
 ### 精细定位（微观分析）
 
 **目标**：在优先使用上述带有参数的扫描命令锁定范围的基础上，结合全量扫描结果，辅以 `grep` / `less` 等文件操作命令查看更细节的原始日志上下文。
@@ -118,24 +125,41 @@ python3 scripts/diagnose_summary.py <log_dir> -s "2026-03-10 08:00:00" -e "2026-
 > **注意：使用脚本时，可优先执行 `--help` 参数，了解脚本多维度过滤用法。**
 
 ---
-## Step 1：场景分类
+## Step 1：场景分类（故障域优先）
 
-根据 Step 0 采集的日志概览，分析故障现象并确定故障场景类型。
+根据 Step 0 采集的日志概览，分析故障现象并确定故障场景类型。**本步骤采用双层分类**：先按用户定义的**故障域**（权威顶层分类）划定根因归属，再用**现象场景标签**辅助取证。
 
-### 场景分类概述
+### 1.A 故障域划分（权威顶层分类，以用户《故障根因分类表》为准）
 
-根据 Step 0 采集的日志概览，分析故障现象并从以下标准场景中确定故障场景类型。
+> 📖 **权威规则集**：[冷存储故障根因定界规则 R1-R16](references/root_cause_rules.md) §0 故障域总览
+
+用户《故障根因分类表》定义了 5 个实体故障域 + 1 个待定界状态，覆盖 R1-R16 全部根因。**Step 1 必须先判定涉事对象落在哪个故障域**（后续 Step 5 在该域内收敛到具体 R 码）：
+
+| 故障域 | 范围 | 覆盖 R 码 | 主要特征（判域入口） |
+| :--- | :--- | :--- | :--- |
+| **硬盘域** | 硬盘本体（磁头/介质/机械/固件） | R1-R6 | 单/多磁头退化、坏道/重分配、飞行异常、振动致伤、固件异常、主轴电机退化——**FARM 盘体侧有异常** |
+| **链路域** | 互联链路（PCIe + SAS/SATA） | R7-R8 | SAS/SATA 链路重置/降速、ICRC、PCIe AER/降速——**FARM 盘体全健康，问题在链路** |
+| **RAID域** | RAID 卡（硬件/固件/驱动） | R9-R10 | RAID 卡离线/card error、固件挂死/驱动 Bug、整卡下挂盘同时受影响 |
+| **EXP域** | EXP 背板（硬件/固件） | R11-R12 | 背板固件跑挂/命令超时、背板芯片损伤、EXP 下挂盘全部不可见 |
+| **OS域** | 操作系统/文件系统/内核 | R13-R16 | 资源耗尽(OOM)、IO 栈配置/慢盘、文件系统损坏、内核 Bug——**非硬盘硬故障** |
+| **待定界** | —（数据不全） | TBD | FARM/OS 日志缺失或质量存疑，无法定界，需补采后重判 |
+
+> ⚠️ **判域原则**：① 故障域可多域并发（如 R1 硬盘域主因 + R7 链路域辅因），取因果链起始点/主导域为主，其余标注为并发；② **FARM 盘体是否健康是硬盘域 vs 其它域的分水岭**——盘体有磁头/介质/振动异常 → 硬盘域；盘体全健康而 OS 有链路/RAID/背板/OS 侧证据 → 对应链路/RAID/EXP/OS 域；③ 整卡级/整背板级（多盘同时受影响）优先怀疑 RAID域/EXP域。
+
+### 1.B 现象场景标签（辅助取证层，映射到故障域）
 
 > 📖 **参考详见**：[磁盘故障场景分类](references/DISK_fault_scenarios.md)
 
-| 场景标签 | 中文描述 | 主要特征 |
-| :--- | :--- | :--- |
-| `DISK_HARDWARE_FAILURE` | 磁盘硬件故障 | SMART 阈值超限、UNC/UF 坏道 (MEDIUM ERROR)、WP 写保护报错、磁盘离线 |
-| `DISK_IO_PERFORMANCE` | I/O 性能问题 | I/O 延迟高、落盘缓慢 (Await 激增)、块请求堆积、SCSI 指令超时 |
-| `DISK_RAID_ERROR` | RAID/控制器故障 | RAID 掉盘、控制器 Cache 故障、电池/超级电容告警、阵列降级 |
-| `DISK_LINK_ISSUE` | 链路/背板故障 | 频繁 SAS 链路重置 (PHY Reset)、ICRC/ABRT 接口错误、链路及背板供电不稳定 |
-| `STORAGE_INDUCED_FS_ERROR` | 存储诱发的文件系统故障 | 底层 I/O 错误引发文件系统 Remount Read-only（注：纯逻辑 FS 损坏属文件系统技能范畴） |
-| `DISK_SYSTEM_CONFIG` | 系统/配置与兼容性限制 | 盘符漂移 (Drift)、磁盘不支持特定指令 (Illegal Request)、磁盘挂载数量过载 |
+现象场景标签用于快速锁定 Step 2 取证方向，每个标签标注其归属/可能归属的故障域：
+
+| 场景标签 | 中文描述 | 主要特征 | → 归属故障域 |
+| :--- | :--- | :--- | :--- |
+| `DISK_HARDWARE_FAILURE` | 磁盘硬件故障 | SMART 阈值超限、UNC/UF 坏道 (MEDIUM ERROR)、WP 写保护报错、磁盘离线 | **硬盘域**(R1-R6) |
+| `DISK_IO_PERFORMANCE` | I/O 性能问题 | I/O 延迟高、落盘缓慢 (Await 激增)、块请求堆积、SCSI 指令超时 | **硬盘域**(R1早期)/ **OS域**(R14) |
+| `DISK_RAID_ERROR` | RAID/控制器故障 | RAID 掉盘、控制器 Cache 故障、电池/超级电容告警、阵列降级 | **RAID域**(R9-R10) |
+| `DISK_LINK_ISSUE` | 链路/背板故障 | 频繁 SAS 链路重置 (PHY Reset)、ICRC/ABRT 接口错误、PCIe AER、链路及背板供电不稳定 | **链路域**(R7-R8)/ **EXP域**(R11-R12,背板级) |
+| `STORAGE_INDUCED_FS_ERROR` | 存储诱发的文件系统故障 | 底层 I/O 错误引发文件系统 Remount Read-only（注：纯逻辑 FS 损坏属文件系统技能范畴） | **OS域**(R15) + 底层硬盘/链路域根因 |
+| `DISK_SYSTEM_CONFIG` | 系统/配置与兼容性限制 | 盘符漂移 (Drift)、磁盘不支持特定指令 (Illegal Request)、磁盘挂载数量过载 | **OS域**(R13资源/配置类) |
 
 ### 场景辅助分析与根因假设
 
@@ -157,9 +181,9 @@ python3 scripts/diagnose_summary.py <log_dir> -s "2026-03-10 08:00:00" -e "2026-
 > ⚠️ **Step 3 强制范围**：无论 Step 1 判定为何种场景，Step 3 健康度评估都必须对涉事磁盘执行 [disk_health_rules.md](references/disk_health_rules.md) 全量规则比对。唯一例外是 Step 2 完全无法锚定任何物理磁盘对象（仅有控制器/背板级故障）时，Step 3 输出"无涉事磁盘对象，规则评估不适用"声明。
 
 **Step 1 完成标志：**
-1. ✅ 确定主要故障场景标签（从上述类型中选择）
-2. ✅ 记录故障现象与关键证据
-3. ✅ 为 Step 2 深入分析提供明确的故障场景方向
+1. ✅ **判定主要故障域**（硬盘域/链路域/RAID域/EXP域/OS域/待定界，以用户《故障根因分类表》为准；多域并发时标注主导域与并发域）
+2. ✅ 确定辅助现象场景标签（从 §1.B 中选择）并记录故障现象与关键证据
+3. ✅ 为 Step 2 深入分析、Step 5 R 码收敛提供明确的故障域方向
 
 ---
 ## Step 2：深入分析
@@ -380,32 +404,35 @@ python3 scripts/diagnose_health_rules.py <log_dir> --include-passed
 4. ✅ E4 维度明确给出规则评估结论与因果链推断的一致性判断（一致 / 部分一致 / 冲突）；冲突时采取更保守的处置策略。
 
 ---
-## Step 5：FARM 底层深度诊断 (可选环节)
+## Step 5：FARM+OS 联合底层定界 (farmlog 存在时必须执行)
 
-**触发条件**（须**同时满足**）：
-1. 在前置步骤中已经识别出是某物理磁盘存在问题；
-2. 当前的日志包内有 `farmlog/` 目录，其中含以该 SN 命名的 FARM 日志（json 优先/txt 兜底）。
+**触发条件**：日志包内存在 `farmlog/` 目录或任何 `*_FARM_*.{json,txt}` 文件——**只要存在就必须执行本步骤，不再以"前置步骤已锁定某块盘"为前提**（未锁定盘时对 farmlog 内所有盘做机群级定界，再与 OS 侧证据对齐锁定涉事盘）。若完全没有 FARM 日志，跳过本步骤，但仍应参考 [root_cause_rules.md](references/root_cause_rules.md) 的 OS 侧量化标准给出候选 R 码。
 
-**目标**：不再局限于"哪块盘坏了"，而是探究**"这块盘的内部哪里坏了"**，将其归类至 8 类部位（如：纯粹个别磁头退化、马达供电异常等）。
+**目标**：两层递进——
+1. **部位层（8 类）**：不再局限于"哪块盘坏了"，探究**"这块盘的内部哪里坏了"**（磁头/盘面/接口/固件等 8 类部位）；
+2. **根因层（R 码）**：按用户定义的**冷存储故障根因定界规则 R1-R16**（[root_cause_rules.md](references/root_cause_rules.md)），将 FARM 侧量化判据与 Step 0-4 的 OS/iBMC 证据**交叉验证闭环**，输出最终 R 码（如 R1 磁头信号退化 / R4 振动致伤 / R7 链路故障）、Depop 适用性与修复路径。
 
 > [!IMPORTANT]
 > **FARM 是单帧快照，没有 `poh` 时间序列。严禁套用"旧→新趋势/活跃增长 vs 暂稳"这类趋势话术。** 活跃度改用 **`Reallocated Candidate Sectors`（候选坏道数）** 近似：候选 > 0 = 退化进行中，候选 = 0 = 暂稳。
 
-### 5.1 运行分析引擎
+### 5.1 运行分析引擎（含 R 码定界）
 ```bash
 # 默认 json 优先、txt 兜底（推荐）
 python3 scripts/analyze_farm.py <log_dir>/farmlog
 
-# 只用 json / 强制只用 txt（测试降级路径）
+# 只用 json / 强制只用 txt（测试降级路径）/ 追加机器可读 JSON
 python3 scripts/analyze_farm.py <log_dir>/farmlog --source json
 python3 scripts/analyze_farm.py <log_dir>/farmlog --source txt
+python3 scripts/analyze_farm.py <log_dir>/farmlog --json
 ```
 
-> [!WARNING]
-> **先确认数据源是 json 还是 txt！** json（openSeaChest）字段最全，能做逐头定位、逐头不可恢复读、Flash LED/Depop 判定；txt（华为 disktool）仅约 40% 字段，第 2/7 类及逐头明细会降级，故障常只能判到"整盘介质退化（未定位到磁头）"。报告"数据源"列已标注，结论关键时应索取该盘 json 重新分析。
+脚本每盘输出：机群汇总（含 R 码列）→ 逐类（8 类）分析表 → **逐磁头明细表**（重分配/候选/不可恢复读/FAFH/MRR/DOS刷新/DOS阈值/**DOS倍率**/VelObs/组件退化/R码异常头）→ **冷存储根因定界（R 码，FARM 侧）**：候选 R 码 + 梯度比 + 判定依据 + Depop 适用性 + **OS 侧交叉验证清单**。
 
-### 5.2 结合指南定界病因
-依据以上输出结果并参考指南进行专业判读：
+> [!WARNING]
+> **先确认数据源是 json 还是 txt！** json（openSeaChest）字段最全，能做逐头定位、逐头不可恢复读、DOS 倍率、H2SAT、Flash LED/Depop 判定；txt（华为 disktool）仅约 40% 字段，第 2/7 类、逐头明细与 R 码判据（DOS 倍率/H2SAT）会降级，故障常只能判到"整盘介质退化（未定位到磁头）"。报告"数据源"列已标注，结论关键时应索取该盘 json 重新分析。
+
+### 5.2 部位层判读（8 类框架）
+依据脚本输出并参考指南进行专业判读：
 > 📖 [FARM 底层诊断指南](references/farm_analysis.md)
 > 📖 [FARM 字段与指标参考字典](references/farm_field_reference.md)
 
@@ -413,22 +440,65 @@ python3 scripts/analyze_farm.py <log_dir>/farmlog --source txt
 1. **种群相对法**：对比同一硬盘内的不同磁头，挑出 `FAFH`（飞高 clearance delta）离群、`MRR`=0xFFFF（磁头开路）或 `H2SAT` 信号劣化的"离群磁头"。
 2. **候选数活跃度**（替代 SM2 的趋势判断）：用 `Reallocated Candidate`（整盘或逐头）判定退化进行中（>0）还是暂稳（=0）。
 3. **整盘↔逐头对账**：用逐头重分配数把整盘坏道定位到具体磁头；逐头全 0 而整盘很大时，诚实标注"无法定位到磁头"。
-4. **FAFH 谨慎**：飞高 clearance delta 逐头校准差异天然大，单独离群只算"关注"，须与同头坏道共振才升级为"退化"。
+4. **FAFH 谨慎**：飞高 clearance delta 逐头校准差异天然大，单独离群只算"关注"，须与同头坏道共振才升级为"退化"（注意：R2 的 |FAFH|>200 绝对阈值判据与此并行，二者口径不同）。
 5. **组合研判**：第 1 类（重分配/坏扇区）+ 第 2 类（不可恢复读）同时非零时，故障概率升至约 76%——最优先备份换盘。
 
+### 5.2.1 【HARD-LOCK】用户定义的磁头/组件退化确定性规则（严禁改判）
+
+> [!CAUTION]
+> **本节规则**优先于/覆盖 R 码定界与 8 类部位层的**所有**发现。脚本 `analyze_farm.py` 已实现（`component_degraded_heads()` + `classify()` 的 HARD-LOCK 分支）；一旦触发，脚本已算好"故障模式 / 健康判定 / 处置建议"三项，报告里这三项**只能等于脚本输出的原文**，不得由 agent 另行改写、升级或降级。
+
+**逐头判据**（满足任一即判该磁头"组件退化"）：
+- `Velocity Observer` > 200；**或**
+- 该头 `DOS Write Count Threshold` 非 0，**且** `DOS Write Refresh Count` > 1000 × `DOS Write Count Threshold`。
+
+**盘级判定**（按退化磁头数 ÷ 总磁头数的占比）：
+
+| 占比 | 终态健康判定 | 处置建议（固定文案，必须逐字复制脚本输出） |
+|---|---|---|
+| **≥ 50%** | **损坏** | `不建议修复，建议备份数据后报废更换硬盘。` |
+| **< 50%（且 > 0）** | **健康** | 1. 建议重新挂载硬盘：<br>```<br>umount /dev/sdx<br>mount /dev/sdx /mnt/data<br>```<br>2. 建议将退化的磁头通过 DEPOP 隔离：<br>```<br>seachest_power --standbyImmediate -d /dev/sdb<br>seachest_power --sleepImmediate -d /dev/sdb<br>``` |
+
+**硬约束（三条铁律，Agent 必读）**：
+1. **判定占比只看退化磁头数占比这一个量**：占比 < 50% ⇒ **健康**（重新挂载 + DEPOP 隔离）；占比 ≥ 50% ⇒ **损坏**（报废换盘）。**没有第三条路径。**
+2. **严禁用其它现象反向覆盖本规则**：即使同盘同时存在 **Reallocated / Candidate / URE > 0、Pending Sector 高、SMART FAILED、固件不可纠正错误 > 0、XFS shutdown、Medium Error** 等第 1/5/7 类异常，只要退化磁头占比 < 50%，健康判定就**仍是"健康"**，处置就**仍是"重新挂载 + DEPOP 隔离"**——**不得**因这些现象升级为"损坏 / 报废换盘 / P1 Critical / 24 小时内换盘"。本规则**优先于 R 码定界**——即使 R 码识别为 R1 磁头信号退化（DOS 倍率超标本就是 R1 的 FARM 侧信号）,R1 也只作为并发根因描述保留在报告 R 码定界段，"健康判定 / 处置建议"仍锁定为本规则的输出。候选扇区/URE/Pending 只写进"关键发现"用于描述，**不参与**本规则的健康判定。
+3. **反例（真实踩坑）**：某 18 头盘退化磁头 2 个（H11 DOS 倍率 2175×、H7 DOS 倍率 405×，占比 11% < 50%），另有 728 个候选扇区 + 33 次不可恢复读 + Pending Sector 736 + XFS 强制 shutdown。脚本正确判"健康 + DEPOP 隔离"，但 agent 被坏扇区/URE/XFS 现象带偏、改判成"P1 Critical / 24 小时内换盘"——**这是错误的**，正是本约束要禁止的。R1（磁头信号退化）作为并发根因描述可保留在报告 R 码定界段，但**健康判定和处置**必须锁定为脚本给出的"健康 + DEPOP 隔离"。
+
+**脚本触发提示位置**（agent 必读三处）：
+- 报告顶部 `⛔ 用户确定性规则触发提示(所有 agent 必读)` 全局横幅表格；
+- 每盘标题下方 `> [!CAUTION]` 逐盘锁定块；
+- 每盘 `### 结论` 段中的"故障模式 / 健康判定 / 处置建议"三项——**逐字复制，严禁改写**。
+
+### 5.3 根因层定界（R 码，OS+FARM 交叉验证闭环）
+
+> 📖 **权威规则集**：[冷存储故障根因定界规则 R1-R16](references/root_cause_rules.md)（用户定义《故障根因分类表》六列逐条落地：故障域·范围·典型故障根因·故障诱因·故障修复措施·FARM+OS 定界方法；量化阈值见各 R 码定界方法、决策树 §7、修复能力矩阵 §8）
+
+**执行要求**：
+1. **FARM 侧候选**：以脚本"冷存储根因定界（R码，FARM侧）"输出为起点——候选 R 码、DOS WR 倍率分级、梯度比、异常磁头占比、Shock 分档、Depop 适用性。
+2. **OS 侧闭环（强制）**：逐条核验脚本给出的"OS 侧交叉验证清单"（对应 [root_cause_rules.md](references/root_cause_rules.md) 各 R 码定界方法的 OS 侧标准）——用 Step 0-4 已收集的 SMART（Attr5/187/197/198/194/195/192/193/3/10）、dmesg（medium error 的 LBA 分布/read retry/链路降速/DID_*）、messages（XFS shutdown/sense code）、hiraidadm 证据逐项打勾，每项标注 `[✅/❌/❓]` 及日志出处 `[绝对路径 : 行号]`。**FARM 侧候选与 OS 侧证据一致 → R 码确认；冲突 → 按规则集 §1-§5 的仲裁规则裁决（R1 vs R3 看 H2SAT 磁头选择性、R1 vs R5c 看 DOS WR 是否同步异常、R2→R1 看是否已出现读写错误、R4 vs R1 看梯度比+Shock）**。
+3. **特殊路径**：盘不可响应、FARM 无法采集 → R5b"先恢复后诊断"流程；FARM 全健康 + OS 链路错误 → R7（对齐 Step 2 时序链验证）；数据不全 → 判"待定界"并列明补采需求（禁止强行定界）。
+4. **时序对齐**：将 FARM 定位到的具体磁头/部位插入 Step 2 的故障传导链（例：`某磁头写侧退化(DOS WR 倍率 >1000×) → 该头介质坏道(逐头 Realloc>0) → dmesg medium error(LBA集中) → XFS shutdown → 挂载点只读`），实现"底层物理细节 → OS 现象 → 业务影响"的全链条闭环。
+
 **Step 5 完成标志**：
-1. ✅ 输出 FARM 逐磁头分析表（重分配/候选/不可恢复读/FAFH(O/M/I)/MRR/离群标记），标注离群磁头及数据源覆盖度。
+1. ✅ 输出 FARM 逐磁头分析表（重分配/候选/不可恢复读/FAFH(O/M/I)/MRR/DOS刷新/DOS倍率/VelObs/离群与R码异常标记），标注离群磁头及数据源覆盖度。
 2. ✅ 给出 8 类故障部位评级（如：磁头退化 / 整盘介质退化 / 接口异常 / 固件硬件级失效等）及其置信度。
-3. ✅ 用候选数判定活跃度（退化进行中 / 暂稳），输出处置建议，并将 FARM 诊断结论整合至 Step 6 的报告中。
+3. ✅ 输出**最终 R 码定界结论**：候选 R 码 → OS 侧交叉验证清单逐项核验（附日志出处）→ 确认/仲裁后的 R 码 + Depop 适用性（25%/50% 分级）+ 修复能力（umount/带外重启/Depop，按规则集 §8）。
+4. ✅ 用候选数判定活跃度（退化进行中 / 暂稳），输出处置建议，并将 FARM+R 码结论整合至 Step 6 的报告中。
 
 ---
 ## Step 6：界面输出分析报告
 
-汇总 Step 0～5 的所有分析结果（若执行了 Step 5 FARM 诊断，须将其逐磁头结论、8 类部位评级与候选数活跃度并入报告），直接在当前对话界面输出结构化的诊断报告。**禁止生成任何额外的文档或报告文件。**
+汇总 Step 0～5 的所有分析结果，直接在当前对话界面输出结构化的诊断报告。**禁止生成任何额外的文档或报告文件。**
 
-### 6.1 报告结构 (五大章节)
+**报告形态按模式二选一**：
+- **纯 OS 模式**（无 farmlog）：输出 §6.1 五大章节；根因章节给出基于 OS 侧量化标准的候选 R 码（标注"无 FARM 数据，硬盘内部细节未验证"）。
+- **OS+FARM 联合模式**（有 farmlog，Step 5 已执行）：输出 §6.1 五大章节 **+ 第 6 章《FARM+OS 联合底层定界》**（见 §6.1.6），且第 1/2/4 章必须引用 FARM 底层细节（具体磁头/部位/量化指标），严禁只写 OS 侧表象。
+
+### 6.1 报告结构 (五大章节 + 联合模式第六章)
 
 1.  **结论 (Conclusion)**
+    *   **🔴 故障域（强制置顶）**：必须明确指明本次故障归属的**故障域**（硬盘域 / 链路域 / RAID域 / EXP域 / OS域 / 待定界，以用户《故障根因分类表》为准）及其**范围**（如"硬盘本体（磁头/介质/机械/固件）"），并给出该域下的具体 **R 码**（如 `硬盘域 · R1 磁头信号退化`）。多域并发时须写明主导域与并发域（如"硬盘域 R1 为主，链路域 R7 为辅"）。
+    *   **⛔ 用户确定性规则触发时的强制锁定**：若脚本报告顶部出现 `⛔ 用户确定性规则触发提示` 横幅（或某盘的"故障模式"以`磁头/组件退化【确定性规则】`开头），本报告的"根本原因/故障级别/是否恢复/故障摘要/修复方案"**必须**采用规则表口径——占比 < 50% 时**故障级别不得写为 P1/Critical，不得建议 24 小时内换盘、报废换盘、更换硬件**，只能给出"重新挂载 + DEPOP 隔离"固定处置；占比 ≥ 50% 时按"备份→报废换盘"固定处置。R1 等 R 码作为并发根因描述保留，但**不得覆盖**规则终态。详见 §5.2.1。
     *   **故障摘要**：必须指明物理槽位（Slot ID）、硬盘型号、具体故障现象（如：坏道超限/链路重置）及业务后果（如：文件系统只读）。
     *   **存储数据流拓扑**：清晰呈现层级映射：`挂载点（用户入口） -> 文件系统 -> 分区/LVM -> 真实故障物理磁盘设备（/dev/sdX）`。
 
@@ -455,12 +525,19 @@ python3 scripts/analyze_farm.py <log_dir>/farmlog --source txt
     
 4.  **根因 (Root Cause)**
     *   **技术分析**：结合 §3 的规则评估结果与 §2 的传导链回溯，明确指出导致本次业务故障的物理级或配置级根因。
+    *   **故障域 + R 码定界**：给出 [root_cause_rules.md](references/root_cause_rules.md) 口径的**故障域 + 范围 + 根因 R 码**（联合模式为 Step 5 闭环后的确认结论；纯 OS 模式为基于 OS 侧量化标准的候选域/R 码 + 数据缺口声明）。
     *   **交叉质询证据 (E1-E4)**：呈现 Step 4 的校验结果（重点说明规则评估结论与因果链推断的一致性）。
     *   **🔴 强制约束**：所有原生日志证据必须统一标注出处：`[完整绝对路径 : 行号/行号范围]`。严禁截断路径。
 
 5.  **修复建议 (Recommendations)**
     *   **处置建议**：综合 §4 因果根因与 §3 规则评估结果给出。若规则评估建议更换（`"是否已更换"=true`），即便因果根因指向其他部件，仍须建议同步更换。
-    *   **具体修复路径**：针对 `"是否可修复"=true` 的部件给出线缆更换、自检、监控等建议；针对 NVMe/缺失盘提供具体的复检命令。
+    *   **具体修复路径**：针对 `"是否可修复"=true` 的部件给出线缆更换、自检、监控等建议；针对 NVMe/缺失盘提供具体的复检命令。联合模式下须按 [root_cause_rules.md](references/root_cause_rules.md) §7 修复能力矩阵闭环：umount+mount / 带外重启 / Depop 三种手段对该 R 码是否有效逐一声明，Depop 给出 25%/50% 分级结论与迁移风险提示。
+
+6.  **FARM+OS 联合底层定界（仅 OS+FARM 联合模式，强制输出）**
+    *   **R 码定界结论表**：逐盘输出 `SN | 故障域 | 最终R码 | FARM侧候选 | OS侧交叉验证结果(逐项✅/❌/❓+日志出处) | 仲裁说明(如有冲突) | Depop适用性`。
+    *   **逐磁头明细表**：引用 Step 5 脚本输出（重分配/候选/不可恢复读/FAFH/MRR/DOS刷新/DOS倍率/VelObs/R码异常头），必须呈现到具体磁头编号（HN）与量化数值，反映底层细节。
+    *   **FARM↔OS 证据对齐**：将 FARM 定位的磁头/部位嵌入故障传导链（`底层物理细节 → OS 现象 → 业务影响`），并与 Step 2 时间轴矩阵对齐。
+    *   **数据源与覆盖度声明**：json/txt 来源、降级项（TXT 无逐头重分配/H2SAT/DOS 阈值等）、待补采清单（如判"待定界"）。
 
 ### 6.2 诊断质量基线 (质量拦截要求)
 
@@ -470,6 +547,10 @@ python3 scripts/analyze_farm.py <log_dir>/farmlog --source txt
 - [ ] **拓扑完整**：报告包含从挂载点到底层硬件的**存储数据流映射**。
 - [ ] **逻辑闭环**：包含时间与传播双向链条，且根因经过 E1-E4 交叉校验。
 - [ ] **规则覆盖**：对每块涉事磁盘完成了 [disk_health_rules.md](references/disk_health_rules.md) 全量规则比对，并在修复建议中闭环规则判定结论。
+- [ ] **故障域标注（强制）**：结论章节置顶写明故障域 + 范围（硬盘域/链路域/RAID域/EXP域/OS域/待定界，以用户《故障根因分类表》为准），多域并发时标注主导域与并发域。
+- [ ] **R 码闭环**：根因章节给出了 [root_cause_rules.md](references/root_cause_rules.md) 口径的故障域 + R 码（联合模式为确认结论，纯 OS 模式为候选结论 + 数据缺口声明）。
+- [ ] **⛔ 用户确定性规则锁定（强制）**：若 `analyze_farm.py` 输出含 `⛔ 用户确定性规则触发提示` 或 `磁头/组件退化【确定性规则】`，报告的"故障级别 / 是否恢复 / 修复方案 / 处置建议"**必须**逐字采用脚本给出的规则表口径——占比<50%→**健康 + 重新挂载/DEPOP 隔离**（禁止 P1、禁止换盘、禁止"24 小时内换盘"、禁止把 XFS shutdown/URE/Pending 作为升级依据）；占比≥50%→**损坏 + 备份→报废换盘**。R1 等 R 码可作为并发根因描述保留，但**不得覆盖**确定性规则终态。详见 SKILL.md §5.2.1 三条硬约束。
+- [ ] **FARM 底层细节（联合模式强制）**：farmlog 存在时，报告含《FARM+OS 联合底层定界》章节——逐磁头明细（具体 HN + 量化数值）、OS 侧交叉验证清单逐项核验、Depop 适用性分级、数据源覆盖度声明；**严禁**有 FARM 数据却只输出 OS 侧表象结论。
 
 ---
 
@@ -485,5 +566,6 @@ python3 scripts/analyze_farm.py <log_dir>/farmlog --source txt
 * [Inspur iBMC 分析](references/Inspur_ibmc.md)
 * [FARM 底层诊断指南](references/farm_analysis.md)
 * [FARM 字段与指标参考字典](references/farm_field_reference.md)
+* [冷存储故障根因定界规则 R1-R16](references/root_cause_rules.md)
 
 ---
