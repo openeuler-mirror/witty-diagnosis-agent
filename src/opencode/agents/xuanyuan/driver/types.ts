@@ -62,6 +62,12 @@ export interface TaskDriverInput {
   taskHome: string;
   /** 停止生成 / 超时中止。 */
   signal: AbortSignal;
+  /**
+   * opencode 服务就绪回调：驱动创建 opencode server 后触发，
+   * 将 server.close() 暴露给调用方（runner），
+   * 用于取消时定点关闭该任务进程，而非全局 pkill。
+   */
+  onServerReady?: (close: () => void) => void;
 }
 
 export interface TaskDriver {

@@ -29,7 +29,7 @@ bash install.sh
 
 默认启动为 **真实诊断模式（opencode）**。如需使用**模拟诊断模式**（快速体验，无需模型），编辑 `.env.example` 文件，将 `TASK_DRIVER=opencode` 改为 `TASK_DRIVER=mock`。
 
-![web_env](images/WEB-GUIDE/web_env.png)
+![web_env](../assets/web_env.png)
 
 前置操作已完成后，进入 web 目录操作：
 
@@ -124,7 +124,7 @@ curl http://127.0.0.1:8787/api/health
 
 浏览器打开 **http://localhost:5173**，自动跳转至登录页面。
 
-![登录页面](images/WEB-GUIDE/web_login.png)
+![登录页面](../assets/web_login.png)
 
 ### 2.2 登录操作
 
@@ -136,7 +136,7 @@ curl http://127.0.0.1:8787/api/health
 
 登录成功后自动跳转至 **任务列表** 页面。
 
-![任务列表页](images/WEB-GUIDE/web_task_list.png)
+![任务列表页](../assets/web_task_list.png)
 
 ### 2.3 退出登录
 
@@ -146,7 +146,7 @@ curl http://127.0.0.1:8787/api/health
 2. 系统清除当前会话，自动跳转回登录页面
 3. 重新登录可查看自己的任务，不同用户之间完全隔离
 
-![退出登录](images/WEB-GUIDE/web_logout.png)
+![退出登录](../assets/web_logout.png)
 
 ---
 
@@ -156,7 +156,7 @@ curl http://127.0.0.1:8787/api/health
 
 在任务列表页面，点击 **「新建诊断」** 按钮，进入任务创建向导。
 
-![新建任务 - 在线模式](images/WEB-GUIDE/web_new_task_online.png)
+![新建任务 - 在线模式](../assets/web_new_task_online.png)
 
 ### 3.2 填写基本信息
 
@@ -193,7 +193,7 @@ curl http://127.0.0.1:8787/api/health
 
 示例：
 
-![连通性测试成功](images/WEB-GUIDE/web_connectivity_ok.png)
+![连通性测试成功](../assets/web_connectivity_ok.png)
 
 ### 3.4 离线分析模式
 
@@ -207,7 +207,7 @@ curl http://127.0.0.1:8787/api/health
 2. 点击文件选择框，选择一个或多个日志文件（支持 `.log`、`.txt`、`.zip` 等格式）
 3. 文件自动上传，上传完成后显示文件名和大小
 
-![新建任务 - 离线上传](images/WEB-GUIDE/web_new_task_offline_upload.png)
+![新建任务 - 离线上传](../assets/web_new_task_offline_upload.png)
 
 #### 方式二：指定服务器路径
 
@@ -217,13 +217,13 @@ curl http://127.0.0.1:8787/api/health
 
 > **注意**：路径方式要求诊断服务有权限读取该路径。
 
-![新建任务 - 离线路径](images/WEB-GUIDE/web_new_task_offline_path.png)
+![新建任务 - 离线路径](../assets/web_new_task_offline_path.png)
 
 ### 3.5 启动诊断
 
 确认信息无误后，点击 **「开始诊断」**（在线）或 **「开始分析」**（离线）按钮。任务进入排队状态，系统自动调度执行。
 
-![任务已启动](images/WEB-GUIDE/web_task_started.png)
+![任务已启动](../assets/web_task_started.png)
 
 ---
 
@@ -286,23 +286,21 @@ curl http://127.0.0.1:8787/api/health
 诊断流程分为以下阶段，进度条实时更新：
 
 ```
-┌──────────┬──────────┬──────────┬──────────┬──────────┐
-│  排队中   │ 数据采集  │ 数据分析  │ 故障定位  │ 生成报告  │
-│    0%    │   25%    │   55%    │   78%    │   92%    │
-└──────────┴──────────┴──────────┴──────────┴──────────┘
-                                                        ↓
-                                                      完成 100%
+┌──────────┬──────────┬──────────┬──────────┬──────────┬──────────┐
+│  排队中   │ 计划构建  │ 数据采集  │ 根因分析  │ 报告生成  │   完成   │
+│    5%    │   25%    │   45%    │   65%    │   85%    │   100%   │
+└──────────┴──────────┴──────────┴──────────┴──────────┴──────────┘
 ```
 
 
-| 阶段     | 说明                           | 进度 |
-| -------- | ------------------------------ | ---- |
-| 排队中   | 等待调度器分配资源             | 0%   |
-| 数据采集 | Fuxi 规划 + Kuafu 采集系统日志 | 25%  |
-| 数据分析 | Dayu 调度执行分析任务          | 55%  |
-| 故障定位 | Baize 融合证据链，定位根因     | 78%  |
-| 生成报告 | 生成可视化 RCA 报告            | 92%  |
-| 完成     | 报告就绪，可查看               | 100% |
+| 阶段     | 说明                                     | 进度 |
+| -------- | ---------------------------------------- | ---- |
+| 排队中   | 等待调度器分配资源                       | 5%   |
+| 计划构建 | Fuxi 规划诊断方案，构建排查计划          | 25%  |
+| 数据采集 | Dayu 编排任务，Kuafu 并行采集系统数据    | 45%  |
+| 根因分析 | Baize 融合证据链，定位根因               | 65%  |
+| 报告生成 | 生成可视化 RCA 报告                      | 85%  |
+| 完成     | 报告就绪，可查看                         | 100% |
 
 ### 5.3 实时日志
 
@@ -317,7 +315,7 @@ curl http://127.0.0.1:8787/api/health
 - 切换到其他页面后返回，进度自动恢复（通过 SSE snapshot 机制）
 - 浏览器刷新后，首次加载即获取完整历史日志快照
 
-![任务详情 - 运行中](images/WEB-GUIDE/web_task_running.png)
+![任务详情 - 运行中](../assets/web_task_running.png)
 
 ---
 
@@ -343,19 +341,19 @@ curl http://127.0.0.1:8787/api/health
 
 点击报告区域的 **「下载 HTML」** 按钮，可将报告保存为本地 HTML 文件，离线查看。
 
-![下载 HTML 按钮](images/WEB-GUIDE/web_download_html.png)
+![下载 HTML 按钮](../assets/web_download_html.png)
 
 ### 6.4 评分
 
 报告底部提供评分功能：选择 **1-5 星**，可选填写备注后提交。
 
-![评分区域](images/WEB-GUIDE/web_rating.png)
+![评分区域](../assets/web_rating.png)
 
 ### 6.5 诊断报告示例
 
 **磁盘故障诊断报告**：
 
-![磁盘故障诊断报告](images/WEB-GUIDE/web_report_disk.png)
+![磁盘故障诊断报告](../assets/web_report_disk.png)
 
 ## 七、任务操作：取消 / 重试 / 删除
 
@@ -369,7 +367,7 @@ curl http://127.0.0.1:8787/api/health
 
 > **说明**：取消后立即释放端口资源，无需等待超时。
 
-![取消任务](images/WEB-GUIDE/web_task_cancel.png)
+![取消任务](../assets/web_task_cancel.png)
 
 ### 7.2 重试任务
 
@@ -379,7 +377,7 @@ curl http://127.0.0.1:8787/api/health
 2. 任务重新进入排队状态
 3. **凭据自动复用**：在线诊断的 SSH 凭据从加密保险箱中恢复，无需重新填写
 
-![重试任务](images/WEB-GUIDE/web_task_retry.png)
+![重试任务](../assets/web_task_retry.png)
 
 ### 7.3 删除任务
 
@@ -390,7 +388,7 @@ curl http://127.0.0.1:8787/api/health
 
 > **限制**：运行中的任务无法删除（返回 409 冲突），需先取消再删除。
 
-![删除任务](images/WEB-GUIDE/web_task_delete.png)
+![删除任务](../assets/web_task_delete.png)
 -------------------------------------------------
 
 ## 八、常见问题排查

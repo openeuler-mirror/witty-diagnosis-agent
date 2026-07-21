@@ -1,7 +1,9 @@
-import { execSync } from "node:child_process";
+import { execFileSync, execSync } from "node:child_process";
 import crypto from "node:crypto";
 import path from "node:path";
 import os from "node:os";
+import net from "node:net";
+import dns from "node:dns/promises";
 import fs from "node:fs";
 import { config } from "../config.js";
 import type { FastifyInstance } from "fastify";
@@ -12,6 +14,21 @@ import * as vault from "../vault.js";
 import { subscribe } from "../streamHub.js";
 import type { CreateTaskInput, StreamEvent, TaskStatus } from "../types.js";
 
+
+/** 校验 host 格式：仅允许合法 IPv4 / IPv6 / RFC 1123 主机名，防范命令注入。 */
+function isValidHost(host: string): boolean {
+  if (!host || host.length > 255) return false;
+  // 使用 net.isIP 判断 IP（覆盖 IPv4 和全部 IPv6 简写格式）
+  if (net.isIP(host) !== 0) return true;
+  // RFC 1123 主机名（含单标签如 localhost）
+  return /^(?:[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?\.)+[a-zA-Z]{2,}$|^[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?$/.test(host);
+}
+
+/** 转义 ansible INI 值中的特殊字符：双引号包裹，内部转义反斜杠和双引号。
+ * 防止密码/用户名含 # = ; 空格 等 INI 元字符导致解析截断或污染。 */
+function escapeIniValue(s: string): string {
+  return '"' + s.replace(/\\/g, '\\\\').replace(/"/g, '\\"') + '"';
+}
 /**
  * Task API（对应 02 §6.1 IF-N02~N04）。
  * 所有读写强制 owner == 当前用户；越权统一 404（NFR-003 / 不泄露存在性）。
@@ -27,36 +44,40 @@ export function registerTaskRoutes(app: FastifyInstance): void {
       reply.code(400);
       return { ok: false, reason: "缺少主机 IP / 账号 / 密码" };
     }
+    const host = b.hostIp;
+    const port = String(b.sshPort || 22);
+    const sshUser = b.sshUser;
+
+    // 安全校验：必须放在 mock 判断之前，确保始终生效（防范命令注入）
+    if (!isValidHost(host)) {
+      reply.code(400);
+      return { ok: false, reason: "主机地址格式不合法: " + host };
+    }
+
     // TASK_DRIVER=mock ? 模拟探测（联调用）: 真实 SSH 探测
     if (config.task.driver === "mock") {
       await new Promise((r) => setTimeout(r, 600));
       return { ok: true };
     }
 
-    const host = b.hostIp;
-    const port = b.sshPort || 22;
-    const sshUser = b.sshUser;
-
     // 第一步：快速检查 TCP 端口是否开放（3s 内判定）
     let portOpen = false;
+    // 使用 execFileSync 替代字符串拼接，避免命令注入
     try {
-      execSync("timeout 3 nc -zv -w 2 " + host + " " + port + " 2>&1",
-        { timeout: 5000, encoding: "utf8" });
+      execFileSync("timeout", ["3", "nc", "-zv", "-w", "2", host, port], { timeout: 5000 });
       portOpen = true;
     } catch {
       try {
-        execSync("timeout 2 bash -c 'echo >/dev/tcp/" + host + "/" + port + "' 2>&1",
-          { timeout: 4000, encoding: "utf8" });
+        execFileSync("bash", ["-c", "echo >/dev/tcp/\"$1\"/\"$2\"", "bash", host, port], { timeout: 4000 });
         portOpen = true;
       } catch {
         portOpen = false;
       }
     }
     if (!portOpen) {
-      // 快速 DNS 检查
+      // DNS 解析（用 Node.js dns 模块替代 shell 命令，彻底消除注入风险）
       try {
-        execSync("getent hosts " + host + " 2>/dev/null || host " + host + " 2>/dev/null || nslookup " + host + " 2>/dev/null",
-          { timeout: 3000, encoding: "utf8" });
+        await dns.resolve(host);
         return { ok: false, reason: "目标主机 " + host + " SSH 端口(" + port + ")未开放或无响应" };
       } catch {
         return { ok: false, reason: "无法解析主机名 " + host + "，请检查地址" };
@@ -74,7 +95,7 @@ export function registerTaskRoutes(app: FastifyInstance): void {
     let controlPath = "";
     // ansible 对 127.0.0.1 会切 local 绕过 SSH，改用 127.0.0.2
     const invHost = host === "127.0.0.1" ? "127.0.0.2" : host;
-    const invContent = "[test]\n" + invHost + " ansible_user=" + sshUser + " ansible_port=" + port + " ansible_password=" + b.sshPassword + " ansible_connection=ssh";
+    const invContent = "[test]\n" + invHost + " ansible_user=" + escapeIniValue(sshUser) + " ansible_port=" + escapeIniValue(port) + " ansible_password=" + escapeIniValue(b.sshPassword) + " ansible_connection=ssh";
     try {
       fs.writeFileSync(tmpFile, invContent, { mode: 0o600 });
       controlPath = "/tmp/ansible-conn-" + crypto.randomUUID() + ".sock";

@@ -1,4 +1,3 @@
-import { execSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
 import * as repo from "./repositories.js";
@@ -28,6 +27,8 @@ import {
 
 interface RunHandle {
   abort: AbortController;
+  /** opencode server 关闭函数（由驱动在 createOpencode 后注册），用于取消时定点清理该任务进程。 */
+  closeServer?: () => void;
 }
 
 const running = new Map<string, RunHandle>();
@@ -105,6 +106,10 @@ export async function run(taskId: string): Promise<void> {
         ? { online: { hostIp: cred.hostIp, sshUser: cred.sshUser, sshPort: cred.sshPort, sshPassword: cred.sshPassword } }
         : {}),
       ...(task.mode === "offline" ? { offline: { logPaths: await repo.listOfflineSourcePaths(taskId) } } : {}),
+      onServerReady: (close) => {
+        const h = running.get(taskId);
+        if (h) h.closeServer = close;
+      },
     };
 
     const drv = await driver();
@@ -162,15 +167,16 @@ export async function run(taskId: string): Promise<void> {
   }
 }
 
-/** 取消运行中任务：立即 kill opencode serve 进程 + 发 abort 信号。
- * 必须 kill 子进程，否则端口 4096 仍被占用，重试会报 Server exited with code 1。 */
+/** 取消运行中任务：定点关闭该任务的 opencode serve 进程 + 发 abort 信号。
+ * 通过驱动注册的 closeServer 回调精确关闭目标进程，避免误杀其它并发任务的 serve。
+ * 取消时先从 running map 删除，保证幂等性——后续同 taskId 的 cancel 调用直接跳过。 */
 export function cancel(taskId: string): void {
   const handle = running.get(taskId);
   if (!handle) return;
-  // 先 kill opencode serve 进程（释放端口），再发 abort 信号
-  // 匹配 "opencode serve"（含 serve 参数），不杀用户 TUI 的 "opencode"（无 serve 参数）
+  running.delete(taskId); // 立即删除，保证幂等
+  // 优先通过驱动注册的 closeServer 定点关闭该任务进程（释放端口），再发 abort 信号
   try {
-    execSync("pkill -f 'opencode serve' 2>/dev/null || true", { timeout: 3000 });
+    handle.closeServer?.();
   } catch { /* ignore */ }
   handle.abort.abort();
 }

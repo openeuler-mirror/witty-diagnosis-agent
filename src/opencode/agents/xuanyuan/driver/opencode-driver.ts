@@ -201,6 +201,8 @@ export function createOpencodeDriver(cfg: OpencodeDriverConfig = {}): TaskDriver
       });
 
       const { client, server } = connection;
+      // 将 server.close 注册给调用方（runner），替换全局 pkill 为定点进程清理
+      input.onServerReady?.(() => server.close());
       const directory = home;
       let state = initTaskSynthState();
 
