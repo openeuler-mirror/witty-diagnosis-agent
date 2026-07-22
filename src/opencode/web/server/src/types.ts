@@ -7,7 +7,7 @@ export type TaskMode = "online" | "offline";
 export type TaskStatus = "queued" | "running" | "succeeded" | "failed" | "canceled";
 
 /** 进度阶段标签（与前端 stepper 一致）。 */
-export const STAGES = ["排队中", "数据采集", "数据分析", "故障定位", "生成报告", "完成"] as const;
+export const STAGES = ["排队中", "计划构建", "数据采集", "根因分析", "报告生成", "完成"] as const;
 export type Stage = (typeof STAGES)[number];
 
 export interface OnlineTargetDTO {

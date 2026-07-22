@@ -27,6 +27,8 @@ import {
 
 interface RunHandle {
   abort: AbortController;
+  /** opencode server 关闭函数（由驱动在 createOpencode 后注册），用于取消时定点清理该任务进程。 */
+  closeServer?: () => void;
 }
 
 const running = new Map<string, RunHandle>();
@@ -104,6 +106,10 @@ export async function run(taskId: string): Promise<void> {
         ? { online: { hostIp: cred.hostIp, sshUser: cred.sshUser, sshPort: cred.sshPort, sshPassword: cred.sshPassword } }
         : {}),
       ...(task.mode === "offline" ? { offline: { logPaths: await repo.listOfflineSourcePaths(taskId) } } : {}),
+      onServerReady: (close) => {
+        const h = running.get(taskId);
+        if (h) h.closeServer = close;
+      },
     };
 
     const drv = await driver();
@@ -151,17 +157,28 @@ export async function run(taskId: string): Promise<void> {
     }
   } finally {
     clearTimeout(timer);
-    // 终态强制擦除凭据（BC-004 用完即焚）
-    vault.wipe(taskId);
+    // 仅成功时擦除凭据；取消、失败、超时都保留（重试时复用连接信息）
+    if (gotReport) {
+      vault.wipe(taskId);
+    }
     // 真实路径：擦除每任务 HOME（连同会话存储/采集中间产物）
     if (config.task.driver === "opencode") wipeTaskHome(taskHome);
     running.delete(taskId);
   }
 }
 
-/** 取消运行中任务：abort 驱动（真实路径会随之 kill opencode server）。 */
+/** 取消运行中任务：定点关闭该任务的 opencode serve 进程 + 发 abort 信号。
+ * 通过驱动注册的 closeServer 回调精确关闭目标进程，避免误杀其它并发任务的 serve。
+ * 取消时先从 running map 删除，保证幂等性——后续同 taskId 的 cancel 调用直接跳过。 */
 export function cancel(taskId: string): void {
-  running.get(taskId)?.abort.abort();
+  const handle = running.get(taskId);
+  if (!handle) return;
+  running.delete(taskId); // 立即删除，保证幂等
+  // 优先通过驱动注册的 closeServer 定点关闭该任务进程（释放端口），再发 abort 信号
+  try {
+    handle.closeServer?.();
+  } catch { /* ignore */ }
+  handle.abort.abort();
 }
 
 export function isRunning(taskId: string): boolean {

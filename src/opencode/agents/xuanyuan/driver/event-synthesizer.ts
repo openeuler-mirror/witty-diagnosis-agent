@@ -18,15 +18,23 @@ export const REPORT_PATH_MARKERS = ["RCA报告路径：", "报告已写入："] 
 
 /** 阶段关键词 → 阶段。命中即把阶段推进到不低于该阶段（forward-only）。 */
 const STAGE_KEYWORDS: { stage: Stage; words: string[] }[] = [
-  { stage: "数据采集", words: ["fuxi", "伏羲", "诊断计划", "计划构建", "排查方案"] },
-  { stage: "数据分析", words: ["dayu", "大禹", "kuafu", "夸父", "编排", "并行执行", "任务执行"] },
-  { stage: "故障定位", words: ["baize", "白泽", "根因", "rca", "root cause"] },
-  { stage: "生成报告", words: ["report_visualization", "可视化报告", "报告已写入", "rca报告路径", "诊断报告"] },
+  // 文本关键词只保留最基础的「计划构建」阶段，用于 agent 开场白后即推进。
+  // 「数据采集」「根因分析」「报告生成」全部依赖工具调用事件推进
+  // （SUBAGENT_STAGE / TOOL_STAGE），避免计划文本中包含的 agent 名导致过早跳阶段。
+  { stage: "计划构建", words: ["fuxi", "伏羲", "诊断计划", "计划构建", "排查方案"] },
 ];
 
 /** 工具名 → 触达的阶段（部分工具能直接标定阶段）。 */
 const TOOL_STAGE: Record<string, Stage> = {
-  report_visualization: "生成报告",
+  report_visualization: "报告生成",
+};
+
+/** 子代理类型 → 触达的阶段（比文本关键词更可靠，避免计划文本误匹配）。 */
+const SUBAGENT_STAGE: Record<string, Stage> = {
+  "fuxi-sub": "计划构建",
+  "dayu":     "数据采集",
+  "kuafu":    "数据采集",
+  "baize":    "根因分析",
 };
 
 export interface TaskSynthState {
@@ -39,7 +47,7 @@ export interface TaskSynthState {
 }
 
 export function initTaskSynthState(): TaskSynthState {
-  // 起点为「排队中」，使首个「数据采集」阶段也能作为一次切换被吐出。
+  // 起点为「排队中」，使首个「计划构建」阶段也能作为一次切换被吐出。
   return { stageIndex: STAGE_ORDER.indexOf("排队中"), lineBuf: "", reportPath: null };
 }
 
@@ -112,11 +120,29 @@ export function reduceTaskEvent(state: TaskSynthState, ev: OpencodeEventPayload)
       const sub = p.part.state?.input?.subagent_type;
       const label = tool === "task" && typeof sub === "string" ? `子代理 ${sub}` : `工具 ${tool}`;
       emits.push({ type: "log", text: `▶ 调用${label}…` });
-      // 子代理类型也参与阶段推断（fuxi-sub→采集 / dayu→分析 / baize→定位）
-      if (typeof sub === "string") scanText(state, sub, emits);
+      // 子代理类型直接推阶段（比文本关键词更可靠）
+      if (typeof sub === "string") {
+        const subStage = SUBAGENT_STAGE[sub.toLowerCase()];
+        if (subStage) advanceTo(state, subStage, emits);
+      }
     } else if (status === "completed") {
       const out = p.part.state?.output;
-      if (typeof out === "string" && out) scanText(state, out, emits);
+      if (typeof out === "string" && out) {
+        scanText(state, out, emits);
+        // 输出子代理内部执行内容（仅 task 工具，按行拆分）
+        if (tool === "task") {
+          for (const line of out.split("\n")) {
+            const t = line.trim();
+            if (t) emits.push({ type: "log", text: `  ${t}` });
+          }
+        }
+        // 捕获 report_visualization 工具产出的 HTML 路径
+        // 其输出格式为: "Successfully converted to HTML: /path/to/file.html"
+        if (tool.toLowerCase() === "report_visualization") {
+          const htmlMatch = out.match(/Successfully converted to HTML:\s*(\S+\.html)/i);
+          if (htmlMatch?.[1]) state.reportPath = htmlMatch[1];
+        }
+      }
       emits.push({ type: "log", text: `✓ ${tool} 完成` });
     } else if (status === "error") {
       const err = p.part.state?.error || "未知错误";

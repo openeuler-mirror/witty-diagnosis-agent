@@ -23,6 +23,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { withWorkingOpencodePath } from "../../../cli/run/opencode-binary-resolver.js";
+import { getAvailableServerPort } from "../../../shared/port-utils.js";
 import {
   initTaskSynthState,
   reduceTaskEvent,
@@ -92,7 +93,10 @@ function buildFirstPrompt(input: TaskDriverInput): string {
   return lines.join("\n");
 }
 
-/** 在 baize/reports 下取最新的 .html（双信号②）。 */
+/** 在 taskHome 的 baize/reports 下取最新的 .html（双信号②）。
+ * 只查 taskHome 隔离目录，不搜索真实 HOME（避免被历史报告干扰）。
+ * report_visualization 工具产出的 HTML 路径已由事件合成器从输出中捕获。
+ */
 function findLatestReportHtml(taskHome: string): string | null {
   const dir = path.join(taskHome, ".witty-diagnosis-agent", "baize", "reports");
   let entries: string[];
@@ -113,7 +117,7 @@ function findLatestReportHtml(taskHome: string): string | null {
   return best?.file ?? null;
 }
 
-/** 解析报告 HTML 路径（优先 state.reportPath 指向的 .html；否则取目录最新 .html）。 */
+/** 解析报告 HTML 路径（优先 state.reportPath 指向的 .html；否则取 taskHome 目录最新 .html）。 */
 function resolveReportPath(taskHome: string, state: TaskSynthState): string | null {
   if (state.reportPath && state.reportPath.toLowerCase().endsWith(".html") && fs.existsSync(state.reportPath)) {
     return state.reportPath;
@@ -159,6 +163,14 @@ export function createOpencodeDriver(cfg: OpencodeDriverConfig = {}): TaskDriver
         saved[k] = process.env[k];
         process.env[k] = v;
       };
+      // 为每个任务分配唯一端口，避免并发时端口冲突
+      let serverPort = 4096;
+      try {
+        const result = await getAvailableServerPort(4096, "127.0.0.1");
+        serverPort = result.port;
+      } catch {
+        // 端口范围全满时回退到默认 4096
+      }
       // 显式指定二进制时直接返回它，否则按 PATH/which 解析（复刻 cli/run/server-connection.ts）
       const binFinder = cfg.opencodeBin ? async () => cfg.opencodeBin ?? null : undefined;
       const connection = await withEnvLock(async () => {
@@ -174,6 +186,7 @@ export function createOpencodeDriver(cfg: OpencodeDriverConfig = {}): TaskDriver
             () =>
               createOpencode({
                 hostname: "127.0.0.1",
+                port: serverPort,
                 signal: abort.signal,
                 timeout: cfg.serverTimeoutMs,
               }),
@@ -188,6 +201,8 @@ export function createOpencodeDriver(cfg: OpencodeDriverConfig = {}): TaskDriver
       });
 
       const { client, server } = connection;
+      // 将 server.close 注册给调用方（runner），替换全局 pkill 为定点进程清理
+      input.onServerReady?.(() => server.close());
       const directory = home;
       let state = initTaskSynthState();
 
