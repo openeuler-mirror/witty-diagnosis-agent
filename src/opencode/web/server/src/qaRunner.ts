@@ -17,9 +17,14 @@ import { createQaDriver, type QaDriver } from "../../../agents/taiyi/index.js";
 import type { StreamEvent, QaMessageStatus, Citation, RetrievalLevels, GraphSubview } from "./types.js";
 
 let _driver: QaDriver | null = null;
-function driver(): QaDriver {
+let _driverPromise: Promise<QaDriver> | null = null;
+
+async function driver(): Promise<QaDriver> {
   if (_driver) return _driver;
-  _driver = createQaDriver({
+  if (_driverPromise) return _driverPromise;
+  const driverType = (process.env.QA_DRIVER as "mock" | "opencode" | undefined) || "mock";
+  _driverPromise = createQaDriver({
+    driver: driverType,
     lightrag: {
       mock: config.lightrag.mock,
       endpoint: config.lightrag.endpoint,
@@ -30,8 +35,16 @@ function driver(): QaDriver {
       responseType: config.lightrag.responseType,
       includeChunkContent: config.lightrag.includeChunkContent,
     },
+    opencode: driverType === "opencode" ? { model: process.env.QA_OPENCODE_MODEL } : undefined,
+  }).then((d) => {
+    _driver = d;
+    _driverPromise = null;
+    return d;
+  }).catch((err) => {
+    _driverPromise = null; // 重置，允许下次重试
+    throw err;
   });
-  return _driver;
+  return _driverPromise;
 }
 
 export interface QaRunInput {
@@ -114,18 +127,36 @@ export async function run(input: QaRunInput, schedulerSignal: AbortSignal): Prom
     ac.abort();
   }, config.conversation.timeoutMs);
 
+  // 时延监控（TBD-001）
+  const timestamps: Record<string, number> = { start: Date.now() };
+
   let state: QaSynthState = initQaSynthState();
 
   try {
+    const d = await driver();
     // 续跑/新建 opencode 会话；首轮把 ocSessionId 落库（多轮上下文，FR-005）
-    const oc = await driver().ensureSession(input.ocSessionId ?? undefined);
-    if (oc !== input.ocSessionId) await repo.touchQaSession(conversationId, { ocSessionId: oc });
+    const session = await d.ensureSession(input.ocSessionId ?? undefined);
+    if (session.sessionId !== input.ocSessionId) await repo.touchQaSession(conversationId, { ocSessionId: session.sessionId });
 
-    for await (const ev of driver().run({ question, sessionId: oc, signal: ac.signal })) {
+    // 若 session 是重建的（上下文丢失），前插重置提示
+    let questionText = input.question;
+    if (session.contextReset) {
+      questionText = "[系统提示：之前的对话上下文已丢失，以下是一个新问题的开始]\n\n" + input.question;
+    }
+
+    for await (const ev of d.run({ question: questionText, sessionId: session.sessionId, signal: ac.signal })) {
       const r = reduceQaEvent(state, ev);
       state = r.state;
-      for (const emit of r.emits) publish(conversationId, toStreamEvent(emit, assistantMessageId));
+      for (const emit of r.emits) {
+        // 时延埋点
+        if (emit.type === "qa_token" && !timestamps.firstToken) timestamps.firstToken = Date.now();
+        if (emit.type === "qa_evidence" && !timestamps.evidence) timestamps.evidence = Date.now();
+        publish(conversationId, toStreamEvent(emit, assistantMessageId));
+      }
     }
+    timestamps.done = Date.now();
+    const elapsed = (t: number) => ((t - timestamps.start) / 1000).toFixed(1);
+    console.log(`[perf] qa=${question.slice(0,30)}... firstToken=${timestamps.firstToken ? elapsed(timestamps.firstToken)+"s" : "N/A"} evidence=${timestamps.evidence ? elapsed(timestamps.evidence)+"s" : "N/A"} total=${elapsed(timestamps.done)}s`);
 
     const status: QaMessageStatus = abortReason === "timeout" ? "failed" : abortReason === "stop" ? "aborted" : "done";
     await finalize(input, state, status, abortReason === "timeout" ? "生成超时，请重试。" : undefined);
@@ -138,18 +169,35 @@ export async function run(input: QaRunInput, schedulerSignal: AbortSignal): Prom
     schedulerSignal.removeEventListener("abort", onStop);
   }
 }
-
 /** 终态：脱敏后落库 assistant 快照并推送 qa_done。 */
 async function finalize(input: QaRunInput, state: QaSynthState, status: QaMessageStatus, fallbackNote?: string): Promise<void> {
   const text = desensitizeWith(state.text || fallbackNote || "", []);
+  const citedIndices = new Set<number>();
+  const citeRegex = /\[(\d+)\]/g;
+  let match;
+  while ((match = citeRegex.exec(state.text)) !== null) {
+    citedIndices.add(parseInt(match[1], 10));
+  }
+  const filteredCitations = state.citations
+    ? state.citations.filter((_, idx) => citedIndices.has(idx + 1))
+    : null;
   await repo.updateQaMessage(input.assistantMessageId, {
     status,
     text,
     retrieval: state.retrieval ? deRetrieval(state.retrieval) : null,
-    citations: state.citations ? deCitations(state.citations) : null,
+    citations: filteredCitations ? deCitations(filteredCitations) : null,
     graph: deGraph(state.graph),
     followups: state.followups ?? null,
   });
+  if (state.citations && filteredCitations && filteredCitations.length !== state.citations.length) {
+    publish(input.conversationId, {
+      type: "qa_evidence",
+      messageId: input.assistantMessageId,
+      citations: deCitations(filteredCitations),
+      graph: deGraph(state.graph),
+      followups: state.followups?.map(desensitize),
+    });
+  }
   await repo.touchQaSession(input.conversationId);
   publish(input.conversationId, { type: "qa_done", messageId: input.assistantMessageId, status });
 }

@@ -18,7 +18,7 @@ import { buildCustomAgentMetadata, parseRegisteredAgentSummaries } from "./custo
 
 type AgentSource = AgentFactory | AgentConfig
 
-const agentSources: Record<BuiltinAgentName, AgentSource> = {
+const agentSources: Partial<Record<BuiltinAgentName, AgentSource>> = {
   "multimodal-looker": createMultimodalLookerAgent,
 }
 

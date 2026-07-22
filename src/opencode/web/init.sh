@@ -26,6 +26,41 @@ else
   echo "    （如果仅使用离线诊断模式，可忽略此提示）"
 fi
 
+# ---------- QA 模块（已知问题对话查询）可选安装 ----------
+echo ""
+echo "=> [可选] 已知问题对话查询（QA）模块"
+echo "  该模块提供基于知识库的检索增强问答（RAG）能力，需连接 LightRAG 服务。"
+echo "  如不确定，选 n 可后续手动配置（修改 .env 中 CONVERSATION_ENABLED=true）。"
+read -r -p "  是否安装 QA 模块？(y/N): " qa_choice
+
+if [[ "$qa_choice" =~ ^[Yy]$ ]]; then
+  echo "  => 启用 QA 模块..."
+  cd "$SERVER_DIR"
+  # 确保 .env 存在
+  [ -f .env ] || cp .env.example .env
+
+  if grep -q '^CONVERSATION_ENABLED=' .env; then
+    sed -i 's/^CONVERSATION_ENABLED=.*/CONVERSATION_ENABLED=true/' .env
+  else
+    echo 'CONVERSATION_ENABLED=true' >> .env
+  fi
+
+  read -r -p "  请输入 LightRAG 服务地址（默认 http://127.0.0.1:9621）: " lr_endpoint
+  lr_endpoint="${lr_endpoint:-http://127.0.0.1:9621}"
+  if grep -q '^LIGHTRAG_ENDPOINT=' .env; then
+    sed -i "s|^LIGHTRAG_ENDPOINT=.*|LIGHTRAG_ENDPOINT=$lr_endpoint|" .env
+  else
+    echo "LIGHTRAG_ENDPOINT=$lr_endpoint" >> .env
+  fi
+  # 兼容旧版无 LIGHTRAG_MOCK 的 .env
+  if ! grep -q '^LIGHTRAG_MOCK=' .env; then
+    echo 'LIGHTRAG_MOCK=' >> .env
+  fi
+  echo "  ✅ QA 模块已启用 (CONVERSATION_ENABLED=true, LIGHTRAG_ENDPOINT=$lr_endpoint)"
+else
+  echo "  => 跳过 QA 模块（可后续手动启用，添加 CONVERSATION_ENABLED=true 到 .env）"
+fi
+
 echo "==> [1/3] 安装后端依赖"
 cd "$SERVER_DIR"
 [ -f .env ] || cp .env.example .env

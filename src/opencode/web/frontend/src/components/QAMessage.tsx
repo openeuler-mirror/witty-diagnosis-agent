@@ -1,71 +1,75 @@
-import { useState, type ReactNode } from "react";
+import { useState, useRef, useEffect } from "react";
 import type { QaMessage } from "../types";
-
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
+import rehypeRaw from "rehype-raw";
 /**
  * 单条消息渲染（FR-001/002/003）：
  *  - user：右侧气泡
- *  - assistant：检索 trace 折叠卡片 + 流式答复（[n] 引用角标 / 行内 code / **bold** / 有序列表）
+ *  - assistant：检索 trace 折叠卡片 + 流式答复（完整 Markdown 渲染）
  *    + 操作行（复制 / 有用·不准 / 查看来源）+ 建议追问
- * 答复用受控 React 渲染（不 dangerouslySetInnerHTML），[n] 角标可点击定位右侧证据。
+ * 答复用 react-markdown 渲染，[n] 角标可点击定位右侧证据。
  */
 
-// 行内：把 [n] / `code` / **bold** 解析为元素，其余为纯文本
-function renderInline(s: string, onCite: (n: number) => void, keyBase: string): ReactNode[] {
-  const out: ReactNode[] = [];
-  const re = /(\[\d+\])|(`[^`]+`)|(\*\*[^*]+\*\*)/g;
-  let last = 0;
-  let m: RegExpExecArray | null;
-  let i = 0;
-  while ((m = re.exec(s)) !== null) {
-    if (m.index > last) out.push(s.slice(last, m.index));
-    const tok = m[0];
-    if (m[1]) {
-      const n = parseInt(tok.slice(1, -1), 10);
-      out.push(
-        <span key={`${keyBase}-c${i}`} className="cite" onClick={() => onCite(n)}>
-          {n}
-        </span>,
-      );
-    } else if (m[2]) {
-      out.push(
-        <code key={`${keyBase}-k${i}`}>{tok.slice(1, -1)}</code>,
-      );
-    } else if (m[3]) {
-      out.push(<strong key={`${keyBase}-b${i}`}>{tok.slice(2, -2)}</strong>);
+/** 修复 LLM 生成的路径重复问题：/docs/guide/docs/guide/... → /docs/guide/ */
+function fixDupPath(url: string): string {
+  try {
+    const u = new URL(url, "http://localhost");
+    const fixed = u.pathname.replace(/(\/[^/]+\/)(?:\1)+/g, "$1");
+    if (fixed !== u.pathname) {
+      u.pathname = fixed;
+      return u.toString();
     }
-    last = re.lastIndex;
-    i++;
+  } catch {
+    /* ignore invalid URLs */
   }
-  if (last < s.length) out.push(s.slice(last));
-  return out;
+  return url;
 }
 
-function renderAnswer(text: string, onCite: (n: number) => void): ReactNode[] {
-  const blocks: ReactNode[] = [];
-  let list: ReactNode[] = [];
-  const flush = () => {
-    if (list.length) {
-      blocks.push(
-        <ol key={`ol${blocks.length}`}>{list}</ol>,
-      );
-      list = [];
-    }
-  };
-  text.split("\n").forEach((ln, idx) => {
-    if (!ln.trim()) {
-      flush();
-      return;
-    }
-    const lm = ln.match(/^(\d+)\.\s+(.*)$/);
-    if (lm) {
-      list.push(<li key={`li${idx}`}>{renderInline(lm[2], onCite, `li${idx}`)}</li>);
-    } else {
-      flush();
-      blocks.push(<p key={`p${idx}`}>{renderInline(ln, onCite, `p${idx}`)}</p>);
-    }
+/** 用 react-markdown 渲染 AI 答复，[n] 角标转为可点击的 <cite> 元素。 */
+function MarkdownAnswer({ text, onCite }: { text: string; onCite: (n: number) => void }) {
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const handler = (e: MouseEvent) => {
+      const citeEl = (e.target as HTMLElement).closest("[data-cite]");
+      if (citeEl) {
+        const n = parseInt(citeEl.getAttribute("data-cite")!, 10);
+        if (Number.isFinite(n)) onCite(n);
+      }
+    };
+    el.addEventListener("click", handler);
+    return () => el.removeEventListener("click", handler);
+  }, [onCite]);
+
+  // 把 [n] 转为可点击的 HTML <cite>（跳过代码块和内联代码中的 [n]）
+  const processed = text.replace(/(```[\s\S]*?```|`[^`]*`)|\[(\d+)\]/g, (_, code, num) => {
+    if (code) return code; // 代码块/内联代码，原样返回
+    return `<cite class="cite" data-cite="${num}">${num}</cite>`;
   });
-  flush();
-  return blocks;
+
+  return (
+    <div ref={ref} className="markdown-answer">
+      <ReactMarkdown
+        remarkPlugins={[remarkGfm]}
+        rehypePlugins={[rehypeRaw]}
+        components={{
+          a: ({ href, children }) => {
+            const url = href ? fixDupPath(href) : "";
+            return (
+              <a href={url} target="_blank" rel="noopener noreferrer">
+                {children}
+              </a>
+            );
+          },
+        }}
+      >
+        {processed}
+      </ReactMarkdown>
+    </div>
+  );
 }
 
 function Trace({ message }: { message: QaMessage }) {
@@ -122,12 +126,14 @@ export default function QAMessage({
   onShowSources,
   onFollowup,
   onFeedback,
+  onRetry,
 }: {
   message: QaMessage;
   onCite: (messageId: string, n: number) => void;
   onShowSources: (messageId: string) => void;
   onFollowup: (text: string) => void;
   onFeedback: (messageId: string, feedback: "useful" | "inaccurate") => void;
+  onRetry?: (messageId: string) => void;
 }) {
   const [feedback, setFeedback] = useState<"useful" | "inaccurate" | null>(message.feedback);
   const [copied, setCopied] = useState(false);
@@ -148,8 +154,18 @@ export default function QAMessage({
   const generating = message.status === "generating";
   const failed = message.status === "failed";
   const aborted = message.status === "aborted";
-  const sourceCount = message.citations?.length ?? 0;
-  const hasTrace = message.status !== null; // assistant 一定有 trace 区
+  const maxCiteId = (message.citations ?? []).reduce((max, c) => Math.max(max, c.id), 0);
+  const citedIds = new Set<number>();
+  if (message.text && maxCiteId > 0) {
+    for (const m of message.text.matchAll(/\[(\d+)\]/g)) {
+      const id = Number(m[1]);
+      if (id >= 1 && id <= maxCiteId) citedIds.add(id);
+    }
+  }
+  const sourceCount = citedIds.size > 0
+    ? (message.citations ?? []).filter((c) => citedIds.has(c.id)).length
+    : (message.status === "generating" ? (message.citations?.length ?? 0) : 0);
+  const hasTrace = message.status !== null;
 
   const copy = () => {
     navigator.clipboard?.writeText(message.text).catch(() => {});
@@ -167,7 +183,7 @@ export default function QAMessage({
           {failed && message.text === "" ? (
             <div className="qa-degraded">⚠ 知识检索服务暂不可用，请稍后重试。</div>
           ) : (
-            renderAnswer(message.text, (n) => onCite(message.id, n))
+            <MarkdownAnswer text={message.text} onCite={(n) => onCite(message.id, n)} />
           )}
           {generating && <span className="qa-caret" />}
         </div>
@@ -195,6 +211,11 @@ export default function QAMessage({
               {sourceCount > 0 && (
                 <button className="iact" onClick={() => onShowSources(message.id)}>
                   ◳ 查看 {sourceCount} 处来源
+                </button>
+              )}
+              {(failed || aborted) && onRetry && (
+                <button className="iact retry" onClick={() => onRetry(message.id)}>
+                  ↻ 重新生成
                 </button>
               )}
               {aborted && <span className="qa-stopped">· 已停止</span>}

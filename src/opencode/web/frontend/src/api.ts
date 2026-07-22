@@ -92,6 +92,9 @@ export const postQaMessage = (id: string, text: string) =>
     method: "POST",
     body: JSON.stringify({ text }),
   });
+export const renameQaSession = (id: string, title: string) =>
+  req<{ ok: boolean }>(`/api/qa/sessions/${id}`, { method: "PUT", body: JSON.stringify({ title }) });
+
 export const stopQa = (id: string) => req<{ ok: boolean }>(`/api/qa/sessions/${id}/stop`, { method: "POST" });
 export const putQaFeedback = (id: string, mid: string, feedback: "useful" | "inaccurate") =>
   req<{ ok: boolean }>(`/api/qa/sessions/${id}/messages/${mid}/feedback`, {

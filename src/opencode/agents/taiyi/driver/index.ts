@@ -1,9 +1,8 @@
 /**
  * 已知问题问答（QA）模块 · 驱动工厂。
  *
- * 本期：始终返回 mock 驱动（LightRAG 走 mock 或 real REST 均由 client 决定）。
- * real 路径（opencode 常驻 server）见 ../README.md 与 ./opencode-driver.ts 脚手架，
- * 待 @opencode-ai/sdk 接入后在此切换；切换对 web/server 透明（同一 QaDriver 契约）。
+ * 静态 import 零外部依赖的 mock 驱动；真实 opencode 驱动经运行时动态 import
+ * 加载（specifier 为变量，tsc 不跟随），避免 web/server 编译路径被 @opencode-ai/sdk 污染。
  */
 
 import { createMockDriver } from "./mock-driver.js";
@@ -11,12 +10,29 @@ import type { LightragClientConfig } from "../lightrag/client.js";
 import type { QaDriver } from "./types.js";
 
 export interface QaDriverConfig {
+  /** 驱动选择：mock（默认）| opencode（真实路径，需模型配置）。 */
+  driver: "mock" | "opencode";
   lightrag: LightragClientConfig;
   retrievalDelayMs?: number;
   tokenIntervalMs?: number;
+  opencode?: {
+    model?: string;
+    serverTimeoutMs?: number;
+  };
 }
 
-export function createQaDriver(cfg: QaDriverConfig): QaDriver {
+export async function createQaDriver(cfg: QaDriverConfig): Promise<QaDriver> {
+  if (cfg.driver === "opencode") {
+    try {
+      const mod = await import("./opencode-driver.js");
+      return mod.createOpencodeDriver(cfg.opencode ?? {});
+    } catch (err) {
+      throw new Error(
+        "opencode 驱动加载失败，请确认 agents/taiyi/driver/opencode-driver.ts 存在。" +
+        "若不需要 opencode 模式，设置 QA_DRIVER=mock"
+      );
+    }
+  }
   return createMockDriver({
     lightrag: cfg.lightrag,
     retrievalDelayMs: cfg.retrievalDelayMs,
