@@ -93,41 +93,75 @@ function buildFirstPrompt(input: TaskDriverInput): string {
   return lines.join("\n");
 }
 
-/** 在 taskHome 的 baize/reports 下取最新的 .html（双信号②）。
- * 只查 taskHome 隔离目录，不搜索真实 HOME（避免被历史报告干扰）。
- * report_visualization 工具产出的 HTML 路径已由事件合成器从输出中捕获。
+/**
+ * 报告扫描目录（双信号②候选，仅在 state.reportPath 没捕获到绝对路径时才用作兜底）。
+ *  - 隔离 taskHome 下的 baize/reports（原设计假设）；
+ *  - **真实用户 HOME** 下的 baize/reports —— 驱动为保住 opencode 凭据而保留了真实 XDG，
+ *    baize 用「~ / os.homedir()」解析报告路径，实际可能把 .html 写到了这里（只扫隔离目录
+ *    会「未检测到报告」的真正原因）。
+ * 真实目录会累积历史会话文件，故调用侧务必用 taskId / sinceMs 收敛，避免读到旧报告。
  */
-function findLatestReportHtml(taskHome: string): string | null {
-  const dir = path.join(taskHome, ".witty-diagnosis-agent", "baize", "reports");
-  let entries: string[];
-  try {
-    entries = fs.readdirSync(dir).filter((f) => f.toLowerCase().endsWith(".html"));
-  } catch {
-    return null;
-  }
-  let best: { file: string; mtime: number } | null = null;
-  for (const f of entries) {
+function reportScanDirs(taskHome: string): string[] {
+  return [
+    path.join(taskHome, ".witty-diagnosis-agent", "baize", "reports"),
+    path.join(os.homedir(), ".witty-diagnosis-agent", "baize", "reports"),
+  ];
+}
+
+/**
+ * 在 baize/reports 下取本任务的最新 .html（双信号②兜底）。
+ * 收敛规则（避免读到共享目录里的历史报告）：
+ *  - 文件名含 taskId 短码 → 强匹配，优先；
+ *  - 否则只认「mtime ≥ sinceMs」的文件（本任务开始后才落地的产物）。
+ */
+function findLatestReportHtml(taskHome: string, taskId?: string, sinceMs?: number): string | null {
+  const shortId = taskId ? taskId.slice(0, 8).toLowerCase() : null;
+  let best: { file: string; mtime: number; idMatch: boolean } | null = null;
+  for (const dir of reportScanDirs(taskHome)) {
+    let entries: string[];
     try {
-      const st = fs.statSync(path.join(dir, f));
-      if (!best || st.mtimeMs > best.mtime) best = { file: path.join(dir, f), mtime: st.mtimeMs };
+      entries = fs.readdirSync(dir).filter((f) => f.toLowerCase().endsWith(".html"));
     } catch {
-      /* ignore */
+      continue;
+    }
+    for (const f of entries) {
+      const full = path.join(dir, f);
+      let mtime: number;
+      try {
+        mtime = fs.statSync(full).mtimeMs;
+      } catch {
+        continue;
+      }
+      const idMatch = !!shortId && f.toLowerCase().includes(shortId);
+      // 无 id 命中时，必须晚于任务起点才可信（隔离 taskHome 每任务全新，不受此限）
+      if (!idMatch && sinceMs != null && mtime < sinceMs) continue;
+      // 优先级：id 命中 > 更新的 mtime
+      const better =
+        !best ||
+        (idMatch && !best.idMatch) ||
+        (idMatch === best.idMatch && mtime > best.mtime);
+      if (better) best = { file: full, mtime, idMatch };
     }
   }
   return best?.file ?? null;
 }
 
-/** 解析报告 HTML 路径（优先 state.reportPath 指向的 .html；否则取 taskHome 目录最新 .html）。 */
-function resolveReportPath(taskHome: string, state: TaskSynthState): string | null {
+/**
+ * 解析报告 HTML 路径：
+ *  ① 优先 state.reportPath —— 由事件合成器从 report_visualization 输出
+ *     「Successfully converted to HTML: <abs>」捕获的绝对路径（最可靠，远程 d9c0bf4 引入）；
+ *  ② 兜底：在 taskHome + 真实 HOME 的 baize/reports 里按 taskId/时间取本任务最新 .html。
+ */
+function resolveReportPath(taskHome: string, state: TaskSynthState, taskId?: string, sinceMs?: number): string | null {
   if (state.reportPath && state.reportPath.toLowerCase().endsWith(".html") && fs.existsSync(state.reportPath)) {
     return state.reportPath;
   }
-  return findLatestReportHtml(taskHome);
+  return findLatestReportHtml(taskHome, taskId, sinceMs);
 }
 
 /** 读取报告 HTML 内容。 */
-function readReportHtml(taskHome: string, state: TaskSynthState): string | null {
-  const candidate = resolveReportPath(taskHome, state);
+function readReportHtml(taskHome: string, state: TaskSynthState, taskId?: string, sinceMs?: number): string | null {
+  const candidate = resolveReportPath(taskHome, state, taskId, sinceMs);
   if (!candidate) return null;
   try {
     return fs.readFileSync(candidate, "utf8");
@@ -140,6 +174,9 @@ export function createOpencodeDriver(cfg: OpencodeDriverConfig = {}): TaskDriver
   return {
     async *run(input: TaskDriverInput): AsyncGenerator<TaskDriverEvent> {
       const { signal, taskHome } = input;
+      // 报告时间下限：本任务开始时刻，留 5s 余量容忍时钟/落盘抖动。用于在共享的真实
+      // baize/reports 目录里把「本任务产出」和历史报告区分开（配合文件名 taskId 强匹配）。
+      const runStartedAt = Date.now() - 5000;
 
       // 隔离策略：仅重定向 HOME（使 agent 的 ~/.witty-diagnosis-agent/{dayu,baize} 每任务独立，
       // 便于按任务采集报告），同时 **保留** XDG_DATA_HOME/XDG_CONFIG_HOME 指向真实用户目录——
@@ -223,6 +260,10 @@ export function createOpencodeDriver(cfg: OpencodeDriverConfig = {}): TaskDriver
       let mainBusy = false;
       let idleAt = 0;
       let sessionErr: string | null = null;
+      let lastSubError: string | null = null; // 子会话最后一次报错（兜底失败说明用，非立即判失败）
+      // 事件流「最后活动」时间戳：opencode server 若在一次 turn 中途死掉，SSE 流会静默（既不产出下一条、
+      // 也不抛错），for await 无法被 abort 打断。用它给主循环/关流兜一个静默看门狗，避免任务永久卡死。
+      let lastEventAt = Date.now();
 
       const dbg = process.env.TASK_OC_DEBUG_EVENTS;
       const dump = (tag: string, obj: unknown) => {
@@ -238,6 +279,7 @@ export function createOpencodeDriver(cfg: OpencodeDriverConfig = {}): TaskDriver
           const events = await client.event.subscribe({ query: { directory } });
           for await (const ev of events.stream as AsyncIterable<OpencodeEventPayload>) {
             if (abort.signal.aborted) break;
+            lastEventAt = Date.now(); // 有活动就刷新，静默看门狗据此判断 server 是否中途死掉
             dump("EV", { type: ev.type, props: ev.properties });
 
             // 主会话生命周期（仅本会话）：busy/idle/error
@@ -258,6 +300,12 @@ export function createOpencodeDriver(cfg: OpencodeDriverConfig = {}): TaskDriver
             } else if (isMain && ev.type === "session.error") {
               const e = (ev.properties as { error?: { data?: { message?: string } } } | undefined)?.error;
               sessionErr = e?.data?.message || "会话执行错误";
+            } else if (ev.type === "session.error") {
+              // 子会话（子 agent）报错：不立即判失败（opencode 可能自行重试/降级），仅记为兜底原因；
+              // 若整轮最终没产出报告，用它给出比「未生成报告」更具体的失败说明。
+              const e = (ev.properties as { error?: { data?: { message?: string } } } | undefined)?.error;
+              const msg = e?.data?.message;
+              if (msg) lastSubError = msg;
             }
 
             const r = reduceTaskEvent(state, ev);
@@ -293,8 +341,16 @@ export function createOpencodeDriver(cfg: OpencodeDriverConfig = {}): TaskDriver
         mainSessionId = id; // 让 pump 据此识别主会话的 busy/idle/error
       } catch (err) {
         abort.abort();
-        await pump.catch(() => {});
-        server.close();
+        // 同 finally：先关 server 让 SSE 流收尾，再对 await pump 加超时，避免早失败路径也永久挂起。
+        try {
+          server.close();
+        } catch {
+          /* ignore */
+        }
+        await Promise.race([
+          pump.catch(() => {}),
+          new Promise<void>((resolve) => setTimeout(resolve, 3000)),
+        ]);
         signal.removeEventListener("abort", onAbort);
         throw err;
       }
@@ -331,6 +387,10 @@ export function createOpencodeDriver(cfg: OpencodeDriverConfig = {}): TaskDriver
       // 完成判定阈值
       const STABILIZE_MS = 5000; // 主会话回到 idle 后的稳定窗口（容忍子代理边界的瞬时 idle）
       const STARTUP_MS = 180000; // 首次进入 busy 前的最长等待（opencode 起会话 + 首个产出）
+      // 静默看门狗：已经 busy 过、但事件流长时间一条都不来 —— opencode server 多半在一次 turn 中途
+      // 死掉（进程退出/崩溃），SSE 流不会抛错也不会结束，靠它兜底跳出，避免 runner 卡在 running 直到硬超时。
+      // 阈值取得比模型单步产出间隔宽松（DeepSeek 等长思考/工具调用间可能几十秒无事件），避免误杀。
+      const SILENCE_MS = 120000;
       const startAt = Date.now();
 
       try {
@@ -343,9 +403,14 @@ export function createOpencodeDriver(cfg: OpencodeDriverConfig = {}): TaskDriver
           if (abort.signal.aborted) break;
           if (sessionErr) break;
           if (streamEnded) break;
-          if (resolveReportPath(taskHome, state)) break; // 成功信号①：报告 HTML 已落地
+          if (resolveReportPath(taskHome, state, input.taskId, runStartedAt)) break; // 成功信号①：报告 HTML 已落地
           if (sawBusy && !mainBusy && Date.now() - idleAt > STABILIZE_MS) break; // 信号②：主会话稳定 idle
           if (!sawBusy && Date.now() - startAt > STARTUP_MS) break; // 启动看门狗
+          if (sawBusy && Date.now() - lastEventAt > SILENCE_MS) {
+            // 静默看门狗命中：server 中途死掉。标记为错误，让下方按失败收敛（而非误判成功）。
+            sessionErr = sessionErr || lastSubError || "opencode 事件流中断（server 可能在诊断中途退出）";
+            break;
+          }
           await Promise.race([
             new Promise<void>((resolve) => {
               wake = resolve;
@@ -361,10 +426,10 @@ export function createOpencodeDriver(cfg: OpencodeDriverConfig = {}): TaskDriver
         }
 
         // 双信号完成判定：读取报告 HTML（turn 结束后报告文件可能仍在落盘，短暂重试）
-        let html = readReportHtml(taskHome, state);
+        let html = readReportHtml(taskHome, state, input.taskId, runStartedAt);
         for (let i = 0; i < 10 && !html && !abort.signal.aborted; i++) {
           await new Promise((r) => setTimeout(r, 300));
-          html = readReportHtml(taskHome, state);
+          html = readReportHtml(taskHome, state, input.taskId, runStartedAt);
         }
         if (html) {
           yield { type: "report", html };
@@ -372,16 +437,23 @@ export function createOpencodeDriver(cfg: OpencodeDriverConfig = {}): TaskDriver
         } else {
           // 未拿到报告：不算成功（runner 据「是否产出 report」判定终态）
           yield { type: "log", text: "未检测到可视化报告产物（baize/reports/*.html 为空）。" };
-          throw new Error("诊断结束但未生成 RCA 报告（report_visualization 未产出 HTML）。");
+          const detail = lastSubError ? `；最后一次子会话报错：${lastSubError}` : "";
+          throw new Error(`诊断结束但未生成 RCA 报告（report_visualization 未产出 HTML）${detail}。`);
         }
       } finally {
         abort.abort();
-        await pump.catch(() => {});
+        // ⚠ 先关 server，再等 pump。event.subscribe 的 SSE 流在 server 存活时不会因 abort 而结束，
+        // 若先 `await pump` 会永久挂起 → generator 永不返回 → runner 卡在 running（本次 hang 根因）。
+        // 关掉 server 通常会让流收尾；再对 await pump 加超时兜底，确保无论如何都能返回。
         try {
           server.close();
         } catch {
           /* ignore */
         }
+        await Promise.race([
+          pump.catch(() => {}),
+          new Promise<void>((resolve) => setTimeout(resolve, 3000)),
+        ]);
         signal.removeEventListener("abort", onAbort);
       }
     },
