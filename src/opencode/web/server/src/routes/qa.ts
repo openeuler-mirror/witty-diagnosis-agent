@@ -46,6 +46,26 @@ export function registerQaRoutes(app: FastifyInstance): void {
     return { session, messages };
   });
 
+  // ---- 重命名会话 ----
+  app.put("/api/qa/sessions/:id", async (req, reply) => {
+    const user = await requireUser(req, reply);
+    if (!user) return;
+    const id = (req.params as { id: string }).id;
+    const session = await repo.getQaSessionForOwner(id, user.id);
+    if (!session) {
+      reply.code(404);
+      return { error: "not found" };
+    }
+    const body = (req.body ?? {}) as { title?: string };
+    const title = (body.title || "").trim();
+    if (!title) {
+      reply.code(400);
+      return { error: "标题不能为空" };
+    }
+    await repo.touchQaSession(id, { title });
+    return { ok: true };
+  });
+
   // ---- 删除会话（级联消息） ----
   app.delete("/api/qa/sessions/:id", async (req, reply) => {
     const user = await requireUser(req, reply);
@@ -60,7 +80,6 @@ export function registerQaRoutes(app: FastifyInstance): void {
     await repo.deleteQaSession(id);
     return { ok: true };
   });
-
   // ---- 发送消息（提问 / 追问；入队，single-flight） ----
   app.post("/api/qa/sessions/:id/messages", async (req, reply) => {
     const user = await requireUser(req, reply);

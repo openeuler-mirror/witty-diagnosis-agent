@@ -15,22 +15,22 @@ export interface MockDriverConfig {
 }
 
 const ONLINE_SEQ: [Stage, string][] = [
-  ["数据采集", "▶ 调用子代理 fuxi-sub 构建诊断计划…"],
-  ["数据采集", "SSH 连接已建立，开始采集系统指标（dmesg / journalctl / 连接状态）"],
-  ["数据分析", "▶ 调用 Dayu 编排任务，Kuafu 并行执行采集脚本"],
-  ["数据分析", "解析 23,481 条日志，提取异常模式与指标关联"],
-  ["故障定位", "▶ 调用 Baize 进行根因分析（RCA）"],
-  ["故障定位", "关联指标与日志，定位疑似根因与受影响范围"],
-  ["生成报告", "▶ 调用 report_visualization 渲染 HTML 报告"],
+  ["计划构建", "▶ 调用子代理 fuxi-sub 构建诊断计划…"],
+  ["计划构建", "SSH 连接已建立，开始采集系统指标（dmesg / journalctl / 连接状态）"],
+  ["数据采集", "▶ 调用 Dayu 编排任务，Kuafu 并行执行采集脚本"],
+  ["数据采集", "解析 23,481 条日志，提取异常模式与指标关联"],
+  ["根因分析", "▶ 调用 Baize 进行根因分析（RCA）"],
+  ["根因分析", "关联指标与日志，定位疑似根因与受影响范围"],
+  ["报告生成", "▶ 调用 report_visualization 渲染 HTML 报告"],
 ];
 
 const OFFLINE_SEQ: [Stage, string][] = [
-  ["数据采集", "▶ 调用子代理 fuxi-sub 构建诊断计划…"],
-  ["数据采集", "解压并校验上传日志，登记离线日志来源"],
-  ["数据分析", "▶ 调用 Dayu/Kuafu 解析日志时间线，识别异常区间"],
-  ["数据分析", "匹配已知故障特征库"],
-  ["故障定位", "▶ 调用 Baize 定位根因与受影响范围"],
-  ["生成报告", "▶ 调用 report_visualization 生成诊断报告"],
+  ["计划构建", "▶ 调用子代理 fuxi-sub 构建诊断计划…"],
+  ["计划构建", "解压并校验上传日志，登记离线日志来源"],
+  ["数据采集", "▶ 调用 Dayu/Kuafu 解析日志时间线，识别异常区间"],
+  ["数据采集", "匹配已知故障特征库"],
+  ["根因分析", "▶ 调用 Baize 定位根因与受影响范围"],
+  ["报告生成", "▶ 调用 report_visualization 生成诊断报告"],
 ];
 
 function sleep(ms: number, signal: AbortSignal): Promise<void> {

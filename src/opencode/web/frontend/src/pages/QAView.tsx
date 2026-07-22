@@ -7,6 +7,7 @@ import {
   listQaSessions,
   postQaMessage,
   putQaFeedback,
+  renameQaSession,
   stopQa,
   streamQa,
 } from "../api";
@@ -20,6 +21,9 @@ const SUGGESTS = [
   "升级 docker 后容器全部启动失败",
   "Java 容器 Exited(137) 反复重启",
 ];
+
+// 与服务端 CONVERSATION_QUESTION_MAX_CHARS 保持一致
+const MAX_CHARS = 4000;
 
 interface EvidenceFocus {
   msgId: string | null;
@@ -54,10 +58,18 @@ export default function QAView() {
   const [input, setInput] = useState("");
   const [busy, setBusy] = useState(false);
   const [ev, setEv] = useState<EvidenceFocus>({ msgId: null, cite: null, tab: "src", nonce: 0 });
+  const [renamingId, setRenamingId] = useState<string | null>(null);
+  const [renameText, setRenameText] = useState("");
+  const [renaming, setRenaming] = useState(false); // 重命名请求中
+  const [menuOpenId, setMenuOpenId] = useState<string | null>(null);
+  const [menuPos, setMenuPos] = useState<{ x: number; y: number } | null>(null);
 
   const streamRef = useRef<HTMLDivElement>(null);
+  const scrollRef = useRef(false); // 仅发送消息时滚动，AI 回复时不滚动
   const taRef = useRef<HTMLTextAreaElement>(null);
-
+  const renameRef = useRef<HTMLInputElement>(null);
+  // 追踪 send() 已创建但可能 SSE 先到的消息 ID，避免 upsert 静默丢弃
+  const pendingMsgIds = useRef(new Set<string>());
   const refreshSessions = () => listQaSessions().then(setSessions).catch(() => {});
 
   // ---- 初始装载：列表 + 选定（store 指定 → 最近一个 → 新建） ----
@@ -92,10 +104,18 @@ export default function QAView() {
     setEv({ msgId: null, cite: null, tab: "src", nonce: 0 });
     setBusy(false);
 
+    // upsert：消息已存在则更新，不存在但属于待发消息则创建
     const upsert = (id: string, patch: (m: QaMessage) => QaMessage) =>
       setMessages((prev) => {
         const i = prev.findIndex((m) => m.id === id);
-        if (i === -1) return [...prev, patch(newAssistant(id, sessionId))];
+        if (i === -1) {
+          // SSE 先于 send() 的 setMessages 到达时，自动创建消息
+          if (pendingMsgIds.current.has(id)) {
+            pendingMsgIds.current.delete(id);
+            return [...prev, patch(newAssistant(id, sessionId))];
+          }
+          return prev;
+        }
         const next = prev.slice();
         next[i] = patch(next[i]);
         return next;
@@ -105,6 +125,7 @@ export default function QAView() {
       switch (e.type) {
         case "qa_snapshot":
           setMessages(e.messages);
+          scrollRef.current = true; // 打开历史会话时滚到底部
           if (e.messages.some((m) => m.status === "generating")) setBusy(true);
           break;
         case "qa_token":
@@ -123,7 +144,7 @@ export default function QAView() {
         case "qa_done":
           upsert(e.messageId, (m) => ({ ...m, status: e.status }));
           setBusy(false);
-          refreshSessions(); // 标题/排序可能更新
+          refreshSessions();
           break;
         case "qa_error":
           if (e.messageId) upsert(e.messageId, (m) => ({ ...m, status: "failed" }));
@@ -135,11 +156,27 @@ export default function QAView() {
     return close;
   }, [sessionId, toast]);
 
-  // ---- 自动滚动到底 ----
+  // ---- 自动滚动到底：发送消息 / 打开历史会话时触发 ----
   useEffect(() => {
+    if (!scrollRef.current) return;
+    scrollRef.current = false;
     const el = streamRef.current;
     if (el) requestAnimationFrame(() => (el.scrollTop = el.scrollHeight));
   }, [messages]);
+
+  // 点击菜单外关闭下拉
+  useEffect(() => {
+    if (!menuOpenId) return;
+    const handler = (e: MouseEvent) => {
+      const target = e.target as HTMLElement;
+      if (!target.closest(".qa-menu, .qa-edit-btn")) {
+        setMenuOpenId(null);
+        setMenuPos(null);
+      }
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, [menuOpenId]);
 
   const autosize = () => {
     const ta = taRef.current;
@@ -155,7 +192,11 @@ export default function QAView() {
     requestAnimationFrame(autosize);
     try {
       const { userMessageId, assistantMessageId } = await postQaMessage(sessionId, q);
+      // 注册待发消息 ID，允许 upsert 在 SSE 先到时自动创建
+      pendingMsgIds.current.add(userMessageId);
+      pendingMsgIds.current.add(assistantMessageId);
       setBusy(true);
+      scrollRef.current = true;
       setMessages((prev) => {
         const withUser = prev.some((m) => m.id === userMessageId)
           ? prev
@@ -181,6 +222,19 @@ export default function QAView() {
     putQaFeedback(sessionId, messageId, feedback).catch(() => toast("反馈提交失败"));
   };
 
+  // 失败/中断消息重试：找到最近一条 user 消息重新发送
+  const onRetry = (assistantMessageId: string) => {
+    const idx = messages.findIndex((m) => m.id === assistantMessageId);
+    if (idx < 0) return;
+    // 向前查找最近的 user 消息
+    for (let i = idx - 1; i >= 0; i--) {
+      if (messages[i].role === "user" && messages[i].text) {
+        send(messages[i].text);
+        return;
+      }
+    }
+  };
+
   // ---- 会话操作 ----
   const newSession = async () => {
     try {
@@ -193,6 +247,31 @@ export default function QAView() {
   };
   const selectSession = (id: string) => {
     if (id !== sessionId) setSessionId(id);
+    setRenamingId(null);
+    setMenuOpenId(null);
+  };
+  const startRename = (id: string, currentTitle: string) => {
+    setRenamingId(id);
+    setRenameText(currentTitle);
+    setTimeout(() => renameRef.current?.focus(), 50);
+  };
+  const submitRename = async (id: string) => {
+    const title = renameText.trim();
+    if (!title || !id || renaming) {
+      setRenamingId(null);
+      return;
+    }
+    setRenaming(true);
+    try {
+      await renameQaSession(id, title);
+      await refreshSessions();
+      setRenamingId(null);
+    } catch {
+      toast("重命名失败");
+      setRenamingId(null);
+    } finally {
+      setRenaming(false);
+    }
   };
   const removeSession = async (id: string, e: React.MouseEvent) => {
     e.stopPropagation();
@@ -224,11 +303,62 @@ export default function QAView() {
         <div className="qa-slist">
           {sessions.length === 0 && <div className="qa-sempty">暂无历史会话</div>}
           {sessions.map((s) => (
-            <div key={s.id} className={`qa-sitem${s.id === sessionId ? " active" : ""}`} onClick={() => selectSession(s.id)} title={s.title}>
-              <span className="qa-stitle">{s.title || "新会话"}</span>
-              <button className="qa-sdel" title="删除会话" onClick={(e) => removeSession(s.id, e)}>
-                ✕
-              </button>
+            <div
+              key={s.id}
+              className={`qa-sitem${s.id === sessionId ? " active" : ""}`}
+              onClick={() => selectSession(s.id)}
+            >
+              {renamingId === s.id ? (
+                <input
+                  ref={renameRef}
+                  className="qa-rename-input"
+                  value={renameText}
+                  onChange={(e) => setRenameText(e.target.value)}
+                  onBlur={() => submitRename(s.id)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") submitRename(s.id);
+                    if (e.key === "Escape") setRenamingId(null);
+                  }}
+                  onClick={(e) => e.stopPropagation()}
+                />
+              ) : (
+                <span className="qa-stitle">
+                  {s.title || "新会话"}
+                </span>
+              )}
+              <div className="qa-menu-wrap">
+                <button className="qa-edit-btn" title="更多" onClick={(e) => {
+                  e.stopPropagation();
+                  if (menuOpenId === s.id) {
+                    setMenuOpenId(null);
+                    setMenuPos(null);
+                  } else {
+                    const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+                    setMenuPos({ x: rect.left, y: rect.bottom + 4 });
+                    setMenuOpenId(s.id);
+                  }
+                }}>
+                  ⋮
+                </button>
+                {menuOpenId === s.id && menuPos && (
+                  <div className="qa-menu" style={{ left: menuPos.x, top: menuPos.y, position: "fixed" }}>
+                    <button onClick={(e) => {
+                      e.stopPropagation();
+                      setMenuOpenId(null);
+                      startRename(s.id, s.title);
+                    }}>
+                      <span className="mi">✎</span> 重命名
+                    </button>
+                    <button className="qa-menu-del" onClick={(e) => {
+                      e.stopPropagation();
+                      setMenuOpenId(null);
+                      removeSession(s.id, e);
+                    }}>
+                      <span className="mi">✕</span> 删除
+                    </button>
+                  </div>
+                )}
+              </div>
             </div>
           ))}
         </div>
@@ -247,7 +377,15 @@ export default function QAView() {
               </div>
             )}
             {messages.map((m) => (
-              <QAMessage key={m.id} message={m} onCite={onCite} onShowSources={onShowSources} onFollowup={send} onFeedback={onFeedback} />
+              <QAMessage
+                key={m.id}
+                message={m}
+                onCite={onCite}
+                onShowSources={onShowSources}
+                onFollowup={send}
+                onFeedback={onFeedback}
+                onRetry={onRetry}
+              />
             ))}
           </div>
         </div>
@@ -267,6 +405,7 @@ export default function QAView() {
                 rows={1}
                 placeholder="描述你遇到的运维问题，例如：升级 docker 后所有容器启动失败……"
                 value={input}
+                maxLength={MAX_CHARS}
                 onChange={(e) => {
                   setInput(e.target.value);
                   autosize();
@@ -289,7 +428,10 @@ export default function QAView() {
               )}
             </div>
             <div className="composer-hint">
-              <kbd>Enter</kbd> 发送 · <kbd>Shift</kbd>+<kbd>Enter</kbd> 换行 · 回答由知识库检索生成，请结合现场核实
+              <kbd>Enter</kbd> 发送 · <kbd>Shift</kbd>+<kbd>Enter</kbd> 换行
+              <span className="char-counter">
+                {input.length}/{MAX_CHARS}
+              </span>
             </div>
           </div>
         </div>

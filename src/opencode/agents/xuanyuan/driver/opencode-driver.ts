@@ -23,6 +23,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { withWorkingOpencodePath } from "../../../cli/run/opencode-binary-resolver.js";
+import { getAvailableServerPort } from "../../../shared/port-utils.js";
 import {
   initTaskSynthState,
   reduceTaskEvent,
@@ -93,11 +94,11 @@ function buildFirstPrompt(input: TaskDriverInput): string {
 }
 
 /**
- * 报告扫描目录（双信号②候选）。
+ * 报告扫描目录（双信号②候选，仅在 state.reportPath 没捕获到绝对路径时才用作兜底）。
  *  - 隔离 taskHome 下的 baize/reports（原设计假设）；
  *  - **真实用户 HOME** 下的 baize/reports —— 驱动为保住 opencode 凭据而保留了真实 XDG，
- *    baize 用「~ / os.homedir()」解析报告路径，实际把 .html 写到了这里（本次 hang 后
- *    「未检测到报告」的真正原因：只扫隔离目录 → 扫不到真实目录里的产物）。
+ *    baize 用「~ / os.homedir()」解析报告路径，实际可能把 .html 写到了这里（只扫隔离目录
+ *    会「未检测到报告」的真正原因）。
  * 真实目录会累积历史会话文件，故调用侧务必用 taskId / sinceMs 收敛，避免读到旧报告。
  */
 function reportScanDirs(taskHome: string): string[] {
@@ -108,7 +109,7 @@ function reportScanDirs(taskHome: string): string[] {
 }
 
 /**
- * 在 baize/reports 下取本任务的最新 .html（双信号②）。
+ * 在 baize/reports 下取本任务的最新 .html（双信号②兜底）。
  * 收敛规则（避免读到共享目录里的历史报告）：
  *  - 文件名含 taskId 短码 → 强匹配，优先；
  *  - 否则只认「mtime ≥ sinceMs」的文件（本任务开始后才落地的产物）。
@@ -145,7 +146,12 @@ function findLatestReportHtml(taskHome: string, taskId?: string, sinceMs?: numbe
   return best?.file ?? null;
 }
 
-/** 解析报告 HTML 路径（优先 state.reportPath 指向的 .html；否则取目录内本任务最新 .html）。 */
+/**
+ * 解析报告 HTML 路径：
+ *  ① 优先 state.reportPath —— 由事件合成器从 report_visualization 输出
+ *     「Successfully converted to HTML: <abs>」捕获的绝对路径（最可靠，远程 d9c0bf4 引入）；
+ *  ② 兜底：在 taskHome + 真实 HOME 的 baize/reports 里按 taskId/时间取本任务最新 .html。
+ */
 function resolveReportPath(taskHome: string, state: TaskSynthState, taskId?: string, sinceMs?: number): string | null {
   if (state.reportPath && state.reportPath.toLowerCase().endsWith(".html") && fs.existsSync(state.reportPath)) {
     return state.reportPath;
@@ -194,6 +200,14 @@ export function createOpencodeDriver(cfg: OpencodeDriverConfig = {}): TaskDriver
         saved[k] = process.env[k];
         process.env[k] = v;
       };
+      // 为每个任务分配唯一端口，避免并发时端口冲突
+      let serverPort = 4096;
+      try {
+        const result = await getAvailableServerPort(4096, "127.0.0.1");
+        serverPort = result.port;
+      } catch {
+        // 端口范围全满时回退到默认 4096
+      }
       // 显式指定二进制时直接返回它，否则按 PATH/which 解析（复刻 cli/run/server-connection.ts）
       const binFinder = cfg.opencodeBin ? async () => cfg.opencodeBin ?? null : undefined;
       const connection = await withEnvLock(async () => {
@@ -209,6 +223,7 @@ export function createOpencodeDriver(cfg: OpencodeDriverConfig = {}): TaskDriver
             () =>
               createOpencode({
                 hostname: "127.0.0.1",
+                port: serverPort,
                 signal: abort.signal,
                 timeout: cfg.serverTimeoutMs,
               }),
@@ -223,6 +238,8 @@ export function createOpencodeDriver(cfg: OpencodeDriverConfig = {}): TaskDriver
       });
 
       const { client, server } = connection;
+      // 将 server.close 注册给调用方（runner），替换全局 pkill 为定点进程清理
+      input.onServerReady?.(() => server.close());
       const directory = home;
       let state = initTaskSynthState();
 

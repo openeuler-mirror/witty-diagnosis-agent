@@ -1,4 +1,11 @@
+import { execFileSync, execSync } from "node:child_process";
+import crypto from "node:crypto";
+import path from "node:path";
+import os from "node:os";
+import net from "node:net";
+import dns from "node:dns/promises";
 import fs from "node:fs";
+import { config } from "../config.js";
 import type { FastifyInstance } from "fastify";
 import { requireUser } from "../auth.js";
 import * as repo from "../repositories.js";
@@ -7,6 +14,21 @@ import * as vault from "../vault.js";
 import { subscribe } from "../streamHub.js";
 import type { CreateTaskInput, StreamEvent, TaskStatus } from "../types.js";
 
+
+/** 校验 host 格式：仅允许合法 IPv4 / IPv6 / RFC 1123 主机名，防范命令注入。 */
+function isValidHost(host: string): boolean {
+  if (!host || host.length > 255) return false;
+  // 使用 net.isIP 判断 IP（覆盖 IPv4 和全部 IPv6 简写格式）
+  if (net.isIP(host) !== 0) return true;
+  // RFC 1123 主机名（含单标签如 localhost）
+  return /^(?:[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?\.)+[a-zA-Z]{2,}$|^[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?$/.test(host);
+}
+
+/** 转义 ansible INI 值中的特殊字符：双引号包裹，内部转义反斜杠和双引号。
+ * 防止密码/用户名含 # = ; 空格 等 INI 元字符导致解析截断或污染。 */
+function escapeIniValue(s: string): string {
+  return '"' + s.replace(/\\/g, '\\\\').replace(/"/g, '\\"') + '"';
+}
 /**
  * Task API（对应 02 §6.1 IF-N02~N04）。
  * 所有读写强制 owner == 当前用户；越权统一 404（NFR-003 / 不泄露存在性）。
@@ -22,11 +44,85 @@ export function registerTaskRoutes(app: FastifyInstance): void {
       reply.code(400);
       return { ok: false, reason: "缺少主机 IP / 账号 / 密码" };
     }
-    // 骨架：模拟探测（真实实现为 ansible ping / SSH 探测，独立于完整诊断）
-    await new Promise((r) => setTimeout(r, 600));
-    return { ok: true };
-  });
+    const host = b.hostIp;
+    const port = String(b.sshPort || 22);
+    const sshUser = b.sshUser;
 
+    // 安全校验：必须放在 mock 判断之前，确保始终生效（防范命令注入）
+    if (!isValidHost(host)) {
+      reply.code(400);
+      return { ok: false, reason: "主机地址格式不合法: " + host };
+    }
+
+    // TASK_DRIVER=mock ? 模拟探测（联调用）: 真实 SSH 探测
+    if (config.task.driver === "mock") {
+      await new Promise((r) => setTimeout(r, 600));
+      return { ok: true };
+    }
+
+    // 第一步：快速检查 TCP 端口是否开放（3s 内判定）
+    let portOpen = false;
+    // 使用 execFileSync 替代字符串拼接，避免命令注入
+    try {
+      execFileSync("timeout", ["3", "nc", "-zv", "-w", "2", host, port], { timeout: 5000 });
+      portOpen = true;
+    } catch {
+      try {
+        execFileSync("bash", ["-c", "echo >/dev/tcp/\"$1\"/\"$2\"", "bash", host, port], { timeout: 4000 });
+        portOpen = true;
+      } catch {
+        portOpen = false;
+      }
+    }
+    if (!portOpen) {
+      // DNS 解析（用 Node.js dns 模块替代 shell 命令，彻底消除注入风险）
+      try {
+        await dns.resolve(host);
+        return { ok: false, reason: "目标主机 " + host + " SSH 端口(" + port + ")未开放或无响应" };
+      } catch {
+        return { ok: false, reason: "无法解析主机名 " + host + "，请检查地址" };
+      }
+    }
+
+    // 第二步：端口已通，检测 sshpass 并验证凭据
+    try {
+      execSync("which sshpass", { encoding: "utf8" });
+    } catch {
+      return { ok: false, reason: "主机可达(端口已开放)，但缺少 sshpass 无法验证密码。请安装: sudo apt-get install sshpass" };
+    }
+
+    const tmpFile = path.join(os.tmpdir(), "conn-" + crypto.randomUUID() + ".ini");
+    let controlPath = "";
+    // ansible 对 127.0.0.1 会切 local 绕过 SSH，改用 127.0.0.2
+    const invHost = host === "127.0.0.1" ? "127.0.0.2" : host;
+    const invContent = "[test]\n" + invHost + " ansible_user=" + escapeIniValue(sshUser) + " ansible_port=" + escapeIniValue(port) + " ansible_password=" + escapeIniValue(b.sshPassword) + " ansible_connection=ssh";
+    try {
+      fs.writeFileSync(tmpFile, invContent, { mode: 0o600 });
+      controlPath = "/tmp/ansible-conn-" + crypto.randomUUID() + ".sock";
+      const out = execSync(
+        "ansible -i \"" + tmpFile + "\" test -m ping -o --ssh-common-args='-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ControlMaster=no -o ControlPath=" + controlPath + "'",
+        { timeout: 8000, encoding: "utf8", stdio: ["pipe", "pipe", "pipe"] });
+      if (out.includes("SUCCESS")) {
+        return { ok: true };
+      }
+      return { ok: false, reason: "SSH 连接失败，请检查凭据" };
+    } catch (err) {
+      const stderr = (err && typeof err === "object" && "stderr" in err) ? (err as {stderr:string}).stderr : "";
+      const stdout = (err && typeof err === "object" && "stdout" in err) ? (err as {stdout:string}).stdout : "";
+      const msg = [stderr, stdout, err instanceof Error ? err.message : ""].filter(Boolean).join(" | ");
+      let reason = msg.includes("Permission denied") || msg.includes("Authentication failure") || msg.includes("authentication") ? "认证失败，请检查账号和密码"
+        : msg.includes("UNREACHABLE") ? "目标主机不可达"
+        : msg.includes("sshpass") ? "需要安装 sshpass 才能验证密码"
+        : "";
+      if (!reason) {
+        reason = "连接失败: " + msg.slice(0, 200).replace(/\n/g, " ");
+      }
+      return { ok: false, reason };
+    } finally {
+      try { fs.unlinkSync(tmpFile); } catch { /* ignore */ }
+      try { fs.unlinkSync(controlPath); } catch { /* ignore */ }
+    }
+  });
   // ---- 创建任务 IF-N02 ----
   app.post("/api/tasks", async (req, reply) => {
     const user = await requireUser(req, reply);
