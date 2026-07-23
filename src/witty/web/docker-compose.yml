@@ -1,0 +1,72 @@
+# 前后端分离容器化部署（NFR-011 / BC-012 / 02 §2.4）。
+# 前端容器 nginx 反代后端；后端单实例（D-005）。默认 SQLite（命名卷持久化）；
+# 取消 mysql 服务注释并将 DB_CLIENT=mysql 即切换到 MySQL（云化推荐，NFR-010）。
+# QA 模块（已知问题对话查询）为可选模块：使用 --profile qa 启用，需依赖 lightrag 服务。
+services:
+  backend:
+    build: ./server
+    environment:
+      - PORT=8787
+      - HOST=0.0.0.0
+      - DB_CLIENT=sqlite
+      - DB_SQLITE_PATH=/data/witty.db
+      - SCHEDULER_MAX_CONCURRENT=4
+      - TASK_RETENTION_DAYS=30
+      - COOKIE_SECRET=change-me-in-prod
+      # QA 模块：默认关闭，通过 --profile qa 或 .env 中 CONVERSATION_ENABLED=true 启用
+      - CONVERSATION_ENABLED=${CONVERSATION_ENABLED:-false}
+      - LIGHTRAG_ENDPOINT=${LIGHTRAG_ENDPOINT:-http://lightrag:9621}
+      # 切 MySQL（取消下面注释 + 启用 mysql 服务）：
+      # - DB_CLIENT=mysql
+      # - DB_MYSQL_HOST=mysql
+      # - DB_MYSQL_PORT=3306
+      # - DB_MYSQL_USER=witty
+      # - DB_MYSQL_PASSWORD=witty-pass
+      # - DB_MYSQL_DATABASE=witty
+    volumes:
+      - backend-data:/data
+    expose:
+      - "8787"
+    depends_on:
+      # - mysql
+      # LightRAG 为可选依赖，仅在启用 QA profile 时生效
+      lightrag:
+        condition: service_started
+        required: false
+
+  lightrag:
+    # QA 模块专属依赖，通过 --profile qa 启用
+    profiles:
+      - qa
+    image: ghcr.io/hkuds/lightrag:latest
+    environment:
+      - LIGHTRAG_PORT=9621
+      - HOST=0.0.0.0
+      - LLM_BINDING_HOST=0.0.0.0
+      - EMBEDDING_BINDING_HOST=0.0.0.0
+    volumes:
+      - lightrag-data:/app/data
+    expose:
+      - "9621"
+
+  frontend:
+    build: ./frontend
+    ports:
+      - "8080:80"
+    depends_on:
+      - backend
+
+  # mysql:
+  #   image: mysql:8
+  #   environment:
+  #     - MYSQL_DATABASE=witty
+  #     - MYSQL_USER=witty
+  #     - MYSQL_PASSWORD=witty-pass
+  #     - MYSQL_ROOT_PASSWORD=root-pass
+  #   volumes:
+  #     - mysql-data:/var/lib/mysql
+
+volumes:
+  backend-data:
+  lightrag-data:
+  # mysql-data:

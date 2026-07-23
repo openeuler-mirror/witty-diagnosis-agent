@@ -234,6 +234,51 @@ select_install_target() {
   echo ""
 }
 
+usage() {
+  cat <<'USAGE'
+Usage: bash install.sh [--language zh|en]
+
+Options:
+  --language zh|en   Output language. If omitted, you are prompted interactively.
+                     输出语言；省略时在安装过程中交互选择。
+  -h, --help         Show this help.
+
+Notes:
+  插件实现位于 src/witty（净室重写树），构建产物为 dist/index.js + dist/cli.js。
+  src/opencode 为旧实现，仅作参考保留，不参与构建与安装。
+USAGE
+}
+
+# --- Args ---
+LANGUAGE=""
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --language)
+      shift
+      LANGUAGE="$1"
+      if [ "$LANGUAGE" != "zh" ] && [ "$LANGUAGE" != "en" ]; then
+        echo "Invalid --language: $LANGUAGE (must be zh or en)"
+        usage
+        exit 1
+      fi
+      ;;
+    --language=*) LANGUAGE="${1#--language=}"
+      if [ "$LANGUAGE" != "zh" ] && [ "$LANGUAGE" != "en" ]; then
+        echo "Invalid --language: $LANGUAGE (must be zh or en)"
+        usage
+        exit 1
+      fi
+      ;;
+    -h|--help) usage; exit 0 ;;
+    *)
+      echo "Unknown option: $1"
+      usage
+      exit 1
+      ;;
+  esac
+  shift
+done
+
 # --- Paths ---
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 XIAOO_HOME="${XIAOO_HOME:-${HOME}/.xiaoo}"
@@ -388,13 +433,18 @@ echo ""
 
 # --- 5. Plugin Registration ---
 print_step 5 5 "Initializing Configuration"
+
 echo -e "${CYAN}Launching Witty Installer...${NC}"
 echo ""
-
-# Execute the built CLI installer
-# We use 'node dist/cli.js install' directly
+# 组装 install 参数：命令行显式给了 --language 则透传（跳过交互），否则交互选择
+LANG_ARG=""
+if [ -n "$LANGUAGE" ]; then
+  LANG_ARG="--language $LANGUAGE"
+fi
 if [ -f "${SCRIPT_DIR}/dist/cli.js" ]; then
-  (cd "$SCRIPT_DIR" && node dist/cli.js install)
+  (cd "$SCRIPT_DIR" && node dist/cli.js install $LANG_ARG)
+  echo ""
+  (cd "$SCRIPT_DIR" && node dist/cli.js doctor) || print_warning "doctor reported issues (see above)"
 else
   print_error "CLI entry point (dist/cli.js) not found after build."
   exit 1
