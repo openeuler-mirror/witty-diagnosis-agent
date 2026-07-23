@@ -34,7 +34,7 @@ bash install.sh
 前置操作已完成后，进入 web 目录操作：
 
 ```bash
-cd ~/witty-diagnosis-agent/src/opencode/web
+cd ~/witty-diagnosis-agent/src/witty/web
 ```
 
 **首次启动**，先执行环境初始化（装依赖 + 建库）：
@@ -445,7 +445,7 @@ bash install.sh
 **方案二**：单独安装 SDK 包
 
 ```bash
-cd ~/witty-diagnosis-agent/src/opencode/web/server
+cd ~/witty-diagnosis-agent/src/witty/web/server
 npm install @opencode-ai/sdk
 ```
 
