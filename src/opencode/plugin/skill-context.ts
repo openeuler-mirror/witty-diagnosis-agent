@@ -8,6 +8,7 @@ import type {
 
 import {
   discoverConfigSourceSkills,
+  discoverHostConfigSkills,
   discoverUserClaudeSkills,
   discoverProjectClaudeSkills,
   discoverOpencodeGlobalSkills,
@@ -57,12 +58,13 @@ export async function createSkillContext(args: {
   })
 
   const includeClaudeSkills = pluginConfig.claude_code?.skills !== false
-  const [configSourceSkills, userSkills, globalSkills, projectSkills, opencodeProjectSkills, agentsProjectSkills, agentsGlobalSkills] =
+  const [configSourceSkills, hostConfigSkills, userSkills, globalSkills, projectSkills, opencodeProjectSkills, agentsProjectSkills, agentsGlobalSkills] =
     await Promise.all([
       discoverConfigSourceSkills({
         config: pluginConfig.skills,
         configDir: directory,
       }),
+      discoverHostConfigSkills({ directory }),
       includeClaudeSkills ? discoverUserClaudeSkills() : Promise.resolve([]),
       discoverOpencodeGlobalSkills(),
       includeClaudeSkills ? discoverProjectClaudeSkills(directory) : Promise.resolve([]),
@@ -76,7 +78,8 @@ export async function createSkillContext(args: {
     pluginConfig.skills,
     configSourceSkills,
     [...userSkills, ...agentsGlobalSkills],
-    globalSkills,
+    // Host `skills.paths` share the `opencode` scope with ~/.config/opencode/skills.
+    [...globalSkills, ...hostConfigSkills],
     [...projectSkills, ...agentsProjectSkills],
     opencodeProjectSkills,
     { configDir: directory },
