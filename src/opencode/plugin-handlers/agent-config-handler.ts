@@ -5,6 +5,7 @@ import { AGENT_NAME_MAP } from "../shared/migration";
 import { getAgentDisplayName } from "../shared/agent-display-names";
 import {
   discoverConfigSourceSkills,
+  discoverHostConfigSkills,
   discoverOpencodeGlobalSkills,
   discoverOpencodeProjectSkills,
   discoverProjectClaudeSkills,
@@ -53,6 +54,7 @@ export async function applyAgentConfig(params: {
   const includeClaudeSkillsForAwareness = params.pluginConfig.claude_code?.skills ?? true;
   const [
     discoveredConfigSourceSkills,
+    discoveredHostConfigSkills,
     discoveredUserSkills,
     discoveredProjectSkills,
     discoveredOpencodeGlobalSkills,
@@ -61,6 +63,10 @@ export async function applyAgentConfig(params: {
     discoverConfigSourceSkills({
       config: params.pluginConfig.skills,
       configDir: params.ctx.directory,
+    }),
+    discoverHostConfigSkills({
+      hostConfig: params.config,
+      directory: params.ctx.directory,
     }),
     includeClaudeSkillsForAwareness ? discoverUserClaudeSkills() : Promise.resolve([]),
     includeClaudeSkillsForAwareness
@@ -75,6 +81,7 @@ export async function applyAgentConfig(params: {
     ...discoveredOpencodeProjectSkills,
     ...discoveredProjectSkills,
     ...discoveredOpencodeGlobalSkills,
+    ...discoveredHostConfigSkills,
     ...discoveredUserSkills,
   ];
 
