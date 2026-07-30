@@ -4,7 +4,7 @@ import type { Hooks, PluginInput } from "@opencode-ai/plugin"
 
 import { loadWittyConfig } from "./config/load"
 import { AGENT_DEFINITIONS } from "./agents/definitions"
-import { applyAgentsToConfig } from "./agents/registry"
+import { applyAgentsToConfig, isWittyOwnedAgent } from "./agents/registry"
 import { discoverSkills, exposeSkillsToOpenCode } from "./skills/discovery"
 import {
   createMdOnlyGuard,
@@ -100,10 +100,22 @@ export async function createWittyHooks(input: PluginInput): Promise<Hooks> {
       trackDiagnosisArtifacts(diagnosisSnapshots, toolInput, reportDir)
     },
 
-    // 语言锁定第二道闸：每次请求都往系统消息追加一条锁定指令。
-    // 比提示词更靠后、更难被忽略，且对所有 agent（含 OpenCode 内置 general 子代理）生效，
+    // 语言锁定第二道闸：往系统消息追加一条锁定指令，比提示词更靠后、更难被忽略，
     // 覆盖“用户用另一种语言提问 / skill 是另一种语言”导致模型漂移的情况。
-    "experimental.chat.system.transform": async (_transformInput, transformOutput) => {
+    //
+    // 范围铁律：**只对本插件自己的 7 个 agent 生效**。这条指令自称“最高优先级·不可
+    // 覆盖”，落到其他插件的 agent 上会直接跟人家自己的指令对打，所以必须限定范围。
+    // 本钩子的入参没有 agent 字段，只有 sessionID，故复用 chat.message 维护的
+    // sessionID→agent 映射来判定归属（与 md-only 守护同一套机制）。
+    // sessionID 缺失时无法归因，按“不是本插件的”处理，不注入。
+    //
+    // 已知取舍：原生 task 委派出去的子代理（如内置 general）跑在自己的子会话里，
+    // agent 名不在本插件名单内，因此拿不到这道闸，仅靠各 agent 提示词里置顶的同一
+    // 指令兜底（prompt-loader）。覆盖子会话需按 parentID 追溯父会话，留待后续优化。
+    "experimental.chat.system.transform": async (transformInput, transformOutput) => {
+      const sessionID = transformInput.sessionID
+      if (sessionID === undefined) return
+      if (!isWittyOwnedAgent(sessionAgents.get(sessionID))) return
       transformOutput.system.push(languageLockDirective(pluginConfig.output_language))
     },
 
