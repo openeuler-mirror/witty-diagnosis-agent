@@ -57,6 +57,20 @@ export function buildAgentConfig(
  */
 const wittyInjectedKeys = new Set<string>()
 
+/**
+ * 该 agent 名是否确实由本插件注册。
+ *
+ * 判断依据是「名字属于本插件 **且** 本插件真的注入成功了」两个条件的合取：
+ * applyAgentsToConfig 在同名 key 已被其他插件/用户占用时会让位（见上），
+ * 此时 "fuxi" 这个名字跑的是别人的 agent，只查 WITTY_AGENT_NAMES 会误判成自己的。
+ *
+ * 供需要「仅对本插件 agent 生效」的钩子做范围限定，避免影响其他插件的 agent。
+ */
+export function isWittyOwnedAgent(agentName: string | undefined): boolean {
+  if (agentName === undefined) return false
+  return WITTY_OWNED_KEYS.has(agentName) && wittyInjectedKeys.has(agentName)
+}
+
 export function applyAgentsToConfig(args: {
   /** OpenCode 的 Config 对象（config 钩子入参），此处只关心 agent 表 */
   target: { agent?: Record<string, AgentConfig | undefined> }
