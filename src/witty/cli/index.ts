@@ -6,7 +6,7 @@ import { runDoctor } from "./doctor"
 
 /**
  * witty-diagnosis-agent CLI 入口。
- * 净室重写完成后，tsup.config.ts 的 cli 入口指向本文件（替代 src/opencode/cli/index.ts）。
+ * tsup 的 cli 入口指向本文件。
  */
 const program = new Command()
 

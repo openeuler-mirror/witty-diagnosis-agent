@@ -244,8 +244,7 @@ Options:
   -h, --help         Show this help.
 
 Notes:
-  插件实现位于 src/witty（净室重写树），构建产物为 dist/index.js + dist/cli.js。
-  src/opencode 为旧实现，仅作参考保留，不参与构建与安装。
+  插件实现位于 src/witty，构建产物为 dist/index.js + dist/cli.js。
 USAGE
 }
 

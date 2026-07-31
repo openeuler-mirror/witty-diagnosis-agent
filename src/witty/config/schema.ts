@@ -4,7 +4,7 @@ import { z } from "zod"
  * WittyConfig 的 Zod schema。
  *
  * 这是配置校验与 assets/witty-diagnosis-agent.schema.json 生成的唯一来源
- * （净室重写完成后由 script/build-schema.ts 调用）。
+ * （由 script/build-schema.ts 调用）。
  */
 
 export const agentOverrideSchema = z.object({

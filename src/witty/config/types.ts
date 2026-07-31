@@ -1,5 +1,5 @@
 /**
- * 净室插件配置契约。
+ * 插件配置契约。
  *
  * 设计原则：只声明诊断产品需要的键。所有键 snake_case，
  * 与用户配置文件 .opencode/witty-diagnosis-agent.jsonc 保持兼容。

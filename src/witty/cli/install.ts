@@ -10,12 +10,12 @@ import { readJsoncFile } from "../shared/jsonc"
 import { packageRootDir } from "../shared/paths"
 
 /**
- * 安装命令：把净室插件注册进 OpenCode 用户配置，并初始化缺省插件配置。
+ * 安装命令：把插件注册进 OpenCode 用户配置，并初始化缺省插件配置。
  *
- * 注册语义（支持新旧链路切换测试）：
+ * 注册语义：
  * - 本插件在 opencode.json 的 plugin 数组中以 file:// 绝对路径条目存在；
- * - 安装时把**所有**含本插件名的旧条目（如指向 dist/index.js 的旧链路条目）
- *   替换为净室入口 dist/witty/index.js 的 file:// 条目，保证同一时刻只有一条生效；
+ * - 安装时把**所有**含本插件名的条目替换为当前入口的 file:// 条目，
+ *   保证同一时刻只有一条生效；
  * - 已是目标条目则不重复写入（幂等）。
  */
 
@@ -51,8 +51,8 @@ export function opencodeConfigDir(): string {
   return path.join(os.homedir(), ".config", "opencode")
 }
 
-/** 净室插件入口的 file:// 条目（基于包根定位构建产物）。 */
-export function cleanRoomPluginEntry(): string {
+/** 插件入口的 file:// 条目（基于包根定位构建产物）。 */
+export function pluginEntryUrl(): string {
   return pathToFileURL(path.join(packageRootDir(), "dist", "witty", "index.js")).href
 }
 
@@ -60,7 +60,7 @@ export async function runInstall(options: InstallOptions = {}): Promise<InstallR
   const configDir = opencodeConfigDir()
   const opencodeConfigFile = path.join(configDir, "opencode.json")
   const pluginConfigFile = path.join(configDir, `${PLUGIN_NAME}.jsonc`)
-  const pluginEntry = cleanRoomPluginEntry()
+  const pluginEntry = pluginEntryUrl()
 
   const { already, replaced, subagentDepthSet } = registerPlugin(
     opencodeConfigFile,

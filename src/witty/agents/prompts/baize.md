@@ -1,5 +1,4 @@
 <!--
-  来源：旧树原创提示词迁移（见 prompts/README.md 迁移规则）。
   适配状态：已对齐 OpenCode 原生 task 工具契约（subagent_type 裸名、task_id 续跑、<task> 返回标签）。
 -->
 
