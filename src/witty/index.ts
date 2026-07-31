@@ -4,9 +4,7 @@ import { createWittyHooks } from "./plugin"
 import { log } from "./shared/log"
 
 /**
- * witty-diagnosis-agent 净室插件入口。
- *
- * 净室重写完成后，tsup.config.ts 的 index 入口指向本文件（替代 src/opencode/index.ts）。
+ * witty-diagnosis-agent 插件入口（tsup 的 index 入口指向本文件）。
  */
 export const WittyDiagnosisPlugin: Plugin = async (input) => {
   log("plugin: 加载", { directory: input.directory })

@@ -9,7 +9,7 @@
     "type": "git",
     "url": "https://gitcode.com/openeuler/witty-diagnosis-agent.git"
   },
-  "license": "MIT",
+  "license": "MulanPSL-2.0",
   "author": "witty-diagnosis-agent",
   "engines": {
     "node": ">=20.0.0"

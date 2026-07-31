@@ -2,7 +2,6 @@ import { defineConfig } from 'tsup'
 
 export default defineConfig({
   entry: {
-    // 净室插件是唯一生效实现；旧树 src/opencode 仅作参考，不参与构建。
     index: 'src/witty/index.ts',
     cli: 'src/witty/cli/index.ts',
   },
