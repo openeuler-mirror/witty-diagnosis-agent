@@ -346,4 +346,4 @@ opencode
 
 ### License
 
-本项目中部分代码基于 `oh-my-openagent` 修改，这部分代码遵循 **Sustainable Use License Version 1.0**。其他原创及贡献部分代码协议以最终发布版本为准。详情请参阅项目根目录下的 [LICENSE](./LICENSE) 文件。
+本项目采用 **木兰宽松许可证第2版（Mulan PSL v2）** 开源。详情请参阅项目根目录下的 [LICENSE](./LICENSE) 文件。

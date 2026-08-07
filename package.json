@@ -1,6 +1,6 @@
 {
   "name": "witty-diagnosis-agent",
-  "version": "0.8.0-beta",
+  "version": "0.10.0-beta",
   "description": "Witty Diagnosis Agent - OpenCode Plugin",
   "keywords": [
     "witty-diagnosis-agent"
@@ -9,7 +9,7 @@
     "type": "git",
     "url": "https://gitcode.com/openeuler/witty-diagnosis-agent.git"
   },
-  "license": "MIT",
+  "license": "MulanPSL-2.0",
   "author": "witty-diagnosis-agent",
   "engines": {
     "node": ">=20.0.0"
@@ -40,40 +40,18 @@
     "build:schema": "tsx script/build-schema.ts"
   },
   "dependencies": {
-    "@ast-grep/cli": "^0.40.0",
-    "@ast-grep/napi": "^0.40.0",
     "@clack/prompts": "^1.0.1",
-    "@code-yeongyu/comment-checker": "^0.6.1",
-    "@modelcontextprotocol/sdk": "^1.25.2",
     "@opencode-ai/plugin": "^1.1.19",
     "@opencode-ai/sdk": "^1.1.19",
-    "better-sqlite3": "^12.6.2",
     "commander": "^14.0.2",
-    "detect-libc": "^2.0.0",
-    "diff": "^8.0.3",
-    "js-yaml": "^4.1.1",
     "jsonc-parser": "^3.3.1",
     "marked": "^17.0.5",
-    "picocolors": "^1.1.1",
-    "picomatch": "^4.0.2",
-    "vscode-jsonrpc": "^8.2.0",
-    "which": "^6.0.1",
     "zod": "^4.1.8"
   },
   "devDependencies": {
-    "@types/better-sqlite3": "^7.6.13",
-    "@types/js-yaml": "^4.0.9",
     "@types/node": "^25.3.3",
-    "@types/picomatch": "^3.0.2",
-    "@types/which": "^3.0.4",
     "tsup": "^8.5.1",
     "tsx": "^4.21.0",
     "typescript": "^5.3.3"
-  },
-  "trustedDependencies": [
-    "@ast-grep/cli",
-    "@ast-grep/napi",
-    "@code-yeongyu/comment-checker",
-    "better-sqlite3"
-  ]
+  }
 }
