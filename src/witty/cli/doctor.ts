@@ -1,12 +1,13 @@
 import fs from "node:fs"
 import path from "node:path"
+import { fileURLToPath } from "node:url"
 import { execFileSync } from "node:child_process"
 
 import { wittyConfigSchema } from "../config/schema"
 import { readJsoncFile } from "../shared/jsonc"
 import { packageRootDir, resolveSkillsDir } from "../shared/paths"
 import { discoverSkills } from "../skills/discovery"
-import { PLUGIN_NAME, REQUIRED_SUBAGENT_DEPTH, opencodeConfigDir } from "./install"
+import { PLUGIN_NAME, REQUIRED_SUBAGENT_DEPTH, opencodeConfigDir, pluginEntryUrl } from "./install"
 
 /**
  * doctor 命令：环境自检（doctor-lite）。
@@ -88,17 +89,39 @@ function checkPluginRegistered(): CheckResult {
     typeof raw === "object" && raw !== null && Array.isArray((raw as { plugin?: unknown }).plugin)
       ? ((raw as { plugin: unknown[] }).plugin)
       : []
-  const registered = pluginList.some(
-    (entry) => typeof entry === "string" && entry.includes(PLUGIN_NAME),
+  const ours = pluginList.filter(
+    (entry): entry is string => typeof entry === "string" && entry.includes(PLUGIN_NAME),
   )
-  return registered
-    ? { name: "plugin-registered", status: "pass", detail: `已登记于 ${configFile}` }
-    : {
-        name: "plugin-registered",
-        status: "fail",
-        detail: `${configFile} 的 plugin 列表中未找到 ${PLUGIN_NAME}`,
-        remedy: `运行 ${PLUGIN_NAME} install`,
-      }
+  if (ours.length === 0) {
+    return {
+      name: "plugin-registered",
+      status: "fail",
+      detail: `${configFile} 的 plugin 列表中未找到 ${PLUGIN_NAME}`,
+      remedy: `运行 ${PLUGIN_NAME} install`,
+    }
+  }
+
+  // 仅登记还不够：条目指向的构建产物必须真实存在，
+  // 否则 OpenCode 会静默跳过该插件（表现为看不到任何 agent）。
+  const expected = pluginEntryUrl()
+  const stale = ours.filter((entry) => {
+    if (!entry.startsWith("file://")) return false
+    try {
+      return !fs.existsSync(fileURLToPath(entry))
+    } catch {
+      return false
+    }
+  })
+  if (stale.length > 0) {
+    return {
+      name: "plugin-registered",
+      status: "fail",
+      detail: `plugin 条目指向的文件不存在: ${stale.join(", ")}（应为 ${expected}）`,
+      remedy: `运行 npm run build 后再执行 ${PLUGIN_NAME} install`,
+    }
+  }
+
+  return { name: "plugin-registered", status: "pass", detail: `已登记于 ${configFile}` }
 }
 
 function checkPluginConfig(): CheckResult {

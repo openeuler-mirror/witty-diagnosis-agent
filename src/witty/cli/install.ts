@@ -53,7 +53,7 @@ export function opencodeConfigDir(): string {
 
 /** 插件入口的 file:// 条目（基于包根定位构建产物）。 */
 export function pluginEntryUrl(): string {
-  return pathToFileURL(path.join(packageRootDir(), "dist", "witty", "index.js")).href
+  return pathToFileURL(path.join(packageRootDir(), "dist", "index.js")).href
 }
 
 export async function runInstall(options: InstallOptions = {}): Promise<InstallReport> {
