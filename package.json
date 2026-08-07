@@ -1,6 +1,6 @@
 {
   "name": "witty-diagnosis-agent",
-  "version": "0.8.0-beta",
+  "version": "0.10.0-beta",
   "description": "Witty Diagnosis Agent - OpenCode Plugin",
   "keywords": [
     "witty-diagnosis-agent"
