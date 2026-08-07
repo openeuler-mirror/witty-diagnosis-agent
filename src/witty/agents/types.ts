@@ -17,6 +17,7 @@ export const WITTY_AGENT_NAMES = [
   "baize",    // 白泽：RCA 报告生成
   "nuwa",     // 女娲：修复方案与止血建议
   "taiyi",    // 太乙：报告质检 + 知识库检索（lightrag）
+  "shennong", // 神农：已知问题案例检索（opt-in，需配置 CASE_KB_ID）
 ] as const
 
 export type WittyAgentName = (typeof WITTY_AGENT_NAMES)[number]

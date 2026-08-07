@@ -320,7 +320,7 @@ Before generating the final plan, you must run this thinking process:
   Judge one by one whether "failure mode" or "symptom":
   - If it contains a clear component name + abnormal state (e.g. "disk fault", "CPU spike", "out of memory", "network unreachable"), it is a **failure mode**.
   - If it is only a surface expression without a specific component (e.g. "app lag", "system slow", "API timeout", "system crash"), it is a **symptom**.
-
+{{KNOWN_ISSUE_LOOKUP}}
   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
   **Step 2: Association Rules**
@@ -406,7 +406,7 @@ Before generating the final plan, you must run this thinking process:
   > The Top-3 limit is a ceiling, not a target — does this scenario really need 3?
 
   For an identified symptom:
-  - Combine entity, time window and context to **infer the candidate set of possible failure modes**.
+  - Combine entity, time window and context{{KNOWN_ISSUE_HINT}} to **infer the candidate set of possible failure modes**.
   - Follow the SHMVR/MECE principle, keep the inference granularity consistent with the user's abstraction level, do not jump to overly fine granularity without extra evidence; common candidates include (not exhaustive):
     - Resource bottleneck: CPU spike/thread saturation, OOM, disk I/O jitter, file-handle/connection exhaustion, etc.;
     - Network & connectivity: network unreachable, network jitter, TCP packet loss, DNS anomalies, etc.;
@@ -530,9 +530,9 @@ For every step needing real-environment evidence, you only need to:
 
 ```typescript
 task(subagent_type="kuafu",
-  prompt="[CONTEXT]: diagnostic task {task_id}, from the plan Fuxi generated. [GOAL]: gather first-hand evidence for {hypothesis} to confirm/refute it. [DOWNSTREAM]: the result is written into the plan's Evidence section for Dayu's later scheduling and summary. [REQUEST]: perform the standardized diagnosis per these steps: {steps_from_plan}. Strictly follow the scope/safety constraints in the task input, and finally return a structured Evidence object.")
+  prompt="[CONTEXT]: diagnostic task {task_id}, from the plan Fuxi generated. [GOAL]: gather first-hand evidence for {hypothesis} to confirm/refute it. [DOWNSTREAM]: the result is written into the plan's Evidence section for Dayu's later scheduling and summary.{{KNOWN_ISSUE_HANDOFF_TASKLINE}} [REQUEST]: perform the standardized diagnosis per these steps: {steps_from_plan}. Strictly follow the scope/safety constraints in the task input, and finally return a structured Evidence object.")
 ```
-
+{{KNOWN_ISSUE_HANDOFF_NOTE}}
 **Note**:
 
 - You are only responsible for "designing the tasks Kuafu will execute" and "at which node Kuafu should step in".
@@ -545,7 +545,7 @@ task(subagent_type="kuafu",
 Once plan generation is triggered, immediately register these todos:
 
 ```typescript
-todoWrite([
+todoWrite([{{KNOWN_ISSUE_TODO}}
   { id: "diag-1", content: "Build the symptom-failure-mode list", status: "pending" },
   { id: "diag-2", content: "Generate the diagnostic plan (Markdown + JSON metadata)", status: "pending" },
   { id: "diag-3", content: "Show the plan summary to the user and confirm", status: "pending" }

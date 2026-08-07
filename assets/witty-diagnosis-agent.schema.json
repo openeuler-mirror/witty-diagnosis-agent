@@ -45,6 +45,13 @@
         "type": "string"
       }
     },
+    "disabled_mcps": {
+      "default": [],
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
     "skills_dir": {
       "default": "skills",
       "type": "string"
@@ -142,6 +149,7 @@
     "output_language",
     "agents",
     "disabled_agents",
+    "disabled_mcps",
     "skills_dir",
     "report",
     "guards",
