@@ -5,6 +5,7 @@ import { fileURLToPath } from "node:url"
 import type { OutputLanguage } from "../config/types"
 import type { AgentDefinition } from "./types"
 import { languageLockDirective } from "../shared/language-lock"
+import { knownIssueReplacements } from "./known-issue-prompt"
 import { log } from "../shared/log"
 
 /**
@@ -26,6 +27,11 @@ export interface PromptContext {
   language: OutputLanguage
   /** 用户附加指令（来自 AgentOverride.extra_instructions） */
   extraInstructions?: string
+  /**
+   * 神农（已知问题检索）是否启用。
+   * 决定伏羲提示词里的 {{KNOWN_ISSUE_*}} 片段是注入实体内容还是塌缩为空串。
+   */
+  knownIssueEnabled?: boolean
 }
 
 const PROMPTS_DIR = path.join(path.dirname(fileURLToPath(import.meta.url)), "prompts")
@@ -53,6 +59,16 @@ export function loadAgentPrompt(definition: AgentDefinition, context: PromptCont
   let prompt = template
     .replaceAll("{{PROJECT_DIR}}", context.projectDir)
     .replaceAll("{{REPORT_DIR}}", context.reportDir)
+
+  // 已知问题检索片段：神农启用时注入实体内容，未启用时全部塌缩为空串
+  // （伏羲提示词里不留任何神农痕迹，与旧版降级行为一致）。
+  const knownIssue = knownIssueReplacements(
+    context.knownIssueEnabled ?? false,
+    context.language,
+  )
+  for (const [key, value] of Object.entries(knownIssue)) {
+    prompt = prompt.replaceAll(`{{${key}}}`, value)
+  }
 
   // 语言锁定指令无条件置顶注入：即便正文已是目标语言，也要显式压住
   // “跟随用户提问语言 / 跟随 skill 语言”的默认倾向。

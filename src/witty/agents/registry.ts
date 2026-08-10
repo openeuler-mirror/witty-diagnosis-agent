@@ -77,8 +77,10 @@ export function applyAgentsToConfig(args: {
   definitions: readonly AgentDefinition[]
   pluginConfig: ResolvedWittyConfig
   promptContext: Omit<PromptContext, "language">
+  /** 神农是否启用；透传给提示词加载器决定 {{KNOWN_ISSUE_*}} 片段是否注入 */
+  knownIssueEnabled?: boolean
 }): void {
-  const { target, definitions, pluginConfig, promptContext } = args
+  const { target, definitions, pluginConfig, promptContext, knownIssueEnabled } = args
   const language: OutputLanguage = pluginConfig.output_language
   const disabled = new Set(pluginConfig.disabled_agents.map((n) => n.toLowerCase()))
 
@@ -103,6 +105,7 @@ export function applyAgentsToConfig(args: {
     target.agent[definition.name] = buildAgentConfig(definition, override, {
       ...promptContext,
       language,
+      knownIssueEnabled,
     })
     wittyInjectedKeys.add(definition.name)
   }

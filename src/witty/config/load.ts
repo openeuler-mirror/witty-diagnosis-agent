@@ -45,7 +45,7 @@ export function loadWittyConfig(projectDir: string): ResolvedWittyConfig {
   return parsed.data
 }
 
-/** 浅合并；agents 表按键合并，disabled_agents 取并集。 */
+/** 浅合并；agents 表按键合并，disabled_agents / disabled_mcps 取并集。 */
 function mergeConfigLayer(
   base: Record<string, unknown>,
   layer: Record<string, unknown>,
@@ -60,6 +60,12 @@ function mergeConfigLayer(
   const layerDisabled = asStringArray(layer["disabled_agents"])
   if (baseDisabled && layerDisabled) {
     result["disabled_agents"] = [...new Set([...baseDisabled, ...layerDisabled])]
+  }
+
+  const baseDisabledMcps = asStringArray(base["disabled_mcps"])
+  const layerDisabledMcps = asStringArray(layer["disabled_mcps"])
+  if (baseDisabledMcps && layerDisabledMcps) {
+    result["disabled_mcps"] = [...new Set([...baseDisabledMcps, ...layerDisabledMcps])]
   }
   return result
 }

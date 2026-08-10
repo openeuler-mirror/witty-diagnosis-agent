@@ -14,4 +14,6 @@ export interface SkillExposeResult {
   exposed: DiscoveredSkill[]
   /** 因目标已存在且非本插件所建而跳过的技能 */
   skipped: DiscoveredSkill[]
+  /** 因门控未开启而未暴露、且已回收旧链接的技能名 */
+  withheld: string[]
 }

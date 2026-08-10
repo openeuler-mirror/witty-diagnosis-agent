@@ -56,6 +56,8 @@ export interface WittyConfig {
   agents?: Record<string, AgentOverride>
   /** 全局禁用的 agent 名列表 */
   disabled_agents?: string[]
+  /** 全局禁用的内置 MCP 名列表（当前可选："case_search"） */
+  disabled_mcps?: string[]
   /** 技能根目录（相对项目根或绝对路径），默认仓库顶层 "skills" */
   skills_dir?: string
   report?: ReportConfig
@@ -66,7 +68,10 @@ export interface WittyConfig {
 
 /** 填充默认值后的运行时配置 */
 export type ResolvedWittyConfig = Required<
-  Pick<WittyConfig, "output_language" | "agents" | "disabled_agents" | "skills_dir">
+  Pick<
+    WittyConfig,
+    "output_language" | "agents" | "disabled_agents" | "disabled_mcps" | "skills_dir"
+  >
 > & {
   report: Required<ReportConfig>
   guards: Required<GuardsConfig>

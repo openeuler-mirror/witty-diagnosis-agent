@@ -38,6 +38,7 @@ export const wittyConfigSchema = z.object({
   output_language: z.enum(["zh", "en"]).default("zh"),
   agents: z.record(z.string(), agentOverrideSchema).default({}),
   disabled_agents: z.array(z.string()).default([]),
+  disabled_mcps: z.array(z.string()).default([]),
   skills_dir: z.string().default("skills"),
   report: reportConfigSchema.prefault({}),
   guards: guardsConfigSchema.prefault({}),
