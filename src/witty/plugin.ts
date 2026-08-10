@@ -3,8 +3,9 @@ import path from "node:path"
 import type { Hooks, PluginInput } from "@opencode-ai/plugin"
 
 import { loadWittyConfig } from "./config/load"
-import { AGENT_DEFINITIONS } from "./agents/definitions"
+import { AGENT_DEFINITIONS, OPTIONAL_AGENT_DEFINITIONS } from "./agents/definitions"
 import { applyAgentsToConfig, isWittyOwnedAgent } from "./agents/registry"
+import { createBuiltinMcps, isCaseSearchEnabled } from "./mcp"
 import { discoverSkills, exposeSkillsToOpenCode } from "./skills/discovery"
 import {
   createMdOnlyGuard,
@@ -76,11 +77,24 @@ export async function createWittyHooks(input: PluginInput): Promise<Hooks> {
       // bash/external_directory/question 等放行，全部写在各自的 agent.permission 里，
       // 只作用于本插件的 7 个 agent。
 
+      // 神农（已知问题检索）opt-in：仅当配置了知识库（CASE_KB_ID）且未禁用
+      // case_search 时才启用。未启用时：不注册 case_search MCP、不注册 shennong
+      // agent，且伏羲提示词里的 {{KNOWN_ISSUE_*}} 片段全部塌缩为空——
+      // 整条链路对伏羲完全不可见，与旧版降级行为一致。
+      const knownIssueEnabled = isCaseSearchEnabled(pluginConfig.disabled_mcps)
+      applyMcpsToConfig(config, createBuiltinMcps(pluginConfig.disabled_mcps))
+
+      const definitions = knownIssueEnabled
+        ? [...AGENT_DEFINITIONS, ...OPTIONAL_AGENT_DEFINITIONS]
+        : AGENT_DEFINITIONS
+      log("plugin: 已知问题检索(神农)", { enabled: knownIssueEnabled })
+
       applyAgentsToConfig({
         target: config as { agent?: Record<string, never> },
-        definitions: AGENT_DEFINITIONS,
+        definitions,
         pluginConfig,
         promptContext: { projectDir: input.directory, reportDir },
+        knownIssueEnabled,
       })
     },
 
@@ -123,6 +137,31 @@ export async function createWittyHooks(input: PluginInput): Promise<Hooks> {
 
     event: sessionNotifier,
   }
+}
+
+/**
+ * 把内置 MCP 写进 OpenCode config.mcp。
+ *
+ * 与 agent 注册同一条铁律：只写自己的 key，且**已被其他来源占用时让位不覆盖**，
+ * 避免影响用户自己配置的同名 MCP。
+ */
+function applyMcpsToConfig(config: unknown, mcps: Record<string, unknown>): void {
+  if (typeof config !== "object" || config === null) return
+  const record = config as Record<string, unknown>
+  const existing =
+    typeof record["mcp"] === "object" && record["mcp"] !== null
+      ? (record["mcp"] as Record<string, unknown>)
+      : {}
+
+  for (const [name, entry] of Object.entries(mcps)) {
+    if (existing[name] !== undefined) {
+      log("plugin: 同名 MCP 已被其他来源占用，让位不覆盖", { mcp: name })
+      continue
+    }
+    existing[name] = entry
+    log("plugin: 已注册内置 MCP", { mcp: name })
+  }
+  record["mcp"] = existing
 }
 
 /**
