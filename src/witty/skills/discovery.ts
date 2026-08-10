@@ -39,18 +39,56 @@ export function discoverSkills(skillsRootDir: string): DiscoveredSkill[] {
   return skills
 }
 
-/** 把发现的技能 symlink 到 OpenCode 项目级技能目录。幂等：已是本插件所建链接则跳过。 */
+/**
+ * 条件暴露的技能：键为技能名，值为「该技能是否应当暴露」的判定。
+ *
+ * 绝大多数诊断技能是无条件暴露的；只有依赖外部服务、且该服务未配置时
+ * 用了反而有害的技能才登记在此。
+ *
+ * `euler-rag-json-search` 依附于神农（已知问题检索）链路：它自带可独立运行的
+ * Python CLI，若在未配置知识库时照样暴露，任何 agent 都能加载它去打一个并不存在
+ * 的 RAG 服务——这会绕过 agent / MCP / 提示词那三层 opt-in 门控。故与它们对齐，
+ * 只有 CASE_KB_ID 配置且 case_search 未被禁用时才暴露。
+ */
+export type SkillGate = (context: SkillGateContext) => boolean
+
+export interface SkillGateContext {
+  /** 神农（已知问题检索）是否启用，与 agent/MCP/提示词门控同源 */
+  knownIssueEnabled: boolean
+}
+
+export const GATED_SKILLS: Readonly<Record<string, SkillGate>> = {
+  "euler-rag-json-search": (ctx) => ctx.knownIssueEnabled,
+}
+
+/**
+ * 把发现的技能 symlink 到 OpenCode 项目级技能目录。幂等：已是本插件所建链接则跳过。
+ *
+ * 门控未通过的技能不仅不暴露，还会**回收**上一次留下的旧链接——否则用户取消配置后，
+ * 磁盘上的软链依然存在，技能会继续对所有 agent 可见（只回收本插件建的软链，
+ * 用户自己放的同名目录一律不动）。
+ */
 export function exposeSkillsToOpenCode(
   skills: DiscoveredSkill[],
   projectDir: string,
+  gateContext: SkillGateContext = { knownIssueEnabled: false },
 ): SkillExposeResult {
   const targetRoot = path.join(projectDir, ".opencode", "skills")
   fs.mkdirSync(targetRoot, { recursive: true })
 
   const exposed: DiscoveredSkill[] = []
   const skipped: DiscoveredSkill[] = []
+  const withheld: string[] = []
   for (const skill of skills) {
     const target = path.join(targetRoot, skill.name)
+
+    const gate = GATED_SKILLS[skill.name]
+    if (gate && !gate(gateContext)) {
+      retractSkillLink(target, skill.dir)
+      withheld.push(skill.name)
+      continue
+    }
+
     try {
       const existing = fs.lstatSync(target, { throwIfNoEntry: false })
       if (existing) {
@@ -68,7 +106,28 @@ export function exposeSkillsToOpenCode(
       skipped.push(skill)
     }
   }
-  return { exposed, skipped }
+  return { exposed, skipped, withheld }
+}
+
+/**
+ * 回收本插件此前建立的技能软链（门控关闭时调用）。
+ *
+ * 安全边界：只删「指向本仓库该技能目录的软链」。用户自己创建的同名目录、
+ * 或指向别处的软链，一律保留不动——删错了会破坏用户配置。
+ */
+function retractSkillLink(target: string, skillDir: string): void {
+  try {
+    const existing = fs.lstatSync(target, { throwIfNoEntry: false })
+    if (!existing) return
+    if (!existing.isSymbolicLink() || fs.readlinkSync(target) !== skillDir) {
+      log("skills: 门控关闭但目标非本插件所建，保留不动", { target })
+      return
+    }
+    fs.unlinkSync(target)
+    log("skills: 门控关闭，已回收技能链接", { target })
+  } catch (error) {
+    log("skills: 回收技能链接失败", { target, error: String(error) })
+  }
 }
 
 /** 读取 SKILL.md YAML frontmatter 的 description 字段（无 frontmatter 返回 undefined）。 */

@@ -31,14 +31,20 @@ export async function createWittyHooks(input: PluginInput): Promise<Hooks> {
   const pluginConfig = loadWittyConfig(input.directory)
   log("plugin: 配置加载完成", { directory: input.directory })
 
-  // 技能暴露（幂等）
+  // 神农（已知问题检索）总开关：CASE_KB_ID 已配置且 case_search 未禁用。
+  // agent 注册、MCP 注册、伏羲提示词注入、技能暴露四处共用这一个判定，
+  // 避免出现「agent 没注册但配套技能仍对所有 agent 可见」这类绕过门控的缺口。
+  const knownIssueEnabled = isCaseSearchEnabled(pluginConfig.disabled_mcps)
+
+  // 技能暴露（幂等）；受门控的技能在开关关闭时不暴露并回收旧链接
   const skillsDir = resolveSkillsDir(pluginConfig.skills_dir)
   const skills = discoverSkills(skillsDir)
-  const exposeResult = exposeSkillsToOpenCode(skills, input.directory)
+  const exposeResult = exposeSkillsToOpenCode(skills, input.directory, { knownIssueEnabled })
   log("plugin: 技能暴露完成", {
     discovered: skills.length,
     exposed: exposeResult.exposed.length,
     skipped: exposeResult.skipped.length,
+    withheld: exposeResult.withheld.length,
   })
 
   // 会话内状态
@@ -77,11 +83,10 @@ export async function createWittyHooks(input: PluginInput): Promise<Hooks> {
       // bash/external_directory/question 等放行，全部写在各自的 agent.permission 里，
       // 只作用于本插件的 7 个 agent。
 
-      // 神农（已知问题检索）opt-in：仅当配置了知识库（CASE_KB_ID）且未禁用
-      // case_search 时才启用。未启用时：不注册 case_search MCP、不注册 shennong
-      // agent，且伏羲提示词里的 {{KNOWN_ISSUE_*}} 片段全部塌缩为空——
+      // 神农（已知问题检索）opt-in（knownIssueEnabled 在上方统一判定）：未启用时
+      // 不注册 case_search MCP、不注册 shennong agent、不暴露 euler-rag-json-search
+      // 技能，且伏羲提示词里的 {{KNOWN_ISSUE_*}} 片段全部塌缩为空——
       // 整条链路对伏羲完全不可见，与旧版降级行为一致。
-      const knownIssueEnabled = isCaseSearchEnabled(pluginConfig.disabled_mcps)
       applyMcpsToConfig(config, createBuiltinMcps(pluginConfig.disabled_mcps))
 
       const definitions = knownIssueEnabled
