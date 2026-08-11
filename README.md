@@ -26,6 +26,7 @@ Witty 智能诊断 Agent 采用“Agent-Skill-工具-知识”四层解耦架构
 采用流水线式机制实现诊断自动化：
 
 - **Xuan Agent(总控)**：调度其它Agent协同完成故障诊断。
+- **Shennong Agent(检索)**：检索历史案例,为 Fuxi Agent 制定规划提供参考依据。
 - **Fuxi Agent (规划)**：基于现象生成结构化排查计划。
 - **Dayu Agent (调度)**：解析计划并并发调度给执行节点。
 - **Kuafu Agent (执行)**：加载专属 Skill 深入节点拉取指标与推理。
@@ -248,6 +249,8 @@ opencode
 > **提示**：将 `/tmp/test` 替换为示例 C 代码所在的实际目录路径。
 
 4）系统将自动执行智能诊断流程，分析进程崩溃原因并输出诊断报告。
+   
+   <img src="docs/assets/process_fault_diagnosis_report.png" alt="process_fault_diagnosis_report" width="800" />
 
 ---
 
@@ -276,6 +279,7 @@ opencode
 
 4）系统将自动执行智能诊断流程，分析硬盘故障原因并输出诊断报告。
 
+   <img src="docs/assets/hard_disk_fault_diagnosis_report.png" alt="hard_disk_fault_diagnosis_report" width="800" />
 ---
 
 ### 火焰图性能分析示例
