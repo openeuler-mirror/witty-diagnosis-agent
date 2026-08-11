@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>硬盘故障根因分析（RCA）报告</title>
+<title>故障诊断报告</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Lora:ital,wght@0,400;0,600;1,400&family=Source+Sans+3:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
@@ -417,56 +417,61 @@
   <div class="toc-content">
 <div class="toc-item has-children"><button class="toc-toggle" onclick="toggleToc(this)" aria-expanded="true">
                 <svg viewBox="0 0 24 24" width="12" height="12" stroke="currentColor" stroke-width="2" fill="none"><polyline points="6 9 12 15 18 9"></polyline></svg>
-              </button><a href="#h-硬盘故障根因分析rca报告" onclick="event.preventDefault(); const target = document.getElementById('h-硬盘故障根因分析rca报告'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l1">硬盘故障根因分析（RCA）报告</a></div>
-<div class="toc-group" id="group-h-报告基本信息">
-<div class="toc-item "><span class="toc-spacer"></span><a href="#h-报告基本信息" onclick="event.preventDefault(); const target = document.getElementById('h-报告基本信息'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l2">报告基本信息</a></div>
-<div class="toc-item "><span class="toc-spacer"></span><a href="#h-执行摘要" onclick="event.preventDefault(); const target = document.getElementById('h-执行摘要'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l2">执行摘要</a></div>
+              </button><a href="#h-故障诊断报告" onclick="event.preventDefault(); const target = document.getElementById('h-故障诊断报告'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l1">🔴 故障诊断报告</a></div>
+<div class="toc-group" id="group-h-一故障概览">
 <div class="toc-item has-children"><button class="toc-toggle" onclick="toggleToc(this)" aria-expanded="true">
                 <svg viewBox="0 0 24 24" width="12" height="12" stroke="currentColor" stroke-width="2" fill="none"><polyline points="6 9 12 15 18 9"></polyline></svg>
-              </button><a href="#h-故障时间线重建" onclick="event.preventDefault(); const target = document.getElementById('h-故障时间线重建'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l2">故障时间线重建</a></div>
-<div class="toc-group" id="group-h-故障零点t0确定2026-03-05-002622">
-<div class="toc-item "><span class="toc-spacer"></span><a href="#h-故障零点t0确定2026-03-05-002622" onclick="event.preventDefault(); const target = document.getElementById('h-故障零点t0确定2026-03-05-002622'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l3">故障零点（T0）确定：2026-03-05 00:26:22</a></div>
-<div class="toc-item "><span class="toc-spacer"></span><a href="#h-事件序列分析" onclick="event.preventDefault(); const target = document.getElementById('h-事件序列分析'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l3">事件序列分析</a></div>
+              </button><a href="#h-一故障概览" onclick="event.preventDefault(); const target = document.getElementById('h-一故障概览'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l2">一、故障概览</a></div>
+<div class="toc-group" id="group-h-置信度说明此表固定展示作为参考">
+<div class="toc-item "><span class="toc-spacer"></span><a href="#h-置信度说明此表固定展示作为参考" onclick="event.preventDefault(); const target = document.getElementById('h-置信度说明此表固定展示作为参考'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l3">置信度说明（此表固定展示作为参考）</a></div>
 </div>
 <div class="toc-item has-children"><button class="toc-toggle" onclick="toggleToc(this)" aria-expanded="true">
                 <svg viewBox="0 0 24 24" width="12" height="12" stroke="currentColor" stroke-width="2" fill="none"><polyline points="6 9 12 15 18 9"></polyline></svg>
-              </button><a href="#h-证据链分析" onclick="event.preventDefault(); const target = document.getElementById('h-证据链分析'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l2">证据链分析</a></div>
-<div class="toc-group" id="group-h-1-硬件层证据ibmc日志">
-<div class="toc-item "><span class="toc-spacer"></span><a href="#h-1-硬件层证据ibmc日志" onclick="event.preventDefault(); const target = document.getElementById('h-1-硬件层证据ibmc日志'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l3">1. 硬件层证据（iBMC日志）</a></div>
-<div class="toc-item "><span class="toc-spacer"></span><a href="#h-2-磁盘健康证据smart信息" onclick="event.preventDefault(); const target = document.getElementById('h-2-磁盘健康证据smart信息'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l3">2. 磁盘健康证据（SMART信息）</a></div>
-<div class="toc-item "><span class="toc-spacer"></span><a href="#h-3-操作系统层证据内核日志" onclick="event.preventDefault(); const target = document.getElementById('h-3-操作系统层证据内核日志'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l3">3. 操作系统层证据（内核日志）</a></div>
-<div class="toc-item "><span class="toc-spacer"></span><a href="#h-4-设备映射信息" onclick="event.preventDefault(); const target = document.getElementById('h-4-设备映射信息'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l3">4. 设备映射信息</a></div>
+              </button><a href="#h-二根因速览" onclick="event.preventDefault(); const target = document.getElementById('h-二根因速览'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l2">二、根因速览</a></div>
+<div class="toc-group" id="group-h-事故时间线-故障传导链路">
+<div class="toc-item "><span class="toc-spacer"></span><a href="#h-事故时间线-故障传导链路" onclick="event.preventDefault(); const target = document.getElementById('h-事故时间线-故障传导链路'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l3">事故时间线 & 故障传导链路</a></div>
+<div class="toc-item "><span class="toc-spacer"></span><a href="#h-故障因果链" onclick="event.preventDefault(); const target = document.getElementById('h-故障因果链'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l3">故障因果链</a></div>
 </div>
 <div class="toc-item has-children"><button class="toc-toggle" onclick="toggleToc(this)" aria-expanded="true">
                 <svg viewBox="0 0 24 24" width="12" height="12" stroke="currentColor" stroke-width="2" fill="none"><polyline points="6 9 12 15 18 9"></polyline></svg>
-              </button><a href="#h-根因推断" onclick="event.preventDefault(); const target = document.getElementById('h-根因推断'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l2">根因推断</a></div>
-<div class="toc-group" id="group-h-根本原因硬盘物理介质损坏">
-<div class="toc-item "><span class="toc-spacer"></span><a href="#h-根本原因硬盘物理介质损坏" onclick="event.preventDefault(); const target = document.getElementById('h-根本原因硬盘物理介质损坏'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l3">根本原因：硬盘物理介质损坏</a></div>
-<div class="toc-item "><span class="toc-spacer"></span><a href="#h-故障机理" onclick="event.preventDefault(); const target = document.getElementById('h-故障机理'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l3">故障机理</a></div>
-</div>
-<div class="toc-item "><span class="toc-spacer"></span><a href="#h-影响评估" onclick="event.preventDefault(); const target = document.getElementById('h-影响评估'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l2">影响评估</a></div>
-<div class="toc-item has-children"><button class="toc-toggle" onclick="toggleToc(this)" aria-expanded="true">
-                <svg viewBox="0 0 24 24" width="12" height="12" stroke="currentColor" stroke-width="2" fill="none"><polyline points="6 9 12 15 18 9"></polyline></svg>
-              </button><a href="#h-行动建议" onclick="event.preventDefault(); const target = document.getElementById('h-行动建议'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l2">行动建议</a></div>
-<div class="toc-group" id="group-h-紧急措施立即执行">
-<div class="toc-item "><span class="toc-spacer"></span><a href="#h-紧急措施立即执行" onclick="event.preventDefault(); const target = document.getElementById('h-紧急措施立即执行'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l3">紧急措施（立即执行）</a></div>
-<div class="toc-item "><span class="toc-spacer"></span><a href="#h-修复措施24小时内" onclick="event.preventDefault(); const target = document.getElementById('h-修复措施24小时内'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l3">修复措施（24小时内）</a></div>
-<div class="toc-item "><span class="toc-spacer"></span><a href="#h-预防措施长期" onclick="event.preventDefault(); const target = document.getElementById('h-预防措施长期'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l3">预防措施（长期）</a></div>
+              </button><a href="#h-三排查过程" onclick="event.preventDefault(); const target = document.getElementById('h-三排查过程'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l2">三、排查过程</a></div>
+<div class="toc-group" id="group-h-31-初始现象">
+<div class="toc-item "><span class="toc-spacer"></span><a href="#h-31-初始现象" onclick="event.preventDefault(); const target = document.getElementById('h-31-初始现象'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l3">3.1 初始现象</a></div>
+<div class="toc-item "><span class="toc-spacer"></span><a href="#h-32-假设驱动排查" onclick="event.preventDefault(); const target = document.getElementById('h-32-假设驱动排查'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l3">3.2 假设驱动排查</a></div>
+<div class="toc-item "><span class="toc-spacer"></span><a href="#h-33-排查结论与逻辑树" onclick="event.preventDefault(); const target = document.getElementById('h-33-排查结论与逻辑树'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l3">3.3 排查结论与逻辑树</a></div>
 </div>
 <div class="toc-item has-children"><button class="toc-toggle" onclick="toggleToc(this)" aria-expanded="true">
                 <svg viewBox="0 0 24 24" width="12" height="12" stroke="currentColor" stroke-width="2" fill="none"><polyline points="6 9 12 15 18 9"></polyline></svg>
-              </button><a href="#h-附录相关日志摘要" onclick="event.preventDefault(); const target = document.getElementById('h-附录相关日志摘要'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l2">附录：相关日志摘要</a></div>
-<div class="toc-group" id="group-h-ibmc关键错误">
-<div class="toc-item "><span class="toc-spacer"></span><a href="#h-ibmc关键错误" onclick="event.preventDefault(); const target = document.getElementById('h-ibmc关键错误'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l3">iBMC关键错误</a></div>
-<div class="toc-item "><span class="toc-spacer"></span><a href="#h-smart监控告警" onclick="event.preventDefault(); const target = document.getElementById('h-smart监控告警'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l3">SMART监控告警</a></div>
-<div class="toc-item "><span class="toc-spacer"></span><a href="#h-内核io错误部分" onclick="event.preventDefault(); const target = document.getElementById('h-内核io错误部分'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l3">内核I/O错误（部分）</a></div>
+              </button><a href="#h-四故障盘修复价值评估" onclick="event.preventDefault(); const target = document.getElementById('h-四故障盘修复价值评估'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l2">四、故障盘修复价值评估</a></div>
+<div class="toc-group" id="group-h-41-devsdw-scsi-00220主故障盘xfs-shutdownp0-紧急">
+<div class="toc-item "><span class="toc-spacer"></span><a href="#h-41-devsdw-scsi-00220主故障盘xfs-shutdownp0-紧急" onclick="event.preventDefault(); const target = document.getElementById('h-41-devsdw-scsi-00220主故障盘xfs-shutdownp0-紧急'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l3">4.1 /dev/sdw — SCSI 0:0:22:0（主故障盘，XFS shutdown，P0 紧急）</a></div>
+<div class="toc-item "><span class="toc-spacer"></span><a href="#h-42-devsdo-scsi-00140当前活跃故障盘挂载-vol14p1-高" onclick="event.preventDefault(); const target = document.getElementById('h-42-devsdo-scsi-00140当前活跃故障盘挂载-vol14p1-高'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l3">4.2 /dev/sdo — SCSI 0:0:14:0（当前活跃故障盘，挂载 vol14，P1 高）</a></div>
+<div class="toc-item "><span class="toc-spacer"></span><a href="#h-43-devsdac-scsi-00280历史故障盘已恢复p2-中" onclick="event.preventDefault(); const target = document.getElementById('h-43-devsdac-scsi-00280历史故障盘已恢复p2-中'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l3">4.3 /dev/sdac — SCSI 0:0:28:0（历史故障盘，已恢复，P2 中）</a></div>
+<div class="toc-item "><span class="toc-spacer"></span><a href="#h-44-群体性退化盘清单未达-xfs-shutdown-但已有-pending-sectors" onclick="event.preventDefault(); const target = document.getElementById('h-44-群体性退化盘清单未达-xfs-shutdown-但已有-pending-sectors'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l3">4.4 群体性退化盘清单（未达 XFS shutdown 但已有 pending sectors）</a></div>
+<div class="toc-item "><span class="toc-spacer"></span><a href="#h-45-故障域-r-码定界" onclick="event.preventDefault(); const target = document.getElementById('h-45-故障域-r-码定界'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l3">4.5 故障域 + R 码定界</a></div>
 </div>
+<div class="toc-item has-children"><button class="toc-toggle" onclick="toggleToc(this)" aria-expanded="true">
+                <svg viewBox="0 0 24 24" width="12" height="12" stroke="currentColor" stroke-width="2" fill="none"><polyline points="6 9 12 15 18 9"></polyline></svg>
+              </button><a href="#h-五修复方案" onclick="event.preventDefault(); const target = document.getElementById('h-五修复方案'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l2">五、修复方案</a></div>
+<div class="toc-group" id="group-h-51-应急处置">
+<div class="toc-item "><span class="toc-spacer"></span><a href="#h-51-应急处置" onclick="event.preventDefault(); const target = document.getElementById('h-51-应急处置'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l3">5.1 应急处置</a></div>
+<div class="toc-item "><span class="toc-spacer"></span><a href="#h-52-永久修复计划" onclick="event.preventDefault(); const target = document.getElementById('h-52-永久修复计划'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l3">5.2 永久修复计划</a></div>
+<div class="toc-item "><span class="toc-spacer"></span><a href="#h-53-r-码修复能力矩阵纯-os-模式候选无-farm-验证" onclick="event.preventDefault(); const target = document.getElementById('h-53-r-码修复能力矩阵纯-os-模式候选无-farm-验证'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l3">5.3 R 码修复能力矩阵（纯 OS 模式候选，无 FARM 验证）</a></div>
+</div>
+<div class="toc-item "><span class="toc-spacer"></span><a href="#h-诊断质量自查" onclick="event.preventDefault(); const target = document.getElementById('h-诊断质量自查'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l2">诊断质量自查</a></div>
 </div>
   </div>
 </nav>
   <article class="article" id="article" style="position: relative;">
-    <div class="title-container"><h1 id="h-硬盘故障根因分析rca报告">硬盘故障根因分析（RCA）报告</h1><div class="brand-logo">by <strong>Witty Diagnosis Agent</strong></div></div>
-<h2 id="h-报告基本信息">报告基本信息</h2>
+    <div class="title-container"><h1 id="h-故障诊断报告">🔴 故障诊断报告</h1><div class="brand-logo">by <strong>Witty Diagnosis Agent</strong></div></div>
+<blockquote>
+<p><strong>报告编号</strong>：BAIZE-RCA-20260811-000758
+<strong>故障级别</strong>：P1（Critical）
+<strong>报告时间</strong>：2026-08-11 00:07:58
+<strong>当前状态</strong>：🔴 处理中（sdw 已 shutdown 卸载，sdo 活跃 I/O error，群体退化持续恶化）</p>
+</blockquote>
+<hr>
+<h2 id="h-一故障概览">一、故障概览</h2>
 <div class="table-wrap"><table>
 <thead>
 <tr>
@@ -475,366 +480,860 @@
 </tr>
 </thead>
 <tbody><tr>
-<td><strong>报告生成时间</strong></td>
-<td>2026-04-12 14:05:13</td>
+<td>故障标题</td>
+<td>服务器 10.120.6.76 多盘物理介质退化致 XFS 文件系统强制 shutdown（sdw P0 / sdo P1 / sdac P2 + ≥12 块群体退化）</td>
 </tr>
 <tr>
-<td><strong>计划ID</strong></td>
-<td>20260404_011757_hard_disk_fault</td>
+<td>影响范围</td>
+<td>数据卷 /data/vols/vol22（sdw）XFS 已 shutdown 卸载、业务不可用；/data/vols/vol14（sdo）活跃 I/O error、读写异常；同批次 ≥12 块盘 pending sectors 早期退化</td>
 </tr>
 <tr>
-<td><strong>分析时间窗口</strong></td>
-<td>2026-03-05 00:00:00 - 2026-03-05 14:31:00</td>
+<td>故障时段</td>
+<td>2026-02-01 03:58:18（smartd 首告 pending sectors）～ 2026-03-03 21:03:43（sdo I/O error 升级），群体退化持续中</td>
 </tr>
 <tr>
-<td><strong>分析模式</strong></td>
-<td>离线日志分析</td>
+<td>根本原因</td>
+<td>HGST WUH721816ALE6L4 16TB SATA 硬盘群体性物理介质退化（硬盘域 R3 盘片介质退化主导），sdw 坏道致 XFS 日志 I/O 错误（log I/O error -5 / EIO）触发 xfs_do_force_shutdown(0x2)</td>
 </tr>
 <tr>
-<td><strong>数据来源</strong></td>
-<td><code>/tmp/logs</code> 目录下的多源日志</td>
+<td>是否恢复</td>
+<td><span class="badge-err">❌ 未恢复（故障盘未更换，群体退化持续）</span></td>
+</tr>
+<tr>
+<td>根因置信度</td>
+<td>🟢 高置信（T1 的 E1-E4 + T2 的 E1-E3 六维交叉校验全部通过，时序/物理同一性/排他性/客观规则一致性闭合）</td>
 </tr>
 </tbody></table></div>
-<h2 id="h-执行摘要">执行摘要</h2>
-<p>本次分析针对2026-03-05 14:31前最近一次硬盘故障进行根因定位。通过综合分析iBMC硬件日志、操作系统日志和磁盘健康信息，确认存在<strong>硬盘物理故障</strong>，具体表现为：</p>
-<ol>
-<li><strong>故障设备</strong>：<code>/dev/sdi</code>（WDC WUH721414AL 14TB硬盘）</li>
-<li><strong>物理位置</strong>：SAS扩展器phy7端口，SCSI地址[0:0:8:0]</li>
-<li><strong>故障类型</strong>：硬盘介质损坏导致的不可恢复读/写错误</li>
-<li><strong>影响范围</strong>：XFS文件系统元数据损坏，可能导致数据丢失或文件系统不可用</li>
-<li><strong>根因</strong>：硬盘物理扇区损坏（坏道）累积导致最终失效</li>
-</ol>
-<h2 id="h-故障时间线重建">故障时间线重建</h2>
-<h3 id="h-故障零点t0确定2026-03-05-002622">故障零点（T0）确定：2026-03-05 00:26:22</h3>
-<p>基于多源日志对齐，确定故障零点为最早可观测的异常时间点：</p>
+<h3 id="h-置信度说明此表固定展示作为参考">置信度说明（此表固定展示作为参考）</h3>
 <div class="table-wrap"><table>
 <thead>
 <tr>
-<th>时间</th>
-<th>事件</th>
-<th>来源</th>
-<th>严重性</th>
+<th>等级</th>
+<th>标识</th>
+<th>含义</th>
+<th>示例场景</th>
 </tr>
 </thead>
 <tbody><tr>
-<td><strong>2026-03-05 00:26:22</strong></td>
-<td><code>/dev/sdi</code> 报告240个不可读扇区（Currently unreadable sectors）</td>
-<td>OS Messages (smartd)</td>
-<td><span class="badge-warn">⚠️ 警告</span></td>
+<td>高置信</td>
+<td>🟢</td>
+<td>根因已明确，可复现，单一原因可解释所有现象</td>
+<td>SQL 无索引 → 复现后加索引立即恢复</td>
 </tr>
 <tr>
-<td>2026-03-05 02:12:08</td>
-<td><code>Get HDD Present Value Failed !!!</code> - 硬盘检测失败</td>
-<td>iBMC日志</td>
-<td>🔴 严重</td>
+<td>中置信</td>
+<td>🟡</td>
+<td>根因基本确认，但存在 1～2 个无法完全解释的现象</td>
+<td>定位到慢查询，但流量突增原因待查</td>
 </tr>
 <tr>
-<td>2026-03-05 02:15:39</td>
-<td><code>HDM_SetBPCtl 0 failed!!</code> - 硬盘控制失败</td>
-<td>iBMC日志</td>
-<td>🔴 严重</td>
+<td>低置信</td>
+<td>🟠</td>
+<td>有多个可疑原因，尚未排除竞争，结论为推断</td>
+<td>多个组件同时异常，无法判断触发顺序</td>
 </tr>
 <tr>
-<td>2026-03-05 02:56:55</td>
-<td><code>HDM_SetBPCtl 1 failed!!</code> - 硬盘控制失败</td>
-<td>iBMC日志</td>
-<td>🔴 严重</td>
-</tr>
-<tr>
-<td>2026-03-05 14:11:36</td>
-<td><code>blk_update_request: I/O error, dev sdi</code> - 首次I/O错误</td>
-<td>OS Messages</td>
-<td>🔴 严重</td>
-</tr>
-<tr>
-<td>2026-03-05 14:12:04</td>
-<td><code>XFS (sdi): metadata I/O error</code> - 文件系统元数据错误</td>
-<td>OS Messages</td>
-<td>🔴 严重</td>
-</tr>
-<tr>
-<td>2026-03-05 14:12:13</td>
-<td><code>XFS (sdi): writeback error</code> - 写回错误</td>
-<td>OS Messages</td>
-<td>🔴 严重</td>
+<td>未知</td>
+<td>🔴</td>
+<td>现象无法解释，根因未定位，仍在排查中</td>
+<td>服务偶发崩溃，日志无异常，无法复现</td>
 </tr>
 </tbody></table></div>
-<h3 id="h-事件序列分析">事件序列分析</h3>
+<hr>
+<h2 id="h-二根因速览">二、根因速览</h2>
+<blockquote>
+<p>用一张图说清楚：<strong>什么事件触发了什么连锁反应，最终导致故障</strong>。</p>
+</blockquote>
+<h3 id="h-事故时间线-故障传导链路">事故时间线 & 故障传导链路</h3>
 <div class="code-block">
-  
+  <span class="code-lang">text</span>
   <button class="copy-btn" onclick="copyCode(this)" title="复制">
     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
   </button>
-  <pre><code>T0 (00:26:22) ──┬─ [SMART] /dev/sdi 报告240个不可读扇区（周期性告警持续14小时）
-                ├─ [硬件] 02:12:08 iBMC检测到硬盘通信异常
-                ├─ [硬件] 02:15:39 硬盘控制失败
-                ├─ [硬件] 02:56:55 硬盘控制再次失败
-                └─ [系统] 14:11:36 爆发性I/O错误，文件系统元数据损坏</code></pre>
+  <pre><code>时间                   事件                                                         性质         溯源路径 [完整绝对路径 : 行号]
+───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+2026-02-01 03:58:18   smartd 首次报告 /dev/sdw 8 个 pending sectors（持续每半小时）   📈 隐患萌芽   [/Users/qzh/huawei/jinsan_cloud/logs/10.120.6.76/infocollect_logs/system/var/log/messages-20260208 : 167]
+  │
+  ▼
+2026-02-15 03:58:13   ≥12 块同批次盘同时出现 pending sectors（群体性退化起点）        ⚠️ 隐患扩散   [/Users/qzh/huawei/jinsan_cloud/logs/10.120.6.76/infocollect_logs/system/var/log/messages-20260215 : 52-58]
+  │                   sdi/sdo/sdq/sds/sdu/sdw/sdab/sdac/sdad/sdah/sdaj(240)/sdak(56)
+  ▼
+2026-03-01 02:28:18   smartd 最后一次正常告警 sdw pending=8（此后盘开始不可响应）      🟡 压力积累   [/Users/qzh/huawei/jinsan_cloud/logs/10.120.6.76/messages/10.120.6.76_vol22_daiwai_20260301_024119.log : 334]
+  │
+  ▼
+2026-03-01 02:37:42   sdw 爆发内核 SCSI I/O 错误（DID_SOFT_ERROR，Read(16) 失败）     🔴 故障爆发   [/Users/qzh/huawei/jinsan_cloud/logs/10.120.6.76/messages/10.120.6.76_vol22_daiwai_20260301_024119.log : 335-343]
+  │                   blk_update_request: I/O error, dev sdw, sector 27917934368
+  ▼
+2026-03-01 02:38:13   sdw 升级 DID_TRANSPORT_DISRUPTED，Synchronize Cache(10) 失败     🔴 故障升级   [/Users/qzh/huawei/jinsan_cloud/logs/10.120.6.76/messages/10.120.6.76_vol22_daiwai_024119.log : 344-358]
+  │                   XFS (sdw): log I/O error -5 → xfs_do_force_shutdown(0x2)
+  │                   → "Log I/O Error Detected. Shutting down filesystem"
+  ▼
+2026-03-01 02:38:14   XFS 持续 writeback error（多个 sector 回写失败）               🔴 故障蔓延   [/Users/qzh/huawei/jinsan_cloud/logs/10.120.6.76/messages/10.120.6.76_vol22_daiwai_024119.log : 361-366]
+  │
+  ▼
+2026-03-03 21:03:14   sdo 开始 I/O error（mpt3sas PL 错误 → DID_SOFT_ERROR）          🔴 二次爆发   [/Users/qzh/huawei/jinsan_cloud/logs/10.120.6.76/infocollect_logs/system/var/log/messages : 22426-22429]
+  │                   Power-on or device reset occurred（vol14 读写异常）
+  ▼
+2026-03-03 21:03:43   sdo 升级 DID_TRANSPORT_DISRUPTED，Read(16) 失败                 🔴 故障蔓延   [/Users/qzh/huawei/jinsan_cloud/logs/10.120.6.76/infocollect_logs/system/var/log/messages : 22515]
+  │                   blk_update_request: I/O error, dev sdo
+  ▼
+2026-03-05 21:21:41   InfoCollect 采集快照：sdw 已卸载，Pending=24/sdo=24/sdac=8      📋 现场快照   [/Users/qzh/huawei/jinsan_cloud/logs/10.120.6.76/infocollect_logs/disk/disk_smart.txt : 4731/3523/497]</code></pre>
 </div>
-<h2 id="h-证据链分析">证据链分析</h2>
-<h3 id="h-1-硬件层证据ibmc日志">1. 硬件层证据（iBMC日志）</h3>
-<div class="table-wrap"><table>
-<thead>
-<tr>
-<th>时间戳</th>
-<th>错误信息</th>
-<th>含义</th>
-</tr>
-</thead>
-<tbody><tr>
-<td>2026-03-05 02:12:08</td>
-<td><code>Get HDD Present Value Failed !!!</code></td>
-<td>硬盘检测失败，无法读取硬盘状态</td>
-</tr>
-<tr>
-<td>2026-03-05 02:15:39</td>
-<td><code>HDM_SetBPCtl 0 failed!!</code></td>
-<td>硬盘电源控制失败</td>
-</tr>
-<tr>
-<td>2026-03-05 02:56:55</td>
-<td><code>HDM_SetBPCtl 1 failed!!</code></td>
-<td>硬盘电源控制再次失败</td>
-</tr>
-</tbody></table></div>
-<p><strong>分析结论</strong>：硬件层检测到硬盘通信异常，表明硬盘可能已无法正常响应控制命令。</p>
-<h3 id="h-2-磁盘健康证据smart信息">2. 磁盘健康证据（SMART信息）</h3>
-<p>从<code>disk_smart.txt</code>中提取的关键SMART属性：</p>
-<div class="table-wrap"><table>
-<thead>
-<tr>
-<th>属性</th>
-<th>原始值</th>
-<th>阈值</th>
-<th>状态</th>
-<th>含义</th>
-</tr>
-</thead>
-<tbody><tr>
-<td>Current_Pending_Sector</td>
-<td>240</td>
-<td>N/A</td>
-<td><span class="badge-warn">⚠️ 警告</span></td>
-<td>当前待处理扇区数（不可读）</td>
-</tr>
-<tr>
-<td>Reallocated_Sector_Ct</td>
-<td>31</td>
-<td>1</td>
-<td>🔴 严重</td>
-<td>已重映射扇区数（超过阈值）</td>
-</tr>
-<tr>
-<td>Command_Timeout</td>
-<td>201876242444</td>
-<td>N/A</td>
-<td><span class="badge-warn">⚠️ 警告</span></td>
-<td>命令超时计数异常高</td>
-</tr>
-</tbody></table></div>
-<p><strong>分析结论</strong>：硬盘存在大量坏道（240个待处理扇区），且已重映射31个扇区（严重超过阈值1），表明硬盘介质已严重损坏。</p>
-<h3 id="h-3-操作系统层证据内核日志">3. 操作系统层证据（内核日志）</h3>
-<div class="table-wrap"><table>
-<thead>
-<tr>
-<th>时间戳</th>
-<th>错误信息</th>
-<th>影响</th>
-</tr>
-</thead>
-<tbody><tr>
-<td>2026-03-05 14:11:36</td>
-<td><code>blk_update_request: I/O error, dev sdi, sector ...</code></td>
-<td>块设备I/O错误</td>
-</tr>
-<tr>
-<td>2026-03-05 14:12:04</td>
-<td><code>XFS (sdi): metadata I/O error in &quot;xfs_trans_read_buf_map&quot;</code></td>
-<td>XFS文件系统元数据读取错误</td>
-</tr>
-<tr>
-<td>2026-03-05 14:12:13</td>
-<td><code>XFS (sdi): writeback error on sector ...</code></td>
-<td>XFS文件系统写回错误</td>
-</tr>
-</tbody></table></div>
-<p><strong>分析结论</strong>：硬盘I/O错误已导致文件系统元数据损坏，XFS文件系统可能已处于不一致状态。</p>
-<h3 id="h-4-设备映射信息">4. 设备映射信息</h3>
-<div class="table-wrap"><table>
-<thead>
-<tr>
-<th>逻辑设备</th>
-<th>物理位置</th>
-<th>硬盘型号</th>
-<th>容量</th>
-</tr>
-</thead>
-<tbody><tr>
-<td><code>/dev/sdi</code></td>
-<td>SAS扩展器phy7端口<br>SCSI地址[0:0:8:0]</td>
-<td>WDC WUH721414AL</td>
-<td>14TB</td>
-</tr>
-</tbody></table></div>
-<h2 id="h-根因推断">根因推断</h2>
-<h3 id="h-根本原因硬盘物理介质损坏">根本原因：硬盘物理介质损坏</h3>
-<p>基于以下证据链，确定根本原因为<strong>硬盘物理介质损坏</strong>：</p>
-<ol>
-<li><strong>时序证据</strong>：SMART告警（00:26:22）早于硬件检测失败（02:12:08），表明介质损坏先于通信故障</li>
-<li><strong>SMART指标</strong>：<code>Current_Pending_Sector=240</code>和<code>Reallocated_Sector_Ct=31</code>明确指示硬盘存在大量坏道</li>
-<li><strong>错误模式</strong>：从不可读扇区告警→硬件通信失败→I/O错误→文件系统损坏的渐进式恶化</li>
-<li><strong>排除其他原因</strong>：<ul>
-<li>RAID状态正常，排除RAID控制器问题</li>
-<li>无链路错误报告，排除SAS线缆或HBA卡问题</li>
-<li>多硬盘SMART告警但仅sdi出现I/O错误，排除供电或环境问题</li>
+<h3 id="h-故障因果链">故障因果链</h3>
+<div class="code-block">
+  <span class="code-lang">text</span>
+  <button class="copy-btn" onclick="copyCode(this)" title="复制">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
+  </button>
+  <pre><code>HGST WUH721816ALE6L4 16TB SATA 同批次硬盘群体性介质老化（Power_On_Hours≈38587h≈4.4 年）
+    │
+    ├─► ≥12 块盘同时出现 Current_Pending_Sector（2026-02-15 起，群体退化）
+    │
+    └─► sdw 退化最严重（Reallocated_Sector_Ct=2 不可逆 + Pending 8→24 + ATA UNC=19）
+            └─► 物理坏道 → smartd 持续告警 1 个月（未触发主动处置）
+                    └─► 2026-03-01 02:37:42 介质读困难 → SCSI Read(16) 失败（DID_SOFT_ERROR）
+                            └─► 02:38:13 mpt3sas HBA 触发 SAS PHY 重置（DID_TRANSPORT_DISRUPTED）
+                                    └─► Synchronize Cache(10) 失败 → WRITE 也失败
+                                            └─► XFS 日志区写入失败（log I/O error -5 / EIO）
+                                                    └─► xfs_do_force_shutdown(0x2) 强制关闭文件系统
+                                                            └─► vol22 卸载 → 业务数据不可访问
+                                                                    └─► 🔴 vol22 业务中断
+
+&lt;div style="margin-bottom: 8px;"&gt;&lt;strong&gt;
+[并发分支] sdo 同等退化（Pending=24 + UNC=14）→ 2026-03-03 21:&lt;/strong&gt; 03 I/O error → vol14 读写异常&lt;/div&gt;
+
+[历史分支] sdac 累积退化（Pending=8 + UNC=86）→ 历史 XFS shutdown 后恢复，当前已卸载
+[伴生因素] mpt3sas PL 错误 0x31110610 + 链路重置 = 硬盘不可响应后 HBA 的下游表现（UDMA_CRC=0 排除 SATA 物理层 CRC 问题）</code></pre>
+</div>
+<hr>
+<h2 id="h-三排查过程">三、排查过程</h2>
+<blockquote>
+<p>排查逻辑：<strong>提出假设 → 收集证据 → 验证或排除 → 逐步收敛到根因</strong>。
+本节基于 T1（offline-disk-fault-diagnosis）与 T2（offline-file-system-fault-diagnosis）两份 Kuafu 报告的真实排查路径整合。</p>
+</blockquote>
+<h3 id="h-31-初始现象">3.1 初始现象</h3>
+<ul>
+<li><strong>业务侧表现</strong>：数据卷 /data/vols/vol22 不可访问，XFS 文件系统被强制 shutdown 并卸载；/data/vols/vol14 出现读写异常。</li>
+<li><strong>日志关键报错</strong>：<ul>
+<li><code>XFS (sdw): log I/O error -5</code> / <code>xfs_do_force_shutdown(0x2)</code> / <code>Log I/O Error Detected. Shutting down filesystem</code></li>
+<li><code>sd 0:0:22:0: [sdw] FAILED Result: hostbyte=DID_SOFT_ERROR</code> → <code>DID_TRANSPORT_DISRUPTED</code></li>
+<li><code>blk_update_request: I/O error, dev sdw, sector 27917934368 op 0x0:(READ)</code></li>
+<li>smartd 持续告警：<code>/dev/sdw [SAT], 8 Currently unreadable (pending) sectors</code>（自 2026-02-01 起）</li>
 </ul>
 </li>
-</ol>
-<h3 id="h-故障机理">故障机理</h3>
-<div class="code-block">
-  
-  <button class="copy-btn" onclick="copyCode(this)" title="复制">
-    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
-  </button>
-  <pre><code>硬盘物理扇区损坏（坏道）
-    ↓
-SMART检测到不可读扇区（Current_Pending_Sector增加）
-    ↓
-硬盘尝试重映射坏道（Reallocated_Sector_Ct增加）
-    ↓
-重映射资源耗尽，新坏道无法处理
-    ↓
-硬盘响应变慢，命令超时（Command_Timeout增加）
-    ↓
-硬盘固件异常，通信失败（iBMC检测失败）
-    ↓
-操作系统I/O错误，文件系统损坏</code></pre>
-</div>
-<h2 id="h-影响评估">影响评估</h2>
+<li><strong>SMART 硬指标</strong>：sdw Reallocated_Sector_Ct=2、Current_Pending_Sector=24、ATA UNC Error=19。</li>
+</ul>
+<hr>
+<h3 id="h-32-假设驱动排查">3.2 假设驱动排查</h3>
+<blockquote>
+<p>⚠️ <strong>反思与自检</strong>：以下假设均来自 T1/T2 报告中真实执行过的证据校验路径，未捏造排查动作。</p>
+</blockquote>
+<h4 id="h-假设-a文件系统自身逻辑损坏非硬件">假设 A：文件系统自身逻辑损坏（非硬件）</h4>
+<blockquote>
+<p>🧪 假设：XFS 元数据逻辑损坏或校验失败导致 shutdown</p>
+</blockquote>
 <div class="table-wrap"><table>
 <thead>
 <tr>
-<th>影响维度</th>
-<th>评估结果</th>
+<th>检查项</th>
+<th>操作（基于真实日志记录）</th>
+<th>结论</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>XFS shutdown 触发标志</td>
+<td>分析 <code>xfs_do_force_shutdown(0x2)</code> 的 flag 值</td>
+<td>❌ 排除：flag=0x2 = <code>XFS_SHUTDOWN_LOG_IO_ERROR</code>（日志 I/O 错误触发），<strong>非</strong> 0x8（元数据校验失败），根因在底层硬件而非 FS 逻辑</td>
+</tr>
+<tr>
+<td>错误类型</td>
+<td>分析 <code>log I/O error -5</code></td>
+<td><span class="badge-err">❌ 排除：-5 = EIO（输入输出错误），由块设备返回，非 FS 内部逻辑错误</span></td>
+</tr>
+</tbody></table></div>
+<p><strong>❌ 排除</strong>：XFS shutdown 由底层 EIO 触发，文件系统逻辑本身未损坏。</p>
+<hr>
+<h4 id="h-假设-braid-卡缓存故障-raid-重建干扰">假设 B：RAID 卡缓存故障 / RAID 重建干扰</h4>
+<blockquote>
+<p>🧪 假设：RAID 控制器缓存异常或后台重建任务导致 I/O 异常</p>
+</blockquote>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>检查项</th>
+<th>操作（基于真实日志记录）</th>
+<th>结论</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>RAID 模式</td>
+<td>检查 sashbalog.txt</td>
+<td>❌ 排除：mpt3sas HBA 直通模式，36 个 SATA Target 正常在线，<strong>无 RAID 逻辑盘/VD</strong>，不存在重建/巡检任务</td>
+</tr>
+<tr>
+<td>RAID 健康度</td>
+<td>检查 sasraidlog.txt</td>
+<td><span class="badge-err">❌ 排除：&quot;No obvious RAID issues found&quot;</span></td>
+</tr>
+</tbody></table></div>
+<p><strong>❌ 排除</strong>：HBA 直通无 RAID 层，排除 RAID 缓存/重建干扰。</p>
+<hr>
+<h4 id="h-假设-c异常断电导致元数据未落盘">假设 C：异常断电导致元数据未落盘</h4>
+<blockquote>
+<p>🧪 假设：服务器异常断电致 XFS 元数据未落盘</p>
+</blockquote>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>检查项</th>
+<th>操作（基于真实日志记录）</th>
+<th>结论</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>断电记录</td>
+<td>检查 iBMC / 系统日志中的 Power Loss 事件</td>
+<td><span class="badge-err">❌ 排除：日志中无 Power Loss / iBMC 断电记录</span></td>
+</tr>
+<tr>
+<td>故障演进特征</td>
+<td>分析 smartd 告警时序</td>
+<td><span class="badge-err">❌ 排除：故障由 SMART 坏道告警渐进式演进（2-01 至 3-01 持续 1 个月），非瞬时断电特征</span></td>
+</tr>
+</tbody></table></div>
+<p><strong>❌ 排除</strong>：无断电证据，故障为渐进式介质退化。</p>
+<hr>
+<h4 id="h-假设-dsas-链路抖动为主因">假设 D：SAS 链路抖动为主因</h4>
+<blockquote>
+<p>🧪 假设：mpt3sas PL 错误与 DID_TRANSPORT_DISRUPTED 表明链路层为主因</p>
+</blockquote>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>检查项</th>
+<th>操作（基于真实日志记录）</th>
+<th>结论</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>SATA 物理层 CRC</td>
+<td>检查 UDMA_CRC_Error_Count</td>
+<td><span class="badge-err">❌ 排除主因：三盘 UDMA_CRC_Error_Count 均为 0，排除 SATA 物理层 CRC 问题</span></td>
+</tr>
+<tr>
+<td>时序先后</td>
+<td>对比 DID_SOFT_ERROR 与 DID_TRANSPORT_DISRUPTED 时间</td>
+<td>❌ 排除主因：sdw 先 02:37:42 出现 DID_SOFT_ERROR（介质读失败），后 02:38:13 才升级为 DID_TRANSPORT_DISRUPTED，链路重置在介质失败<strong>之后</strong></td>
+</tr>
+</tbody></table></div>
+<p><strong>❌ 排除主因（伴生因素）</strong>：链路重置是硬盘不可响应后 HBA 触发的下游表现，非根因。</p>
+<hr>
+<h4 id="h-假设-e磁盘物理介质退化-确认根因">假设 E：磁盘物理介质退化 ✅ 确认根因</h4>
+<blockquote>
+<p>🧪 假设：基于 SMART Pre-fail 属性 + 内核 I/O error 时序，推断物理介质退化</p>
+</blockquote>
+<p><strong>Step 1 — 确认 SMART 介质退化硬指标</strong>（sdw，采集于 2026-03-05 21:21:41）：</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>SMART ID</th>
+<th>属性名</th>
+<th>Raw Value</th>
+<th>含义</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>5</td>
+<td>Reallocated_Sector_Ct</td>
+<td>2</td>
+<td>已重映射扇区（Pre-fail 预警，不可逆坏道）</td>
+</tr>
+<tr>
+<td>196</td>
+<td>Reallocated_Event_Count</td>
+<td>2</td>
+<td>重映射事件计数（与 ID 5 一致）</td>
+</tr>
+<tr>
+<td>197</td>
+<td>Current_Pending_Sector</td>
+<td>24</td>
+<td>待重映射扇区（从带外日志期间 8 增长至 24，持续恶化）</td>
+</tr>
+<tr>
+<td>9</td>
+<td>Power_On_Hours</td>
+<td>38588</td>
+<td>累计上电≈4.4 年（接近设计寿命后期）</td>
+</tr>
+<tr>
+<td>-</td>
+<td>ATA Error Count</td>
+<td>19</td>
+<td>UNC at LBA=0x00000000（不可纠正错误）</td>
+</tr>
+</tbody></table></div>
+<p>证据：<code>[/Users/qzh/huawei/jinsan_cloud/logs/10.120.6.76/infocollect_logs/disk/disk_smart.txt : 4654-4759]</code></p>
+<p><strong>Step 2 — 时序连续性校验（E1）</strong>：</p>
+<p>smartd 告警（2026-02-01 起）→ 内核 I/O error（2026-03-01 02:37:42）→ XFS shutdown（02:38:13，晚 31 秒）。物理介质退化早于文件系统故障约 1 个月，时序连续无跳跃。</p>
+<p><strong>Step 3 — 物理同一性校验（E2）</strong>：</p>
+<p><code>/dev/sdw</code> → SCSI 0:0:22:0 → SAS Address 0x578aa82c42b7d015 → Expander Phy 21 → Enclosure #2 Slot #21 → Serial 2BJEY2RN → WDC WUH721816ALE6L4。phy_info.txt、sashbalog.txt、disk_smart.txt 三源一致指向同一物理磁盘。</p>
+<p><strong>Step 4 — 现象排他性校验（E3）</strong>：</p>
+<p>故障为本地 SATA HDD（非 NFS），排除网络；错误为 EIO/UNC（非 ENOMEM/ENOSPC），排除 OOM 与空间耗尽；XFS shutdown 由 log I/O error -5 触发，非人为 rm/umount。</p>
+<p><strong>✅ 结论：sdw 物理介质退化（Reallocated=2 + Pending=24 + UNC=19）导致底层 I/O 失败，XFS 日志区写入失败触发 force_shutdown，为 vol22 不可用的根本原因。群体性退化（≥12 块同批次盘）指向同批次老化或系统性环境因素。</strong></p>
+<hr>
+<h3 id="h-33-排查结论与逻辑树">3.3 排查结论与逻辑树</h3>
+<div class="code-block">
+  <span class="code-lang">text</span>
+  <button class="copy-btn" onclick="copyCode(this)" title="复制">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
+  </button>
+  <pre><code>vol22 XFS shutdown + vol14 I/O error + 多盘 pending
+├─► 文件系统自身逻辑损坏          → ❌ 排除（shutdown flag=0x2 LOG_IO_ERROR，非 0x8 元数据校验）
+├─► RAID 卡缓存/重建干扰          → ❌ 排除（HBA 直通模式，无 RAID 逻辑盘）
+├─► 异常断电致元数据未落盘        → ❌ 排除（无 Power Loss 记录，渐进式 SMART 告警）
+├─► SAS 链路抖动为主因            → ❌ 排除主因（UDMA_CRC=0；链路重置在介质失败之后，为下游表现）
+└─► 磁盘物理介质退化              → ✅ 确认根因（SMART Reallocated/Pending/UNC + E1 时序 + E2 物理同一性 + E3 排他性）
+        └─► 群体性退化（≥12 块同批次盘）→ 同批次老化 / 系统性环境因素（候选 R4 振动致伤，无 FARM 未验证）</code></pre>
+</div>
+<hr>
+<h2 id="h-四故障盘修复价值评估">四、故障盘修复价值评估</h2>
+<blockquote>
+<p>本章节内容由 T1 报告领域扩展块透传，已剥离协议标签并将标准化 JSON 对象转化为表格。</p>
+</blockquote>
+<h3 id="h-41-devsdw-scsi-00220主故障盘xfs-shutdownp0-紧急">4.1 /dev/sdw — SCSI 0:0:22:0（主故障盘，XFS shutdown，P0 紧急）</h3>
+<p><strong>故障盘结论</strong>：sdw（SN: 2BJEY2RN）已发生不可逆介质退化，导致 XFS 文件系统强制 shutdown 并卸载。Reallocated_Sector_Ct=2（已重分配）+ Current_Pending_Sector=24（待重分配）+ ATA UNC Error=19 次，盘体介质持续退化中。<strong>建议立即更换，不可修复。</strong></p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>字段</th>
+<th>内容</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>故障服务器 IP</td>
+<td>10.120.6.76</td>
+</tr>
+<tr>
+<td>卷 ID</td>
+<td>未知（故障后已卸载，原挂载点 vol22）</td>
+</tr>
+<tr>
+<td>物理槽位</td>
+<td>Slot 22 / EXP phy21（SAS Addr 578aa82c42b7d015，handle 0x001f）</td>
+</tr>
+<tr>
+<td>SCSI 磁盘设备</td>
+<td>/dev/sdw</td>
+</tr>
+<tr>
+<td>硬盘型号</td>
+<td>WUH721816ALE6L4</td>
+</tr>
+<tr>
+<td>序列号</td>
+<td>2BJEY2RN</td>
+</tr>
+<tr>
+<td>接口类型</td>
+<td>SATA</td>
+</tr>
+<tr>
+<td>容量</td>
+<td>16.0 TB</td>
+</tr>
+<tr>
+<td>通电时长（小时）</td>
+<td>38588</td>
+</tr>
+<tr>
+<td>是否已更换</td>
+<td>否</td>
+</tr>
+<tr>
+<td>是否可修复</td>
+<td>否</td>
+</tr>
+<tr>
+<td>半年存活概率</td>
+<td>0.0</td>
+</tr>
+<tr>
+<td>命中故障规则</td>
+<td>Reallocated_Sector_Ct=2（Pre-fail，已超 0 阈值）/ Current_Pending_Sector=24 / ATA UNC Error Count=19 / XFS 文件系统 shutdown</td>
+</tr>
+</tbody></table></div>
+<p><strong>分析原因</strong>：</p>
+<ol>
+<li>Reallocated_Sector_Ct=2 表明盘体已出现重分配扇区（坏道），介质退化不可逆。</li>
+<li>Current_Pending_Sector 从 smartd 告警时的 8 增长至 SMART 快照的 24，退化活跃进行中。</li>
+<li>ATA Error Count=19 次（UNC at LBA=0），介质读不可纠正错误持续发生。</li>
+<li>XFS log I/O error -5 导致文件系统强制 shutdown，业务不可用。</li>
+<li>Power_On_Hours=38588（约 4.4 年），接近设计寿命后期。</li>
+</ol>
+<hr>
+<h3 id="h-42-devsdo-scsi-00140当前活跃故障盘挂载-vol14p1-高">4.2 /dev/sdo — SCSI 0:0:14:0（当前活跃故障盘，挂载 vol14，P1 高）</h3>
+<p><strong>故障盘结论</strong>：sdo（SN: 2BJH1BRN）当前活跃 I/O error，挂载在 /data/vols/vol14。Current_Pending_Sector=24 + ATA UNC Error=14 次，介质退化与 sdw 同等程度。虽未触发 XFS shutdown，但 <code>DID_TRANSPORT_DISRUPTED</code> + <code>Power-on/device reset</code> 表明盘体已间发性不可响应。<strong>建议尽快更换，并优先备份 vol14 数据。</strong></p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>字段</th>
+<th>内容</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>故障服务器 IP</td>
+<td>10.120.6.76</td>
+</tr>
+<tr>
+<td>卷 ID</td>
+<td>vol14</td>
+</tr>
+<tr>
+<td>物理槽位</td>
+<td>Slot 14 / EXP phy13（SAS Addr 578aa82c42b7d00d，handle 0x0017）</td>
+</tr>
+<tr>
+<td>SCSI 磁盘设备</td>
+<td>/dev/sdo</td>
+</tr>
+<tr>
+<td>硬盘型号</td>
+<td>WUH721816ALE6L4</td>
+</tr>
+<tr>
+<td>序列号</td>
+<td>2BJH1BRN</td>
+</tr>
+<tr>
+<td>接口类型</td>
+<td>SATA</td>
+</tr>
+<tr>
+<td>容量</td>
+<td>16.0 TB</td>
+</tr>
+<tr>
+<td>通电时长（小时）</td>
+<td>38587</td>
+</tr>
+<tr>
+<td>是否已更换</td>
+<td>否</td>
+</tr>
+<tr>
+<td>是否可修复</td>
+<td>否</td>
+</tr>
+<tr>
+<td>半年存活概率</td>
+<td>0.0</td>
+</tr>
+<tr>
+<td>命中故障规则</td>
+<td>Current_Pending_Sector=24 / ATA UNC Error Count=14 / DID_TRANSPORT_DISRUPTED + I/O error</td>
+</tr>
+</tbody></table></div>
+<p><strong>分析原因</strong>：</p>
+<ol>
+<li>Current_Pending_Sector=24 与 sdw 同等程度，介质退化活跃。</li>
+<li>ATA Error Count=14 次（UNC at LBA=0），介质读不可纠正错误。</li>
+<li>2026-03-03 21:03:14 发生 DID_SOFT_ERROR → DID_TRANSPORT_DISRUPTED + Power-on/device reset，盘体间发性不可响应。</li>
+<li>仍挂载在 /data/vols/vol14，业务读写异常风险高。</li>
+<li>Power_On_Hours=38587（约 4.4 年），同批次老化。</li>
+</ol>
+<hr>
+<h3 id="h-43-devsdac-scsi-00280历史故障盘已恢复p2-中">4.3 /dev/sdac — SCSI 0:0:28:0（历史故障盘，已恢复，P2 中）</h3>
+<p><strong>故障盘结论</strong>：sdac（SN: 2CKXLNRJ）历史曾发生 XFS shutdown（dmesg ring buffer 记录 <code>Corruption of in-memory data detected</code>），后重新挂载恢复。当前 Current_Pending_Sector=8 + ATA UNC Error=86 次（最高），温度 45°C（偏高）。虽当前无活跃 I/O error，但 UNC Error 累积量大，<strong>建议更换或降级使用。</strong></p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>字段</th>
+<th>内容</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>故障服务器 IP</td>
+<td>10.120.6.76</td>
+</tr>
+<tr>
+<td>卷 ID</td>
+<td>未知（当前已卸载）</td>
+</tr>
+<tr>
+<td>物理槽位</td>
+<td>Slot 28 / EXP phy27（SAS Addr 578aa82c42b7d01b，handle 0x0025）</td>
+</tr>
+<tr>
+<td>SCSI 磁盘设备</td>
+<td>/dev/sdac</td>
+</tr>
+<tr>
+<td>硬盘型号</td>
+<td>WUH721816ALE6L4</td>
+</tr>
+<tr>
+<td>序列号</td>
+<td>2CKXLNRJ</td>
+</tr>
+<tr>
+<td>接口类型</td>
+<td>SATA</td>
+</tr>
+<tr>
+<td>容量</td>
+<td>16.0 TB</td>
+</tr>
+<tr>
+<td>通电时长（小时）</td>
+<td>38587</td>
+</tr>
+<tr>
+<td>是否已更换</td>
+<td>否</td>
+</tr>
+<tr>
+<td>是否可修复</td>
+<td>否</td>
+</tr>
+<tr>
+<td>半年存活概率</td>
+<td>0.0</td>
+</tr>
+<tr>
+<td>命中故障规则</td>
+<td>ATA UNC Error Count=86（极高）/ Current_Pending_Sector=8 / 历史 XFS shutdown</td>
+</tr>
+</tbody></table></div>
+<p><strong>分析原因</strong>：</p>
+<ol>
+<li>ATA Error Count=86 次（三盘中最高，UNC at LBA=0），介质长期不可纠正读错误。</li>
+<li>历史曾 XFS shutdown（Corruption of in-memory data detected），后重新挂载恢复。</li>
+<li>Current_Pending_Sector=8（较 sdw/sdo 少，但非零）。</li>
+<li>温度 45°C（Min/Max 22/54），偏高运行。</li>
+<li>Error 86 发生在 lifetime 29328 小时（约 3.3 年），长期退化累积。</li>
+</ol>
+<hr>
+<h3 id="h-44-群体性退化盘清单未达-xfs-shutdown-但已有-pending-sectors">4.4 群体性退化盘清单（未达 XFS shutdown 但已有 pending sectors）</h3>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>盘符</th>
+<th>Pending</th>
+<th>smartd 首告时间</th>
+<th>风险等级</th>
+<th>备注</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>sdaj</td>
+<td>240</td>
+<td>2026-02-15 03:58:18</td>
+<td>高风险</td>
+<td>pending 最多，高风险</td>
+</tr>
+<tr>
+<td>sdak</td>
+<td>56</td>
+<td>2026-02-15 03:58:23</td>
+<td>高风险</td>
+<td>高风险</td>
+</tr>
+<tr>
+<td>sds</td>
+<td>16</td>
+<td>2026-02-15 03:58:13</td>
+<td>中风险</td>
+<td>中风险</td>
+</tr>
+<tr>
+<td>sdi/sdq/sdu/sdab/sdad/sdah</td>
+<td>8</td>
+<td>2026-02-15 03:58</td>
+<td>早期退化</td>
+<td>同批次老化</td>
+</tr>
+<tr>
+<td>sdo/sdw/sdac</td>
+<td>8→24/24/8</td>
+<td>2026-02-15 起</td>
+<td>已活跃故障</td>
+<td>见 4.1/4.2/4.3</td>
+</tr>
+</tbody></table></div>
+<blockquote>
+<p>以上 ≥12 块盘均为同型号 WUH721816ALE6L4，同批次运行约 38587h，群体性退化特征明显。</p>
+</blockquote>
+<hr>
+<h3 id="h-45-故障域-r-码定界">4.5 故障域 + R 码定界</h3>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>盘符</th>
+<th>故障域</th>
+<th>候选 R 码</th>
+<th>FARM 验证状态</th>
 <th>说明</th>
 </tr>
 </thead>
 <tbody><tr>
-<td><strong>数据完整性</strong></td>
-<td>🔴 高风险</td>
-<td>XFS元数据损坏，可能导致数据丢失</td>
+<td>sdw</td>
+<td>硬盘域</td>
+<td>R3 盘片介质退化</td>
+<td><span class="badge-err">❌ 无 FARM，未验证磁头级</span></td>
+<td>Reallocated=2 + Pending=24 + UNC=19 → XFS shutdown</td>
 </tr>
 <tr>
-<td><strong>系统可用性</strong></td>
-<td>🟡 中风险</td>
-<td>单硬盘故障，但可能影响依赖该文件系统的服务</td>
+<td>sdo</td>
+<td>硬盘域</td>
+<td>R3 盘片介质退化 / R1 磁头信号退化（早期）</td>
+<td><span class="badge-err">❌ 无 FARM，未验证</span></td>
+<td>Pending=24 + UNC=14 → I/O error（未达 shutdown）</td>
 </tr>
 <tr>
-<td><strong>业务连续性</strong></td>
-<td>🟡 中风险</td>
-<td>需要及时更换硬盘并恢复数据</td>
+<td>sdac</td>
+<td>硬盘域</td>
+<td>R3 盘片介质退化</td>
+<td><span class="badge-err">❌ 无 FARM，未验证</span></td>
+<td>Pending=8 + UNC=86 → 历史 XFS shutdown 后恢复</td>
 </tr>
 <tr>
-<td><strong>扩展风险</strong></td>
-<td>🟢 低风险</td>
-<td>单点故障，未发现其他硬盘类似问题</td>
+<td>群体退化</td>
+<td>硬盘域</td>
+<td>R4 振动致伤（候选）/ R3 同批次老化</td>
+<td><span class="badge-err">❌ 无 FARM Shock 数据</span></td>
+<td>≥12 盘同时退化，需 FARM Shock 分档确认</td>
+</tr>
+<tr>
+<td>链路并发</td>
+<td>链路域</td>
+<td>R7 SAS 链路重置</td>
+<td>N/A（OS 侧证据充分）</td>
+<td>mpt3sas PL 错误 + DID_TRANSPORT_DISRUPTED</td>
 </tr>
 </tbody></table></div>
-<h2 id="h-行动建议">行动建议</h2>
-<h3 id="h-紧急措施立即执行">紧急措施（立即执行）</h3>
-<ol>
-<li><p><strong>隔离故障硬盘</strong>：</p>
-<ul>
-<li>确认业务已从<code>/dev/sdi</code>所在文件系统迁移</li>
-<li>卸载相关文件系统：<code>umount /dev/sdi</code></li>
-<li>将硬盘标记为故障：<code>echo offline &gt; /sys/block/sdi/device/state</code></li>
-</ul>
-</li>
-<li><p><strong>数据备份与验证</strong>：</p>
-<ul>
-<li>检查XFS文件系统完整性：<code>xfs_repair -n /dev/sdi</code></li>
-<li>如有可读数据，立即备份到其他存储</li>
-<li>验证备份数据的完整性</li>
-</ul>
-</li>
-</ol>
-<h3 id="h-修复措施24小时内">修复措施（24小时内）</h3>
-<ol>
-<li><p><strong>硬件更换</strong>：</p>
-<ul>
-<li>根据物理位置（phy7）定位并更换故障硬盘</li>
-<li>使用同型号或兼容的14TB硬盘替换</li>
-<li>验证新硬盘SMART状态正常</li>
-</ul>
-</li>
-<li><p><strong>数据恢复</strong>：</p>
-<ul>
-<li>如果使用RAID，启动重建过程</li>
-<li>如果为独立磁盘，从备份恢复数据</li>
-<li>执行完整的文件系统检查和修复</li>
-</ul>
-</li>
-</ol>
-<h3 id="h-预防措施长期">预防措施（长期）</h3>
-<ol>
-<li><p><strong>监控强化</strong>：</p>
-<ul>
-<li>配置SMART监控告警阈值（Reallocated_Sector_Ct &gt; 1即告警）</li>
-<li>定期检查<code>Current_Pending_Sector</code>增长趋势</li>
-<li>监控硬盘温度、振动等环境指标</li>
-</ul>
-</li>
-<li><p><strong>运维优化</strong>：</p>
-<ul>
-<li>建立硬盘健康度评分体系，提前预警</li>
-<li>制定硬盘更换标准（如通电时间&gt;5年或重映射扇区&gt;10）</li>
-<li>定期执行硬盘坏道扫描</li>
-</ul>
-</li>
-<li><p><strong>架构改进</strong>：</p>
-<ul>
-<li>考虑使用RAID保护重要数据</li>
-<li>实施数据多副本存储策略</li>
-<li>建立自动化硬盘故障检测和更换流程</li>
-</ul>
-</li>
-</ol>
-<h2 id="h-附录相关日志摘要">附录：相关日志摘要</h2>
-<h3 id="h-ibmc关键错误">iBMC关键错误</h3>
-<div class="code-block">
-  
-  <button class="copy-btn" onclick="copyCode(this)" title="复制">
-    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
-  </button>
-  <pre><code>2026-03-05 02:12:08.756: Get HDD Present Value Failed !!!
-2026-03-05 02:15:39.986: HDM_SetBPCtl 0 failed!!
-2026-03-05 02:56:55.357: HDM_SetBPCtl 1 failed!!</code></pre>
-</div>
-<h3 id="h-smart监控告警">SMART监控告警</h3>
-<div class="code-block">
-  
-  <button class="copy-btn" onclick="copyCode(this)" title="复制">
-    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
-  </button>
-  <pre><code>Device: /dev/sdi [SAT], 240 Currently unreadable (pending) sectors
-（从00:26:22开始，每小时报告一次）</code></pre>
-</div>
-<h3 id="h-内核io错误部分">内核I/O错误（部分）</h3>
-<div class="code-block">
-  
-  <button class="copy-btn" onclick="copyCode(this)" title="复制">
-    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
-  </button>
-  <pre><code>Mar  5 14:11:36: blk_update_request: I/O error, dev sdi, sector 19327755344
-Mar  5 14:12:04: XFS (sdi): metadata I/O error in "xfs_trans_read_buf_map"
-Mar  5 14:12:13: XFS (sdi): writeback error on sector 25771412312</code></pre>
-</div>
+<blockquote>
+<p>⚠️ <strong>数据缺口声明</strong>：本日志包无 FARM 底层遥测日志（farmlog/ 目录不存在），无法执行逐磁头底层定界。上述 R 码为基于 OS 侧量化标准的候选结论，硬盘内部细节（磁头级退化/盘面级坏道分布/振动冲击痕迹）未验证。本批盘为 HGST 品牌（非希捷），建议使用 <code>smartctl -l gpstat</code> / <code>smartctl -l xerror</code> 补充盘体侧证据后复检。</p>
+</blockquote>
 <hr>
-<p><strong>报告生成完成时间</strong>：2026-04-12 14:05:13<br><strong>分析Agent</strong>：白泽（Baize）分析与报告Agent<br><strong>置信度评估</strong>：高（证据链完整，多源日志一致）</p>
+<h2 id="h-五修复方案">五、修复方案</h2>
+<h3 id="h-51-应急处置">5.1 应急处置</h3>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>步骤</th>
+<th>操作</th>
+<th>执行人</th>
+<th>时间</th>
+<th>效果</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>1</td>
+<td>确认 sdw 已卸载（<code>umount /dev/sdw 2&gt;/dev/null</code>），防止进一步损坏</td>
+<td>运维</td>
+<td>立即</td>
+<td>隔离故障盘</td>
+</tr>
+<tr>
+<td>2</td>
+<td>优先备份 vol14 数据（<code>rsync -a /data/vols/vol14/ &lt;backup&gt;/</code>），sdo 活跃 I/O error</td>
+<td>运维</td>
+<td>立即</td>
+<td>抢救 vol14 业务数据</td>
+</tr>
+<tr>
+<td>3</td>
+<td>物理更换 sdw（Slot 22 / EXP phy21），新盘上线后 <code>mkfs.xfs /dev/sdw</code> 重建并挂载</td>
+<td>现场/运维</td>
+<td>24h 内</td>
+<td>恢复 vol22 文件系统</td>
+</tr>
+<tr>
+<td>4</td>
+<td>对 sdo 执行 <code>xfs_repair -n /dev/sdo</code>（只读检查评估损坏程度），谨慎修复</td>
+<td>运维</td>
+<td>备份后</td>
+<td>评估 vol14 可恢复性</td>
+</tr>
+<tr>
+<td>5</td>
+<td>物理更换 sdo（Slot 14 / EXP phy13），重建 XFS 并恢复数据</td>
+<td>现场/运维</td>
+<td>48h 内</td>
+<td>恢复 vol14</td>
+</tr>
+<tr>
+<td>6</td>
+<td>对 sdac 降级或更换（Slot 28 / EXP phy27），UNC=86 累积风险高</td>
+<td>现场/运维</td>
+<td>1 周内</td>
+<td>消除历史隐患</td>
+</tr>
+</tbody></table></div>
+<p><strong>针对 sdw（已 shutdown，P0）的恢复脚本</strong>：</p>
+<div class="code-block">
+  <span class="code-lang">bash</span>
+  <button class="copy-btn" onclick="copyCode(this)" title="复制">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
+  </button>
+  <pre><code># 1. 确认文件系统已卸载
+umount /dev/sdw 2&gt;/dev/null  # 若仍挂载则卸载
+
+# 2. 物理更换硬盘（Slot 22 / EXP phy21）
+
+# 3. 新盘上线后重新创建 XFS 文件系统并挂载
+mkfs.xfs /dev/sdw
+mount /dev/sdw &lt;原挂载点&gt;
+
+# 4. 从备份恢复数据（XFS shutdown 后数据可能不完整）</code></pre>
+</div>
+<p><strong>针对 sdo（活跃故障，P1）的恢复脚本</strong>：</p>
+<div class="code-block">
+  <span class="code-lang">bash</span>
+  <button class="copy-btn" onclick="copyCode(this)" title="复制">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
+  </button>
+  <pre><code># 1. 立即备份 /data/vols/vol14 数据到安全位置
+rsync -a /data/vols/vol14/ &lt;backup_location&gt;/
+
+# 2. 卸载文件系统
+umount /data/vols/vol14
+
+# 3. 尝试 xfs_repair 修复（若 XFS 未 shutdown）
+xfs_repair /dev/sdo
+
+# 4. 物理更换硬盘（Slot 14 / EXP phy13），重建 XFS 并恢复数据</code></pre>
+</div>
+<h3 id="h-52-永久修复计划">5.2 永久修复计划</h3>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>修复措施</th>
+<th>负责人</th>
+<th>完成时间</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>立即更换 sdw（P0），重建 vol22 XFS 并恢复数据</td>
+<td>运维/现场</td>
+<td>24h 内</td>
+</tr>
+<tr>
+<td>尽快更换 sdo（P1），优先备份 vol14</td>
+<td>运维/现场</td>
+<td>48h 内</td>
+</tr>
+<tr>
+<td>更换或降级 sdac（P2），消除 UNC=86 累积隐患</td>
+<td>运维/现场</td>
+<td>1 周内</td>
+</tr>
+<tr>
+<td>对 sdaj(240)/sdak(56)/sds(16) 等高风险盘执行扩展自检并计划更换</td>
+<td>运维</td>
+<td>2 周内</td>
+</tr>
+<tr>
+<td>制定本批 HGST WUH721816ALE6L4 整批更换计划（≥12 块群体退化，运行 4.4 年）</td>
+<td>存储团队</td>
+<td>1 个月内</td>
+</tr>
+<tr>
+<td>排查机箱振动源（风扇/电源）、温度（sdac 45°C 偏高）、供电稳定性，排除 R4 振动致伤系统性环境因素</td>
+<td>现场/硬件</td>
+<td>2 周内</td>
+</tr>
+<tr>
+<td>补充采集 iBMC SEL 带外日志（本次 ibmc_logs/ 为空），补全硬件事件时间线</td>
+<td>运维</td>
+<td>1 周内</td>
+</tr>
+<tr>
+<td>使用 <code>smartctl -l gpstat</code> / <code>smartctl -l xerror</code> 补充盘体侧证据，辅助区分 R1/R3/R4（HGST 无标准 FARM）</td>
+<td>存储团队</td>
+<td>2 周内</td>
+</tr>
+<tr>
+<td>配置 smartd 对 Reallocated_Sector_Ct&gt;0 或 Current_Pending_Sector&gt;0 自动告警，将 pending&gt;0 纳入主动更换标准</td>
+<td>运维</td>
+<td>1 周内</td>
+</tr>
+<tr>
+<td>排查系统内存压力（dmesg 记录 3 次 OOM Killer），配置 swap 或扩容，避免 OOM 加剧存储 I/O 异常</td>
+<td>系统团队</td>
+<td>2 周内</td>
+</tr>
+</tbody></table></div>
+<h3 id="h-53-r-码修复能力矩阵纯-os-模式候选无-farm-验证">5.3 R 码修复能力矩阵（纯 OS 模式候选，无 FARM 验证）</h3>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>R 码</th>
+<th>修复手段</th>
+<th>对本故障有效性</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>R3 盘片介质退化</td>
+<td>umount + mount</td>
+<td><span class="badge-err">❌ 无效</span></td>
+<td>已有 Reallocated，介质物理退化不可逆</td>
+</tr>
+<tr>
+<td>R3</td>
+<td>xfs_repair</td>
+<td><span class="badge-warn">⚠️ 仅修复文件系统逻辑结构</span></td>
+<td>不解决底层介质退化，换盘后可修 FS</td>
+</tr>
+<tr>
+<td>R3</td>
+<td>带外重启硬盘</td>
+<td><span class="badge-err">❌ 无效</span></td>
+<td>介质物理退化，重启无法恢复坏道</td>
+</tr>
+<tr>
+<td>R3</td>
+<td>Depop 隔离磁头</td>
+<td>❓ 无法评估</td>
+<td>无 FARM 数据，无法定位到具体磁头</td>
+</tr>
+<tr>
+<td>R7 SAS 链路重置</td>
+<td>带外重启 HBA/硬盘</td>
+<td><span class="badge-warn">⚠️ 临时缓解</span></td>
+<td>链路重置为硬盘不可响应的下游表现，重启可能临时恢复但介质退化仍在</td>
+</tr>
+<tr>
+<td>R4 振动致伤</td>
+<td>更换硬盘</td>
+<td><span class="badge-ok">✅ 有效</span></td>
+<td>若确认为振动致伤，需更换硬盘并排查机箱振动源</td>
+</tr>
+</tbody></table></div>
+<hr>
+<h2 id="h-诊断质量自查">诊断质量自查</h2>
+<ul>
+<li><input checked="" disabled="" type="checkbox"> <strong>领域透传</strong>：已剥离 DOMAIN_EXT/DOMAIN_DATA 协议标签，将 T1 报告中三块盘的标准化 JSON 对象转化为 Markdown 表格完整展示（§4.1/4.2/4.3）。</li>
+<li><input checked="" disabled="" type="checkbox"> <strong>标题对齐</strong>：第四章标题&quot;故障盘修复价值评估&quot;准确提取自 T1 报告领域扩展块的 <code>## 标题：故障盘修复价值评估</code>。</li>
+<li><input checked="" disabled="" type="checkbox"> <strong>路径溯源</strong>：所有核心结论均附带了完整绝对路径与精准行号（见 §二时间线、§三排查过程、§四分析原因）。</li>
+<li><input checked="" disabled="" type="checkbox"> <strong>逻辑闭环</strong>：故障传导链路（物理坏道 → smartd 告警 → 内核 I/O error → XFS log I/O error → force_shutdown → 卸载 → 业务不可用）能逻辑自洽地解释所有观测证据，且 E1-E4 六维交叉校验全部通过。</li>
+<li><input checked="" disabled="" type="checkbox"> <strong>时间格式</strong>：所有时间点已补齐为完整的「YYYY-MM-DD HH:MM:SS」格式。</li>
+<li><input checked="" disabled="" type="checkbox"> <strong>表格规范</strong>：全部使用标准 Markdown 表格语法，无纯文本表格。</li>
+<li><input checked="" disabled="" type="checkbox"> <strong>证据来源</strong>：严格仅读取用户指定的两个 Kuafu 报告绝对路径，未在 dayu/report 目录自行检索。</li>
+<li><input checked="" disabled="" type="checkbox"> <strong>多源互证</strong>：T1（硬件层）与 T2（文件系统层）对 sdw 的根因结论完全一致，物理同一性三源（phy_info/sashbalog/disk_smart）闭合。</li>
+</ul>
+<hr>
+<blockquote>
+<p><strong>报告生成</strong>：白泽（Baize）分析与报告 Agent（Phase 1.4）
+<strong>证据来源</strong>：T1 <code>/Users/qzh/.witty-diagnosis-agent/dayu/report/kuafu_T1_20260811_000417.md</code> + T2 <code>/Users/qzh/.witty-diagnosis-agent/dayu/report/kuafu_T2_20260811_000232.md</code>
+<strong>报告路径</strong>：<code>/Users/qzh/.witty-diagnosis-agent/baize/reports/多盘介质退化致XFSshutdown_20260811_000758_report.md</code></p>
+</blockquote>
 
     <div class="meta">
-      <span class="meta-source">硬盘故障_20260404_011757_hard_disk_fault_20260412140513_report.md</span>
-      <span>生成于 2026/04/12 14:07</span>
+      <span class="meta-source">多盘介质退化致XFSshutdown_20260811_000758_report.md</span>
+      <span>生成于 2026/08/11 00:12</span>
     </div>
   </article>
 </div>

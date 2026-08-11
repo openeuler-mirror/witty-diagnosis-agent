@@ -1,0 +1,1133 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>故障诊断报告</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Lora:ital,wght@0,400;0,600;1,400&family=Source+Sans+3:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  /* ── Design tokens ─────────────────────────────────────────────────────── */
+  :root {
+    --bg:          #f8f7f4;
+    --surface:     #ffffff;
+    --border:      #e8e5df;
+    --border-soft: #f0ede8;
+
+    --text:        #1c1917;
+    --text-2:      #57534e;
+    --text-3:      #a8a29e;
+
+    --accent:      #1d4e6e;
+    --accent-light:#e8f1f7;
+    --accent-mid:  #3b82a0;
+
+    --red:         #c0392b;
+    --red-bg:      #fef2f2;
+    --amber:       #92400e;
+    --amber-bg:    #fffbeb;
+    --green:       #14532d;
+    --green-bg:    #f0fdf4;
+
+    --code-bg:     #1a1d27;
+    --code-text:   #cdd6f4;
+    --code-border: #2d3148;
+
+    --font-body: "Source Sans 3", "PingFang SC", "Hiragino Sans GB", sans-serif;
+    --font-head: "Lora", "PingFang SC", Georgia, serif;
+    --font-mono: "JetBrains Mono", "Fira Code", Consolas, monospace;
+
+    --radius:    8px;
+    --radius-lg: 12px;
+    --shadow:    0 1px 3px rgba(0,0,0,.06), 0 4px 16px rgba(0,0,0,.05);
+    --shadow-lg: 0 2px 8px rgba(0,0,0,.07), 0 8px 32px rgba(0,0,0,.06);
+
+    --toc-width:   240px;
+    --gap:         32px;
+  }
+
+  /* ── Progress bar ──────────────────────────────────────────────────────── */
+  #progress {
+    position: fixed; top: 0; left: 0; height: 3px; width: 0%;
+    background: linear-gradient(90deg, var(--accent-mid), var(--accent));
+    z-index: 999; transition: width .1s linear;
+    border-radius: 0 2px 2px 0;
+  }
+
+  /* ── Base ──────────────────────────────────────────────────────────────── */
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  html { font-size: 16px; scroll-behavior: smooth; }
+  body {
+    font-family: var(--font-body);
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.8;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* ── Layout ────────────────────────────────────────────────────────────── */
+  .layout {
+    display: flex;
+    align-items: flex-start;
+    max-width: calc(var(--toc-width) + 820px + var(--gap) * 3);
+    margin: 0 auto;
+    padding: 48px var(--gap) 96px;
+    gap: var(--gap);
+  }
+
+  /* ── TOC ───────────────────────────────────────────────────────────────── */
+  .toc {
+    width: var(--toc-width);
+    flex-shrink: 0;
+    position: sticky;
+    top: 32px;
+    max-height: calc(100vh - 64px);
+    overflow-y: auto;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    padding: 20px;
+    box-shadow: var(--shadow);
+    scrollbar-width: thin;
+    scrollbar-color: var(--border) transparent;
+  }
+  .toc-title {
+    font-size: 10.5px;
+    font-weight: 600;
+    letter-spacing: .1em;
+    text-transform: uppercase;
+    color: var(--text-3);
+    margin-bottom: 12px;
+    padding-bottom: 10px;
+    border-bottom: 1px solid var(--border-soft);
+  }
+  .toc-item {
+    display: flex;
+    align-items: flex-start;
+    margin: 2px 0;
+  }
+  .toc-toggle {
+    background: none;
+    border: none;
+    cursor: pointer;
+    color: var(--text-3);
+    padding: 4px;
+    margin-right: 4px;
+    margin-top: 2px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 4px;
+    transition: background 0.2s, transform 0.2s;
+  }
+  .toc-toggle:hover { background: var(--border-soft); color: var(--text); }
+  .toc-toggle[aria-expanded="false"] svg { transform: rotate(-90deg); }
+  .toc-spacer { width: 20px; flex-shrink: 0; }
+  .toc-group { overflow: hidden; transition: max-height 0.3s ease-in-out; }
+  .toc-group.collapsed { max-height: 0 !important; }
+  
+  .toc a {
+    display: block;
+    font-size: 13px;
+    color: var(--text-2);
+    text-decoration: none;
+    padding: 4px 8px;
+    border-radius: 5px;
+    line-height: 1.45;
+    transition: background .15s, color .15s;
+    word-break: break-all;
+    flex-grow: 1;
+  }
+  .toc a:hover  { background: var(--accent-light); color: var(--accent); }
+  .toc a.active { background: var(--accent-light); color: var(--accent); font-weight: 500; }
+  .toc-l1 { font-weight: 600; color: var(--text); }
+  .toc-l2 { font-weight: 600; color: var(--text); }
+  .toc-l3 { font-size: 12px !important; padding-left: 14px !important; }
+
+  /* ── Article card ──────────────────────────────────────────────────────── */
+  .article {
+    flex: 1; min-width: 0;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    padding: 52px 60px;
+    box-shadow: var(--shadow-lg);
+  }
+
+  /* ── Headings ──────────────────────────────────────────────────────────── */
+  .title-container {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-end;
+    margin: 0 0 28px;
+    padding-bottom: 18px;
+    border-bottom: 2px solid var(--text);
+  }
+  .article h1 {
+    font-family: var(--font-head);
+    font-size: 26px; font-weight: 600; line-height: 1.3;
+    margin: 0; padding-bottom: 0;
+    border-bottom: none;
+  }
+  .article h2 {
+    font-family: var(--font-head);
+    font-size: 19px; font-weight: 600;
+    margin: 48px 0 14px; padding-bottom: 8px;
+    border-bottom: 1px solid var(--border);
+  }
+  .article h2::before {
+    content: attr(data-index);
+    display: inline-block;
+    font-family: var(--font-mono);
+    font-size: 10.5px; font-weight: 500;
+    color: var(--accent-mid);
+    background: var(--accent-light);
+    padding: 1px 7px; border-radius: 4px;
+    margin-right: 10px; vertical-align: middle;
+    letter-spacing: .05em;
+  }
+  .article h3 {
+    font-family: var(--font-head);
+    font-size: 15.5px; font-weight: 600;
+    margin: 28px 0 10px;
+  }
+  .article h3::before {
+    content: "§ ";
+    color: var(--text-3);
+    font-family: var(--font-mono); font-size: 13px;
+  }
+  .article h4 {
+    font-size: 13.5px; font-weight: 600;
+    color: var(--accent); margin: 20px 0 8px;
+  }
+
+  /* ── Body text ─────────────────────────────────────────────────────────── */
+  .article p, .plain { 
+    font-size: 15px; 
+    line-height: 1.85; 
+    color: var(--text); 
+    margin: 0 0 12px; 
+    font-family: var(--font-body);
+  }
+  .article strong { font-weight: 600; }
+  .article em     { font-style: italic; color: var(--text-2); }
+  .article a {
+    color: var(--accent); text-decoration: underline;
+    text-decoration-color: var(--accent-light);
+    text-underline-offset: 3px;
+  }
+  .article a:hover { text-decoration-color: var(--accent); }
+  .article hr { border: none; border-top: 1px solid var(--border); margin: 20px 0; }
+  .article hr.heavy { border-top: 3px solid var(--text); margin: 32px 0; }
+
+  /* ── Blockquote ────────────────────────────────────────────────────────── */
+  .article blockquote {
+    border-left: 3px solid var(--accent-mid);
+    background: var(--accent-light);
+    margin: 20px 0; padding: 13px 20px 13px 20px;
+    border-radius: 0 var(--radius) var(--radius) 0;
+  }
+  .article blockquote p { font-size: 14.5px; color: var(--accent); margin: 0; line-height: 1.7; }
+  /* 支持块引用内部保留换行符（修复头部概要换行丢失问题） */
+  .article blockquote p { white-space: pre-wrap; }
+  .article blockquote strong { color: var(--accent); }
+
+  /* ── Lists ─────────────────────────────────────────────────────────────── */
+  .article ul, .article ol { padding-left: 22px; margin: 6px 0 14px; }
+  .article li { font-size: 15px; line-height: 1.8; margin: 4px 0; }
+  .article li::marker { color: var(--accent-mid); }
+  .article li > ul, .article li > ol { margin: 3px 0; }
+
+  /* ── Inline code ───────────────────────────────────────────────────────── */
+  .article :not(pre) > code {
+    font-family: var(--font-mono);
+    font-size: 12.5px; font-weight: 500;
+    background: #f3f0eb; color: var(--red);
+    padding: 1px 5px; border-radius: 4px;
+    border: 1px solid var(--border);
+  }
+
+  /* ── Code blocks ───────────────────────────────────────────────────────── */
+  .code-block {
+    position: relative; margin: 20px 0;
+    border-radius: var(--radius-lg); overflow: hidden;
+    border: 1px solid var(--code-border);
+    box-shadow: 0 4px 20px rgba(0,0,0,.16);
+  }
+  .code-lang {
+    position: absolute; top: 0; left: 0;
+    font-family: var(--font-mono); font-size: 10px; font-weight: 500;
+    color: #7c8db5; background: #222538;
+    padding: 4px 12px; border-bottom-right-radius: 6px;
+    text-transform: uppercase; letter-spacing: .08em;
+    user-select: none;
+  }
+  .copy-btn {
+    position: absolute; top: 8px; right: 10px;
+    background: #2d3148; border: 1px solid #3d4260;
+    border-radius: 5px; color: #7c8db5; cursor: pointer;
+    padding: 5px 8px; display: flex; align-items: center;
+    transition: background .15s, color .15s; z-index: 1;
+  }
+  .copy-btn:hover  { background: #3a3f60; color: #cdd6f4; }
+  .copy-btn.copied { color: #a6e3a1; border-color: #4a6a4a; }
+  .code-block pre {
+    margin: 0; padding: 36px 20px 20px;
+    background: var(--code-bg); overflow-x: auto;
+    scrollbar-width: thin; scrollbar-color: #3d4260 transparent;
+  }
+  .code-block pre::-webkit-scrollbar { height: 5px; }
+  .code-block pre::-webkit-scrollbar-thumb { background: #3d4260; border-radius: 3px; }
+  .code-block code {
+    font-family: var(--font-mono); font-size: 13px; line-height: 1.7;
+    color: var(--code-text); background: none; border: none; padding: 0;
+    white-space: pre; word-break: normal;
+  }
+
+  /* ── Tables ────────────────────────────────────────────────────────────── */
+  .table-wrap {
+    overflow-x: auto; margin: 16px 0;
+    border-radius: var(--radius-lg);
+    border: 1px solid var(--border);
+    box-shadow: var(--shadow);
+  }
+  table { width: 100%; border-collapse: collapse; font-size: 14px; min-width: 360px; }
+  thead { background: #f4f2ee; }
+  th {
+    padding: 9px 14px; text-align: left;
+    font-size: 11.5px; font-weight: 600;
+    letter-spacing: .04em; text-transform: uppercase;
+    color: var(--text-2); border-bottom: 1px solid var(--border);
+    white-space: nowrap;
+  }
+  td {
+    padding: 8px 14px; border-bottom: 1px solid var(--border-soft);
+    color: var(--text); vertical-align: top; line-height: 1.6;
+  }
+  tbody tr:last-child td { border-bottom: none; }
+  tbody tr:nth-child(even) td { background: #faf9f7; }
+  tbody tr:hover td { background: var(--accent-light); transition: background .1s; }
+
+  /* ── KV block ──────────────────────────────────────────────────────────── */
+  .kv-block { background: var(--bg); border: 1px solid var(--border); border-radius: var(--radius-lg); overflow: hidden; margin: 12px 0 20px; }
+  .kv-row { display: flex; border-bottom: 1px solid var(--border-soft); align-items: flex-start; }
+  .kv-row:last-child { border-bottom: none; }
+  .kv-key { flex: 0 0 160px; padding: 9px 16px; font-size: 13.5px; font-weight: 600; color: var(--text-2); background: var(--surface); border-right: 1px solid var(--border-soft); }
+  .kv-val { flex: 1; padding: 9px 16px; font-size: 14px; color: var(--text); }
+
+  /* ── Status badges ─────────────────────────────────────────────────────── */
+  .badge-ok { display: inline-flex; align-items: center; gap: 4px; background: var(--green-bg); color: var(--green); font-size: 13px; font-weight: 500; padding: 2px 9px; border-radius: 20px; border: 1px solid #bbf7d0; }
+  .badge-err { display: inline-flex; align-items: center; gap: 4px; background: var(--red-bg); color: var(--red); font-size: 13px; font-weight: 500; padding: 2px 9px; border-radius: 20px; border: 1px solid #fecaca; }
+  .badge-warn { display: inline-flex; align-items: center; gap: 4px; background: var(--amber-bg); color: var(--amber); font-size: 13px; font-weight: 500; padding: 2px 9px; border-radius: 20px; border: 1px solid #fde68a; }
+
+  /* ── Priority badges ───────────────────────────────────────────────────── */
+  .pri-p0 { display: inline-block; background: #fef2f2; color: #991b1b; border: 1px solid #fca5a5; font-size: 12px; font-weight: 700; padding: 2px 8px; border-radius: 4px; letter-spacing: .04em; }
+  .pri-p1 { display: inline-block; background: #fff7ed; color: #9a3412; border: 1px solid #fdba74; font-size: 12px; font-weight: 700; padding: 2px 8px; border-radius: 4px; }
+  .pri-p2 { display: inline-block; background: #fffbeb; color: #92400e; border: 1px solid #fde68a; font-size: 12px; font-weight: 700; padding: 2px 8px; border-radius: 4px; }
+  .pri-p3 { display: inline-block; background: var(--accent-light); color: var(--accent); border: 1px solid #bfdbfe; font-size: 12px; font-weight: 700; padding: 2px 8px; border-radius: 4px; }
+
+  /* ── Fault header ──────────────────────────────────────────────────────── */
+  .fault-header { display: flex; align-items: center; gap: 12px; padding: 12px 16px; border-radius: var(--radius-lg); margin: 16px 0 8px; border: 1px solid; }
+  .fh-p0 { background: #fef2f2; border-color: #fca5a5; }
+  .fh-p1 { background: #fff7ed; border-color: #fdba74; }
+  .fh-p2 { background: #fffbeb; border-color: #fde68a; }
+  .fh-p3 { background: var(--accent-light); border-color: #bfdbfe; }
+  .fh-badge { font-family: var(--font-mono); font-size: 11px; font-weight: 700; letter-spacing: .08em; }
+  .fh-p0 .fh-badge { color: #991b1b; }
+  .fh-p1 .fh-badge { color: #9a3412; }
+  .fh-p2 .fh-badge { color: #92400e; }
+  .fh-p3 .fh-badge { color: var(--accent); }
+  .fh-rest { font-size: 14px; font-weight: 500; color: var(--text); }
+
+  /* ── Timeline ──────────────────────────────────────────────────────────── */
+  .timeline { border-left: 2px solid var(--accent-mid); margin: 16px 0 16px 8px; padding-left: 20px; }
+  .tl-row { display: flex; align-items: baseline; gap: 10px; margin: 8px 0; font-size: 13.5px; }
+  .tl-ts { font-family: var(--font-mono); font-size: 12px; color: var(--text-3); flex-shrink: 0; white-space: nowrap; }
+  .tl-tag { font-size: 11px; font-weight: 600; padding: 1px 7px; border-radius: 10px; flex-shrink: 0; background: var(--accent-light); color: var(--accent); }
+  .tl-tag.err { background: var(--red-bg); color: var(--red); }
+  .tl-tag.warn { background: var(--amber-bg); color: var(--amber); }
+  .tl-desc { color: var(--text); line-height: 1.5; }
+
+  /* ── Global warn ───────────────────────────────────────────────────────── */
+  .global-warn { background: #fef2f2; border: 1px solid #fca5a5; border-radius: var(--radius-lg); padding: 14px 18px; font-size: 14.5px; font-weight: 600; color: #991b1b; margin: 16px 0; }
+
+  /* ── Tree note ─────────────────────────────────────────────────────────── */
+  .tree-note { white-space: pre-wrap; font-family: var(--font-mono); font-size: 13.5px; line-height: 1.6; color: var(--text-2); margin: 8px 0 8px 16px; }
+
+  /* ── Disclaimer ────────────────────────────────────────────────────────── */
+  .disclaimer { background: var(--bg); border: 1px solid var(--border); border-radius: var(--radius); padding: 14px 18px; font-size: 13.5px; color: var(--text-2); font-style: italic; }
+
+  /* ── Meta footer ───────────────────────────────────────────────────────── */
+  .meta {
+    margin-top: 48px; padding-top: 16px;
+    border-top: 1px solid var(--border-soft);
+    display: flex; justify-content: space-between; align-items: center;
+    font-size: 12px; color: var(--text-3);
+  }
+  .meta-source { font-family: var(--font-mono); font-size: 11.5px; }
+
+  /* ── Brand logo ────────────────────────────────────────────────────────── */
+  .brand-logo {
+    font-family: var(--font-head);
+    font-size: 14px;
+    color: var(--text-3);
+    letter-spacing: 0.05em;
+    margin-bottom: 4px;
+    flex-shrink: 0;
+    margin-left: 16px;
+  }
+  .brand-logo strong {
+    font-weight: 600;
+    color: var(--accent);
+  }
+  @media (max-width: 900px) {
+    .title-container { flex-direction: column; align-items: flex-start; gap: 12px; }
+    .brand-logo { margin-left: 0; margin-bottom: 0; }
+  }
+  /* ── Print ─────────────────────────────────────────────────────────────── */
+  @media print {
+    body { background: white; }
+    #progress, .toc { display: none; }
+    .layout { display: block; padding: 0; }
+    .article { border: none; box-shadow: none; padding: 24px; }
+    .copy-btn { display: none; }
+    .brand-logo { margin-bottom: 0; }
+  }
+
+  /* ── Responsive ────────────────────────────────────────────────────────── */
+  @media (max-width: 900px) {
+    .toc { display: none; }
+    .article { padding: 36px 28px; }
+    .layout { padding: 24px 16px 64px; }
+  }
+  @media (max-width: 480px) {
+    .article { padding: 24px 18px; }
+    .article h1 { font-size: 22px; }
+  }
+</style>
+</head>
+<body>
+
+<div id="progress"></div>
+
+<div class="layout">
+  <nav class="toc" id="toc">
+  <div class="toc-title">目录</div>
+  <div class="toc-content">
+<div class="toc-item has-children"><button class="toc-toggle" onclick="toggleToc(this)" aria-expanded="true">
+                <svg viewBox="0 0 24 24" width="12" height="12" stroke="currentColor" stroke-width="2" fill="none"><polyline points="6 9 12 15 18 9"></polyline></svg>
+              </button><a href="#h-故障诊断报告" onclick="event.preventDefault(); const target = document.getElementById('h-故障诊断报告'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l1">🔴 故障诊断报告</a></div>
+<div class="toc-group" id="group-h-一故障概览">
+<div class="toc-item has-children"><button class="toc-toggle" onclick="toggleToc(this)" aria-expanded="true">
+                <svg viewBox="0 0 24 24" width="12" height="12" stroke="currentColor" stroke-width="2" fill="none"><polyline points="6 9 12 15 18 9"></polyline></svg>
+              </button><a href="#h-一故障概览" onclick="event.preventDefault(); const target = document.getElementById('h-一故障概览'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l2">一、故障概览</a></div>
+<div class="toc-group" id="group-h-置信度说明此表固定展示作为参考">
+<div class="toc-item "><span class="toc-spacer"></span><a href="#h-置信度说明此表固定展示作为参考" onclick="event.preventDefault(); const target = document.getElementById('h-置信度说明此表固定展示作为参考'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l3">置信度说明（此表固定展示作为参考）</a></div>
+</div>
+<div class="toc-item has-children"><button class="toc-toggle" onclick="toggleToc(this)" aria-expanded="true">
+                <svg viewBox="0 0 24 24" width="12" height="12" stroke="currentColor" stroke-width="2" fill="none"><polyline points="6 9 12 15 18 9"></polyline></svg>
+              </button><a href="#h-二根因速览" onclick="event.preventDefault(); const target = document.getElementById('h-二根因速览'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l2">二、根因速览</a></div>
+<div class="toc-group" id="group-h-事故时间线-故障传导链路">
+<div class="toc-item "><span class="toc-spacer"></span><a href="#h-事故时间线-故障传导链路" onclick="event.preventDefault(); const target = document.getElementById('h-事故时间线-故障传导链路'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l3">事故时间线 & 故障传导链路</a></div>
+<div class="toc-item "><span class="toc-spacer"></span><a href="#h-故障因果链" onclick="event.preventDefault(); const target = document.getElementById('h-故障因果链'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l3">故障因果链</a></div>
+</div>
+<div class="toc-item has-children"><button class="toc-toggle" onclick="toggleToc(this)" aria-expanded="true">
+                <svg viewBox="0 0 24 24" width="12" height="12" stroke="currentColor" stroke-width="2" fill="none"><polyline points="6 9 12 15 18 9"></polyline></svg>
+              </button><a href="#h-三排查过程" onclick="event.preventDefault(); const target = document.getElementById('h-三排查过程'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l2">三、排查过程</a></div>
+<div class="toc-group" id="group-h-31-初始现象">
+<div class="toc-item "><span class="toc-spacer"></span><a href="#h-31-初始现象" onclick="event.preventDefault(); const target = document.getElementById('h-31-初始现象'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l3">3.1 初始现象</a></div>
+<div class="toc-item "><span class="toc-spacer"></span><a href="#h-32-假设驱动排查" onclick="event.preventDefault(); const target = document.getElementById('h-32-假设驱动排查'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l3">3.2 假设驱动排查</a></div>
+<div class="toc-item "><span class="toc-spacer"></span><a href="#h-33-排查结论" onclick="event.preventDefault(); const target = document.getElementById('h-33-排查结论'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l3">3.3 排查结论</a></div>
+</div>
+<div class="toc-item has-children"><button class="toc-toggle" onclick="toggleToc(this)" aria-expanded="true">
+                <svg viewBox="0 0 24 24" width="12" height="12" stroke="currentColor" stroke-width="2" fill="none"><polyline points="6 9 12 15 18 9"></polyline></svg>
+              </button><a href="#h-四修复方案" onclick="event.preventDefault(); const target = document.getElementById('h-四修复方案'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l2">四、修复方案</a></div>
+<div class="toc-group" id="group-h-41-应急处置">
+<div class="toc-item "><span class="toc-spacer"></span><a href="#h-41-应急处置" onclick="event.preventDefault(); const target = document.getElementById('h-41-应急处置'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l3">4.1 应急处置</a></div>
+<div class="toc-item "><span class="toc-spacer"></span><a href="#h-42-永久修复计划" onclick="event.preventDefault(); const target = document.getElementById('h-42-永久修复计划'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l3">4.2 永久修复计划</a></div>
+<div class="toc-item "><span class="toc-spacer"></span><a href="#h-43-长期治理建议" onclick="event.preventDefault(); const target = document.getElementById('h-43-长期治理建议'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l3">4.3 长期治理建议</a></div>
+</div>
+<div class="toc-item has-children"><button class="toc-toggle" onclick="toggleToc(this)" aria-expanded="true">
+                <svg viewBox="0 0 24 24" width="12" height="12" stroke="currentColor" stroke-width="2" fill="none"><polyline points="6 9 12 15 18 9"></polyline></svg>
+              </button><a href="#h-五技术细节补充" onclick="event.preventDefault(); const target = document.getElementById('h-五技术细节补充'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l2">五、技术细节补充</a></div>
+<div class="toc-group" id="group-h-51-python-扩展模块崩溃特性">
+<div class="toc-item "><span class="toc-spacer"></span><a href="#h-51-python-扩展模块崩溃特性" onclick="event.preventDefault(); const target = document.getElementById('h-51-python-扩展模块崩溃特性'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l3">5.1 Python 扩展模块崩溃特性</a></div>
+<div class="toc-item "><span class="toc-spacer"></span><a href="#h-52-多线程环境" onclick="event.preventDefault(); const target = document.getElementById('h-52-多线程环境'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l3">5.2 多线程环境</a></div>
+<div class="toc-item "><span class="toc-spacer"></span><a href="#h-53-内存映射特性" onclick="event.preventDefault(); const target = document.getElementById('h-53-内存映射特性'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l3">5.3 内存映射特性</a></div>
+<div class="toc-item "><span class="toc-spacer"></span><a href="#h-54-证据清单" onclick="event.preventDefault(); const target = document.getElementById('h-54-证据清单'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l3">5.4 证据清单</a></div>
+</div>
+<div class="toc-item "><span class="toc-spacer"></span><a href="#h-六总结" onclick="event.preventDefault(); const target = document.getElementById('h-六总结'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l2">六、总结</a></div>
+<div class="toc-item "><span class="toc-spacer"></span><a href="#h-附录诊断工具链" onclick="event.preventDefault(); const target = document.getElementById('h-附录诊断工具链'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l2">附录：诊断工具链</a></div>
+</div>
+  </div>
+</nav>
+  <article class="article" id="article" style="position: relative;">
+    <div class="title-container"><h1 id="h-故障诊断报告">🔴 故障诊断报告</h1><div class="brand-logo">by <strong>Witty Diagnosis Agent</strong></div></div>
+<blockquote>
+<p><strong>报告编号</strong>：RCA-20260416-001
+<strong>故障级别</strong>：P2 (Major)
+<strong>报告时间</strong>：2026-04-16 18:11:06
+<strong>当前状态</strong>：🔴 待修复（根因已明确）</p>
+</blockquote>
+<hr>
+<h2 id="h-一故障概览">一、故障概览</h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>项目</th>
+<th>内容</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>故障标题</td>
+<td>Python 进程 SIGSEGV 崩溃（Use-After-Unmap 内存访问错误）</td>
+</tr>
+<tr>
+<td>影响范围</td>
+<td>服务器 190.92.216.132，Python sensor_service 进程及其 C 扩展模块</td>
+</tr>
+<tr>
+<td>故障时段</td>
+<td>2023-04-13（core 文件时间戳推断）</td>
+</tr>
+<tr>
+<td>根本原因</td>
+<td>C 扩展模块 libsensor_proc.c 在 munmap 内存释放后，立即访问已失效的内存地址，触发 SIGSEGV</td>
+</tr>
+<tr>
+<td>是否恢复</td>
+<td><span class="badge-err">❌ 未恢复（需代码修复）</span></td>
+</tr>
+<tr>
+<td>根因置信度</td>
+<td>🟢 高置信（符号齐全、证据链完整、逻辑自洽、无歧义）</td>
+</tr>
+</tbody></table></div>
+<h3 id="h-置信度说明此表固定展示作为参考">置信度说明（此表固定展示作为参考）</h3>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>等级</th>
+<th>标识</th>
+<th>含义</th>
+<th>示例场景</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>高置信</td>
+<td>🟢</td>
+<td>根因已明确，可复现，单一原因可解释所有现象</td>
+<td>SQL 无索引 → 复现后加索引立即恢复</td>
+</tr>
+<tr>
+<td>中置信</td>
+<td>🟡</td>
+<td>根因基本确认，但存在 1～2 个无法完全解释的现象</td>
+<td>定位到慢查询，但流量突增原因待查</td>
+</tr>
+<tr>
+<td>低置信</td>
+<td>🟠</td>
+<td>有多个可疑原因，尚未排除竞争，结论为推断</td>
+<td>多个组件同时异常，无法判断触发顺序</td>
+</tr>
+<tr>
+<td>未知</td>
+<td>🔴</td>
+<td>现象无法解释，根因未定位，仍在排查中</td>
+<td>服务偶发崩溃，日志无异常，无法复现</td>
+</tr>
+</tbody></table></div>
+<hr>
+<h2 id="h-二根因速览">二、根因速览</h2>
+<blockquote>
+<p>用一张图说清楚：<strong>什么事件触发了什么连锁反应，最终导致故障</strong>。</p>
+</blockquote>
+<h3 id="h-事故时间线-故障传导链路">事故时间线 & 故障传导链路</h3>
+<div class="code-block">
+  <span class="code-lang">text</span>
+  <button class="copy-btn" onclick="copyCode(this)" title="复制">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
+  </button>
+  <pre><code>时间                   事件                                          性质
+────────────────────────────────────────────────────────────────────────
+2023-04-13 启动阶段   Python 进程启动，加载 C 扩展模块 libsensor_proc     📈 正常启动
+  │                   启动 11 个 worker_thread 工作线程
+  │
+  ▼
+正常运行阶段          worker_thread 执行数据处理逻辑                     ⚙️ 正常运行
+  │                   分配 mmap 内存：0x7bb01a8b6000（16384 字节）
+  │                   计算 rms = 0.3608, peak = 0.5145
+  │
+  ▼
+异常条件触发          Line 99: munmap(work_buf, buf_bytes) 释放内存       ⚠️ 隐患激活
+  │                   内存映射区域立即失效，页表回收
+  │                   但指针 wptr 未置空，仍指向原地址
+  │
+  ▼
+SIGSEGV 触发          Line 102: volatile double trigger = wptr[0]        🔴 故障爆发
+  │                   CPU 访问已失效地址 0x7bb01a8b6000
+  │                   页故障 → SIGSEGV (signal 11)
+  │
+  ▼
+进程崩溃              Python 解释器捕获信号并终止                         💥 进程终止
+                      Core dump 文件生成：core.python3.17321.1776306926</code></pre>
+</div>
+<h3 id="h-故障因果链">故障因果链</h3>
+<div class="code-block">
+  <span class="code-lang">text</span>
+  <button class="copy-btn" onclick="copyCode(this)" title="复制">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
+  </button>
+  <pre><code>C 扩展模块代码逻辑错误（munmap 后未置空指针）
+    └─► Line 99: munmap(work_buf, 0x4000) → 内核立即回收页表映射
+            └─► 指针 wptr 仍指向 0x7bb01a8b6000（已失效）
+                    └─► Line 102: volatile double trigger = wptr[0] → 访问已卸载页
+                            └─► CPU 触发页故障 → SIGSEGV (signal 11)
+                                    └─► 内核递送信号到进程
+                                            └─► Python 进程崩溃，生成 core dump
+                                                    └─► 🔴 sensor_service 服务中断</code></pre>
+</div>
+<hr>
+<h2 id="h-三排查过程">三、排查过程</h2>
+<blockquote>
+<p>排查逻辑：<strong>提出假设 → 收集证据 → 验证或排除 → 逐步收敛到根因</strong></p>
+</blockquote>
+<h3 id="h-31-初始现象">3.1 初始现象</h3>
+<ul>
+<li><strong>故障现象</strong>：远程服务器 190.92.216.132 的 Python 进程发生 coredump</li>
+<li><strong>Core 文件位置</strong>：<code>/home/coredump/case01/core.python3.17321.1776306926</code></li>
+<li><strong>文件大小</strong>：约 1311 MiB</li>
+<li><strong>崩溃进程</strong>：Python 3.12 解释器（通过 C 扩展模块 libsensor_proc 运行）</li>
+<li><strong>线程数</strong>：11 个线程（Thread 1-11），均为 worker_thread</li>
+</ul>
+<h3 id="h-32-假设驱动排查">3.2 假设驱动排查</h3>
+<h4 id="h-假设-a空指针访问nullptr">假设 A：空指针访问（nullptr）</h4>
+<blockquote>
+<p>🧪 假设：崩溃由访问 NULL 指针（地址 0x0）导致</p>
+</blockquote>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>检查项</th>
+<th>操作</th>
+<th>结论</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>崩溃地址</td>
+<td>GDB 查看寄存器 RAX/RDI</td>
+<td>❌ 地址为 <code>0x7bb01a8b6000</code>（非 NULL）</td>
+</tr>
+<tr>
+<td>内存访问</td>
+<td>GDB 尝试读取崩溃地址</td>
+<td><span class="badge-err">❌ &quot;Cannot access memory&quot;（地址已失效）</span></td>
+</tr>
+</tbody></table></div>
+<p><strong>❌ 排除</strong>：崩溃地址非 NULL，非空指针访问问题。</p>
+<hr>
+<h4 id="h-假设-b栈溢出stackoverflow">假设 B：栈溢出（stack_overflow）</h4>
+<blockquote>
+<p>🧪 假设：递归调用过深或栈空间耗尽导致崩溃</p>
+</blockquote>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>检查项</th>
+<th>操作</th>
+<th>结论</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>栈深度</td>
+<td>GDB <code>bt full</code> 查看调用栈</td>
+<td><span class="badge-ok">✅ 仅 7 层，无递归</span></td>
+</tr>
+<tr>
+<td>栈增长模式</td>
+<td>检查调用栈符号重复</td>
+<td><span class="badge-ok">✅ 无同一符号反复出现</span></td>
+</tr>
+</tbody></table></div>
+<p><strong>❌ 排除</strong>：栈深度正常，无栈溢出迹象。</p>
+<hr>
+<h4 id="h-假设-c堆损坏malloc-错误abort">假设 C：堆损坏/malloc 错误（abort）</h4>
+<blockquote>
+<p>🧪 假设：内存分配器检测到堆损坏，触发 SIGABRT</p>
+</blockquote>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>检查项</th>
+<th>操作</th>
+<th>结论</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>崩溃信号</td>
+<td>GDB <code>info signals</code></td>
+<td><span class="badge-err">❌ SIGSEGV (11)，非 SIGABRT (6)</span></td>
+</tr>
+<tr>
+<td>调用栈符号</td>
+<td>检查栈中是否有 malloc_printerr/abort</td>
+<td><span class="badge-ok">✅ 无堆检查相关符号</span></td>
+</tr>
+</tbody></table></div>
+<p><strong>❌ 排除</strong>：信号非 SIGABRT，栈中无堆检查函数，非堆损坏。</p>
+<hr>
+<h4 id="h-假设-d除零错误divzero">假设 D：除零错误（divzero）</h4>
+<blockquote>
+<p>🧪 假设：浮点或整数除零导致 SIGFPE</p>
+</blockquote>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>检查项</th>
+<th>操作</th>
+<th>结论</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>崩溃信号</td>
+<td>GDB <code>info signals</code></td>
+<td><span class="badge-err">❌ SIGSEGV，非 SIGFPE (8)</span></td>
+</tr>
+<tr>
+<td>崩溃指令</td>
+<td>GDB 反汇编查看崩溃位置指令</td>
+<td><span class="badge-ok">✅ 为内存访问指令，非 div/idiv</span></td>
+</tr>
+</tbody></table></div>
+<p><strong>❌ 排除</strong>：信号非 SIGFPE，崩溃指令为内存访问而非除法。</p>
+<hr>
+<h4 id="h-假设-e内存访问错误use-after-unmap-确认根因">假设 E：内存访问错误（Use-After-Unmap） ✅ 确认根因</h4>
+<blockquote>
+<p>🧪 假设：访问已释放的内存映射区域导致 SIGSEGV</p>
+</blockquote>
+<p><strong>Step 1 — 确认崩溃信号与地址</strong></p>
+<div class="code-block">
+  <span class="code-lang">text</span>
+  <button class="copy-btn" onclick="copyCode(this)" title="复制">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
+  </button>
+  <pre><code>信号：SIGSEGV (signal 11)
+崩溃地址：0x7bb01a8b6000
+崩溃线程：Thread 1 (LWP 17323)</code></pre>
+</div>
+<p><strong>Step 2 — 定位崩溃源码位置</strong></p>
+<div class="code-block">
+  <span class="code-lang">c</span>
+  <button class="copy-btn" onclick="copyCode(this)" title="复制">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
+  </button>
+  <pre><code>#5  0x00007bb01d60f994 in worker_thread (arg=0x5edcf912dc90) at libsensor_proc.c:102
+102     volatile double trigger = wptr[0];   /* &lt;── SIGSEGV */</code></pre>
+</div>
+<p><strong>Step 3 — 分析内存生命周期</strong></p>
+<div class="code-block">
+  <span class="code-lang">c</span>
+  <button class="copy-btn" onclick="copyCode(this)" title="复制">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
+  </button>
+  <pre><code>98      /* munmap → 页失效 */
+99      munmap(work_buf, buf_bytes);          /* Line 99: 释放内存映射 */
+100 
+101      /* 访问已卸载页 → SIGSEGV */
+102      volatile double trigger = wptr[0];   /* Line 102: 访问已失效地址 */</code></pre>
+</div>
+<p><strong>Step 4 — 确认变量状态</strong></p>
+<div class="code-block">
+  <span class="code-lang">text</span>
+  <button class="copy-btn" onclick="copyCode(this)" title="复制">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
+  </button>
+  <pre><code>item = 0x5edcf912dc90
+buf_bytes = 16384
+work_buf = 0x7bb01a8b6000  ← 已 munmap
+wptr = 0x7bb01a8b6000      ← 同样指向已失效地址
+rms = 0.36082208772836682
+peak = 0.51452299364378862
+trigger = &lt;未成功赋值，栈上随机值&gt;</code></pre>
+</div>
+<p><strong>Step 5 — 确认内存已失效</strong></p>
+<div class="code-block">
+  <span class="code-lang">text</span>
+  <button class="copy-btn" onclick="copyCode(this)" title="复制">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
+  </button>
+  <pre><code>GDB 尝试读取地址 0x7bb01a8b6000:
+Cannot access memory at address 0x7bb01a8b6000</code></pre>
+</div>
+<p><strong>✅ 结论</strong>：Line 99 调用 <code>munmap(work_buf, buf_bytes)</code> 释放内存映射后，Line 102 立即访问已失效地址 <code>wptr[0]</code>，触发 SIGSEGV。源码注释明确标注 &quot;访问已卸载页 → SIGSEGV&quot;，表明该崩溃场景可能为<strong>故意设计的测试/演示代码</strong>。</p>
+<hr>
+<h3 id="h-33-排查结论">3.3 排查结论</h3>
+<div class="code-block">
+  <span class="code-lang">text</span>
+  <button class="copy-btn" onclick="copyCode(this)" title="复制">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
+  </button>
+  <pre><code>Python 进程 SIGSEGV 崩溃
+├─► 空指针访问            → ❌ 崩溃地址非 NULL，排除
+├─► 栈溢出                → ❌ 栈深度仅 7 层，无递归，排除
+├─► 堆损坏/malloc 错误     → ❌ 信号非 SIGABRT，无堆检查符号，排除
+├─► 除零错误              → ❌ 信号非 SIGFPE，崩溃指令非除法，排除
+└─► 内存访问错误           → ✅ 确认根因
+        └─► munmap 后立即访问已失效地址
+                └─► 崩溃源码：libsensor_proc.c:102
+                        └─► 🎯 根因确认：Use-After-Unmap（释放后访问）</code></pre>
+</div>
+<hr>
+<h2 id="h-四修复方案">四、修复方案</h2>
+<h3 id="h-41-应急处置">4.1 应急处置</h3>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>步骤</th>
+<th>操作</th>
+<th>执行人</th>
+<th>时间</th>
+<th>效果</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>1</td>
+<td>收集 core dump 文件用于根因分析</td>
+<td>Kuafu Agent</td>
+<td>2026-04-16 10:00:00</td>
+<td>已定位崩溃原因</td>
+</tr>
+<tr>
+<td>2</td>
+<td>确认代码性质（测试代码 vs 生产代码）</td>
+<td>开发团队</td>
+<td>待执行</td>
+<td>需确认代码用途</td>
+</tr>
+</tbody></table></div>
+<h3 id="h-42-永久修复计划">4.2 永久修复计划</h3>
+<h4 id="h-修复方案-a移除崩溃代码段若为测试演示代码">修复方案 A：移除崩溃代码段（若为测试/演示代码）</h4>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>修复措施</th>
+<th>负责人</th>
+<th>完成时间</th>
+<th>验证方式</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>删除 libsensor_proc.c Line 98-103 的 munmap + 访问代码段</td>
+<td>开发团队</td>
+<td>待定</td>
+<td>重新运行，确认无崩溃</td>
+</tr>
+<tr>
+<td>移除不必要的测试代码</td>
+<td>开发团队</td>
+<td>待定</td>
+<td>Code Review 确认</td>
+</tr>
+</tbody></table></div>
+<h4 id="h-修复方案-b修复内存生命周期管理若为生产代码">修复方案 B：修复内存生命周期管理（若为生产代码）</h4>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>修复措施</th>
+<th>负责人</th>
+<th>完成时间</th>
+<th>验证方式</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>在 munmap 后立即将指针置空：<code>work_buf = NULL; wptr = NULL;</code></td>
+<td>开发团队</td>
+<td>待定</td>
+<td>编译运行，无 SIGSEGV</td>
+</tr>
+<tr>
+<td>在访问前检查指针有效性：<code>if (wptr != NULL) { ... }</code></td>
+<td>开发团队</td>
+<td>待定</td>
+<td>单元测试验证</td>
+</tr>
+<tr>
+<td>移除释放后仍存在的访问路径</td>
+<td>开发团队</td>
+<td>待定</td>
+<td>AddressSanitizer 测试</td>
+</tr>
+</tbody></table></div>
+<h3 id="h-43-长期治理建议">4.3 长期治理建议</h3>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>预防措施</th>
+<th>负责人</th>
+<th>完成时间</th>
+<th>优先级</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>启用编译器警告：<code>-Wall -Wextra -Wuninitialized</code></td>
+<td>开发团队</td>
+<td>待定</td>
+<td>P1</td>
+</tr>
+<tr>
+<td>集成静态分析工具：Clang Static Analyzer / Coverity</td>
+<td>开发团队</td>
+<td>待定</td>
+<td>P1</td>
+</tr>
+<tr>
+<td>启用 AddressSanitizer：编译时加 <code>-fsanitize=address</code></td>
+<td>开发团队</td>
+<td>待定</td>
+<td>P2</td>
+</tr>
+<tr>
+<td>Code Review 重点检查：munmap/free 后是否有指针置空</td>
+<td>开发团队</td>
+<td>待定</td>
+<td>P1</td>
+</tr>
+<tr>
+<td>内存生命周期单元测试：验证释放后指针置空</td>
+<td>QA团队</td>
+<td>待定</td>
+<td>P2</td>
+</tr>
+<tr>
+<td>压力测试：长时间运行验证无内存泄漏/野指针</td>
+<td>QA团队</td>
+<td>待定</td>
+<td>P2</td>
+</tr>
+<tr>
+<td>监控探针：core dump 自动采集与告警</td>
+<td>运维团队</td>
+<td>待定</td>
+<td>P2</td>
+</tr>
+</tbody></table></div>
+<hr>
+<h2 id="h-五技术细节补充">五、技术细节补充</h2>
+<h3 id="h-51-python-扩展模块崩溃特性">5.1 Python 扩展模块崩溃特性</h3>
+<ul>
+<li>Python 解释器通过 C 扩展模块（libsensor_proc）执行业务逻辑</li>
+<li>崩溃发生在 C 层，而非 Python 解释器本身</li>
+<li>GDB 的 <code>py-bt</code> / <code>py-locals</code> 无法定位 Python frame（提示 &quot;Unable to locate python frame&quot;）</li>
+<li>崩溃由 C 代码直接触发，Python 层无异常捕获机会</li>
+</ul>
+<h3 id="h-52-多线程环境">5.2 多线程环境</h3>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>线程信息</th>
+<th>内容</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>总线程数</td>
+<td>11 个线程（Thread 1-11）</td>
+</tr>
+<tr>
+<td>线程类型</td>
+<td>所有线程均为 <code>worker_thread</code>，执行相同逻辑</td>
+</tr>
+<tr>
+<td>崩溃线程</td>
+<td>Thread 1 (LWP 17323)</td>
+</tr>
+<tr>
+<td>其他线程状态</td>
+<td>Thread 2-11 均处于 <code>usleep</code> 状态，未参与崩溃</td>
+</tr>
+</tbody></table></div>
+<h3 id="h-53-内存映射特性">5.3 内存映射特性</h3>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>内存信息</th>
+<th>内容</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>崩溃地址</td>
+<td><code>0x7bb01a8b6000</code>（mmap 区域）</td>
+</tr>
+<tr>
+<td>映射大小</td>
+<td>16384 字节（0x4000）</td>
+</tr>
+<tr>
+<td>munmap 特性</td>
+<td>内核立即回收页表映射，CPU 访问触发页故障</td>
+</tr>
+<tr>
+<td>与堆/栈区别</td>
+<td>mmap 区域在 munmap 后立即失效，不同于堆/栈延迟回收</td>
+</tr>
+</tbody></table></div>
+<h3 id="h-54-证据清单">5.4 证据清单</h3>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>证据编号</th>
+<th>证据内容</th>
+<th>作用</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>E1</td>
+<td>GDB 完整调用栈（Frame 0-7）</td>
+<td>确认崩溃信号为 SIGSEGV，崩溃点位于 libsensor_proc.c:102</td>
+</tr>
+<tr>
+<td>E2</td>
+<td>崩溃现场源码与变量（Frame 5）</td>
+<td>直接定位到 Line 99 munmap → Line 102 访问的代码逻辑错误</td>
+</tr>
+<tr>
+<td>E3</td>
+<td>局部变量值（work_buf, wptr, buf_bytes）</td>
+<td>确认两个指针都指向已被 munmap 的地址</td>
+</tr>
+<tr>
+<td>E4</td>
+<td>寄存器状态（RAX, RDI）</td>
+<td>确认崩溃地址为 <code>0x7bb01a8b6000</code></td>
+</tr>
+<tr>
+<td>E5</td>
+<td>内存访问失败错误</td>
+<td>确认地址已失效，页表映射已回收</td>
+</tr>
+<tr>
+<td>E6</td>
+<td>场景分类结果</td>
+<td>分类为 <code>memory_corrupt</code>（内存破坏/野指针）</td>
+</tr>
+</tbody></table></div>
+<hr>
+<h2 id="h-六总结">六、总结</h2>
+<p>本次 Python 进程崩溃为<strong>典型的 Use-After-Unmap 问题</strong>，根因明确、证据完整、修复方案清晰。源码注释表明该崩溃场景可能为<strong>故意设计的测试/演示代码</strong>（注释明确标注 &quot;访问已卸载页 → SIGSEGV&quot;），若为生产环境则属于严重的内存管理逻辑错误。</p>
+<p><strong>关键发现</strong>：</p>
+<ul>
+<li>崩溃由代码内部逻辑直接触发，不依赖特定输入或配置</li>
+<li>源码中已明确标注崩溃原因，表明可能是故意设计的演示代码</li>
+<li>若为生产代码，需立即修复内存生命周期管理逻辑</li>
+</ul>
+<p><strong>置信度评估</strong>：</p>
+<ul>
+<li>符号齐全：源码包含调试符号 (-g)，GDB 可直接定位到源码行号</li>
+<li>证据链完整：从源码 → 变量 → 寄存器 → 内存映射，形成完整崩溃链</li>
+<li>逻辑自洽：源码注释与实际崩溃完全一致</li>
+<li>无歧义：崩溃原因唯一且明确，无其他竞争性假设</li>
+</ul>
+<hr>
+<h2 id="h-附录诊断工具链">附录：诊断工具链</h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>工具</th>
+<th>用途</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Ansible</td>
+<td>远程服务器连接与脚本执行</td>
+</tr>
+<tr>
+<td>GNU GDB</td>
+<td>Core dump 深度分析（调用栈、变量、寄存器）</td>
+</tr>
+<tr>
+<td>coredump_diagnose Skill</td>
+<td>四阶段诊断流程（前置检查 → 信息收集 → 深度分析 → 报告生成）</td>
+</tr>
+</tbody></table></div>
+<hr>
+<p><strong>报告生成时间</strong>：2026-04-16 18:11:06<br><strong>诊断执行方</strong>：Kuafu (General Diagnostic Executor)<br><strong>根因分析方</strong>：Baize (Analysis &amp; Report Agent)<br><strong>诊断 Skill</strong>：coredump_diagnose + fault-rca-report-generation</p>
+
+    <div class="meta">
+      <span class="meta-source">Python进程SIGSEGV崩溃_use-after-unmap_20260416_181106_report.md</span>
+      <span>生成于 2026/04/16 18:14</span>
+    </div>
+  </article>
+</div>
+
+<script>
+  /* ── 滚动进度条 ── */
+  window.addEventListener("scroll", () => {
+    const el  = document.documentElement;
+    const pct = el.scrollTop / (el.scrollHeight - el.clientHeight) * 100;
+    document.getElementById("progress").style.width = Math.min(pct, 100) + "%";
+  });
+
+  /* ── TOC 高亮当前章节 ── */
+  (function () {
+    const headings = Array.from(document.querySelectorAll("article h1,article h2,article h3"));
+    const links    = Array.from(document.querySelectorAll(".toc a"));
+    if (!links.length) return;
+    const obs = new IntersectionObserver(entries => {
+      entries.forEach(e => {
+        if (!e.isIntersecting) return;
+        links.forEach(l => l.classList.remove("active"));
+        const a = links.find(l => l.getAttribute("href") === "#" + e.target.id);
+        if (a) a.classList.add("active");
+      });
+    }, { rootMargin: "-10% 0px -80% 0px" });
+    headings.forEach(h => obs.observe(h));
+  })();
+
+  /* ── h2 章节序号自动计数 ── */
+  (function () {
+    let idx = 0;
+    document.querySelectorAll("article h2").forEach(el => {
+      idx++;
+      el.setAttribute("data-index", String(idx).padStart(2, "0"));
+    });
+  })();
+
+  /* ── 代码块一键复制 ── */
+  function copyCode(btn) {
+    const code = btn.closest(".code-block").querySelector("code").innerText;
+    navigator.clipboard.writeText(code).then(() => {
+      btn.classList.add("copied");
+      btn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>';
+      setTimeout(() => {
+        btn.classList.remove("copied");
+        btn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>';
+      }, 2000);
+    });
+  }
+
+  /* ── 目录树收缩/展开 ── */
+  function toggleToc(btn) {
+    const expanded = btn.getAttribute("aria-expanded") === "true";
+    btn.setAttribute("aria-expanded", String(!expanded));
+    const parentItem = btn.closest(".toc-item");
+    let nextEl = parentItem.nextElementSibling;
+    if (nextEl && nextEl.classList.contains("toc-group")) {
+      if (expanded) {
+        nextEl.style.maxHeight = nextEl.scrollHeight + "px";
+        void nextEl.offsetHeight;
+        nextEl.classList.add("collapsed");
+      } else {
+        nextEl.classList.remove("collapsed");
+        nextEl.style.maxHeight = nextEl.scrollHeight + "px";
+        setTimeout(() => {
+          if (!nextEl.classList.contains("collapsed")) {
+            nextEl.style.maxHeight = "none";
+          }
+        }, 300);
+      }
+    }
+  }
+</script>
+</body>
+</html>
