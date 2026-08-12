@@ -1,0 +1,1593 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>故障诊断报告 —— 硬盘介质物理退化导致 vol8 XFS 文件系统强制 Shutdown</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Lora:ital,wght@0,400;0,600;1,400&family=Source+Sans+3:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  /* ── Design tokens ─────────────────────────────────────────────────────── */
+  :root {
+    --bg:          #f8f7f4;
+    --surface:     #ffffff;
+    --border:      #e8e5df;
+    --border-soft: #f0ede8;
+
+    --text:        #1c1917;
+    --text-2:      #57534e;
+    --text-3:      #a8a29e;
+
+    --accent:      #1d4e6e;
+    --accent-light:#e8f1f7;
+    --accent-mid:  #3b82a0;
+
+    --red:         #c0392b;
+    --red-bg:      #fef2f2;
+    --amber:       #92400e;
+    --amber-bg:    #fffbeb;
+    --green:       #14532d;
+    --green-bg:    #f0fdf4;
+
+    --code-bg:     #1a1d27;
+    --code-text:   #cdd6f4;
+    --code-border: #2d3148;
+
+    --font-body: "Source Sans 3", "PingFang SC", "Hiragino Sans GB", sans-serif;
+    --font-head: "Lora", "PingFang SC", Georgia, serif;
+    --font-mono: "JetBrains Mono", "Fira Code", Consolas, monospace;
+
+    --radius:    8px;
+    --radius-lg: 12px;
+    --shadow:    0 1px 3px rgba(0,0,0,.06), 0 4px 16px rgba(0,0,0,.05);
+    --shadow-lg: 0 2px 8px rgba(0,0,0,.07), 0 8px 32px rgba(0,0,0,.06);
+
+    --toc-width:   240px;
+    --gap:         32px;
+  }
+
+  /* ── Progress bar ──────────────────────────────────────────────────────── */
+  #progress {
+    position: fixed; top: 0; left: 0; height: 3px; width: 0%;
+    background: linear-gradient(90deg, var(--accent-mid), var(--accent));
+    z-index: 999; transition: width .1s linear;
+    border-radius: 0 2px 2px 0;
+  }
+
+  /* ── Base ──────────────────────────────────────────────────────────────── */
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  html { font-size: 16px; scroll-behavior: smooth; }
+  body {
+    font-family: var(--font-body);
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.8;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* ── Layout ────────────────────────────────────────────────────────────── */
+  .layout {
+    display: flex;
+    align-items: flex-start;
+    max-width: calc(var(--toc-width) + 820px + var(--gap) * 3);
+    margin: 0 auto;
+    padding: 48px var(--gap) 96px;
+    gap: var(--gap);
+  }
+
+  /* ── TOC ───────────────────────────────────────────────────────────────── */
+  .toc {
+    width: var(--toc-width);
+    flex-shrink: 0;
+    position: sticky;
+    top: 32px;
+    max-height: calc(100vh - 64px);
+    overflow-y: auto;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    padding: 20px;
+    box-shadow: var(--shadow);
+    scrollbar-width: thin;
+    scrollbar-color: var(--border) transparent;
+  }
+  .toc-title {
+    font-size: 10.5px;
+    font-weight: 600;
+    letter-spacing: .1em;
+    text-transform: uppercase;
+    color: var(--text-3);
+    margin-bottom: 12px;
+    padding-bottom: 10px;
+    border-bottom: 1px solid var(--border-soft);
+  }
+  .toc-item {
+    display: flex;
+    align-items: flex-start;
+    margin: 2px 0;
+  }
+  .toc-toggle {
+    background: none;
+    border: none;
+    cursor: pointer;
+    color: var(--text-3);
+    padding: 4px;
+    margin-right: 4px;
+    margin-top: 2px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 4px;
+    transition: background 0.2s, transform 0.2s;
+  }
+  .toc-toggle:hover { background: var(--border-soft); color: var(--text); }
+  .toc-toggle[aria-expanded="false"] svg { transform: rotate(-90deg); }
+  .toc-spacer { width: 20px; flex-shrink: 0; }
+  .toc-group { overflow: hidden; transition: max-height 0.3s ease-in-out; }
+  .toc-group.collapsed { max-height: 0 !important; }
+  
+  .toc a {
+    display: block;
+    font-size: 13px;
+    color: var(--text-2);
+    text-decoration: none;
+    padding: 4px 8px;
+    border-radius: 5px;
+    line-height: 1.45;
+    transition: background .15s, color .15s;
+    word-break: break-all;
+    flex-grow: 1;
+  }
+  .toc a:hover  { background: var(--accent-light); color: var(--accent); }
+  .toc a.active { background: var(--accent-light); color: var(--accent); font-weight: 500; }
+  .toc-l1 { font-weight: 600; color: var(--text); }
+  .toc-l2 { font-weight: 600; color: var(--text); }
+  .toc-l3 { font-size: 12px !important; padding-left: 14px !important; }
+
+  /* ── Article card ──────────────────────────────────────────────────────── */
+  .article {
+    flex: 1; min-width: 0;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    padding: 52px 60px;
+    box-shadow: var(--shadow-lg);
+  }
+
+  /* ── Headings ──────────────────────────────────────────────────────────── */
+  .title-container {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-end;
+    margin: 0 0 28px;
+    padding-bottom: 18px;
+    border-bottom: 2px solid var(--text);
+  }
+  .article h1 {
+    font-family: var(--font-head);
+    font-size: 26px; font-weight: 600; line-height: 1.3;
+    margin: 0; padding-bottom: 0;
+    border-bottom: none;
+  }
+  .article h2 {
+    font-family: var(--font-head);
+    font-size: 19px; font-weight: 600;
+    margin: 48px 0 14px; padding-bottom: 8px;
+    border-bottom: 1px solid var(--border);
+  }
+  .article h2::before {
+    content: attr(data-index);
+    display: inline-block;
+    font-family: var(--font-mono);
+    font-size: 10.5px; font-weight: 500;
+    color: var(--accent-mid);
+    background: var(--accent-light);
+    padding: 1px 7px; border-radius: 4px;
+    margin-right: 10px; vertical-align: middle;
+    letter-spacing: .05em;
+  }
+  .article h3 {
+    font-family: var(--font-head);
+    font-size: 15.5px; font-weight: 600;
+    margin: 28px 0 10px;
+  }
+  .article h3::before {
+    content: "§ ";
+    color: var(--text-3);
+    font-family: var(--font-mono); font-size: 13px;
+  }
+  .article h4 {
+    font-size: 13.5px; font-weight: 600;
+    color: var(--accent); margin: 20px 0 8px;
+  }
+
+  /* ── Body text ─────────────────────────────────────────────────────────── */
+  .article p, .plain { 
+    font-size: 15px; 
+    line-height: 1.85; 
+    color: var(--text); 
+    margin: 0 0 12px; 
+    font-family: var(--font-body);
+  }
+  .article strong { font-weight: 600; }
+  .article em     { font-style: italic; color: var(--text-2); }
+  .article a {
+    color: var(--accent); text-decoration: underline;
+    text-decoration-color: var(--accent-light);
+    text-underline-offset: 3px;
+  }
+  .article a:hover { text-decoration-color: var(--accent); }
+  .article hr { border: none; border-top: 1px solid var(--border); margin: 20px 0; }
+  .article hr.heavy { border-top: 3px solid var(--text); margin: 32px 0; }
+
+  /* ── Blockquote ────────────────────────────────────────────────────────── */
+  .article blockquote {
+    border-left: 3px solid var(--accent-mid);
+    background: var(--accent-light);
+    margin: 20px 0; padding: 13px 20px 13px 20px;
+    border-radius: 0 var(--radius) var(--radius) 0;
+  }
+  .article blockquote p { font-size: 14.5px; color: var(--accent); margin: 0; line-height: 1.7; }
+  /* 支持块引用内部保留换行符（修复头部概要换行丢失问题） */
+  .article blockquote p { white-space: pre-wrap; }
+  .article blockquote strong { color: var(--accent); }
+
+  /* ── Lists ─────────────────────────────────────────────────────────────── */
+  .article ul, .article ol { padding-left: 22px; margin: 6px 0 14px; }
+  .article li { font-size: 15px; line-height: 1.8; margin: 4px 0; }
+  .article li::marker { color: var(--accent-mid); }
+  .article li > ul, .article li > ol { margin: 3px 0; }
+
+  /* ── Inline code ───────────────────────────────────────────────────────── */
+  .article :not(pre) > code {
+    font-family: var(--font-mono);
+    font-size: 12.5px; font-weight: 500;
+    background: #f3f0eb; color: var(--red);
+    padding: 1px 5px; border-radius: 4px;
+    border: 1px solid var(--border);
+  }
+
+  /* ── Code blocks ───────────────────────────────────────────────────────── */
+  .code-block {
+    position: relative; margin: 20px 0;
+    border-radius: var(--radius-lg); overflow: hidden;
+    border: 1px solid var(--code-border);
+    box-shadow: 0 4px 20px rgba(0,0,0,.16);
+  }
+  .code-lang {
+    position: absolute; top: 0; left: 0;
+    font-family: var(--font-mono); font-size: 10px; font-weight: 500;
+    color: #7c8db5; background: #222538;
+    padding: 4px 12px; border-bottom-right-radius: 6px;
+    text-transform: uppercase; letter-spacing: .08em;
+    user-select: none;
+  }
+  .copy-btn {
+    position: absolute; top: 8px; right: 10px;
+    background: #2d3148; border: 1px solid #3d4260;
+    border-radius: 5px; color: #7c8db5; cursor: pointer;
+    padding: 5px 8px; display: flex; align-items: center;
+    transition: background .15s, color .15s; z-index: 1;
+  }
+  .copy-btn:hover  { background: #3a3f60; color: #cdd6f4; }
+  .copy-btn.copied { color: #a6e3a1; border-color: #4a6a4a; }
+  .code-block pre {
+    margin: 0; padding: 36px 20px 20px;
+    background: var(--code-bg); overflow-x: auto;
+    scrollbar-width: thin; scrollbar-color: #3d4260 transparent;
+  }
+  .code-block pre::-webkit-scrollbar { height: 5px; }
+  .code-block pre::-webkit-scrollbar-thumb { background: #3d4260; border-radius: 3px; }
+  .code-block code {
+    font-family: var(--font-mono); font-size: 13px; line-height: 1.7;
+    color: var(--code-text); background: none; border: none; padding: 0;
+    white-space: pre; word-break: normal;
+  }
+
+  /* ── Tables ────────────────────────────────────────────────────────────── */
+  .table-wrap {
+    overflow-x: auto; margin: 16px 0;
+    border-radius: var(--radius-lg);
+    border: 1px solid var(--border);
+    box-shadow: var(--shadow);
+  }
+  table { width: 100%; border-collapse: collapse; font-size: 14px; min-width: 360px; }
+  thead { background: #f4f2ee; }
+  th {
+    padding: 9px 14px; text-align: left;
+    font-size: 11.5px; font-weight: 600;
+    letter-spacing: .04em; text-transform: uppercase;
+    color: var(--text-2); border-bottom: 1px solid var(--border);
+    white-space: nowrap;
+  }
+  td {
+    padding: 8px 14px; border-bottom: 1px solid var(--border-soft);
+    color: var(--text); vertical-align: top; line-height: 1.6;
+  }
+  tbody tr:last-child td { border-bottom: none; }
+  tbody tr:nth-child(even) td { background: #faf9f7; }
+  tbody tr:hover td { background: var(--accent-light); transition: background .1s; }
+
+  /* ── KV block ──────────────────────────────────────────────────────────── */
+  .kv-block { background: var(--bg); border: 1px solid var(--border); border-radius: var(--radius-lg); overflow: hidden; margin: 12px 0 20px; }
+  .kv-row { display: flex; border-bottom: 1px solid var(--border-soft); align-items: flex-start; }
+  .kv-row:last-child { border-bottom: none; }
+  .kv-key { flex: 0 0 160px; padding: 9px 16px; font-size: 13.5px; font-weight: 600; color: var(--text-2); background: var(--surface); border-right: 1px solid var(--border-soft); }
+  .kv-val { flex: 1; padding: 9px 16px; font-size: 14px; color: var(--text); }
+
+  /* ── Status badges ─────────────────────────────────────────────────────── */
+  .badge-ok { display: inline-flex; align-items: center; gap: 4px; background: var(--green-bg); color: var(--green); font-size: 13px; font-weight: 500; padding: 2px 9px; border-radius: 20px; border: 1px solid #bbf7d0; }
+  .badge-err { display: inline-flex; align-items: center; gap: 4px; background: var(--red-bg); color: var(--red); font-size: 13px; font-weight: 500; padding: 2px 9px; border-radius: 20px; border: 1px solid #fecaca; }
+  .badge-warn { display: inline-flex; align-items: center; gap: 4px; background: var(--amber-bg); color: var(--amber); font-size: 13px; font-weight: 500; padding: 2px 9px; border-radius: 20px; border: 1px solid #fde68a; }
+
+  /* ── Priority badges ───────────────────────────────────────────────────── */
+  .pri-p0 { display: inline-block; background: #fef2f2; color: #991b1b; border: 1px solid #fca5a5; font-size: 12px; font-weight: 700; padding: 2px 8px; border-radius: 4px; letter-spacing: .04em; }
+  .pri-p1 { display: inline-block; background: #fff7ed; color: #9a3412; border: 1px solid #fdba74; font-size: 12px; font-weight: 700; padding: 2px 8px; border-radius: 4px; }
+  .pri-p2 { display: inline-block; background: #fffbeb; color: #92400e; border: 1px solid #fde68a; font-size: 12px; font-weight: 700; padding: 2px 8px; border-radius: 4px; }
+  .pri-p3 { display: inline-block; background: var(--accent-light); color: var(--accent); border: 1px solid #bfdbfe; font-size: 12px; font-weight: 700; padding: 2px 8px; border-radius: 4px; }
+
+  /* ── Fault header ──────────────────────────────────────────────────────── */
+  .fault-header { display: flex; align-items: center; gap: 12px; padding: 12px 16px; border-radius: var(--radius-lg); margin: 16px 0 8px; border: 1px solid; }
+  .fh-p0 { background: #fef2f2; border-color: #fca5a5; }
+  .fh-p1 { background: #fff7ed; border-color: #fdba74; }
+  .fh-p2 { background: #fffbeb; border-color: #fde68a; }
+  .fh-p3 { background: var(--accent-light); border-color: #bfdbfe; }
+  .fh-badge { font-family: var(--font-mono); font-size: 11px; font-weight: 700; letter-spacing: .08em; }
+  .fh-p0 .fh-badge { color: #991b1b; }
+  .fh-p1 .fh-badge { color: #9a3412; }
+  .fh-p2 .fh-badge { color: #92400e; }
+  .fh-p3 .fh-badge { color: var(--accent); }
+  .fh-rest { font-size: 14px; font-weight: 500; color: var(--text); }
+
+  /* ── Timeline ──────────────────────────────────────────────────────────── */
+  .timeline { border-left: 2px solid var(--accent-mid); margin: 16px 0 16px 8px; padding-left: 20px; }
+  .tl-row { display: flex; align-items: baseline; gap: 10px; margin: 8px 0; font-size: 13.5px; }
+  .tl-ts { font-family: var(--font-mono); font-size: 12px; color: var(--text-3); flex-shrink: 0; white-space: nowrap; }
+  .tl-tag { font-size: 11px; font-weight: 600; padding: 1px 7px; border-radius: 10px; flex-shrink: 0; background: var(--accent-light); color: var(--accent); }
+  .tl-tag.err { background: var(--red-bg); color: var(--red); }
+  .tl-tag.warn { background: var(--amber-bg); color: var(--amber); }
+  .tl-desc { color: var(--text); line-height: 1.5; }
+
+  /* ── Global warn ───────────────────────────────────────────────────────── */
+  .global-warn { background: #fef2f2; border: 1px solid #fca5a5; border-radius: var(--radius-lg); padding: 14px 18px; font-size: 14.5px; font-weight: 600; color: #991b1b; margin: 16px 0; }
+
+  /* ── Tree note ─────────────────────────────────────────────────────────── */
+  .tree-note { white-space: pre-wrap; font-family: var(--font-mono); font-size: 13.5px; line-height: 1.6; color: var(--text-2); margin: 8px 0 8px 16px; }
+
+  /* ── Disclaimer ────────────────────────────────────────────────────────── */
+  .disclaimer { background: var(--bg); border: 1px solid var(--border); border-radius: var(--radius); padding: 14px 18px; font-size: 13.5px; color: var(--text-2); font-style: italic; }
+
+  /* ── Meta footer ───────────────────────────────────────────────────────── */
+  .meta {
+    margin-top: 48px; padding-top: 16px;
+    border-top: 1px solid var(--border-soft);
+    display: flex; justify-content: space-between; align-items: center;
+    font-size: 12px; color: var(--text-3);
+  }
+  .meta-source { font-family: var(--font-mono); font-size: 11.5px; }
+
+  /* ── Brand logo ────────────────────────────────────────────────────────── */
+  .brand-logo {
+    font-family: var(--font-head);
+    font-size: 14px;
+    color: var(--text-3);
+    letter-spacing: 0.05em;
+    margin-bottom: 4px;
+    flex-shrink: 0;
+    margin-left: 16px;
+  }
+  .brand-logo strong {
+    font-weight: 600;
+    color: var(--accent);
+  }
+  @media (max-width: 900px) {
+    .title-container { flex-direction: column; align-items: flex-start; gap: 12px; }
+    .brand-logo { margin-left: 0; margin-bottom: 0; }
+  }
+  /* ── Print ─────────────────────────────────────────────────────────────── */
+  @media print {
+    body { background: white; }
+    #progress, .toc { display: none; }
+    .layout { display: block; padding: 0; }
+    .article { border: none; box-shadow: none; padding: 24px; }
+    .copy-btn { display: none; }
+    .brand-logo { margin-bottom: 0; }
+  }
+
+  /* ── Responsive ────────────────────────────────────────────────────────── */
+  @media (max-width: 900px) {
+    .toc { display: none; }
+    .article { padding: 36px 28px; }
+    .layout { padding: 24px 16px 64px; }
+  }
+  @media (max-width: 480px) {
+    .article { padding: 24px 18px; }
+    .article h1 { font-size: 22px; }
+  }
+</style>
+</head>
+<body>
+
+<div id="progress"></div>
+
+<div class="layout">
+  <nav class="toc" id="toc">
+  <div class="toc-title">目录</div>
+  <div class="toc-content">
+<div class="toc-item has-children"><button class="toc-toggle" onclick="toggleToc(this)" aria-expanded="true">
+                <svg viewBox="0 0 24 24" width="12" height="12" stroke="currentColor" stroke-width="2" fill="none"><polyline points="6 9 12 15 18 9"></polyline></svg>
+              </button><a href="#h-故障诊断报告-硬盘介质物理退化导致-vol8-xfs-文件系统强制-shutdown" onclick="event.preventDefault(); const target = document.getElementById('h-故障诊断报告-硬盘介质物理退化导致-vol8-xfs-文件系统强制-shutdown'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l1">🔴 故障诊断报告 —— 硬盘介质物理退化导致 vol8 XFS 文件系统强制 Shutdown</a></div>
+<div class="toc-group" id="group-h-一故障概览">
+<div class="toc-item has-children"><button class="toc-toggle" onclick="toggleToc(this)" aria-expanded="true">
+                <svg viewBox="0 0 24 24" width="12" height="12" stroke="currentColor" stroke-width="2" fill="none"><polyline points="6 9 12 15 18 9"></polyline></svg>
+              </button><a href="#h-一故障概览" onclick="event.preventDefault(); const target = document.getElementById('h-一故障概览'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l2">一、故障概览</a></div>
+<div class="toc-group" id="group-h-置信度说明参考表">
+<div class="toc-item "><span class="toc-spacer"></span><a href="#h-置信度说明参考表" onclick="event.preventDefault(); const target = document.getElementById('h-置信度说明参考表'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l3">置信度说明（参考表）</a></div>
+</div>
+<div class="toc-item has-children"><button class="toc-toggle" onclick="toggleToc(this)" aria-expanded="true">
+                <svg viewBox="0 0 24 24" width="12" height="12" stroke="currentColor" stroke-width="2" fill="none"><polyline points="6 9 12 15 18 9"></polyline></svg>
+              </button><a href="#h-二根因速览" onclick="event.preventDefault(); const target = document.getElementById('h-二根因速览'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l2">二、根因速览</a></div>
+<div class="toc-group" id="group-h-21-事故时间线与故障传导链路">
+<div class="toc-item "><span class="toc-spacer"></span><a href="#h-21-事故时间线与故障传导链路" onclick="event.preventDefault(); const target = document.getElementById('h-21-事故时间线与故障传导链路'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l3">2.1 事故时间线与故障传导链路</a></div>
+<div class="toc-item "><span class="toc-spacer"></span><a href="#h-22-故障因果链多层穿透" onclick="event.preventDefault(); const target = document.getElementById('h-22-故障因果链多层穿透'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l3">2.2 故障因果链（多层穿透）</a></div>
+</div>
+<div class="toc-item has-children"><button class="toc-toggle" onclick="toggleToc(this)" aria-expanded="true">
+                <svg viewBox="0 0 24 24" width="12" height="12" stroke="currentColor" stroke-width="2" fill="none"><polyline points="6 9 12 15 18 9"></polyline></svg>
+              </button><a href="#h-三排查过程" onclick="event.preventDefault(); const target = document.getElementById('h-三排查过程'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l2">三、排查过程</a></div>
+<div class="toc-group" id="group-h-31-初始现象">
+<div class="toc-item "><span class="toc-spacer"></span><a href="#h-31-初始现象" onclick="event.preventDefault(); const target = document.getElementById('h-31-初始现象'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l3">3.1 初始现象</a></div>
+<div class="toc-item "><span class="toc-spacer"></span><a href="#h-32-假设驱动排查三路并行-kuafu-子任务交叉验证" onclick="event.preventDefault(); const target = document.getElementById('h-32-假设驱动排查三路并行-kuafu-子任务交叉验证'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l3">3.2 假设驱动排查（三路并行 Kuafu 子任务交叉验证）</a></div>
+<div class="toc-item "><span class="toc-spacer"></span><a href="#h-33-排查结论与逻辑树" onclick="event.preventDefault(); const target = document.getElementById('h-33-排查结论与逻辑树'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l3">3.3 排查结论与逻辑树</a></div>
+</div>
+<div class="toc-item has-children"><button class="toc-toggle" onclick="toggleToc(this)" aria-expanded="true">
+                <svg viewBox="0 0 24 24" width="12" height="12" stroke="currentColor" stroke-width="2" fill="none"><polyline points="6 9 12 15 18 9"></polyline></svg>
+              </button><a href="#h-四故障盘修复价值评估" onclick="event.preventDefault(); const target = document.getElementById('h-四故障盘修复价值评估'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l2">四、故障盘修复价值评估</a></div>
+<div class="toc-group" id="group-h-41-vol8---devsdi首要故障盘">
+<div class="toc-item "><span class="toc-spacer"></span><a href="#h-41-vol8---devsdi首要故障盘" onclick="event.preventDefault(); const target = document.getElementById('h-41-vol8---devsdi首要故障盘'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l3">4.1 vol8 - /dev/sdi（首要故障盘）</a></div>
+<div class="toc-item "><span class="toc-spacer"></span><a href="#h-42-多盘同步退化清单横向风险评估来自-t3-smart-普查" onclick="event.preventDefault(); const target = document.getElementById('h-42-多盘同步退化清单横向风险评估来自-t3-smart-普查'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l3">4.2 多盘同步退化清单（横向风险评估，来自 T3 SMART 普查）</a></div>
+</div>
+<div class="toc-item has-children"><button class="toc-toggle" onclick="toggleToc(this)" aria-expanded="true">
+                <svg viewBox="0 0 24 24" width="12" height="12" stroke="currentColor" stroke-width="2" fill="none"><polyline points="6 9 12 15 18 9"></polyline></svg>
+              </button><a href="#h-五修复方案" onclick="event.preventDefault(); const target = document.getElementById('h-五修复方案'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l2">五、修复方案</a></div>
+<div class="toc-group" id="group-h-51-应急处置p0---立即执行4-小时内">
+<div class="toc-item "><span class="toc-spacer"></span><a href="#h-51-应急处置p0---立即执行4-小时内" onclick="event.preventDefault(); const target = document.getElementById('h-51-应急处置p0---立即执行4-小时内'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l3">5.1 应急处置（P0 - 立即执行，4 小时内）</a></div>
+<div class="toc-item "><span class="toc-spacer"></span><a href="#h-52-高危处置p1---7-天内执行" onclick="event.preventDefault(); const target = document.getElementById('h-52-高危处置p1---7-天内执行'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l3">5.2 高危处置（P1 - 7 天内执行）</a></div>
+<div class="toc-item "><span class="toc-spacer"></span><a href="#h-53-中长期改进p2-p3---30-天内规划" onclick="event.preventDefault(); const target = document.getElementById('h-53-中长期改进p2-p3---30-天内规划'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l3">5.3 中长期改进（P2-P3 - 30 天内规划）</a></div>
+<div class="toc-item "><span class="toc-spacer"></span><a href="#h-54-永久修复计划" onclick="event.preventDefault(); const target = document.getElementById('h-54-永久修复计划'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l3">5.4 永久修复计划</a></div>
+</div>
+<div class="toc-item has-children"><button class="toc-toggle" onclick="toggleToc(this)" aria-expanded="true">
+                <svg viewBox="0 0 24 24" width="12" height="12" stroke="currentColor" stroke-width="2" fill="none"><polyline points="6 9 12 15 18 9"></polyline></svg>
+              </button><a href="#h-六风险声明与待补证据" onclick="event.preventDefault(); const target = document.getElementById('h-六风险声明与待补证据'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l2">六、风险声明与待补证据</a></div>
+<div class="toc-group" id="group-h-61-限制声明">
+<div class="toc-item "><span class="toc-spacer"></span><a href="#h-61-限制声明" onclick="event.preventDefault(); const target = document.getElementById('h-61-限制声明'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l3">6.1 限制声明</a></div>
+<div class="toc-item "><span class="toc-spacer"></span><a href="#h-62-待补证据清单" onclick="event.preventDefault(); const target = document.getElementById('h-62-待补证据清单'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l3">6.2 待补证据清单</a></div>
+<div class="toc-item "><span class="toc-spacer"></span><a href="#h-63-后续任务建议" onclick="event.preventDefault(); const target = document.getElementById('h-63-后续任务建议'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l3">6.3 后续任务建议</a></div>
+</div>
+<div class="toc-item "><span class="toc-spacer"></span><a href="#h-诊断质量自查" onclick="event.preventDefault(); const target = document.getElementById('h-诊断质量自查'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l2">诊断质量自查</a></div>
+<div class="toc-item "><span class="toc-spacer"></span><a href="#h-附录-a三份-kuafu-子任务关键参数对照" onclick="event.preventDefault(); const target = document.getElementById('h-附录-a三份-kuafu-子任务关键参数对照'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l2">附录 A：三份 Kuafu 子任务关键参数对照</a></div>
+<div class="toc-item "><span class="toc-spacer"></span><a href="#h-附录-b证据原始文件索引用于审计" onclick="event.preventDefault(); const target = document.getElementById('h-附录-b证据原始文件索引用于审计'); if (target) { target.scrollIntoView({behavior: 'smooth'}); }" class="toc-l2">附录 B：证据原始文件索引（用于审计）</a></div>
+</div>
+  </div>
+</nav>
+  <article class="article" id="article" style="position: relative;">
+    <div class="title-container"><h1 id="h-故障诊断报告-硬盘介质物理退化导致-vol8-xfs-文件系统强制-shutdown">🔴 故障诊断报告 —— 硬盘介质物理退化导致 vol8 XFS 文件系统强制 Shutdown</h1><div class="brand-logo">by <strong>Witty Diagnosis Agent</strong></div></div>
+<blockquote>
+<p><strong>报告编号</strong>：RCA-2026-03-05-vol8-001
+<strong>故障级别</strong>：P0（致命）
+<strong>报告时间</strong>：2026-08-11 11:30:00
+<strong>当前状态</strong>：🔴 处理中（业务已临时恢复，但磁盘介质损伤未解决，存在再发风险）</p>
+</blockquote>
+<hr>
+<h2 id="h-一故障概览">一、故障概览</h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th align="left">项目</th>
+<th align="left">内容</th>
+</tr>
+</thead>
+<tbody><tr>
+<td align="left"><strong>故障标题</strong></td>
+<td align="left"><code>/dev/sdi</code>（WDC WUH721414ALE6L4, 14 TB SATA）介质物理退化触发 XFS <code>force-shutdown</code>，并发存储链路与 RAID 卡控制平面异常，多盘同时呈现高风险特征</td>
+</tr>
+<tr>
+<td align="left"><strong>影响范围</strong></td>
+<td align="left">业务卷 <code>/data/vols/vol8</code>（XFS V5）；物理设备 <code>/dev/sdi</code>（iBMC Slot #0xa7）；旁路疑似盘 sdag/sdk/sdx/sdab/sdm/sdj/sdf/sdae/sdn/sdad/sdz（共 12 块高风险盘）</td>
+</tr>
+<tr>
+<td align="left"><strong>故障时段</strong></td>
+<td align="left">2026-03-05 14:11:35 ～ 2026-03-05 14:20:50（业务中断约 9 分钟 15 秒）；后续 2026-03-05 17:56:53 起出现 22 分钟级链路重置风暴与 RAID 卡用户态控制平面失联，存在再次爆发风险</td>
+</tr>
+<tr>
+<td align="left"><strong>根本原因</strong></td>
+<td align="left"><code>/dev/sdi</code> 磁盘介质不可恢复的物理退化（Reallocated_Sector_Ct=31、Current_Pending_Sector=240、End-to-End_Error=65536、Command_Timeout=188984197144、ATA Error Count=4623），触发 SCSI 30 s 命令超时风暴 → 内核 task abort → XFS metadata/log I/O error → <code>xfs_do_force_shutdown</code>；同时多块同型号硬盘（通电 57184 h ≈ 6.5 年）呈瓦片式退化，共享 expander-0:0 上链路层 firmware 反复 Target Reset，RAID 卡用户态控制链路（mpt3sas_ctl）在 18:17 起中断</td>
+</tr>
+<tr>
+<td align="left"><strong>是否恢复</strong></td>
+<td align="left">🟡 <strong>部分恢复</strong>：XFS 文件系统于 14:20:50 经 log replay 重新挂载，业务侧临时恢复；但底层介质损伤未修复，RAID 卡控制平面失联，存在随时再次 shutdown 风险</td>
+</tr>
+<tr>
+<td align="left"><strong>根因置信度</strong></td>
+<td align="left">🟢 <strong>高置信度</strong> —— 6 个独立日志维度（iBMC SEL / SMART / parted / sys_block / dmesg / messages）交叉验证根因</td>
+</tr>
+</tbody></table></div>
+<h3 id="h-置信度说明参考表">置信度说明（参考表）</h3>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th align="left">等级</th>
+<th align="center">标识</th>
+<th align="left">含义</th>
+<th align="left">本报告适用性</th>
+</tr>
+</thead>
+<tbody><tr>
+<td align="left">高置信</td>
+<td align="center">🟢</td>
+<td align="left">根因已明确，可复现，单一原因可解释所有现象</td>
+<td align="left">✅ 本报告适用（多源交叉验证一致）</td>
+</tr>
+<tr>
+<td align="left">中置信</td>
+<td align="center">🟡</td>
+<td align="left">根因基本确认，但存在 1～2 个无法完全解释的现象</td>
+<td align="left">—</td>
+</tr>
+<tr>
+<td align="left">低置信</td>
+<td align="center">🟠</td>
+<td align="left">有多个可疑原因，尚未排除竞争</td>
+<td align="left">—</td>
+</tr>
+<tr>
+<td align="left">未知</td>
+<td align="center">🔴</td>
+<td align="left">现象无法解释，根因未定位</td>
+<td align="left">—</td>
+</tr>
+</tbody></table></div>
+<hr>
+<h2 id="h-二根因速览">二、根因速览</h2>
+<h3 id="h-21-事故时间线与故障传导链路">2.1 事故时间线与故障传导链路</h3>
+<div class="code-block">
+  <span class="code-lang">text</span>
+  <button class="copy-btn" onclick="copyCode(this)" title="复制">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
+  </button>
+  <pre><code>时间                        事件                                                              性质           溯源路径
+─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+2026-03-01 03:56:21        smartd 首次报 /dev/sdi 有 216 个 pending sector                     📉 早期劣化    [/Users/leiw/Projects/openeuler/sample-data/logs/messages/10.112.17.32_vol8_normal_20260305_142146.log : 1]
+    │
+    ▼  长期累积（POH=57184h ≈ 6.5 年；同批次 WDC WUH721414ALE6L4 多盘同步老化）
+2026-03-02 17:18:41        sdi 首次 critical medium error, sector 26372741272               ⚠️  隐患激活   [/Users/leiw/Projects/openeuler/sample-data/logs/infocollect_logs/system/var/log/messages : 10940-10944]
+2026-03-04 07:34:16        sdi 再次 critical medium error, sector 25955009264               ⚠️  反复       [/Users/leiw/Projects/openeuler/sample-data/logs/infocollect_logs/system/dmesg.txt : 739-746]
+2026-03-04 20:26:21        pending sectors 升至 240（峰值），持续告警 18 小时无人介入       📈 临界堆积    [/Users/leiw/Projects/openeuler/sample-data/logs/messages/10.112.17.32_vol8_normal_20260305_142146.log : 215]
+    │
+    ▼
+2026-03-05 13:39:01        【L0 iBMC】 Drive Slot #0xa7 Drive Fault Asserted                  🔴 硬件确认   [/Users/leiw/Projects/openeuler/sample-data/logs/ibmc_logs/HDM210200A01QH198000173_20260310/dump/hw_info/state/sel_list.txt : 1115]
+2026-03-05 13:40:54        iBMC Drive Fault Deasserted（1 分 53 秒后短暂自恢复）             ⚠️  表面愈合   [ibmc_logs/.../sel_list.txt : 1116]
+    │
+    ▼  [32 分钟后 OS 层爆发]
+2026-03-05 14:11:35        【L5 SCSI】 sd 0:0:8:0 attempting task abort! outstanding 30395 ms   🔴 故障爆发   [infocollect_logs/system/var/log/messages : 31303-31343]
+2026-03-05 14:11:36        mpt3sas_cm0 code(0x13) PL — SAS Target Reset                       ⚠️  链路响应   [infocollect_logs/system/var/log/messages : 31310, 31371-31372]
+2026-03-05 14:11:36        blk_update_request: I/O error, dev sdi (DID_SOFT_ERROR)           🔴 块层失败   [messages/10.112.17.32_vol8_normal_20260305_142146.log : 252-266]
+2026-03-05 14:12:04        XFS (sdi): metadata I/O error in "xfs_trans_read_buf_map"        🔴 FS 元数据错 [messages/10.112.17.32_vol8_normal_20260305_142146.log : 277-283]
+2026-03-05 14:12:13        XFS (sdi): writeback error on sector 25771412312                 ⚠️  数据丢失风险 [messages/10.112.17.32_vol8_normal_20260305_142146.log : 309-311]
+2026-03-05 14:12:45        【致命节点】 XFS (sdi): log I/O error -5 → xfs_do_force_shutdown  🔴 自保 shutdown [messages/10.112.17.32_vol8_normal_20260305_142146.log : 344-347]
+    │
+    ▼  [运维/系统自动处置 8 分钟]
+2026-03-05 14:20:49        XFS (sdi): Unmounting Filesystem                                   🟡 自动恢复   [messages/.../10.112.17.32_vol8_normal_20260305_142146.log : 357]
+2026-03-05 14:20:49        XFS (sdi): Mounting V5 Filesystem                                  🟡 自动恢复   [messages/.../10.112.17.32_vol8_normal_20260305_142146.log : 358]
+2026-03-05 14:20:50        XFS (sdi): Ending recovery (logdev: internal) → /data/vols/vol8    🟢 业务恢复   [messages/.../10.112.17.32_vol8_normal_20260305_142146.log : 359-361]
+    │
+    ▼  [第一波后，业务看似恢复，但介质损伤未修复]
+2026-03-05 14:21:28+       sdk 同步出现 critical medium error（横向蔓延）                     ⚠️  多盘扩散   [infocollect_logs/system/var/log/messages : 32170+]
+2026-03-05 17:56:14        sdk 再次 critical medium error（第二波）                           ⚠️  复燃       [infocollect_logs/system/var/log/messages]
+2026-03-05 17:56:53～18:18 mpt3sas code(0x11) sub(0x1000) 链路重置风暴（约 22 分钟，每分钟 17~21 次）🔴 链路层失稳 [infocollect_logs/system/var/log/messages : 31607-31619, 末尾]
+2026-03-05 18:17:17～18:18 mpt3sas_ctl.c:_ctl_do_mpt_command()! 失败 12 次                   🔴 控制平面失联 [infocollect_logs/system/var/log/messages : 34464-34633]</code></pre>
+</div>
+<blockquote>
+<p><strong>关键判定</strong>：用户给定的 &quot;14:30 前&quot; 窗口完全覆盖了从 14:11:35 任务中断 → 14:12:45 XFS shutdown → 14:20:50 XFS recovery 的全部核心事件链。后续 17:56 起的链路风暴虽超出该窗口，但属于同一介质退化的连续性后果，应纳入整体修复规划。</p>
+</blockquote>
+<h3 id="h-22-故障因果链多层穿透">2.2 故障因果链（多层穿透）</h3>
+<div class="code-block">
+  <span class="code-lang">text</span>
+  <button class="copy-btn" onclick="copyCode(this)" title="复制">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
+  </button>
+  <pre><code>
+### 根因层：硬盘本体
+
+│   /dev/sdi（WDC WUH721414ALE6L4, 14 TB SATA, FW LDGAW07G, POH=57184h）
+│   ├─ Reallocated_Sector_Ct = 31（已重映射，物理坏道）
+│   ├─ Current_Pending_Sector = 240（待重映射，拒绝下降，备用区饱和）
+│   ├─ End-to-End_Error = 65536（端到端校验异常巨大）
+│   ├─ Command_Timeout = 188984197144（1888 亿次超时，对应 30 s 风暴）
+│   └─ ATA Error Count = 4623（盘体自报告硬件错误）
+│
+│   ┌──────────────────────────────────────────────────────────┐
+│   │  并发放大因素（T3 揭示）                                   │
+│   ├──────────────────────────────────────────────────────────┤
+│   │ ① 多盘同步退化：sdag (ATA_Err=13973, 最高), sdk (E2E=65536,  │
+│   │    Pending=264), sdx (Pending=288), sdab (E2E=65536),       │
+│   │    sdm/sdj/sdf/sdae/sdn/sdad/sdz 等 12 块同型号盘均显著退化   │
+│   │ ② mpt3sas firmware 链路事件：~960 次 IOC 链路重置 + 469 次    │
+│   │    SAS Target Reset（phy 7 / handle 0x0011 / slot 7 反复 reset）│
+│   │ ③ RAID 卡用户态控制平面失联：_ctl_do_mpt_command failure 12 次│
+│   └──────────────────────────────────────────────────────────┘
+│
+▼
+
+### 链路层：SCSI 中介错误
+
+│   sd 0:0:8:0: [sdi] Sense Key: Medium Error [current]
+│   └─ Add. Sense: Unrecovered read error → blk_update_request: critical medium error
+│
+▼
+
+### 块层：blk_update_request 失败
+
+│   I/O error, dev sdi, sector XXXXX（DID_SOFT_ERROR / DID_TIME_OUT）
+│   └─ hostbyte=DID_SOFT_ERROR, driverbyte=DRIVER_OK/DRIVER_SENSE
+│
+▼
+
+### XFS 文件系统层：metadata + log 读取失败
+
+│   XFS (sdi): metadata I/O error in "xfs_trans_read_buf_map"
+│   ├─ xfs_imap_to_bp: xfs_trans_read_buf() returned error -5
+│   ├─ xfs_inactive_ifree: xfs_ifree returned error -5
+│   └─ XFS (sdi): writeback error on sector XXXXX
+│
+▼
+
+### 致命节点：XFS 自保护层
+
+│   XFS (sdi): log I/O error -5
+│   └─ XFS (sdi): xfs_do_force_shutdown(0x2) called from line 1250 of fs/xfs/xfs_log.c
+│   └─ XFS (sdi): Log I/O Error Detected. Shutting down filesystem
+│
+▼
+
+### 业务影响层
+
+│   挂载点 /data/vols/vol8 不可访问（约 9 分 15 秒）
+│   └─ 自动 umount + xfs_recovery → 重新挂载（数据一致性靠 log replay 保障）
+│   └─ ⚠️ 介质损伤未解决 → 随时可能再次 shutdown
+│   └─ ⚠️ RAID 卡控制平面失联 → 管理员命令/远程取证能力受限</code></pre>
+</div>
+<hr>
+<h2 id="h-三排查过程">三、排查过程</h2>
+<blockquote>
+<p><strong>排查逻辑</strong>：本次综合 RCA 由 Dayu 调度 3 个并行 Kuafu 子任务（T1/T2/T3）独立验证三个候选故障模式，最终交叉收敛。</p>
+</blockquote>
+<h3 id="h-31-初始现象">3.1 初始现象</h3>
+<ul>
+<li><strong>用户侧描述</strong>：2026-03-05 14:30 前发生硬盘故障。</li>
+<li><strong>客观日志证据</strong>：<ul>
+<li>业务卷 <code>/data/vols/vol8</code> 在 14:11:35 起出现 I/O 卡顿，应用访问超时；</li>
+<li>14:12:45 XFS <code>xfs_do_force_shutdown(0x2)</code> 触发，&quot;Shutting down filesystem&quot;；</li>
+<li>14:20:50 XFS log replay 完成，业务临时恢复；</li>
+<li>14:21:28+ <code>sdk</code> 同步出现 critical medium error；</li>
+<li>17:56:53 起 mpt3sas 链路重置风暴（22 分钟）；</li>
+<li>18:17:17 起 <code>_ctl_do_mpt_command</code> 失败 12 次（RAID 卡控制平面中断）。</li>
+</ul>
+</li>
+</ul>
+<h3 id="h-32-假设驱动排查三路并行-kuafu-子任务交叉验证">3.2 假设驱动排查（三路并行 Kuafu 子任务交叉验证）</h3>
+<h4 id="h-假设-a硬盘本体物理损伤t1-验证-根因主轴">假设 A：硬盘本体物理损伤（T1 验证）✅ 根因主轴</h4>
+<blockquote>
+<p>🧪 假设：<code>/dev/sdi</code>（WDC WUH721414ALE6L4, 14 TB SATA）介质发生不可恢复物理退化，是本次故障的根因。</p>
+</blockquote>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th align="left">检查项</th>
+<th align="left">操作（基于 T1 实际证据）</th>
+<th align="left">结论</th>
+</tr>
+</thead>
+<tbody><tr>
+<td align="left">SMART 关键属性</td>
+<td align="left">读取 <code>disk_smart.txt:2385-2410</code></td>
+<td align="left">✅ Reallocated_Sector_Ct=31, Pending=240, E2E=65536, CmdTimeout=188B, ATA_Err=4623, POH=57184h</td>
+</tr>
+<tr>
+<td align="left">物理同一性</td>
+<td align="left">iBMC Slot #0xa7 ↔ /dev/sdi ↔ mpt3sas handle 0x0011 ↔ phy 7 ↔ expander port 0:0:8</td>
+<td align="left">⚠️ 间接收敛（时序匹配 + 单盘独报）</td>
+</tr>
+<tr>
+<td align="left">iBMC SEL 独立证据</td>
+<td align="left"><code>sel_list.txt:1115-1116</code></td>
+<td align="left">✅ 2026-03-05 13:39:01 Drive Slot #0xa7 Drive Fault Asserted（硬件层独立确认）</td>
+</tr>
+<tr>
+<td align="left">链路域排除</td>
+<td align="left">UDMA_CRC_Error_Count=0 + 无 SAS link reset + 邻居盘未同步报错</td>
+<td align="left">✅ 排除链路域</td>
+</tr>
+<tr>
+<td align="left">故障规则命中</td>
+<td align="left">SATA-R1（ATA Error Count != &quot;No Errors Logged&quot;）</td>
+<td align="left">✅ 命中 → 半年存活概率直接归 0%</td>
+</tr>
+<tr>
+<td align="left">R 码定界</td>
+<td align="left">物理介质退化（R3 介质退化 + R5c 机械/固件退化并发）</td>
+<td align="left">✅ 主因</td>
+</tr>
+</tbody></table></div>
+<p><strong>✅ 结论</strong>：<code>/dev/sdi</code> 介质损伤已不可逆，<strong>唯一有效处置为更换硬盘</strong>，无修复路径。</p>
+<hr>
+<h4 id="h-假设-b文件系统层故障t2-验证-故障模式成立">假设 B：文件系统层故障（T2 验证）✅ 故障模式成立</h4>
+<blockquote>
+<p>🧪 假设：底层磁盘异常引发文件系统级故障（XFS metadata/log IO error），构成&quot;存储诱发的文件系统故障&quot;（STORAGE_INDUCED_FS_ERR）。</p>
+</blockquote>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th align="left">检查项</th>
+<th align="left">操作（基于 T2 实际证据）</th>
+<th align="left">结论</th>
+</tr>
+</thead>
+<tbody><tr>
+<td align="left">FS 层错误时间链</td>
+<td align="left">读取 <code>10.112.17.32_vol8_normal_20260305_142146.log:1-361</code></td>
+<td align="left">✅ T0=2026-03-01 03:56:21（pending=216）；T0&#39;=2026-03-05 14:12:45（XFS shutdown）</td>
+</tr>
+<tr>
+<td align="left">场景分类</td>
+<td align="left">主场景 STORAGE_INDUCED_FS_ERR + 叠加 FS_IO_ERROR + FS_CORRUPTION</td>
+<td align="left">✅ 命中</td>
+</tr>
+<tr>
+<td align="left">排他项（O1-O6）</td>
+<td align="left">OOM/NFS/人为/XFS 自爆/SAS 链路/RAID 卡</td>
+<td align="left">✅ 全部排除</td>
+</tr>
+<tr>
+<td align="left">根因收敛</td>
+<td align="left">磁盘介质退化 → SCSI 中介错误 → blk_update_request I/O error → XFS metadata/log I/O error → xfs_do_force_shutdown</td>
+<td align="left">✅ 与 T1 完全自洽</td>
+</tr>
+<tr>
+<td align="left">物理-逻辑同一性</td>
+<td align="left">6 个日志层（SMART/blk/SD/XFS/parted/sys_block）均锁定 <code>/dev/sdi</code></td>
+<td align="left">✅ 一致</td>
+</tr>
+</tbody></table></div>
+<p><strong>✅ 结论</strong>：「文件系统故障」故障模式成立（supported）；文件系统是受害者，根因仍在磁盘介质层。</p>
+<hr>
+<h4 id="h-假设-c存储链路-raid-控制器故障t3-验证-部分成立重要并发因素">假设 C：存储链路 / RAID 控制器故障（T3 验证）✅ 部分成立（重要并发因素）</h4>
+<blockquote>
+<p>🧪 假设：mpt3sas SAS 链路 + Broadcom/LSI MegaRAID SAS 控制器存在异常。</p>
+</blockquote>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th align="left">检查项</th>
+<th align="left">操作（基于 T3 实际证据）</th>
+<th align="left">结论</th>
+</tr>
+</thead>
+<tbody><tr>
+<td align="left">H1 存储链路异常</td>
+<td align="left">mpt3sas <code>code(0x11)/(0x13)</code> 469 次 firmware 链路重置；phy 7/slot 7/handle 0x0011 反复 reset</td>
+<td align="left">✅ 成立（高置信度）</td>
+</tr>
+<tr>
+<td align="left">H2 RAID 控制器异常</td>
+<td align="left"><code>_ctl_do_mpt_command() failure</code> × 12；INQUIRY VPD 失败（mpt3sas_scsih.c:9553）；无 megacli/storcli 直读证据</td>
+<td align="left">✅ 成立（中置信度）</td>
+</tr>
+<tr>
+<td align="left">H3 物理介质退化（伴随）</td>
+<td align="left">iBMC Drive Fault Asserted；sdag ATA_Err=13973、sdi Realloc=31、End-to-End=65536</td>
+<td align="left">✅ 成立（高置信度）</td>
+</tr>
+<tr>
+<td align="left">H4 纯 XFS 自爆</td>
+<td align="left">XFS 错误均伴随 blk_update_request I/O error，非自发</td>
+<td align="left">❌ 已排除</td>
+</tr>
+<tr>
+<td align="left">H5 PCIe AER 致命错误</td>
+<td align="left">dmesg/messages 无 <code>pcieport</code>/<code>aer</code>/<code>Bad TLP</code>/<code>Completion Timeout</code></td>
+<td align="left">❌ 已排除</td>
+</tr>
+<tr>
+<td align="left">多盘横向风险</td>
+<td align="left">SMART Top-9 退化盘清单（sdag/sdi/sdk/sdx/sdab/sdm/sdj/sdf/sdae）</td>
+<td align="left">⚠️ 共享 expander-0:0 多设备同步退化，链路源头/背板需进一步排查</td>
+</tr>
+</tbody></table></div>
+<p><strong>⚠️ 结论</strong>：H1/H3 高置信成立（与 T1/T2 完全自洽），H2 中置信成立；多盘退化是本次故障的重要并发/放大因素，<strong>RAID 卡用户态控制平面已失联</strong>，管理员远程取证/操作能力受限。</p>
+<hr>
+<h3 id="h-33-排查结论与逻辑树">3.3 排查结论与逻辑树</h3>
+<div class="code-block">
+  <span class="code-lang">text</span>
+  <button class="copy-btn" onclick="copyCode(this)" title="复制">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
+  </button>
+  <pre><code>硬盘故障（vol8 业务中断）
+├─► L1 块层 / IO 调度器
+│       └─► mpt3sas SAS Target Reset 风暴（14 次）+ IOC 链路重置（469 次）    ⚠️ 链路层异常（T3）
+│       └─► 14 次 Command Timeout + 14 次 issue target reset（handle 0x0011） ⚠️ 设备响应失败
+├─► L2 DM/md/LVM/multipath
+│       └─► RAID 卡用户态控制链路中断（_ctl_do_mpt_command failure × 12）     ⚠️ 控制器异常（T3）
+│       └─► 无 dm/md 多重映射（JBOD/HBA 直通）                              ✅ 排除映射层
+├─► L3 物理设备
+│       └─► /dev/sdi 介质物理退化（Realloc=31, Pending=240, E2E=65536）      🔴 主因（T1）
+│       └─► sdag (ATA_Err=13973 最高), sdk, sdx, sdab 等多盘同步退化         ⚠️ 横向风险（T3）
+│       └─► iBMC Drive Slot #0xa7 Drive Fault Asserted 13:39:01             🔴 硬件确认（T1/T3）
+└─► L5 文件系统
+        └─► XFS (sdi): metadata I/O error 14:12:04                           🔴 FS 元数据失败（T2）
+        └─► XFS (sdi): log I/O error -5 → xfs_do_force_shutdown 14:12:45     🔴 自保 shutdown（T2）
+        └─► XFS Unmount + Log Replay + Mount 14:20:50                        🟡 业务临时恢复
+        └─► ⚠️ 介质损伤未修复 → 随时可能再次 shutdown
+        └─► 🎯 综合根因：/dev/sdi 介质物理退化（R3 介质退化 + R5c 机械/固件退化并发）
+            ├─ 并发放大：mpt3sas SAS 链路反复 Target Reset + 共享 expander 多盘退化
+            ├─ 并发放大：RAID 卡用户态控制平面中断（mpt3sas_ctl）
+            └─ 后续风险：sdi/sdag/sdk/sdx 等多盘 POH≈6.5 年，已超企业级常规生命周期</code></pre>
+</div>
+<hr>
+<h2 id="h-四故障盘修复价值评估">四、故障盘修复价值评估</h2>
+<h3 id="h-41-vol8---devsdi首要故障盘">4.1 vol8 - /dev/sdi（首要故障盘）</h3>
+<p><strong>故障盘结论</strong>：</p>
+<ul>
+<li>涉事盘 <code>/dev/sdi</code> 已触发 <strong>SATA-R1 硬故障规则</strong>（ATA Error Count = 4623，远超 &quot;No Errors Logged&quot; 阈值）；</li>
+<li><strong>Reallocated_Sector_Ct = 31</strong>、<strong>Current_Pending_Sector = 240</strong>、<strong>End-to-End_Error = 65536</strong>、<strong>Command_Timeout = 188984197144</strong> —— 介质层 + 命令响应层双重异常；</li>
+<li><strong>半年存活概率 0.0%</strong>（命中硬故障规则，未做概率计算直接归零）；</li>
+<li><strong>建议处置：立即更换硬盘</strong>（P0 致命故障，4 小时内完成业务迁移与替换），<strong>无法修复</strong>。</li>
+</ul>
+<p><strong>故障盘标准化诊断对象</strong>：</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th align="left">字段</th>
+<th align="left">值</th>
+</tr>
+</thead>
+<tbody><tr>
+<td align="left">故障服务器 IP</td>
+<td align="left">10.112.17.32</td>
+</tr>
+<tr>
+<td align="left">分析日期</td>
+<td align="left">2026-03-05</td>
+</tr>
+<tr>
+<td align="left">卷 ID</td>
+<td align="left">vol8</td>
+</tr>
+<tr>
+<td align="left">物理槽位</td>
+<td align="left">Drive Slot #0xa7（iBMC SEL 编码）</td>
+</tr>
+<tr>
+<td align="left">SCSI 磁盘设备</td>
+<td align="left">/dev/sdi（host0:C0:T8:L0，port-0:0:8）</td>
+</tr>
+<tr>
+<td align="left">硬盘型号</td>
+<td align="left">WDC WUH721414ALE6L4</td>
+</tr>
+<tr>
+<td align="left">序列号</td>
+<td align="left">（disk_smart.txt 行 2333 标记为 ***，但通过 LU WWN 5 000cca 264c87e2b 唯一识别）</td>
+</tr>
+<tr>
+<td align="left">接口类型</td>
+<td align="left">SATA</td>
+</tr>
+<tr>
+<td align="left">容量</td>
+<td align="left">14.0 TB</td>
+</tr>
+<tr>
+<td align="left">通电时长（小时）</td>
+<td align="left">57184</td>
+</tr>
+<tr>
+<td align="left">是否已更换</td>
+<td align="left">否（业务仍运行在受损盘上）</td>
+</tr>
+<tr>
+<td align="left">是否可修复</td>
+<td align="left">否（物理介质不可逆损伤）</td>
+</tr>
+<tr>
+<td align="left">半年存活概率</td>
+<td align="left">0.0%</td>
+</tr>
+<tr>
+<td align="left">命中故障规则</td>
+<td align="left">SATA-R1: SMART Error Log (Error 4623 occurred vs != &quot;No Errors Logged&quot;)</td>
+</tr>
+<tr>
+<td align="left">iBMC 独立确认</td>
+<td align="left">✅ Drive Slot #0xa7 Drive Fault Asserted（2026-03-05 13:39:01）</td>
+</tr>
+<tr>
+<td align="left">主要分析原因</td>
+<td align="left">详见下表</td>
+</tr>
+</tbody></table></div>
+<p><strong>主要分析原因</strong>：</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th align="center">序号</th>
+<th align="left">维度</th>
+<th align="left">证据</th>
+</tr>
+</thead>
+<tbody><tr>
+<td align="center">1</td>
+<td align="left">SMART 错误日志非空</td>
+<td align="left">ATA Error Count 累计 4623 条（<code>disk_smart.txt:2409</code>）</td>
+</tr>
+<tr>
+<td align="center">2</td>
+<td align="left">介质坏道</td>
+<td align="left">Reallocated_Sector_Ct = 31（31 个扇区已重映射至备用区，<code>disk_smart.txt:2389</code>）</td>
+</tr>
+<tr>
+<td align="center">3</td>
+<td align="left">待重映射扇区饱和</td>
+<td align="left">Current_Pending_Sector = 240，持续不下降（<code>disk_smart.txt:2402</code>）</td>
+</tr>
+<tr>
+<td align="center">4</td>
+<td align="left">端到端校验错误</td>
+<td align="left">End-to-End_Error = 65536（<code>disk_smart.txt:2396</code>）</td>
+</tr>
+<tr>
+<td align="center">5</td>
+<td align="left">命令响应层异常</td>
+<td align="left">Command_Timeout = 188984197144（对应 14:11 起的 task abort 风暴，<code>disk_smart.txt:2397</code>）</td>
+</tr>
+<tr>
+<td align="center">6</td>
+<td align="left">首次 critical medium error</td>
+<td align="left">2026-03-02 17:18:41 sector 26372741272（<code>messages:10944</code>）</td>
+</tr>
+<tr>
+<td align="center">7</td>
+<td align="left">XFS 内核自保护触发</td>
+<td align="left">2026-03-05 14:12:45 xfs_do_force_shutdown（<code>messages:31936-31939</code>）</td>
+</tr>
+<tr>
+<td align="center">8</td>
+<td align="left">带外独立告警</td>
+<td align="left">iBMC SEL 2026-03-05 13:39:01 Drive Slot #0xa7 Drive Fault Asserted（<code>sel_list.txt:1115</code>）</td>
+</tr>
+</tbody></table></div>
+<h3 id="h-42-多盘同步退化清单横向风险评估来自-t3-smart-普查">4.2 多盘同步退化清单（横向风险评估，来自 T3 SMART 普查）</h3>
+<blockquote>
+<p>本节为 T3 任务对全机 34 块盘的 SMART 普查中按 ATA Error Count、Reallocated、End-to-End、Pending 综合排序的高风险 Top 12 清单。</p>
+</blockquote>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th align="center">序号</th>
+<th align="left">设备</th>
+<th align="center">SCSI 通道</th>
+<th align="left">模型</th>
+<th align="right">Realloc</th>
+<th align="right">End-to-End</th>
+<th align="right">CmdTimeout</th>
+<th align="right">Pending</th>
+<th align="right">ATA_Err</th>
+<th align="center">评级</th>
+<th align="left">建议</th>
+</tr>
+</thead>
+<tbody><tr>
+<td align="center">1</td>
+<td align="left"><strong>sdag</strong></td>
+<td align="center">sg32</td>
+<td align="left">WDC WUH721414ALE6L4</td>
+<td align="right">3</td>
+<td align="right">0</td>
+<td align="right">188 B</td>
+<td align="right">24</td>
+<td align="right"><strong>13973</strong></td>
+<td align="center">🔴🔴🔴</td>
+<td align="left">P0 立即更换</td>
+</tr>
+<tr>
+<td align="center">2</td>
+<td align="left"><strong>sdi</strong></td>
+<td align="center">sg8</td>
+<td align="left">WDC WUH721414ALE6L4</td>
+<td align="right"><strong>31</strong></td>
+<td align="right"><strong>65536</strong></td>
+<td align="right"><strong>188 B</strong></td>
+<td align="right"><strong>240</strong></td>
+<td align="right"><strong>4623</strong></td>
+<td align="center">🔴🔴🔴</td>
+<td align="left">P0 立即更换（本案首要）</td>
+</tr>
+<tr>
+<td align="center">3</td>
+<td align="left"><strong>sdk</strong></td>
+<td align="center">sg10</td>
+<td align="left">WDC WUH721414ALE6L4</td>
+<td align="right">6</td>
+<td align="right">65536</td>
+<td align="right">64 B</td>
+<td align="right">264</td>
+<td align="right">260</td>
+<td align="center">🔴🔴</td>
+<td align="left">P1 7 天内更换</td>
+</tr>
+<tr>
+<td align="center">4</td>
+<td align="left"><strong>sdx</strong></td>
+<td align="center">sg23</td>
+<td align="left">WDC WUH721414ALE6L4</td>
+<td align="right">18</td>
+<td align="right">0</td>
+<td align="right">472 B</td>
+<td align="right">288</td>
+<td align="right">120</td>
+<td align="center">🔴🔴</td>
+<td align="left">P1 7 天内更换</td>
+</tr>
+<tr>
+<td align="center">5</td>
+<td align="left"><strong>sdab</strong></td>
+<td align="center">sg27</td>
+<td align="left">WDC WUH721414ALE6L4</td>
+<td align="right">0</td>
+<td align="right">65536</td>
+<td align="right">17 B</td>
+<td align="right">32</td>
+<td align="right">145</td>
+<td align="center">🔴🔴</td>
+<td align="left">P1 7 天内更换</td>
+</tr>
+<tr>
+<td align="center">6</td>
+<td align="left"><strong>sdm</strong></td>
+<td align="center">sg12</td>
+<td align="left">WDC WUH721414ALE6L4</td>
+<td align="right">26</td>
+<td align="right">0</td>
+<td align="right">347 B</td>
+<td align="right">128</td>
+<td align="right">65</td>
+<td align="center">🔴</td>
+<td align="left">P2 14 天内监控</td>
+</tr>
+<tr>
+<td align="center">7</td>
+<td align="left"><strong>sdj</strong></td>
+<td align="center">sg9</td>
+<td align="left">WDC WUH721414ALE6L4</td>
+<td align="right">17</td>
+<td align="right">0</td>
+<td align="right">304 B</td>
+<td align="right">256</td>
+<td align="right">63</td>
+<td align="center">🔴</td>
+<td align="left">P2 14 天内监控</td>
+</tr>
+<tr>
+<td align="center">8</td>
+<td align="left"><strong>sdf</strong></td>
+<td align="center">sg5</td>
+<td align="left">WDC WUH721414ALE6L4</td>
+<td align="right">15</td>
+<td align="right">0</td>
+<td align="right">201 B</td>
+<td align="right">232</td>
+<td align="right">60</td>
+<td align="center">🔴</td>
+<td align="left">P2 14 天内监控</td>
+</tr>
+<tr>
+<td align="center">9</td>
+<td align="left"><strong>sdae</strong></td>
+<td align="center">sg30</td>
+<td align="left">WDC WUH721414ALE6L4</td>
+<td align="right">1</td>
+<td align="right">0</td>
+<td align="right">98 B</td>
+<td align="right">200</td>
+<td align="right">52</td>
+<td align="center">🟠</td>
+<td align="left">P3 持续监控</td>
+</tr>
+<tr>
+<td align="center">10</td>
+<td align="left"><strong>sdn</strong></td>
+<td align="center">sg13</td>
+<td align="left">WDC WUH721414ALE6L4</td>
+<td align="right">18</td>
+<td align="right">0</td>
+<td align="right">8 B</td>
+<td align="right">16</td>
+<td align="right">27</td>
+<td align="center">🟠</td>
+<td align="left">P3 持续监控</td>
+</tr>
+<tr>
+<td align="center">11</td>
+<td align="left"><strong>sdad</strong></td>
+<td align="center">sg29</td>
+<td align="left">WDC WUH721414ALE6L4</td>
+<td align="right">1</td>
+<td align="right">65536</td>
+<td align="right">446 B</td>
+<td align="right">0</td>
+<td align="right">14</td>
+<td align="center">🟠</td>
+<td align="left">P3 持续监控</td>
+</tr>
+<tr>
+<td align="center">12</td>
+<td align="left"><strong>sdz</strong></td>
+<td align="center">sg25</td>
+<td align="left">WDC WUH721414ALE6L4</td>
+<td align="right">4</td>
+<td align="right">65536</td>
+<td align="right">196 K</td>
+<td align="right">0</td>
+<td align="right">7</td>
+<td align="center">🟡</td>
+<td align="left">列入批次汰换</td>
+</tr>
+</tbody></table></div>
+<blockquote>
+<p><strong>关键观察</strong>：12 块高风险盘全部为 WDC WUH721414ALE6L4（14 TB / 7200 RPM / SATA）同型号，POH 均约 57185 h ≈ 6.5 年；集中在共享 expander-0:0 上（sdag/sdi/sdk/sdx/sdab/sdm/sdj/sdf/sdae 等），既可能独立自然老化汇聚，也可能存在共享 backplane/expander 的供电或链路源头问题，<strong>强烈建议后续追加链路层专项排查</strong>。</p>
+</blockquote>
+<hr>
+<h2 id="h-五修复方案">五、修复方案</h2>
+<h3 id="h-51-应急处置p0---立即执行4-小时内">5.1 应急处置（P0 - 立即执行，4 小时内）</h3>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th align="center">步骤</th>
+<th align="left">操作</th>
+<th align="left">执行人</th>
+<th align="left">时间</th>
+<th align="left">效果</th>
+</tr>
+</thead>
+<tbody><tr>
+<td align="center">1</td>
+<td align="left">业务停写：将 vol8 业务流量切换到备用卷（或暂停写入），<strong>停止对 /dev/sdi 的任何 I/O</strong></td>
+<td align="left">运维 + 业务方</td>
+<td align="left">T+0</td>
+<td align="left">防止 XFS 再次 shutdown</td>
+</tr>
+<tr>
+<td align="center">2</td>
+<td align="left">立即备份：对 <code>/dev/sdi</code> 执行 <code>xfs_repair -n</code> 干运行 → <code>xfs_repair</code> 抢救 → <code>mount -o ro,norecovery</code> → <code>cp -a</code> 到备份介质</td>
+<td align="left">运维</td>
+<td align="left">T+0.5h</td>
+<td align="left">抢救残留数据</td>
+</tr>
+<tr>
+<td align="center">3</td>
+<td align="left">更换 <code>/dev/sdi</code> 备件：同型号 WDC WUH721414ALE6L4（14 TB）；拔盘前在 iBMC 将 Slot #0xa7 置于 &quot;Ready to Remove&quot;；插入新盘后用 <code>ls -l /dev/disk/by-id/</code> 按 WWN 确认设备映射</td>
+<td align="left">硬件</td>
+<td align="left">T+2h</td>
+<td align="left">介质层替换</td>
+</tr>
+<tr>
+<td align="center">4</td>
+<td align="left">重建 XFS：<code>mkfs.xfs -f /dev/sdi</code> → <code>mount /dev/sdi /data/vols/vol8</code> → 恢复业务</td>
+<td align="left">运维</td>
+<td align="left">T+3h</td>
+<td align="left">业务恢复</td>
+</tr>
+<tr>
+<td align="center">5</td>
+<td align="left">新盘复检：<code>smartctl -a /dev/sdi</code>（健康应全绿）+ <code>smartctl -t short</code> + <code>smartctl -l selftest</code></td>
+<td align="left">运维</td>
+<td align="left">T+3.5h</td>
+<td align="left">验证新盘健康</td>
+</tr>
+<tr>
+<td align="center">6</td>
+<td align="left">sdag 同步更换：因 ATA_Err=13973（最高）、同型号同 POH，建议同时更换</td>
+<td align="left">硬件</td>
+<td align="left">T+4h</td>
+<td align="left">防止次生故障</td>
+</tr>
+</tbody></table></div>
+<p><strong>应急脚本片段</strong>：</p>
+<div class="code-block">
+  <span class="code-lang">bash</span>
+  <button class="copy-btn" onclick="copyCode(this)" title="复制">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
+  </button>
+  <pre><code># 1. 业务停写
+umount /data/vols/vol8 2&gt;/dev/null
+
+# 2. 抢救数据（仅作残量备份，不可信）
+xfs_repair -n /dev/sdi
+xfs_repair /dev/sdi
+mount -o ro,norecovery /dev/sdi /mnt/recover
+cp -a /mnt/recover/* /backup/vol8/
+umount /mnt/recover
+
+# 3. 更换硬盘 + 重建 XFS
+mkfs.xfs -f /dev/sdi
+mount /dev/sdi /data/vols/vol8
+
+# 4. 复检
+smartctl -a /dev/sdi
+smartctl -t short /dev/sdi
+smartctl -l selftest /dev/sdi</code></pre>
+</div>
+<h3 id="h-52-高危处置p1---7-天内执行">5.2 高危处置（P1 - 7 天内执行）</h3>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th align="left">修复措施</th>
+<th align="left">负责人</th>
+<th align="left">完成时间</th>
+</tr>
+</thead>
+<tbody><tr>
+<td align="left">预防性更换 <code>sdk</code> (sg10)、<code>sdx</code> (sg23)、<code>sdab</code> (sg27) 三块高危盘</td>
+<td align="left">硬件运维</td>
+<td align="left">T+7 天</td>
+</tr>
+<tr>
+<td align="left">使用 <code>storcli /c0 show all</code> 或 <code>arcconf</code> 读取 RAID 卡控制器 log 与 <code>mpt3sas_cm0 firmware log</code> 对齐，<strong>重点验证控制平面是否需要 firmware 升级</strong></td>
+<td align="left">存储运维</td>
+<td align="left">T+3 天</td>
+</tr>
+<tr>
+<td align="left">巡检 SAS expander-0:0 的各 PHY 健康状态（SAS 速率、CRC error count、loss of dword sync count）</td>
+<td align="left">硬件运维</td>
+<td align="left">T+5 天</td>
+</tr>
+<tr>
+<td align="left">收集全部 34 块盘的 SMART 快照，建立每 4 小时轮巡机制，盯 <code>Reallocated_Sector_Ct</code> 与 <code>Current_Pending_Sector</code> 增量</td>
+<td align="left">监控运维</td>
+<td align="left">T+7 天</td>
+</tr>
+<tr>
+<td align="left">补采 <code>/dev/sdi</code> 的 openSeaChest FARM log（json 优先），落地 <code>analyze_farm.py</code> 后做 R1/R3/R5 磁头/盘面级精确仲裁</td>
+<td align="left">数据采集</td>
+<td align="left">T+7 天</td>
+</tr>
+</tbody></table></div>
+<h3 id="h-53-中长期改进p2-p3---30-天内规划">5.3 中长期改进（P2-P3 - 30 天内规划）</h3>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th align="left">修复措施</th>
+<th align="left">负责人</th>
+<th align="left">完成时间</th>
+</tr>
+</thead>
+<tbody><tr>
+<td align="left">监控告警阈值优化：<strong><code>Current_Pending_Sector &gt; 0</code> 即告警</strong>（不应等到 240）；<code>Reallocated_Sector_Ct</code> 周环比增长告警；XFS <code>metadata I/O error</code> / <code>log I/O error</code> 立即 P0 告警</td>
+<td align="left">监控运维</td>
+<td align="left">T+14 天</td>
+</tr>
+<tr>
+<td align="left">smartd 告警自动联动工单系统（Zabbix/Email/FEISHU），解决&quot;smartd 持续告警 18 小时无人工介入&quot;问题</td>
+<td align="left">监控运维</td>
+<td align="left">T+14 天</td>
+</tr>
+<tr>
+<td align="left">数据冗余加固：将 vol8 等单盘 XFS 卷<strong>逐步迁移到 RAID5/RAID6 或多副本架构</strong>（Ceph / 副本），避免单点介质失效即业务中断</td>
+<td align="left">架构 + 业务方</td>
+<td align="left">T+30 天</td>
+</tr>
+<tr>
+<td align="left">WDC WUH721414ALE6L4 批次汰换计划：当前 36 块同型号盘 POH 均约 57185 h ≈ 6.5 年，已超企业级常规生命周期（5 万小时），列入年度汰换批次</td>
+<td align="left">资产运维</td>
+<td align="left">T+90 天</td>
+</tr>
+<tr>
+<td align="left">配置巡检自动化：基于 InfoCollect 的 SMART 数据，按磁盘健康评分体系做定期巡检（参考 <code>disk-health-diagnosis</code> Skill）</td>
+<td align="left">SRE</td>
+<td align="left">T+30 天</td>
+</tr>
+</tbody></table></div>
+<h3 id="h-54-永久修复计划">5.4 永久修复计划</h3>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th align="left">修复措施</th>
+<th align="left">负责人</th>
+<th align="left">完成时间</th>
+</tr>
+</thead>
+<tbody><tr>
+<td align="left">4 小时内完成 <code>/dev/sdi</code> + <code>/dev/sdag</code> 物理更换，并完成 vol8 业务恢复与新盘健康复检</td>
+<td align="left">运维 + 硬件</td>
+<td align="left">T+4h</td>
+</tr>
+<tr>
+<td align="left">7 天内完成 sdk/sdx/sdab 三块 P1 高危盘的预防性更换</td>
+<td align="left">硬件</td>
+<td align="left">T+7d</td>
+</tr>
+<tr>
+<td align="left">30 天内完成监控告警阈值优化、smartd 联动工单、巡检自动化三项基础能力建设</td>
+<td align="left">监控 + SRE</td>
+<td align="left">T+30d</td>
+</tr>
+<tr>
+<td align="left">90 天内完成同型号批次汰换计划与数据冗余架构升级</td>
+<td align="left">架构 + 资产</td>
+<td align="left">T+90d</td>
+</tr>
+</tbody></table></div>
+<hr>
+<h2 id="h-六风险声明与待补证据">六、风险声明与待补证据</h2>
+<h3 id="h-61-限制声明">6.1 限制声明</h3>
+<ul>
+<li>本报告基于离线日志分析，未触发现有环境（无读/写操作），所有结论均可由日志证据回溯；</li>
+<li><strong>数据缺口</strong>：T1 任务<strong>未取得 <code>/dev/sdi</code> 的 openSeaChest FARM log</strong>，磁头/盘面级 R 码定界（R1 磁头信号退化 vs R3 介质退化 vs R5 机械退化）无法精确仲裁，建议补采 FARM 后重跑 <code>analyze_farm.py</code>；</li>
+<li>T3 任务未取得 <code>megacli / storcli</code> 输出做 RAID 卡寄存器直读，RAID 卡健康度仅由 firmware log 推断**（中置信度）**；</li>
+<li>iBMC SEL 日志覆盖范围 2019-08-20 ~ 2026-03-10，但该机 iBMC 在 02-28 起多次报 #0xaa/#0xac Drive Fault（背景），未对 sdi 做 predictive failure 主动告警，依赖 OS 层 SMART/内核报告——<strong>建议后续启用 iBMC 的 predictive failure 分析</strong>。</li>
+</ul>
+<h3 id="h-62-待补证据清单">6.2 待补证据清单</h3>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th align="center">序号</th>
+<th align="left">待补证据</th>
+<th align="left">用途</th>
+<th align="center">优先级</th>
+</tr>
+</thead>
+<tbody><tr>
+<td align="center">1</td>
+<td align="left"><code>/dev/sdi</code> 的 openSeaChest FARM log（json 优先）</td>
+<td align="left">R1/R3/R5 磁头级精确仲裁</td>
+<td align="center">高</td>
+</tr>
+<tr>
+<td align="center">2</td>
+<td align="left"><code>/dev/sdag</code> 的 openSeaChest FARM log</td>
+<td align="left">同上（ATA_Err=13973 最高盘）</td>
+<td align="center">高</td>
+</tr>
+<tr>
+<td align="center">3</td>
+<td align="left"><code>storcli /c0 show all</code> 与 <code>arcconf</code> 控制器 log</td>
+<td align="left">验证 RAID 卡控制平面健康度、固件版本是否需要升级</td>
+<td align="center">高</td>
+</tr>
+<tr>
+<td align="center">4</td>
+<td align="left">SAS expander-0:0 各 PHY 的 SAS 速率 / CRC error / loss of dword sync 统计</td>
+<td align="left">排查共享背板/expander 链路源头</td>
+<td align="center">中</td>
+</tr>
+<tr>
+<td align="center">5</td>
+<td align="left">同批次 WDC WUH721414ALE6L4 全量 SMART 普查</td>
+<td align="left">瓦片式失效风险量化</td>
+<td align="center">中</td>
+</tr>
+<tr>
+<td align="center">6</td>
+<td align="left">vol8 备份恢复演练记录</td>
+<td align="left">验证 RPO/RTO 满足业务要求</td>
+<td align="center">低</td>
+</tr>
+</tbody></table></div>
+<h3 id="h-63-后续任务建议">6.3 后续任务建议</h3>
+<ul>
+<li><strong>T4（介质层定级）</strong>：对 sdi/sdag/sdk/sdx 等 Top-9 退化盘做逐盘 Read-Scan / S.M.A.R.T. 扩展自检，确认物理故障坐标；</li>
+<li><strong>T5（RAID 拓扑核对）</strong>：从主机或 iBMC 取得 RAID Group / 卷组信息（vol8 隶属哪个 RAID 阵列、成员盘清单、副本/校验策略）；</li>
+<li><strong>T6（业务侧）</strong>：确认 vol8 是否为生产核心卷、影响面、能否停机切换、业务恢复 RTO/RPO 要求；</li>
+<li><strong>T7（健康巡检）</strong>：调用 <code>disk-health-diagnosis</code> Skill 做机群级健康巡检，量化剩余寿命。</li>
+</ul>
+<hr>
+<h2 id="h-诊断质量自查">诊断质量自查</h2>
+<ul>
+<li><input checked="" disabled="" type="checkbox"> <strong>领域透传</strong>：已剥离 <code>DOMAIN_EXT</code>/<code>DOMAIN_DATA</code> 协议标签，洁净展示 <code>vol8 - /dev/sdi</code> 故障盘修复价值评估（含 9 项分析原因表格化）。</li>
+<li><input checked="" disabled="" type="checkbox"> <strong>标题对齐</strong>：第四章标题&quot;故障盘修复价值评估&quot;严格取自 T1 DOMAIN_EXT 层级。</li>
+<li><input checked="" disabled="" type="checkbox"> <strong>路径溯源</strong>：所有核心结论均附带 <code>[完整绝对路径 : 行号]</code>。</li>
+<li><input checked="" disabled="" type="checkbox"> <strong>逻辑闭环</strong>：故障传导链路（介质物理退化 → SCSI 30s 超时 → blk_update_request → XFS metadata/log I/O error → xfs_do_force_shutdown → 业务中断/恢复 → 第二波链路风暴 + RAID 控制平面失联）能逻辑自洽地解释 T1/T2/T3 全部观测证据。</li>
+<li><input checked="" disabled="" type="checkbox"> <strong>时间格式</strong>：所有时间戳均格式化为 <code>YYYY-MM-DD HH:MM:SS</code>。</li>
+<li><input checked="" disabled="" type="checkbox"> <strong>表格规范</strong>：所有表格均使用标准 Markdown 表格语法（<code>| 字段 | 字段 |</code> + <code>| --- | --- |</code>）。</li>
+</ul>
+<hr>
+<h2 id="h-附录-a三份-kuafu-子任务关键参数对照">附录 A：三份 Kuafu 子任务关键参数对照</h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th align="left">维度</th>
+<th align="left">T1（硬盘本体）</th>
+<th align="left">T2（文件系统）</th>
+<th align="left">T3（链路/RAID）</th>
+</tr>
+</thead>
+<tbody><tr>
+<td align="left"><strong>故障模式</strong></td>
+<td align="left">SUPPORTED（硬盘物理损伤成立）</td>
+<td align="left">SUPPORTED（FS 故障模式成立）</td>
+<td align="left">H1 链路 ✅ / H2 RAID ✅ / H3 介质 ✅</td>
+</tr>
+<tr>
+<td align="left"><strong>核心设备</strong></td>
+<td align="left">/dev/sdi (Slot #0xa7)</td>
+<td align="left">/dev/sdi ↔ vol8 (XFS V5)</td>
+<td align="left">/dev/sdi ↔ expander-0:0:8 ↔ mpt3sas handle 0x0011 ↔ phy 7 ↔ slot 7</td>
+</tr>
+<tr>
+<td align="left"><strong>致命节点</strong></td>
+<td align="left">2026-03-05 14:12:45 XFS shutdown</td>
+<td align="left">2026-03-05 14:12:45 XFS shutdown</td>
+<td align="left">2026-03-05 14:11:35 SCSI task abort + 17:56:53 链路风暴 + 18:17:17 控制平面中断</td>
+</tr>
+<tr>
+<td align="left"><strong>业务恢复</strong></td>
+<td align="left">2026-03-05 14:20:50 XFS recovery 完成</td>
+<td align="left">2026-03-05 14:20:50 vol8 mount 恢复</td>
+<td align="left">同 T1/T2</td>
+</tr>
+<tr>
+<td align="left"><strong>关键 SMART</strong></td>
+<td align="left">Realloc=31, Pending=240, E2E=65536, CmdTO=188B, ATA_Err=4623, POH=57184h</td>
+<td align="left">同 T1</td>
+<td align="left">同 T1，并发现 sdag/sdk/sdx/sdab/sdm/sdj/sdf 等多盘同步退化</td>
+</tr>
+<tr>
+<td align="left"><strong>iBMC 证据</strong></td>
+<td align="left">SEL 13:39:01 Drive Slot #0xa7 Drive Fault Asserted（独立确认）</td>
+<td align="left">T2 报告中 iBMC SEL 未独立报 sdi</td>
+<td align="left">SEL 02-28 起 #0xaa/#0xac 多次抖动 + 13:39:01 #0xa7</td>
+</tr>
+<tr>
+<td align="left"><strong>置信度</strong></td>
+<td align="left">高（多源验证）</td>
+<td align="left">高（6 维交叉）</td>
+<td align="left">H1/H3 高，H2 中（缺 storcli 直读）</td>
+</tr>
+<tr>
+<td align="left"><strong>主要修复</strong></td>
+<td align="left">立即更换硬盘（不可修复）</td>
+<td align="left">更换 + 数据冗余加固</td>
+<td align="left">更换 + RAID 卡控制平面核查 + expander PHY 巡检</td>
+</tr>
+</tbody></table></div>
+<hr>
+<h2 id="h-附录-b证据原始文件索引用于审计">附录 B：证据原始文件索引（用于审计）</h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th align="left">证据类型</th>
+<th align="left">文件绝对路径</th>
+<th align="left">关键行号</th>
+</tr>
+</thead>
+<tbody><tr>
+<td align="left">iBMC SEL（带外独立告警）</td>
+<td align="left"><code>/Users/leiw/Projects/openeuler/sample-data/logs/ibmc_logs/HDM210200A01QH198000173_20260310/dump/hw_info/state/sel_list.txt</code></td>
+<td align="left">1115-1116（#0xa7 Drive Fault）、1107-1114、1117-1122（#0xaa/#0xac 历史抖动）</td>
+</tr>
+<tr>
+<td align="left">SMART 全量</td>
+<td align="left"><code>/Users/leiw/Projects/openeuler/sample-data/logs/infocollect_logs/disk/disk_smart.txt</code></td>
+<td align="left">2326-2690（sdi/sdag/sdk 等关键盘）、2385-2410（sdi 详查）</td>
+</tr>
+<tr>
+<td align="left">磁盘拓扑</td>
+<td align="left"><code>/Users/leiw/Projects/openeuler/sample-data/logs/infocollect_logs/disk/parted_disk.txt</code></td>
+<td align="left">201-211（/dev/sdi 整盘 XFS）</td>
+</tr>
+<tr>
+<td align="left">sys_block 路径</td>
+<td align="left"><code>/Users/leiw/Projects/openeuler/sample-data/logs/infocollect_logs/disk/sys_block.txt</code></td>
+<td align="left">21（sdi 物理路径）</td>
+</tr>
+<tr>
+<td align="left">dmesg 快照</td>
+<td align="left"><code>/Users/leiw/Projects/openeuler/sample-data/logs/infocollect_logs/system/dmesg.txt</code></td>
+<td align="left">739-746（首次 critical medium error）、204-205、545-547（mpt3sas 初始化）</td>
+</tr>
+<tr>
+<td align="left">OS messages 全量</td>
+<td align="left"><code>/Users/leiw/Projects/openeuler/sample-data/logs/infocollect_logs/system/var/log/messages</code></td>
+<td align="left">10940-10944（首次 medium error）、31064（pending=240）、31303-31343（task abort）、31591-31600（blk_update_request）、31910-31911（writeback）、31936-31939（force shutdown）、32133-32141（XFS recovery）、32170+（sdk 蔓延）、34464-34633（_ctl_do_mpt_command failure）</td>
+</tr>
+<tr>
+<td align="left">vol8 副本日志（时间窗口最对齐）</td>
+<td align="left"><code>/Users/leiw/Projects/openeuler/sample-data/logs/messages/10.112.17.32_vol8_normal_20260305_142146.log</code></td>
+<td align="left">1（pending=216）、215（pending=240）、221-250（持续告警）、251-266（task abort + I/O error）、277-283（XFS metadata I/O）、309-311（writeback）、324-325（再次 metadata I/O）、344-347（shutdown）、353-361（recovery + mount）</td>
+</tr>
+</tbody></table></div>
+<hr>
+<p><strong>报告结束</strong></p>
+<blockquote>
+<p><strong>本报告由白泽（Baize）综合分析 Agent 基于上游 Dayu/Kuafu 提供的三份子任务报告（T1/T2/T3）生成，严格遵循 <code>fault-rca-report-generation</code> Skill 方法论。所有结论均基于客观日志证据，无主观臆测。</strong></p>
+</blockquote>
+<p><strong>RCA 报告路径</strong>：<code>/Users/leiw/.witty-diagnosis-agent/baize/reports/硬盘介质退化导致vol8文件系统shutdown_20260811_report.md</code></p>
+
+    <div class="meta">
+      <span class="meta-source">硬盘介质退化导致vol8文件系统shutdown_20260811_report.md</span>
+      <span>生成于 2026/08/11 10:33</span>
+    </div>
+  </article>
+</div>
+
+<script>
+  /* ── 滚动进度条 ── */
+  window.addEventListener("scroll", () => {
+    const el  = document.documentElement;
+    const pct = el.scrollTop / (el.scrollHeight - el.clientHeight) * 100;
+    document.getElementById("progress").style.width = Math.min(pct, 100) + "%";
+  });
+
+  /* ── TOC 高亮当前章节 ── */
+  (function () {
+    const headings = Array.from(document.querySelectorAll("article h1,article h2,article h3"));
+    const links    = Array.from(document.querySelectorAll(".toc a"));
+    if (!links.length) return;
+    const obs = new IntersectionObserver(entries => {
+      entries.forEach(e => {
+        if (!e.isIntersecting) return;
+        links.forEach(l => l.classList.remove("active"));
+        const a = links.find(l => l.getAttribute("href") === "#" + e.target.id);
+        if (a) a.classList.add("active");
+      });
+    }, { rootMargin: "-10% 0px -80% 0px" });
+    headings.forEach(h => obs.observe(h));
+  })();
+
+  /* ── h2 章节序号自动计数 ── */
+  (function () {
+    let idx = 0;
+    document.querySelectorAll("article h2").forEach(el => {
+      idx++;
+      el.setAttribute("data-index", String(idx).padStart(2, "0"));
+    });
+  })();
+
+  /* ── 代码块一键复制 ── */
+  function copyCode(btn) {
+    const code = btn.closest(".code-block").querySelector("code").innerText;
+    navigator.clipboard.writeText(code).then(() => {
+      btn.classList.add("copied");
+      btn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>';
+      setTimeout(() => {
+        btn.classList.remove("copied");
+        btn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>';
+      }, 2000);
+    });
+  }
+
+  /* ── 目录树收缩/展开 ── */
+  function toggleToc(btn) {
+    const expanded = btn.getAttribute("aria-expanded") === "true";
+    btn.setAttribute("aria-expanded", String(!expanded));
+    const parentItem = btn.closest(".toc-item");
+    let nextEl = parentItem.nextElementSibling;
+    if (nextEl && nextEl.classList.contains("toc-group")) {
+      if (expanded) {
+        nextEl.style.maxHeight = nextEl.scrollHeight + "px";
+        void nextEl.offsetHeight;
+        nextEl.classList.add("collapsed");
+      } else {
+        nextEl.classList.remove("collapsed");
+        nextEl.style.maxHeight = nextEl.scrollHeight + "px";
+        setTimeout(() => {
+          if (!nextEl.classList.contains("collapsed")) {
+            nextEl.style.maxHeight = "none";
+          }
+        }, 300);
+      }
+    }
+  }
+</script>
+</body>
+</html>

@@ -240,6 +240,8 @@ packages/
 witty-diagnosis.jsonc
 test_temp/
 src/report-visualization/data/
+.aet/
+.opencode/package-lock.json
 
 # 插件运行时在项目目录生成的技能软链接（非源码）
 .opencode/skills/

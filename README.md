@@ -280,6 +280,9 @@ opencode
 4）系统将自动执行智能诊断流程，分析硬盘故障原因并输出诊断报告。
 
    <img src="docs/assets/hard_disk_fault_diagnosis_report.png" alt="hard_disk_fault_diagnosis_report" width="800" />
+
+5）本案例输出报告：[硬盘介质退化导致 vol8 文件系统 shutdown](docs/reference/reports/hard_disk_fault_diagnosis_report_2.html)。
+
 ---
 
 ### 火焰图性能分析示例
