@@ -52,14 +52,27 @@
 ### 2.1 前置环境
 
 ```bash
-sudo dnf install -y rpm-build rpmdevtools nodejs npm git tar
+sudo dnf install -y rpm-build rpmdevtools git tar
 ```
 
-确认 Node.js ≥ 20（`package.json` 的硬性要求）：
+Node.js ≥ 20 需自行准备（`package.json` 的硬性要求）。openEuler 22.03 默认源里是 v16，需从 NodeSource 安装：
+
+```bash
+curl -fsSL https://rpm.nodesource.com/setup_20.x | bash - && dnf install -y nodejs
+```
+
+确认版本：
 
 ```bash
 node -v
 ```
+
+> spec **默认不声明 `BuildRequires: nodejs/npm`**，改由 `build-rpm.sh` 在构建前实际执行 `node -v` 检查。这样经 NodeSource / nvm 安装的 Node（不在 rpm 数据库内）也能正常构建，无需 `--nodeps`。
+>
+> 若需恢复标准依赖声明（例如提交 openEuler 官方源），带 `--with strictdeps` 构建：
+> ```bash
+> rpmbuild -ba --with strictdeps ~/rpmbuild/SPECS/witty-diagnosis-agent.spec
+> ```
 
 ### 2.2 一键打包
 
@@ -67,12 +80,23 @@ node -v
 bash packaging/build-rpm.sh
 ```
 
-脚本会自动完成：环境检查 → 打包源码 → 准备 `~/rpmbuild` 目录树 → 执行 `rpmbuild`。
+脚本会自动完成：环境检查 → 打包源码 → 准备 `~/rpmbuild` 目录树 → 执行 `rpmbuild`
+→ 收集产物到项目下的 `rpm-out/`。
 
-产物位于 `~/rpmbuild/RPMS/noarch/`，形如：
+产物位于项目根目录的 `rpm-out/`：
 
 ```
-witty-diagnosis-agent-0.10.0-1.beta.oe2403.noarch.rpm
+rpm-out/witty-diagnosis-agent-0.10.0-1.beta.noarch.rpm      # 安装用
+rpm-out/witty-diagnosis-agent-0.10.0-1.beta.src.rpm         # 源码包
+```
+
+（rpmbuild 自身的工作区仍是 `~/rpmbuild/`，`rpm-out/` 是构建完成后的拷贝。
+`rpm-out/` 已在 `.gitignore` 中排除，不会误提交。每次构建会先清理同名旧产物。）
+
+安装：
+
+```bash
+sudo dnf install rpm-out/witty-diagnosis-agent-0.10.0-1.beta.noarch.rpm
 ```
 
 ### 2.3 离线构建
@@ -92,7 +116,7 @@ bash packaging/build-rpm.sh --vendor
 在项目根目录执行：
 
 ```bash
-docker run --rm -v "$PWD":/src -w /src openeuler/openeuler:24.03 bash -c "dnf install -y rpm-build rpmdevtools nodejs npm git tar && bash packaging/build-rpm.sh && cp -r /root/rpmbuild/RPMS/noarch /src/rpm-out"
+docker run --rm -v "$PWD":/src -w /src openeuler/openeuler:24.03 bash -c "dnf install -y rpm-build rpmdevtools nodejs npm git tar && bash packaging/build-rpm.sh"
 ```
 
 产物会落到项目下的 `rpm-out/` 目录。
@@ -135,10 +159,14 @@ sudo dnf install ./witty-diagnosis-agent-0.10.0-1.beta.oe2403.noarch.rpm
 
 **依赖说明：**
 
-- 硬依赖 `nodejs >= 20`、`ansible` —— dnf 自动拉取
-- 弱依赖（诊断工具）—— dnf 默认一并安装，装不上不阻塞：
-  `strace` `perf` `gdb` `sysstat` `iproute` `smartmontools` `ipmitool` `tcpdump` `dmidecode` `ltrace` `numactl` `nvme-cli` `ethtool` `python3`
-- **还需要 OpenCode 或 xiaoO**（至少一个），作为插件宿主，需自行安装
+本包**全部依赖均为弱依赖（`Recommends`）**，dnf 默认会尝试安装，但缺失时不阻塞装包：
+
+- `nodejs >= 20`、`ansible` —— 运行必需，但**故意不写成 `Requires`**
+- 诊断工具 —— 按需调用：`strace` `perf` `gdb` `sysstat` `iproute` `smartmontools` `ipmitool` `tcpdump` `dmidecode` `ltrace` `numactl` `nvme-cli` `ethtool` `python3`
+
+> **为什么 Node 不设硬依赖？** 实践中 Node.js 常通过 NodeSource / nvm / 手工解压安装，这些方式装的 Node **不在 rpm 数据库内**（`rpm -q nodejs` 查无此包）。若写成 `Requires: nodejs >= 20`，这类机器即使 `node -v` 完全正常也**装不上包**。改为弱依赖后：dnf 仍会尝试从源里装，已自备 Node 的机器不受阻，真正缺失时由 wrapper 与 `doctor` 给出明确运行时提示。
+
+**还需要 OpenCode 或 xiaoO**（至少一个），作为插件宿主，需自行安装。
 
 ### 第 2 步：注册（普通用户，**不要用 sudo**）
 
@@ -234,7 +262,9 @@ rm -rf ~/.witty-diagnosis-agent ~/.config/opencode/witty-diagnosis-agent.jsonc
 | 配置写进了 root 家目录 | 注册时误用 sudo | 切回普通用户重新执行 |
 | 技能报「命令未找到」 | 弱依赖未安装 | 按第三节补装对应诊断工具 |
 | 构建时 `npm ci` 失败 | 构建机无网络 | 改用 `build-rpm.sh --vendor` |
-| 构建报 Node 版本过低 | Node < 20 | 升级 Node.js |
+| 构建报 Node 版本过低 | Node < 20 | 从 NodeSource 装 Node 20 |
+| 构建报 `nodejs >= 20 is needed` | 用了 `--with strictdeps` 但 Node 不在 rpm 库内 | 去掉该开关，或加 `--nodeps` |
+| `%changelog` 日期告警 | 星期与日期不匹配 | 仅告警，不影响产物 |
 
 查看包内文件清单：
 
@@ -258,13 +288,44 @@ rpm -ql witty-diagnosis-agent
 - `skill-gen/third_party/Skill_Seekers`（git 子模块，开发期工具）
 - `test/`、`smoke/`、`node_modules/`
 
-### 三个关键设计点
+### 四个关键设计点
 
 **1. 为什么不打包 `node_modules`？**
 
-tsup 将全部 9 个运行时依赖 bundle 进 `dist/`，且均为纯 JS（`zod`/`commander`/`marked`/`@clack/prompts` 等），无原生扩展。因此产物仅 496K，且可声明 `BuildArch: noarch`，x86_64 与 aarch64 通用 —— 无需逐个 npm 包做 RPM。
+tsup 将全部运行时依赖 bundle 进 `dist/`，且均为纯 JS（`zod`/`commander`/`marked`/`@clack/prompts` 等），无原生扩展。因此 RPM 包体仅 1.5M，且可声明 `BuildArch: noarch`，x86_64 与 aarch64 通用 —— 无需逐个 npm 包做 RPM。
 
-**2. 为什么 `package.json` 必须安装？**
+但这个「全部 bundle 进去」并非 tsup 的默认行为，需要显式配置，见下一条。
+
+**2. `tsup.config.ts` 的 `noExternal` 与 banner 不可删除** ⚠️
+
+这是本方案最脆弱的一环，改动前务必读完。
+
+**tsup 默认把 `package.json` 的 `dependencies` 视为 external，不会打进产物。** 由于 RPM 不分发 `node_modules`，若沿用默认行为，打出的包会是这样：
+
+- `rpmbuild` 全程无错误，包体正常生成
+- `rpm -qlp` 文件清单完整，`dist/cli.js` 等入口一个不少
+- 但用户一执行就崩：`Error [ERR_MODULE_NOT_FOUND]: Cannot find package 'commander'`
+
+也就是说，**文件齐全 ≠ 能跑**，任何只检查文件存在性的校验都拦不住它。
+
+因此 `tsup.config.ts` 中有两项配置，缺一不可：
+
+```ts
+noExternal: [/.*/],   // 强制内联全部依赖
+banner: {             // 补 require —— 内联进来的 CJS 依赖仍会调用它
+  js: 'import{createRequire as __cr}from"node:module";const require=__cr(import.meta.url);',
+},
+```
+
+只加 `noExternal` 仍然不够：`commander` 等 CJS 包被内联后，其自身代码里的 `require()` 在 ESM 产物中无定义，会抛 `Error: Dynamic require of "events" is not supported` —— 报错方式变了，但依旧是坏包。
+
+代价是 `dist/` 从 496K 增至约 2.3M（RPM 包体 1.5M），换取「目标机器零依赖即可运行」。
+
+**兜底**：`spec` 的 `%build` 段末尾有一段冒烟自检，会把 `dist/` 拷到无 `node_modules` 的临时目录真正启动一次 `cli.js --help` 与 `index.js`。任一失败即中断构建。这道检查是专门为防止本条被误删而设的，请勿一并移除。
+
+> **注意**：`tsup.config.ts` 是主构建配置，非打包专用。此改动同样影响 npm 发布产物（包体变大，但同样修掉了依赖缺失问题）。如果 npm 链路需要保留 external 行为，需拆分为两套构建配置。
+
+**3. 为什么 `package.json` 必须安装？**
 
 `src/witty/shared/paths.ts` 的 `packageRootDir()` 通过「向上最多 6 层查找 package.json」来定位包根；配置 schema 中 `skills_dir` 默认值为相对路径 `"skills"`，由 `resolveSkillsDir()` 拼接包根得到。
 
@@ -280,7 +341,7 @@ tsup 将全部 9 个运行时依赖 bundle 进 `dist/`，且均为纯 JS（`zod`
 
 **这正是「无需修改任何代码」的前提** —— 现有路径解析逻辑在 FHS 布局下天然可用。
 
-**3. 为什么用 wrapper 而非软链接？**
+**4. 为什么用 wrapper 而非软链接？**
 
 `dist/cli.js` 自带 `#!/usr/bin/env node`，理论上软链接可行。但软链接场景下 `import.meta.url` 在部分 Node 版本会解析到链接自身，干扰上述包根查找。wrapper 使用真实绝对路径 exec，规避此类边界问题。
 

@@ -61,7 +61,7 @@ Witty 智能诊断 Agent 采用“Agent-Skill-工具-知识”四层解耦架构
 
 #### 安装与配置
 
-Witty 智能诊断 Agent 支持**在线安装**与**源码安装**两种方式，请根据您的网络环境选择合适的安装方式。
+Witty 智能诊断 Agent 支持**在线安装**、**源码安装**与 **RPM 包安装**，请根据您的网络环境与系统类型选择合适的安装方式。
 
 ##### 方式一：在线安装（推荐）
 
@@ -88,6 +88,33 @@ tar -xzvf witty-diagnosis-agent-v0.6.0-beta.tar.gz
 cd witty-diagnosis-agent-v0.6.0-beta
 bash install.sh
 ```
+
+##### 方式四：RPM 包安装（适用于 openEuler 等 RPM 系发行版）
+
+适合在多台机器批量部署，或希望由系统包管理器统一管理安装与卸载的场景。安装分两步：**装包**（root，一次）与**注册**（每个使用者各一次）。
+
+```bash
+# 第 1 步：装包（root）
+sudo dnf install -y witty-diagnosis-agent-0.10.0-1.beta.noarch.rpm
+
+# 第 2 步：注册到个人 OpenCode 配置（普通用户，不要用 sudo）
+witty-diagnosis-agent install
+
+# 验证
+witty-diagnosis-agent doctor
+```
+
+> ⚠️ 第 2 步**不要加 sudo**。该命令写入的是 `~/.config/opencode/`，用 sudo 会写到 root 家目录，导致普通用户实际用不了。
+
+包为 `noarch`，x86_64 与 aarch64 通用；运行依赖已全部内联进产物，目标机器无需安装 npm 依赖。
+
+自行构建 RPM 包（需在 Linux 构建机上执行）：
+
+```bash
+bash packaging/build-rpm.sh
+```
+
+产物输出到项目下的 `rpm-out/`。完整的打包、离线构建、升级卸载与故障排查说明见 **[packaging/README.md](packaging/README.md)**。
 
 ---
 
