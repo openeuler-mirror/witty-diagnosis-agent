@@ -243,3 +243,13 @@ src/report-visualization/data/
 
 # 插件运行时在项目目录生成的技能软链接（非源码）
 .opencode/skills/
+
+# RPM 构建产物（packaging/build-rpm.sh 输出到此）
+rpm-out/
+*.rpm
+
+# RPM spec 是源码而非产物，必须入库。
+# 上面第 56 行的 `*.spec` 来自 Python 模板的 PyInstaller 段（PyInstaller 会
+# 生成同后缀的临时文件），与 RPM 无关，会误伤本文件——此处显式放行。
+# 否则 packaging/build-rpm.sh 在新克隆的仓库中会直接报「未找到 spec 文件」。
+!packaging/*.spec
