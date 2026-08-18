@@ -39,12 +39,16 @@ export async function createWittyHooks(input: PluginInput): Promise<Hooks> {
   // 技能暴露（幂等）；受门控的技能在开关关闭时不暴露并回收旧链接
   const skillsDir = resolveSkillsDir(pluginConfig.skills_dir)
   const skills = discoverSkills(skillsDir)
-  const exposeResult = exposeSkillsToOpenCode(skills, input.directory, { knownIssueEnabled })
+  const exposeResult = exposeSkillsToOpenCode(skills, input.directory, skillsDir, { knownIssueEnabled })
   log("plugin: 技能暴露完成", {
+    mode: exposeResult.mode,
     discovered: skills.length,
     exposed: exposeResult.exposed.length,
     skipped: exposeResult.skipped.length,
     withheld: exposeResult.withheld.length,
+    repointed: exposeResult.repointed.length,
+    pruned: exposeResult.pruned.length,
+    unmanaged: exposeResult.unmanaged,
   })
 
   // 会话内状态

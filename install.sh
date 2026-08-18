@@ -319,6 +319,43 @@ else
   print_success "Only xiaoO was detected; installing to xiaoO"
 fi
 
+# 技能清单文件名：记录上次安装写入的技能，用于识别「本次安装应当移除」的技能。
+# 不靠「目录里有 SKILL.md」来判断归属——那会误删用户自行放入的技能。
+SKILLS_MANIFEST=".witty-skills-manifest"
+
+# 把源技能目录同步到目标目录（copy 形态，用于 xiaoO / 打包等软链不可用的场景）。
+#
+# 相比裸 cp 多做两件事，二者缺一都会导致目标目录腐化：
+#   1) 用 cp -a 保留权限位——skills/ 下有 20 余个 .sh/.py 需要可执行位，cp -R 会丢；
+#   2) 按清单对账，移除上次装过、本次源中已不存在的技能——否则被删除/改名的技能
+#      会永久残留，继续对所有 agent 可见。
+sync_skills() {
+  local src="$1" dst="$2"
+  local manifest="${dst}/${SKILLS_MANIFEST}"
+
+  mkdir -p "$dst"
+
+  # 1) 对账：清单中存在、但源中已无的技能予以移除
+  if [ -f "$manifest" ]; then
+    local removed=0 name
+    while IFS= read -r name; do
+      [ -n "$name" ] || continue
+      case "$name" in */*|.|..) continue ;; esac   # 防御异常清单条目
+      if [ ! -d "${src}/${name}" ] && [ -d "${dst}/${name}" ]; then
+        rm -rf "${dst:?}/${name}"
+        removed=$((removed + 1))
+      fi
+    done < "$manifest"
+    [ "$removed" -gt 0 ] && print_success "Removed ${removed} skill(s) no longer in source"
+  fi
+
+  # 2) 拷贝：-a 保留权限位与时间戳
+  cp -a "${src}/." "${dst}/"
+
+  # 3) 写入本次清单
+  ( cd "$src" && for d in */; do [ -f "${d}SKILL.md" ] && printf '%s\n' "${d%/}"; done ) > "$manifest"
+}
+
 install_xiaoo() {
   print_step 3 5 "Installing xiaoO assets"
 
@@ -333,8 +370,12 @@ install_xiaoo() {
   fi
 
   mkdir -p "${XIAOO_HOME}/command" "${XIAOO_HOME}/skills" "${XIAOO_HOME}/tools" "${XIAOO_CONFIG_DIR}"
-  cp -R "${SCRIPT_DIR}/skills/." "${XIAOO_HOME}/skills/"
+  sync_skills "${SCRIPT_DIR}/skills" "${XIAOO_HOME}/skills"
   print_success "xiaoO skills installed ${ARROW} ${XIAOO_HOME}/skills"
+  if [ -d "${SCRIPT_DIR}/skills-gated" ]; then
+    sync_skills "${SCRIPT_DIR}/skills-gated" "${XIAOO_HOME}/skills-gated"
+    print_success "xiaoO gated skills installed ${ARROW} ${XIAOO_HOME}/skills-gated"
+  fi
   cp -R "${XIAOO_ASSETS_DIR}/command/." "${XIAOO_HOME}/command/"
   print_success "xiaoO command installed ${ARROW} ${XIAOO_HOME}/command"
   cp -R "${XIAOO_ASSETS_DIR}/tools/." "${XIAOO_HOME}/tools/"
