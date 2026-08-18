@@ -509,9 +509,9 @@ python3 scripts/analyze_farm.py <log_dir>/farmlog --json
 3.  **故障盘修复价值评估**
     *   **协议封装**：输出时必须使用双层协议标签包裹。若涉及多块磁盘，需分开描述：
         <!-- DOMAIN_EXT_START-->
-        ## 标题： 故障盘修复价值评估 
+        ** 标题：故障盘修复价值评估 **
         <!-- DOMAIN_DATA_START-->
-        ### 卷_id - SCSI 磁盘设备
+        ** 卷_id - SCSI 磁盘设备 **
         1. 故障盘结论：[结论描述，含修复/更换建议及原因]
         2. 故障盘标准化诊断对象：
         ```json
