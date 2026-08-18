@@ -156,6 +156,8 @@ cp -a dist %{buildroot}%{wittydir}/
 
 # 2) 诊断技能库（约 6.8M，49 个技能包）
 cp -a skills %{buildroot}%{wittydir}/
+# 门控技能（默认不暴露，需 CASE_KB_ID 才启用）单独成目录，使 skills/ 可整体软链
+cp -a skills-gated %{buildroot}%{wittydir}/
 
 # 3) xiaoO 目标所需资源（command / tools / config）
 install -d %{buildroot}%{wittydir}/src
@@ -176,8 +178,8 @@ install -m 0644 LICENSE     %{buildroot}%{_docdir}/%{name}/LICENSE
 install -m 0644 assets/%{name}.schema.json %{buildroot}%{_docdir}/%{name}/%{name}.schema.json
 
 # 技能脚本保持可执行位，供技能调用
-find %{buildroot}%{wittydir}/skills -type f -name "*.sh" -exec chmod 0755 {} \;
-find %{buildroot}%{wittydir}/skills -type f -name "*.py" -exec chmod 0755 {} \;
+find %{buildroot}%{wittydir}/skills %{buildroot}%{wittydir}/skills-gated -type f -name "*.sh" -exec chmod 0755 {} \;
+find %{buildroot}%{wittydir}/skills %{buildroot}%{wittydir}/skills-gated -type f -name "*.py" -exec chmod 0755 {} \;
 
 # 清理开发期残留
 find %{buildroot}%{wittydir} -name ".DS_Store" -delete
@@ -187,6 +189,7 @@ find %{buildroot}%{wittydir} -name ".DS_Store" -delete
 %dir %{wittydir}
 %{wittydir}/dist
 %{wittydir}/skills
+%{wittydir}/skills-gated
 %{wittydir}/src
 %{wittydir}/package.json
 %{_bindir}/%{name}

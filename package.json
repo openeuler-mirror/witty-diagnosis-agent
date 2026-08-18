@@ -30,6 +30,7 @@
     "dist",
     "postinstall.mjs",
     "skills",
+    "skills-gated",
     "src/xiaoO"
   ],
   "scripts": {
@@ -37,6 +38,7 @@
     "clean": "rm -rf dist",
     "postinstall": "node postinstall.mjs",
     "typecheck": "tsc --noEmit",
+    "test:skills": "tsx test/skills/exposure.test.ts && bash test/skills/sync-skills.test.sh",
     "build:schema": "tsx script/build-schema.ts"
   },
   "dependencies": {

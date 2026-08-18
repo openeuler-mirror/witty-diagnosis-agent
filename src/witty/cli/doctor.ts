@@ -6,7 +6,7 @@ import { execFileSync } from "node:child_process"
 import { wittyConfigSchema } from "../config/schema"
 import { readJsoncFile } from "../shared/jsonc"
 import { packageRootDir, resolveSkillsDir } from "../shared/paths"
-import { discoverSkills } from "../skills/discovery"
+import { discoverSkills, gatedSkillsDir, inspectSkillExposure } from "../skills/discovery"
 import { PLUGIN_NAME, REQUIRED_SUBAGENT_DEPTH, opencodeConfigDir, pluginEntryUrl } from "./install"
 
 /**
@@ -32,6 +32,7 @@ export async function runDoctor(): Promise<CheckResult[]> {
     checkSubagentDepth(),
     checkPluginConfig(),
     checkSkillsDir(),
+    checkSkillExposure(),
   ]
 }
 
@@ -155,6 +156,78 @@ function checkPluginConfig(): CheckResult {
         status: "fail",
         detail: `配置校验失败: ${parsed.error.issues.map((i) => `${i.path.join(".")}: ${i.message}`).join("; ")}`,
         remedy: "按 schema 修正配置键",
+      }
+}
+
+/**
+ * 检查当前项目实际在用哪一份 skill。
+ *
+ * 这一项回答排查中最关键、此前却无从得知的问题：项目级 `.opencode/skills` 指向哪里、
+ * 是否就是当前安装。历史上出现过「插件已换到新 checkout、技能却仍加载旧仓库」且
+ * 长期无人察觉的情况，正是因为没有任何一条命令能给出这个答案。
+ */
+function checkSkillExposure(): CheckResult {
+  const name = "skill-exposure"
+  const projectDir = process.cwd()
+  const skillsDir = resolveSkillsDir("skills")
+  const main = discoverSkills(skillsDir)
+  // 已知集合需含门控技能，否则 per-skill 形态下会把门控技能误判为孤儿
+  const known = new Set([...main, ...discoverSkills(gatedSkillsDir(skillsDir))].map((s) => s.name))
+  const st = inspectSkillExposure(projectDir, skillsDir, known)
+
+  if (st.mode === "absent") {
+    return {
+      name,
+      status: "warn",
+      detail: `当前项目尚未暴露技能: ${st.targetRoot} 不存在`,
+      remedy: "在本项目目录启动一次 opencode，插件加载时会自动建立",
+    }
+  }
+
+  if (st.mode === "foreign") {
+    return {
+      name,
+      status: "warn",
+      detail: `${st.targetRoot} 为用户自有内容，插件未接管（${st.detail}）`,
+      remedy: "如需由插件托管，请移走该目录后重启 opencode",
+    }
+  }
+
+  if (st.mode === "directory") {
+    if (st.danglingCount > 0) {
+      return {
+        name,
+        status: "fail",
+        detail: `技能目录软链已悬空: ${st.targetRoot} -> ${st.target}（目标不存在）`,
+        remedy: "重启 opencode 由插件重建，或确认安装根未被移动/删除",
+      }
+    }
+    return st.matchesInstall
+      ? {
+          name,
+          status: "pass",
+          detail: `目录级软链 -> ${st.target}（与当前安装一致，${main.length} 个技能；门控技能未暴露）`,
+        }
+      : {
+          name,
+          status: "fail",
+          detail: `技能来自其他安装: ${st.target}，当前安装为 ${skillsDir}`,
+          remedy: "重启 opencode，插件会自动重指到当前安装",
+        }
+  }
+
+  // per-skill 形态
+  const problems: string[] = []
+  if (st.danglingCount > 0) problems.push(`悬空 ${st.danglingCount}`)
+  if (st.foreignCount > 0) problems.push(`非当前安装 ${st.foreignCount}`)
+  if (st.orphanCount > 0) problems.push(`孤儿 ${st.orphanCount}`)
+  return problems.length === 0
+    ? { name, status: "pass", detail: `逐技能软链 ${st.linkCount} 条，均来自当前安装（因门控扣留技能而采用此形态）` }
+    : {
+        name,
+        status: "fail",
+        detail: `逐技能软链 ${st.linkCount} 条存在问题: ${problems.join("、")}`,
+        remedy: "重启 opencode，插件会自动重指并清理",
       }
 }
 
