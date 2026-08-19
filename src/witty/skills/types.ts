@@ -44,6 +44,12 @@ export interface SkillExposureStatus {
   target?: string
   /** foreign 时的说明 */
   detail?: string
+  /**
+   * per-skill 形态下：目录缺少独占标记，即由旧版本插件建立的遗留目录。
+   * 当前插件只在「有门控技能需暴露」时才用 per-skill，且必写标记；
+   * 无标记说明是旧版遗留，下次插件加载会自动迁移为目录级软链。
+   */
+  legacy?: boolean
   /** 暴露内容是否确实来自当前安装 */
   matchesInstall: boolean
   linkCount: number

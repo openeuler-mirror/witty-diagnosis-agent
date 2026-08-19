@@ -95,9 +95,10 @@ bash install.sh
 
 ```bash
 # 第 1 步：装包（root）
-sudo dnf install -y witty-diagnosis-agent-0.10.0-1.beta.noarch.rpm
+sudo dnf install -y witty-diagnosis-agent-0.10.0-2.beta.noarch.rpm
 
-# 第 2 步：注册到个人 OpenCode 配置（普通用户，不要用 sudo）
+# 第 2 步：注册到个人配置（普通用户，不要用 sudo）
+# 自动识别宿主框架；也可用 --target opencode|xiaoo|both 显式指定
 witty-diagnosis-agent install
 
 # 验证

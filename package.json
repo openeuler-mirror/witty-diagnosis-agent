@@ -39,6 +39,7 @@
     "postinstall": "node postinstall.mjs",
     "typecheck": "tsc --noEmit",
     "test:skills": "tsx test/skills/exposure.test.ts && bash test/skills/sync-skills.test.sh",
+    "test:cli": "tsx test/cli/install-xiaoo.test.ts",
     "build:schema": "tsx script/build-schema.ts"
   },
   "dependencies": {

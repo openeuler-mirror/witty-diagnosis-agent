@@ -25,7 +25,7 @@
 
 Name:           witty-diagnosis-agent
 Version:        0.10.0
-Release:        1.beta%{?dist}
+Release:        2.beta%{?dist}
 Summary:        Witty Diagnosis Agent - AI-powered Linux fault diagnosis for OpenCode
 Summary(zh_CN): Witty 智能诊断 Agent —— 面向 OpenCode 的 Linux 故障诊断插件
 
@@ -79,7 +79,7 @@ Witty Diagnosis Agent is an AI-powered fault diagnosis plugin for OpenCode
 and xiaoO, built on the hypothetico-deductive troubleshooting paradigm and a
 multi-agent collaborative architecture.
 
-It ships 49 diagnosis skills covering CPU, memory, disk, network, filesystem,
+It ships 48 diagnosis skills covering CPU, memory, disk, network, filesystem,
 kernel and hardware faults, providing automated root-cause analysis with
 read-only diagnosis phases and user-approved remediation.
 
@@ -91,7 +91,7 @@ OpenCode configuration.
 Witty 智能诊断 Agent 基于「假设-验证」故障排查范式与 Multi-Agent 协同架构，
 为 OpenCode / xiaoO 提供分钟级、代码行级的全自动故障诊断能力。
 
-内置 49 个诊断技能，覆盖 CPU、内存、磁盘、网络、文件系统、内核与硬件故障，
+内置 48 个诊断技能，覆盖 CPU、内存、磁盘、网络、文件系统、内核与硬件故障，
 诊断阶段严格只读，修复阶段需用户审批确认。
 
 注意：本包只安装系统文件。每个使用者需自行执行一次
@@ -154,7 +154,7 @@ install -d %{buildroot}%{_docdir}/%{name}
 # 1) 构建产物：插件入口 + CLI + MCP server + 提示词
 cp -a dist %{buildroot}%{wittydir}/
 
-# 2) 诊断技能库（约 6.8M，49 个技能包）
+# 2) 诊断技能库（约 6.8M，47 个常规技能 + 1 个门控技能）
 cp -a skills %{buildroot}%{wittydir}/
 # 门控技能（默认不暴露，需 CASE_KB_ID 才启用）单独成目录，使 skills/ 可整体软链
 cp -a skills-gated %{buildroot}%{wittydir}/
@@ -234,6 +234,11 @@ EOF
 fi
 
 %changelog
+* Wed Aug 19 2026 witty-diagnosis-agent <witty@openeuler.org> - 0.10.0-2.beta
+- 技能目录拆分：门控技能移入 skills-gated/，使 skills/ 可整体软链
+- 修复插件换 checkout 后技能仍加载旧仓库的问题
+- 技能脚本可执行位覆盖 skills-gated/
+
 * Tue Aug 11 2026 witty-diagnosis-agent <witty@openeuler.org> - 0.10.0-1.beta
 - 首个 RPM 打包版本
 - 包含插件本体、CLI、神农检索 MCP server 与 49 个诊断技能

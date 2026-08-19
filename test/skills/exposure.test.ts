@@ -241,7 +241,25 @@ scenario("⑮ per-skill 形态含孤儿/悬空 → 如实计数", () => {
   assert.equal(st.matchesInstall, false)
 })
 
-scenario("⑯ 用户自有目录 → foreign 且带说明", () => {
+scenario("⑯ 旧版遗留目录（无独占标记）→ legacy=true，与门控形态区分开", () => {
+  // 复刻服务器现场：旧版插件建的逐技能目录，链接都有效但无 .witty-managed
+  const p = makeProject()
+  fs.mkdirSync(links(p), { recursive: true })
+  for (const s of skills) fs.symlinkSync(s.dir, path.join(links(p), s.name), "dir")
+  const legacy = inspectSkillExposure(p, CUR, names)
+  assert.equal(legacy.mode, "per-skill")
+  assert.equal(legacy.legacy, true, "无标记 ⇒ 旧版遗留")
+  assert.equal(legacy.matchesInstall, true, "链接本身有效")
+
+  // 对照：当前插件在门控开启时建的目录带标记，不应判为遗留
+  const q = makeProject()
+  expose(q, true)
+  const managed = inspectSkillExposure(q, CUR, names)
+  assert.equal(managed.mode, "per-skill")
+  assert.equal(managed.legacy, false, "有标记 ⇒ 非遗留")
+})
+
+scenario("⑰ 用户自有目录 → foreign 且带说明", () => {
   const p = makeProject()
   fs.mkdirSync(path.join(links(p), "mine"), { recursive: true })
   fs.writeFileSync(path.join(links(p), "mine", "SKILL.md"), "x")
