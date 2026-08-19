@@ -34,7 +34,8 @@
 ```
 /usr/lib/witty-diagnosis-agent/         程序私有目录（用户不直接接触）
 ├── dist/                               插件入口 + CLI + MCP server + 提示词
-├── skills/                             49 个诊断技能包
+├── skills/                             47 个诊断技能包（可整体软链到项目）
+├── skills-gated/                       1 个门控技能（需 CASE_KB_ID 才暴露）
 ├── src/xiaoO/                          xiaoO 目标资源
 └── package.json                        包根路标（不可省略，见第七节）
 
@@ -86,8 +87,8 @@ bash packaging/build-rpm.sh
 产物位于项目根目录的 `rpm-out/`：
 
 ```
-rpm-out/witty-diagnosis-agent-0.10.0-1.beta.noarch.rpm      # 安装用
-rpm-out/witty-diagnosis-agent-0.10.0-1.beta.src.rpm         # 源码包
+rpm-out/witty-diagnosis-agent-0.10.0-2.beta.noarch.rpm      # 安装用
+rpm-out/witty-diagnosis-agent-0.10.0-2.beta.src.rpm         # 源码包
 ```
 
 （rpmbuild 自身的工作区仍是 `~/rpmbuild/`，`rpm-out/` 是构建完成后的拷贝。
@@ -96,7 +97,7 @@ rpm-out/witty-diagnosis-agent-0.10.0-1.beta.src.rpm         # 源码包
 安装：
 
 ```bash
-sudo dnf install rpm-out/witty-diagnosis-agent-0.10.0-1.beta.noarch.rpm
+sudo dnf install rpm-out/witty-diagnosis-agent-0.10.0-2.beta.noarch.rpm
 ```
 
 ### 2.3 离线构建
@@ -152,7 +153,7 @@ rpmbuild -ba ~/rpmbuild/SPECS/witty-diagnosis-agent.spec
 ### 第 1 步：装包（root）
 
 ```bash
-sudo dnf install ./witty-diagnosis-agent-0.10.0-1.beta.oe2403.noarch.rpm
+sudo dnf install ./witty-diagnosis-agent-0.10.0-2.beta.oe2403.noarch.rpm
 ```
 
 > 用 `dnf install` 而非 `rpm -ivh`：dnf 会自动解决 nodejs / ansible 依赖，`rpm` 只会报错让你手动装。
@@ -174,16 +175,24 @@ sudo dnf install ./witty-diagnosis-agent-0.10.0-1.beta.oe2403.noarch.rpm
 witty-diagnosis-agent install
 ```
 
-会交互式选择输出语言。跳过交互：
+会交互式选择宿主框架与输出语言。跳过交互：
 
 ```bash
-witty-diagnosis-agent install --language zh
+witty-diagnosis-agent install --target opencode --language zh
 ```
 
-这一步做的事：
+`--target` 可选 `opencode` / `xiaoo` / `both`；不传时按本机已安装的框架决定，两个都装了且在交互终端下会弹出选择菜单。
+
+装到 **OpenCode** 时做的事：
 
 - 把插件路径写入 `~/.config/opencode/opencode.json` 的 `plugin` 数组
 - 将 `subagent_depth` 提升到 3（诊断流水线需要两层子代理委派）
+
+装到 **xiaoO** 时做的事：
+
+- 把技能库拷贝到 `~/.xiaoo/skills` 与 `~/.xiaoo/skills-gated`（保留脚本可执行位，并按清单移除源中已删除的技能）
+- 把 agent 资源拷贝到 `~/.xiaoo/command` 与 `~/.xiaoo/tools`
+- 写入或合并 `~/.config/xiaoo/config.toml` 的 witty 配置段（用户自有段落原样保留）
 - 生成 `~/.config/opencode/witty-diagnosis-agent.jsonc` 默认配置
 
 该命令**幂等**，重复执行安全，并会自动清理旧版本遗留的路径条目。
@@ -278,7 +287,7 @@ rpm -ql witty-diagnosis-agent
 
 ### 包含
 
-`dist/`（插件入口、CLI、神农检索 MCP server、提示词）、`skills/`（49 个技能）、`src/xiaoO/`、`package.json`、README、LICENSE、配置 schema。
+`dist/`（插件入口、CLI、神农检索 MCP server、提示词）、`skills/`（47 个技能）、`skills-gated/`（1 个门控技能）、`src/xiaoO/`、`package.json`、README、LICENSE、配置 schema。
 
 安装体积约 8 MB。
 

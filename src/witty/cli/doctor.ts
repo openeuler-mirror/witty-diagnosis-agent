@@ -221,9 +221,22 @@ function checkSkillExposure(): CheckResult {
   if (st.danglingCount > 0) problems.push(`悬空 ${st.danglingCount}`)
   if (st.foreignCount > 0) problems.push(`非当前安装 ${st.foreignCount}`)
   if (st.orphanCount > 0) problems.push(`孤儿 ${st.orphanCount}`)
-  return problems.length === 0
-    ? { name, status: "pass", detail: `逐技能软链 ${st.linkCount} 条，均来自当前安装（因门控扣留技能而采用此形态）` }
-    : {
+  if (problems.length === 0) {
+    // 逐技能形态有两种来源，理由不同，不能一概归因于门控
+    return st.legacy
+      ? {
+          name,
+          status: "warn",
+          detail: `旧版本遗留的逐技能软链 ${st.linkCount} 条（均来自当前安装，无独占标记）`,
+          remedy: "在本项目目录启动一次 opencode，插件会自动迁移为单条目录级软链",
+        }
+      : {
+          name,
+          status: "pass",
+          detail: `逐技能软链 ${st.linkCount} 条，均来自当前安装（因门控技能需暴露而采用此形态）`,
+        }
+  }
+  return {
         name,
         status: "fail",
         detail: `逐技能软链 ${st.linkCount} 条存在问题: ${problems.join("、")}`,

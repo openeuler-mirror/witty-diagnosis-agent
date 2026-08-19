@@ -445,6 +445,7 @@ export function inspectSkillExposure(
   return {
     ...status,
     mode: "per-skill",
+    legacy: state.kind === "ours-legacy-dir",
     matchesInstall: foreign === 0 && dangling === 0,
     linkCount: link,
     danglingCount: dangling,
