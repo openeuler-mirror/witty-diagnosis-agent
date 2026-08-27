@@ -1,0 +1,599 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Witty Diagnosis Agent — 仓库速查手册</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@600;700;800&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+
+<style>
+  :root {
+    --bg: #F3F5F2;
+    --surface: #FFFFFF;
+    --surface-2: #E9EDE8;
+    --surface-3: #DEE4DD;
+    --ink: #16211E;
+    --ink-soft: #4E5A54;
+    --ink-faint: #7C8981;
+    --border: #D7DCD3;
+    --accent: #0E7C7B;
+    --accent-strong: #0A5F5D;
+    --accent-soft: #DCEFEC;
+    --warn: #A9661D;
+    --warn-soft: #F3E6D3;
+    --code-ink: #E8EDE9;
+    --code-bg: #16211E;
+    --code-comment: #6FD9C9;
+    --shadow: 0 1px 2px rgba(22,33,30,0.06), 0 8px 24px -12px rgba(22,33,30,0.18);
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #101613;
+      --surface: #161E1B;
+      --surface-2: #1D2622;
+      --surface-3: #263029;
+      --ink: #E8EDE9;
+      --ink-soft: #9FB0A8;
+      --ink-faint: #6C7D75;
+      --border: #2A3733;
+      --accent: #35DECF;
+      --accent-strong: #6BEFE3;
+      --accent-soft: rgba(53,222,207,0.14);
+      --warn: #E3A05C;
+      --warn-soft: rgba(227,160,92,0.14);
+      --code-ink: #DCE7E2;
+      --code-bg: #0B100E;
+      --code-comment: #35DECF;
+      --shadow: 0 1px 2px rgba(0,0,0,0.3), 0 12px 30px -14px rgba(0,0,0,0.6);
+    }
+  }
+
+  :root[data-theme="dark"] {
+    --bg: #101613;
+    --surface: #161E1B;
+    --surface-2: #1D2622;
+    --surface-3: #263029;
+    --ink: #E8EDE9;
+    --ink-soft: #9FB0A8;
+    --ink-faint: #6C7D75;
+    --border: #2A3733;
+    --accent: #35DECF;
+    --accent-strong: #6BEFE3;
+    --accent-soft: rgba(53,222,207,0.14);
+    --warn: #E3A05C;
+    --warn-soft: rgba(227,160,92,0.14);
+    --code-ink: #DCE7E2;
+    --code-bg: #0B100E;
+    --code-comment: #35DECF;
+    --shadow: 0 1px 2px rgba(0,0,0,0.3), 0 12px 30px -14px rgba(0,0,0,0.6);
+  }
+
+  * { box-sizing: border-box; }
+  html { -webkit-text-size-adjust: 100%; }
+
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--ink);
+    font-family: "IBM Plex Sans", "PingFang SC", "Noto Sans SC", sans-serif;
+    font-size: 16px;
+    line-height: 1.65;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  h1, h2, h3 { font-family: "Archivo", "PingFang SC", sans-serif; text-wrap: balance; letter-spacing: -0.01em; margin: 0; }
+  code, .mono, .num, td.mono, .stat-value { font-family: "IBM Plex Mono", "SFMono-Regular", monospace; }
+  a { color: var(--accent-strong); }
+  a:focus-visible, button:focus-visible, .toc a:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+  ::selection { background: var(--accent-soft); }
+
+  /* ---------- masthead ---------- */
+  .masthead {
+    background: linear-gradient(180deg, var(--surface-2), var(--bg) 140%);
+    border-bottom: 1px solid var(--border);
+    padding: 3rem 1.5rem 2rem;
+  }
+  .masthead-inner { max-width: 1100px; margin: 0 auto; }
+  .eyebrow {
+    display: inline-flex; align-items: center; gap: .5rem;
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 0.72rem; letter-spacing: 0.12em; text-transform: uppercase;
+    color: var(--accent-strong);
+    background: var(--accent-soft);
+    border: 1px solid color-mix(in srgb, var(--accent) 35%, transparent);
+    padding: 0.3rem 0.65rem;
+    border-radius: 3px;
+  }
+  h1.title {
+    font-size: clamp(2.2rem, 5vw, 3.1rem);
+    font-weight: 800;
+    margin-top: 0.9rem;
+    color: var(--ink);
+  }
+  .tagline {
+    max-width: 62ch;
+    color: var(--ink-soft);
+    font-size: 1.05rem;
+    margin-top: 0.75rem;
+  }
+  .badges { display: flex; flex-wrap: wrap; gap: 0.5rem 0.7rem; margin-top: 1.4rem; align-items: center; }
+  .badge {
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 0.8rem;
+    color: var(--ink-soft);
+    background: var(--surface);
+    border: 1px solid var(--border);
+    padding: 0.32rem 0.6rem;
+    border-radius: 3px;
+    display: inline-flex; gap: 0.4em;
+  }
+  .badge b { color: var(--ink); font-weight: 600; }
+
+  .stat-strip {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+    gap: 1px;
+    background: var(--border);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    overflow: hidden;
+    margin-top: 1.8rem;
+  }
+  .stat {
+    background: var(--surface);
+    padding: 0.9rem 1rem;
+  }
+  .stat-value {
+    font-size: 1.4rem;
+    font-weight: 600;
+    color: var(--accent-strong);
+    font-variant-numeric: tabular-nums;
+  }
+  .stat-label {
+    font-size: 0.74rem;
+    color: var(--ink-faint);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    margin-top: 0.15rem;
+  }
+
+  /* ---------- layout shell ---------- */
+  .shell {
+    max-width: 1100px;
+    margin: 0 auto;
+    padding: 2.5rem 1.5rem 5rem;
+    display: grid;
+    grid-template-columns: 190px minmax(0,1fr);
+    gap: 3rem;
+    align-items: start;
+  }
+  nav.toc {
+    position: sticky;
+    top: 1.75rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.15rem;
+  }
+  .toc-label {
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 0.7rem;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--ink-faint);
+    margin-bottom: 0.5rem;
+  }
+  .toc a {
+    text-decoration: none;
+    color: var(--ink-soft);
+    font-size: 0.9rem;
+    padding: 0.35rem 0 0.35rem 0.7rem;
+    border-left: 2px solid var(--border);
+    transition: color .15s, border-color .15s;
+  }
+  .toc a:hover { color: var(--ink); border-color: var(--ink-faint); }
+
+  main { min-width: 0; display: flex; flex-direction: column; gap: 3.2rem; }
+  section { scroll-margin-top: 1.5rem; }
+
+  .section-head { display: flex; align-items: baseline; gap: 0.8rem; margin-bottom: 1.1rem; }
+  .section-num { font-family: "IBM Plex Mono", monospace; color: var(--ink-faint); font-size: 0.95rem; }
+  h2 { font-size: 1.5rem; font-weight: 700; }
+  .lede { color: var(--ink-soft); max-width: 68ch; margin: 0.6rem 0 1.3rem; }
+
+  /* ---------- tables ---------- */
+  .table-wrap { overflow-x: auto; border: 1px solid var(--border); border-radius: 8px; background: var(--surface); box-shadow: var(--shadow); }
+  table { border-collapse: collapse; width: 100%; font-size: 0.88rem; min-width: 560px; }
+  th, td { text-align: left; padding: 0.6rem 0.85rem; border-bottom: 1px solid var(--border); vertical-align: top; }
+  thead th {
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.07em;
+    color: var(--ink-faint);
+    background: var(--surface-2);
+    white-space: nowrap;
+  }
+  tbody tr:last-child td { border-bottom: none; }
+  tbody tr:hover { background: var(--surface-2); }
+  td.mono, td code { font-size: 0.83rem; color: var(--accent-strong); background: var(--accent-soft); padding: 0.1em 0.4em; border-radius: 3px; }
+  .pill {
+    display: inline-block; font-family: "IBM Plex Mono", monospace; font-size: 0.72rem;
+    padding: 0.15rem 0.5rem; border-radius: 999px; white-space: nowrap;
+  }
+  .pill-lang { background: var(--accent-soft); color: var(--accent-strong); }
+  .pill-py { background: var(--warn-soft); color: var(--warn); }
+  .pill-req { background: var(--accent-soft); color: var(--accent-strong); }
+  .pill-opt { background: var(--surface-2); color: var(--ink-faint); border: 1px solid var(--border); }
+
+  /* ---------- chips ---------- */
+  .chip-grid { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 1.4rem; }
+  .chip {
+    display: inline-flex; align-items: baseline; gap: 0.45em;
+    border: 1px solid var(--border); background: var(--surface);
+    border-radius: 999px; padding: 0.4rem 0.85rem; font-size: 0.85rem; color: var(--ink-soft);
+  }
+  .chip b { color: var(--ink); font-weight: 600; }
+  .chip .v { font-family: "IBM Plex Mono", monospace; font-size: 0.76rem; color: var(--ink-faint); }
+
+  /* ---------- diagram ---------- */
+  .diagram-card {
+    border: 1px solid var(--border); background: var(--surface); border-radius: 10px;
+    box-shadow: var(--shadow);
+    padding: 1.2rem 1rem 0.6rem;
+    overflow-x: auto;
+  }
+  .diagram-card pre.mermaid { margin: 0; display: flex; justify-content: center; min-width: 640px; }
+  .legend { display: flex; flex-wrap: wrap; gap: 1.1rem; padding: 0.8rem 0.4rem 1rem; font-size: 0.78rem; color: var(--ink-faint); }
+  .legend span { display: inline-flex; align-items: center; gap: 0.4em; }
+  .swatch { width: 0.7em; height: 0.7em; border-radius: 2px; display: inline-block; }
+
+  .diagram-dark { display: none; }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) .diagram-light { display: none; }
+    :root:not([data-theme="light"]) .diagram-dark { display: flex; }
+  }
+  :root[data-theme="dark"] .diagram-light { display: none; }
+  :root[data-theme="dark"] .diagram-dark { display: flex; }
+
+  /* ---------- code blocks ---------- */
+  .code-block {
+    background: var(--code-bg); color: var(--code-ink);
+    border-radius: 8px; padding: 1rem 1.15rem;
+    font-family: "IBM Plex Mono", monospace; font-size: 0.85rem; line-height: 1.7;
+    overflow-x: auto; box-shadow: var(--shadow);
+  }
+  .code-block .c { color: var(--code-comment); }
+  .code-block .ln { display: block; white-space: pre; }
+
+  .callout {
+    border-left: 3px solid var(--accent);
+    background: var(--accent-soft);
+    padding: 0.75rem 1rem;
+    border-radius: 0 6px 6px 0;
+    font-size: 0.88rem;
+    color: var(--ink);
+    margin-top: 1rem;
+  }
+  .callout.warn { border-left-color: var(--warn); background: var(--warn-soft); }
+  .callout b { font-weight: 600; }
+  .callout code { background: rgba(0,0,0,0.06); padding: 0.05em 0.35em; border-radius: 3px; }
+
+  .step { display: flex; gap: 1rem; margin-bottom: 1.6rem; }
+  .step:last-child { margin-bottom: 0; }
+  .step-marker {
+    flex: none; width: 1.8rem; height: 1.8rem; border-radius: 50%;
+    background: var(--surface); border: 1px solid var(--border);
+    display: flex; align-items: center; justify-content: center;
+    font-family: "IBM Plex Mono", monospace; font-size: 0.78rem; color: var(--ink-soft);
+  }
+  .step-body { flex: 1; min-width: 0; }
+  .step-title { font-weight: 600; margin-bottom: 0.5rem; }
+
+  .dir-note { font-size: 0.85rem; color: var(--ink-faint); margin-top: 0.9rem; }
+
+  footer {
+    max-width: 1100px; margin: 0 auto; padding: 2rem 1.5rem 3rem;
+    color: var(--ink-faint); font-size: 0.82rem; border-top: 1px solid var(--border);
+  }
+  footer .commit { font-family: "IBM Plex Mono", monospace; }
+
+  @media (max-width: 860px) {
+    .shell { grid-template-columns: 1fr; gap: 1.5rem; }
+    nav.toc {
+      position: static;
+      flex-direction: row;
+      overflow-x: auto;
+      gap: 0.4rem;
+      padding-bottom: 0.3rem;
+    }
+    .toc-label { display: none; }
+    .toc a { border-left: none; border-bottom: 2px solid var(--border); white-space: nowrap; padding: 0.3rem 0.2rem; }
+  }
+</style>
+</head>
+<body>
+
+<div class="masthead">
+  <div class="masthead-inner">
+    <span class="eyebrow">📡 REPOSITORY REFERENCE</span>
+    <h1 class="title">Witty Diagnosis Agent</h1>
+    <p class="tagline">Witty 智能诊断 Agent 是 openEuler 社区孵化的开源智能故障诊断平台，基于「假设-验证」（Hypothetico-Deductive）故障排查范式与 Xuanyuan/Fuxi/Dayu/Kuafu/Baize/Nuwa/Shennong/Taiyi 八 Agent 流水线协同架构，覆盖用户态、内核态与硬件三层故障，实现"现象分析 → 根因定界 → 报告生成 → 自愈修复"分钟级、代码行级的全自动诊断闭环。目前已适配 OpenCode 与 xiaoO 两大 Agent 运行时。</p>
+    <div class="badges">
+      <span class="badge">仓库 <b>openeuler/witty-diagnosis-agent</b></span>
+      <span class="badge">版本 <b>0.10.0-beta</b></span>
+      <span class="badge">License <b>MulanPSL-2.0</b></span>
+      <span class="badge">运行时 <b>OpenCode · xiaoO</b></span>
+    </div>
+    <div class="stat-strip">
+      <div class="stat"><div class="stat-value">~12.3k</div><div class="stat-label">TypeScript 行</div></div>
+      <div class="stat"><div class="stat-value">49</div><div class="stat-label">内置诊断 Skill</div></div>
+      <div class="stat"><div class="stat-value">8</div><div class="stat-label">协同 Agent</div></div>
+      <div class="stat"><div class="stat-value">18</div><div class="stat-label">故障场景测试床</div></div>
+      <div class="stat"><div class="stat-value">2</div><div class="stat-label">宿主运行时</div></div>
+    </div>
+  </div>
+</div>
+
+<div class="shell">
+  <nav class="toc" aria-label="目录">
+    <div class="toc-label">On this page</div>
+    <a href="#stack">核心技术栈</a>
+    <a href="#layout">目录结构</a>
+    <a href="#start">快速开始</a>
+    <a href="#env">环境变量</a>
+    <a href="#deploy">部署</a>
+  </nav>
+
+  <main>
+    <section id="stack">
+      <div class="section-head"><span class="section-num">01</span><h2>核心技术栈</h2></div>
+      <p class="lede">主体是一个以 TypeScript 编写、经 tsup 打包为 ESM 的 OpenCode/xiaoO 插件（CLI + Agent 定义 + Skill）；另带一个可选的独立诊断 Web 控制台，前端 React + Vite，后端 Fastify + Knex。</p>
+
+      <div class="chip-grid">
+        <span class="chip"><b>TypeScript</b><span class="v">5.9.3</span></span>
+        <span class="chip"><b>Node.js</b><span class="v">≥ 20</span></span>
+        <span class="chip"><b>commander</b><span class="v">14.0.3</span></span>
+        <span class="chip"><b>@opencode-ai/sdk</b><span class="v">1.18.4</span></span>
+        <span class="chip"><b>@modelcontextprotocol/sdk</b><span class="v">1.30.0</span></span>
+        <span class="chip"><b>zod</b><span class="v">4.4.3</span></span>
+        <span class="chip"><b>tsup</b><span class="v">8.5.1</span></span>
+        <span class="chip"><b>React（web）</b><span class="v">18.3.1</span></span>
+        <span class="chip"><b>Fastify（web）</b><span class="v">4.29.1</span></span>
+      </div>
+
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>类别</th><th>名称</th><th>版本</th><th>用途</th></tr></thead>
+          <tbody>
+            <tr><td><span class="pill pill-lang">语言</span></td><td>TypeScript</td><td class="mono">5.9.3</td><td>主开发语言（插件核心 + Web 前后端）</td></tr>
+            <tr><td><span class="pill pill-py">语言</span></td><td>Shell / TOML / Python（少量）</td><td class="mono">—</td><td>install.sh 安装脚本；xiaoO 侧提示词以 TOML/MD 暴露；<code>src/xiaoO/tools/md_to_html.py</code> 单文件报告渲染工具</td></tr>
+            <tr><td>运行时</td><td>Node.js</td><td class="mono">≥ 20</td><td>CLI 与 Web 控制台后端（web/server 额外限定 &lt; 24）</td></tr>
+            <tr><td>CLI 框架</td><td>commander</td><td class="mono">14.0.3</td><td><code>witty-diagnosis-agent install / doctor</code> 子命令</td></tr>
+            <tr><td>CLI 交互</td><td>@clack/prompts</td><td class="mono">1.7.0</td><td>安装期交互式提示（语言选择等）</td></tr>
+            <tr><td>Agent 宿主 SDK</td><td>@opencode-ai/sdk / @opencode-ai/plugin</td><td class="mono">1.18.4</td><td>注册插件、驱动 OpenCode 会话</td></tr>
+            <tr><td>协议 SDK</td><td>@modelcontextprotocol/sdk</td><td class="mono">1.30.0</td><td>神农(Shennong) Agent 检索用的 stdio MCP Server</td></tr>
+            <tr><td>校验</td><td>zod</td><td class="mono">4.4.3</td><td>配置 Schema 定义与运行期校验</td></tr>
+            <tr><td>解析</td><td>jsonc-parser</td><td class="mono">3.3.1</td><td>带注释 JSON 配置（<code>.opencode/*.jsonc</code>）解析</td></tr>
+            <tr><td>渲染</td><td>marked</td><td class="mono">17.0.6</td><td>诊断报告 Markdown → HTML 渲染</td></tr>
+            <tr><td>构建</td><td>tsup</td><td class="mono">8.5.1</td><td>ESM 打包（CLI / index / case-search-cli 三入口）</td></tr>
+            <tr><td>构建</td><td>tsx</td><td class="mono">4.23.1</td><td>脚本执行、schema 构建、watch 开发</td></tr>
+            <tr><td>Web 前端</td><td>React / Vite</td><td class="mono">18.3.1 / 5.4.21</td><td>独立诊断控制台 SPA</td></tr>
+            <tr><td>Web 前端</td><td>Zustand</td><td class="mono">4.5.7</td><td>前端状态管理</td></tr>
+            <tr><td>Web 前端</td><td>react-markdown + remark-gfm + rehype-raw</td><td class="mono">10.x / 4.x / 7.x</td><td>诊断报告 Markdown 渲染</td></tr>
+            <tr><td>Web 后端</td><td>Fastify</td><td class="mono">4.29.1</td><td>控制台 API 服务（任务调度 / 鉴权 / QA 对话）</td></tr>
+            <tr><td>Web 后端</td><td>Knex</td><td class="mono">3.3.0</td><td>SQL 查询构建 + 数据库 migration</td></tr>
+            <tr><td>Web 数据库</td><td>better-sqlite3 / mysql2</td><td class="mono">11.10.0 / 3.23.0</td><td>默认 SQLite，<code>DB_CLIENT=mysql</code> 可切云化 MySQL</td></tr>
+            <tr><td>外部依赖</td><td>Ansible</td><td class="mono">—</td><td>安装期自动化前置依赖，未安装直接终止 install</td></tr>
+            <tr><td>外部服务</td><td>DeepSeek API</td><td class="mono">deepseek-chat</td><td>默认核心 LLM 服务提供商</td></tr>
+            <tr><td>外部服务</td><td>LightRAG（可选）</td><td class="mono">—</td><td>太乙(Taiyi) 运维问答检索后端</td></tr>
+            <tr><td>可观测</td><td>Langfuse（可选）</td><td class="mono">—</td><td>LLM 调用追踪</td></tr>
+            <tr><td>包管理</td><td>npm</td><td class="mono">—</td><td>依赖管理（插件核心 / web/frontend / web/server 各自独立 lockfile）</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section id="layout">
+      <div class="section-head"><span class="section-num">02</span><h2>目录结构</h2></div>
+      <p class="lede"><code>src/witty/</code> 是插件核心：<code>agents/</code> 定义 8 个 Agent 角色与双语 Prompt，<code>cli/</code> 负责安装与自检，<code>guards/</code> 挂进 OpenCode 会话生命周期做安全护栏，<code>tools/</code> 与 <code>mcp/</code> 对接外部检索服务；<code>web/</code> 是一套相对独立的诊断控制台子系统。<code>src/xiaoO/</code>（暖色节点）不是 TS 代码，而是把同一套 Agent 以 <code>command/*.md</code> + <code>config.toml</code> 的形式适配给 xiaoO 运行时。</p>
+
+      <div class="diagram-card">
+        <pre class="mermaid diagram-light">
+%%{init: {'theme':'base', 'themeVariables': { 'background':'#FFFFFF', 'primaryColor':'#DCEFEC', 'primaryTextColor':'#16211E', 'primaryBorderColor':'#0E7C7B', 'lineColor':'#7C8981', 'secondaryColor':'#F3E6D3', 'secondaryBorderColor':'#A9661D', 'tertiaryColor':'#F3F5F2', 'tertiaryBorderColor':'#B9C2B6', 'fontFamily':'IBM Plex Mono, monospace', 'fontSize':'13px' }}}%%
+graph TD
+    ROOT["witty-diagnosis-agent/"]:::root
+    ROOT --> SRC["src/witty/ 插件核心"]:::ts
+    ROOT --> XIAOO["src/xiaoO/ xiaoO 运行时适配"]:::py
+    ROOT --> SKILLS["skills/ 49个诊断 Skill"]:::root
+    ROOT --> TESTD["test/ 18个故障场景测试床"]:::root
+    ROOT --> SCRIPTS["script/ 构建期脚本"]:::root
+    ROOT --> CFGH["config/ · hooks/ 全局配置+会话钩子"]:::root
+    ROOT --> DOCS["docs/ 用户+开发文档"]:::root
+    ROOT --> OTHER["install.sh · postinstall.mjs · dist/"]:::root
+
+    SRC --> AGENTS["agents/ 8个Agent定义+双语Prompt"]:::ts
+    SRC --> CLI["cli/ install / doctor 命令"]:::ts
+    SRC --> GUARDS["guards/ 会话安全钩子"]:::ts
+    SRC --> MCP["mcp/case-search-server/ 神农检索MCP"]:::ts
+    SRC --> TOOLS["tools/ lightrag问答+报告可视化"]:::ts
+    SRC --> WEB["web/ 独立诊断控制台"]:::ts
+
+    WEB --> FRONT["frontend/ React+Vite SPA"]:::ts
+    WEB --> SERVER["server/ Fastify+Knex API"]:::ts
+
+    classDef ts fill:#DCEFEC,stroke:#0E7C7B,color:#16211E;
+    classDef py fill:#F3E6D3,stroke:#A9661D,color:#16211E;
+    classDef root fill:#FFFFFF,stroke:#B9C2B6,color:#16211E;
+        </pre>
+        <pre class="mermaid diagram-dark">
+%%{init: {'theme':'base', 'themeVariables': { 'background':'#161E1B', 'primaryColor':'#1B3C39', 'primaryTextColor':'#E8EDE9', 'primaryBorderColor':'#35DECF', 'lineColor':'#6C7D75', 'secondaryColor':'#3A2E1B', 'secondaryBorderColor':'#E3A05C', 'tertiaryColor':'#101613', 'tertiaryBorderColor':'#2A3733', 'fontFamily':'IBM Plex Mono, monospace', 'fontSize':'13px' }}}%%
+graph TD
+    ROOT2["witty-diagnosis-agent/"]:::root
+    ROOT2 --> SRC2["src/witty/ 插件核心"]:::ts
+    ROOT2 --> XIAOO2["src/xiaoO/ xiaoO 运行时适配"]:::py
+    ROOT2 --> SKILLS2["skills/ 49个诊断 Skill"]:::root
+    ROOT2 --> TESTD2["test/ 18个故障场景测试床"]:::root
+    ROOT2 --> SCRIPTS2["script/ 构建期脚本"]:::root
+    ROOT2 --> CFGH2["config/ · hooks/ 全局配置+会话钩子"]:::root
+    ROOT2 --> DOCS2["docs/ 用户+开发文档"]:::root
+    ROOT2 --> OTHER2["install.sh · postinstall.mjs · dist/"]:::root
+
+    SRC2 --> AGENTS2["agents/ 8个Agent定义+双语Prompt"]:::ts
+    SRC2 --> CLI2["cli/ install / doctor 命令"]:::ts
+    SRC2 --> GUARDS2["guards/ 会话安全钩子"]:::ts
+    SRC2 --> MCP2["mcp/case-search-server/ 神农检索MCP"]:::ts
+    SRC2 --> TOOLS2["tools/ lightrag问答+报告可视化"]:::ts
+    SRC2 --> WEB2["web/ 独立诊断控制台"]:::ts
+
+    WEB2 --> FRONT2["frontend/ React+Vite SPA"]:::ts
+    WEB2 --> SERVER2["server/ Fastify+Knex API"]:::ts
+
+    classDef ts fill:#1B3C39,stroke:#35DECF,color:#E8EDE9;
+    classDef py fill:#3A2E1B,stroke:#E3A05C,color:#E8EDE9;
+    classDef root fill:#161E1B,stroke:#2A3733,color:#E8EDE9;
+        </pre>
+        <div class="legend">
+          <span><i class="swatch" style="background:var(--accent-soft); border:1px solid var(--accent);"></i>TypeScript（src/witty 下）</span>
+          <span><i class="swatch" style="background:var(--warn-soft); border:1px solid var(--warn);"></i>xiaoO 运行时适配（配置+提示词，非 TS）</span>
+          <span><i class="swatch" style="background:var(--surface); border:1px solid var(--border);"></i>配置 / 文档 / 脚本 / Skill</span>
+        </div>
+      </div>
+
+      <div class="table-wrap" style="margin-top:1.4rem;">
+        <table>
+          <thead><tr><th>目录</th><th>用途</th><th>关键文件</th></tr></thead>
+          <tbody>
+            <tr><td class="mono">src/witty/agents/</td><td>8 个 Agent 定义 + 中英双语 Prompt</td><td><code>definitions/{xuanyuan,fuxi,dayu,kuafu,baize,nuwa,shennong,taiyi}.ts</code>；<code>prompts/*.md</code>（各 17 份，含 <code>.en.md</code>）</td></tr>
+            <tr><td class="mono">src/witty/cli/</td><td>CLI 入口：安装与环境自检</td><td><code>index.ts</code>、<code>install.ts</code>（注册插件+初始化配置，支持 <code>--dry-run</code>/<code>--language</code>）、<code>doctor.ts</code></td></tr>
+            <tr><td class="mono">src/witty/config/</td><td>配置加载与 Zod Schema 校验</td><td><code>load.ts</code>、<code>schema.ts</code>、<code>types.ts</code></td></tr>
+            <tr><td class="mono">src/witty/guards/</td><td>OpenCode 会话钩子：防压缩丢上下文、防截断、纯 Markdown 约束</td><td><code>compaction-preserver.ts</code>、<code>md-only.ts</code>、<code>output-truncator.ts</code>、<code>session-notifier.ts</code></td></tr>
+            <tr><td class="mono">src/witty/mcp/case-search-server/</td><td>神农(Shennong) Agent 检索历史案例用的 stdio MCP Server</td><td><code>index.ts</code>（<code>search_jsons</code> 工具）、<code>client.ts</code>、<code>cli.ts</code></td></tr>
+            <tr><td class="mono">src/witty/tools/lightrag/</td><td>太乙(Taiyi) 运维问答对接 LightRAG REST <code>/query</code></td><td><code>client.ts</code>、<code>schema.ts</code>、<code>index.ts</code></td></tr>
+            <tr><td class="mono">src/witty/tools/report-visualization/</td><td>诊断报告可视化（HTML + Markdown 双格式输出）</td><td><code>tool.ts</code>、<code>index.ts</code></td></tr>
+            <tr><td class="mono">src/witty/web/frontend/</td><td>独立诊断 Web 控制台前端（React + Vite SPA）</td><td>约 2.9k 行 TS/TSX</td></tr>
+            <tr><td class="mono">src/witty/web/server/</td><td>控制台后端：任务调度 / 鉴权 / QA 对话（Fastify + Knex）</td><td><code>src/{routes,driver,qa,db}/</code>，37 个文件，约 5.2k 行</td></tr>
+            <tr><td class="mono">src/xiaoO/</td><td>xiaoO(Rust) 运行时适配：同一套 Agent 以 <code>command/*.md</code> + <code>config.toml</code> 暴露</td><td><code>command/{xuanyuan,fuxi,dayu,kuafu,baize}.md</code></td></tr>
+            <tr><td class="mono">skills/</td><td>49 个诊断 Skill（用户态/内核态/硬件三层），含 2 个 <code>online-*</code> 与 8 个 <code>offline-*</code>（带外）专项</td><td><code>fault-model/</code>、<code>fault-rca-report-generation/</code>、<code>euler-rag-json-search/</code> 等</td></tr>
+            <tr><td class="mono">test/</td><td>18 个故障场景测试床：故障注入脚本 + 参考诊断报告，非单元测试</td><td><code>swap-thrashing/</code>、<code>block-dm-raid-diagnosis/</code>、<code>kernel-io-uring-diagnosis/</code> 等</td></tr>
+            <tr><td class="mono">script/</td><td>构建期脚本：生成配置 JSON Schema、打包二进制</td><td><code>build-schema.ts</code>、<code>build-binaries.js</code></td></tr>
+            <tr><td class="mono">config/ · hooks/</td><td>全局默认配置 + OpenCode 会话钩子脚本</td><td><code>config/global.yaml</code>；<code>hooks/hooks.json</code> + <code>session-start.sh</code></td></tr>
+            <tr><td class="mono">docs/</td><td>用户与开发者文档</td><td><code>guide/</code>（安装/手册/贡献）、<code>reference/</code>（架构/Agent/功能清单）、<code>standards/</code>、<code>architecture-analysis/</code></td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p class="dir-note">插件核心是 <code>src/witty/agents</code> + <code>guards</code>（Agent 行为定义与安全护栏）；<code>web/</code> 是相对独立的诊断控制台子系统，经 <code>@opencode-ai/sdk</code> 驱动同一套 Agent。详见 <code>docs/reference/development_framework_architecture.md</code>。</p>
+    </section>
+
+    <section id="start">
+      <div class="section-head"><span class="section-num">03</span><h2>快速开始</h2></div>
+      <p class="lede">前置条件：Node.js ≥ 20；已安装 <a href="https://opencode.ai/">OpenCode</a> 或 <a href="https://gitcode.com/openeuler/xiaoO/">xiaoO</a> 之一作为宿主 Agent 运行时；Ansible 需提前安装并在 <code>PATH</code> 中可用（<code>witty-diagnosis-agent install</code> 会强校验，未装直接终止）。</p>
+
+      <div class="step">
+        <div class="step-marker">1</div>
+        <div class="step-body">
+          <div class="step-title">安装</div>
+          <div class="code-block"><span class="ln"><span class="c"># 方式一：在线安装（推荐）</span></span><span class="ln">npm install -g witty-diagnosis-agent@latest</span><span class="ln">witty-diagnosis-agent install</span><span class="ln"> </span><span class="ln"><span class="c"># 方式二：源码一键安装</span></span><span class="ln">git clone https://atomgit.com/openeuler/witty-diagnosis-agent.git</span><span class="ln">cd witty-diagnosis-agent</span><span class="ln">bash install.sh</span><span class="ln"> </span><span class="ln"><span class="c"># 方式三：离线包一键安装</span></span><span class="ln">tar -xzvf witty-diagnosis-agent-v&lt;version&gt;.tar.gz</span><span class="ln">cd witty-diagnosis-agent-v&lt;version&gt;</span><span class="ln">bash install.sh</span></div>
+          <div class="callout"><b>witty-diagnosis-agent install</b> 把插件注册进 OpenCode 并初始化配置；支持 <code>--dry-run</code> 只预览变更、<code>--language zh|en</code> 指定输出语言（非交互终端默认 zh）。<code>install.sh</code> 额外负责环境检查、依赖安装与 <code>npm run build</code>。</div>
+        </div>
+      </div>
+
+      <div class="step">
+        <div class="step-marker">2</div>
+        <div class="step-body">
+          <div class="step-title">使用</div>
+          <div class="code-block"><span class="ln"><span class="c"># 基于 OpenCode</span></span><span class="ln">启动 OpenCode → /agents 选择 Xuanyuan → 描述故障现象</span><span class="ln"> </span><span class="ln"><span class="c"># 基于 xiaoO</span></span><span class="ln">启动 xiaoO → Tab 切换 Xuanyuan → 描述故障现象</span><span class="ln"> </span><span class="ln"><span class="c"># 环境自检</span></span><span class="ln">witty-diagnosis-agent doctor</span><span class="ln"> </span><span class="ln"><span class="c"># 独立诊断 Web 控制台（可选）</span></span><span class="ln">cd src/witty/web && bash init.sh && bash start.sh</span><span class="ln">docker compose -f src/witty/web/docker-compose.yml up -d</span></div>
+          <p class="dir-note">Xuanyuan（总控）调度 Shennong（检索历史案例）→ Fuxi（生成结构化排查计划）→ Dayu（并发调度执行节点）→ Kuafu（加载 Skill 深入节点拉取指标）→ Baize（汇总证据链输出报告）；按需触发 Nuwa（安全规则下自动修复）。诊断完成后同时生成 HTML 与 Markdown 两种格式的报告。</p>
+        </div>
+      </div>
+
+      <div class="step">
+        <div class="step-marker">3</div>
+        <div class="step-body">
+          <div class="step-title">测试</div>
+          <div class="code-block"><span class="ln">npm run typecheck              <span class="c"># tsc --noEmit</span></span><span class="ln">cd src/witty/web/server && npm test   <span class="c"># node --test src/**/*.test.ts</span></span></div>
+          <p class="dir-note">常规单元测试只有 6 个 <code>*.test.ts</code>，集中在 <code>web/server</code> 与 <code>tools/lightrag</code>；<code>test/</code> 目录下 18 个场景是"故障注入 + 期望诊断报告"的端到端验证床，需要真实故障环境，不是常规单测。</p>
+        </div>
+      </div>
+    </section>
+
+    <section id="env">
+      <div class="section-head"><span class="section-num">04</span><h2>环境变量</h2></div>
+      <p class="lede">来源：<code>.env.example</code>（插件核心，20 项）+ <code>src/witty/web/docker-compose.yml</code>（Web 控制台另有一套）。</p>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>变量名</th><th>用途</th><th>默认值</th><th>必需</th></tr></thead>
+          <tbody>
+            <tr><td class="mono">DEEPSEEK_API_KEY</td><td>核心 LLM 服务密钥</td><td class="mono">—</td><td><span class="pill pill-req">是</span></td></tr>
+            <tr><td class="mono">DEEPSEEK_BASE_URL</td><td>DeepSeek API 端点</td><td class="mono">https://api.deepseek.com/</td><td><span class="pill pill-opt">否</span></td></tr>
+            <tr><td class="mono">DEEPSEEK_MODEL</td><td>模型名称</td><td class="mono">deepseek-chat</td><td><span class="pill pill-opt">否</span></td></tr>
+            <tr><td class="mono">LANGFUSE_PUBLIC_KEY / SECRET_KEY</td><td>LLM 调用追踪凭据（可选）</td><td class="mono">—</td><td><span class="pill pill-opt">否</span></td></tr>
+            <tr><td class="mono">LANGFUSE_HOST</td><td>Langfuse 服务地址</td><td class="mono">cloud.langfuse.com</td><td><span class="pill pill-opt">否</span></td></tr>
+            <tr><td class="mono">CUSTOM_SKILL_PATHS</td><td>自定义 Skill 存放目录</td><td class="mono">{project_root}/custom_skills</td><td><span class="pill pill-opt">否</span></td></tr>
+            <tr><td class="mono">LIGHTRAG_ENDPOINT</td><td>太乙(Taiyi) 运维问答检索服务端点</td><td class="mono">http://localhost:9621</td><td><span class="pill pill-opt">否*</span></td></tr>
+            <tr><td class="mono">LIGHTRAG_API_KEY / _API_KEY_HEADER</td><td>LightRAG 鉴权密钥 + 请求头名</td><td class="mono">X-API-Key</td><td><span class="pill pill-opt">否</span></td></tr>
+            <tr><td class="mono">LIGHTRAG_QUERY_MODE</td><td>检索模式：local/global/hybrid/naive/mix/bypass</td><td class="mono">mix</td><td><span class="pill pill-opt">否</span></td></tr>
+            <tr><td class="mono">LIGHTRAG_TIMEOUT_MS</td><td>单次检索超时（毫秒）</td><td class="mono">30000</td><td><span class="pill pill-opt">否</span></td></tr>
+            <tr><td class="mono">LIGHTRAG_RESPONSE_TYPE</td><td>期望回答格式（透传给 LightRAG）</td><td class="mono">Multiple Paragraphs</td><td><span class="pill pill-opt">否</span></td></tr>
+            <tr><td class="mono">LIGHTRAG_INCLUDE_CHUNK_CONTENT</td><td>是否附带引用 chunk 原文</td><td class="mono">true</td><td><span class="pill pill-opt">否</span></td></tr>
+            <tr><td class="mono">CASE_KB_ID / CASE_API_BASE_URL / CASE_ACCESS_KEY</td><td>神农(Shennong) Agent 检索的知识库 ID / 地址 / 密钥</td><td class="mono">—</td><td><span class="pill pill-opt">否*</span></td></tr>
+            <tr><td class="mono">CASE_API_TIMEOUT_MS / CASE_TOP_K</td><td>检索超时与返回条数</td><td class="mono">—</td><td><span class="pill pill-opt">否</span></td></tr>
+            <tr><td class="mono">CASE_CASES_DIR</td><td>本地 case 缓存目录</td><td class="mono">—</td><td><span class="pill pill-opt">否</span></td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p class="dir-note">* <code>LIGHTRAG_*</code> 仅在太乙问答功能启用时必需；<code>CASE_*</code> 仅在神农历史案例检索启用时必需。Web 控制台另有独立环境变量（<code>PORT</code>、<code>DB_CLIENT</code>、<code>COOKIE_SECRET</code> 等），见下一节 <code>docker-compose.yml</code>。</p>
+    </section>
+
+    <section id="deploy">
+      <div class="section-head"><span class="section-num">05</span><h2>部署</h2></div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>部署方式</th><th>配置文件</th><th>说明</th></tr></thead>
+          <tbody>
+            <tr>
+              <td>CLI 插件（在线安装）</td>
+              <td class="mono">npm install -g + witty-diagnosis-agent install</td>
+              <td>注册进宿主 OpenCode/xiaoO 配置，随宿主进程运行，无需常驻服务</td>
+            </tr>
+            <tr>
+              <td>CLI 插件（源码/离线一键安装）</td>
+              <td class="mono">install.sh</td>
+              <td>环境检查 → 依赖安装 → <code>npm run build</code>（tsup）→ 写入插件配置</td>
+            </tr>
+            <tr>
+              <td>Web 诊断控制台（Docker）</td>
+              <td class="mono">src/witty/web/docker-compose.yml</td>
+              <td>前端 Nginx 反代 + 后端 Fastify 单实例；默认 SQLite 命名卷持久化，<code>DB_CLIENT=mysql</code> 可切云化 MySQL；<code>--profile qa</code> 按需启用依赖 LightRAG 的问答模块</td>
+            </tr>
+            <tr>
+              <td>Web 诊断控制台（本地开发）</td>
+              <td class="mono">src/witty/web/{init.sh,start.sh}</td>
+              <td>本地起前后端（Vite dev server + tsx watch），便于调试</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="callout warn">关键差异：诊断执行阶段（Kuafu 等）严格只读，仅 Nuwa 自愈阶段按安全规则申请操作权限，且变更必经用户审批确认。</div>
+    </section>
+  </main>
+</div>
+
+<footer>
+  基于 commit <span class="commit">752dde8</span> 生成 · 完整版见仓库内 <code>docs/witty-diagnosis-agent.md</code>（另见 <code>docs/reference/development_framework_architecture.md</code>）
+</footer>
+
+<!--
+  本页最初以 Claude Artifact 形式发布，那边的 mermaid 渲染由平台运行时提供，
+  文件本身不含渲染引擎。拷到仓库里做静态文档后要能独立打开，
+  因此在这里本地引入 mermaid（vendor/mermaid.min.js，来自 node_modules/mermaid/dist），
+  离线也能把 .mermaid 代码块渲成图。
+-->
+<script src="./vendor/mermaid.min.js"></script>
+<script>
+  mermaid.initialize({ startOnLoad: false });
+  mermaid.run({ querySelector: '.mermaid' });
+</script>
+</body>
+</html>
