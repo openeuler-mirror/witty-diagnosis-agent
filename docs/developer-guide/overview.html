@@ -328,7 +328,7 @@
     </div>
     <div class="stat-strip">
       <div class="stat"><div class="stat-value">~12.3k</div><div class="stat-label">TypeScript 行</div></div>
-      <div class="stat"><div class="stat-value">49</div><div class="stat-label">内置诊断 Skill</div></div>
+      <div class="stat"><div class="stat-value">39</div><div class="stat-label">内置诊断 Skill</div></div>
       <div class="stat"><div class="stat-value">8</div><div class="stat-label">协同 Agent</div></div>
       <div class="stat"><div class="stat-value">18</div><div class="stat-label">故障场景测试床</div></div>
       <div class="stat"><div class="stat-value">2</div><div class="stat-label">宿主运行时</div></div>
@@ -406,7 +406,7 @@ graph TD
     ROOT["witty-diagnosis-agent/"]:::root
     ROOT --> SRC["src/witty/ 插件核心"]:::ts
     ROOT --> XIAOO["src/xiaoO/ xiaoO 运行时适配"]:::py
-    ROOT --> SKILLS["skills/ 49个诊断 Skill"]:::root
+    ROOT --> SKILLS["skills/ 45个 Skill"]:::root
     ROOT --> TESTD["test/ 18个故障场景测试床"]:::root
     ROOT --> SCRIPTS["script/ 构建期脚本"]:::root
     ROOT --> CFGH["config/ · hooks/ 全局配置+会话钩子"]:::root
@@ -433,7 +433,7 @@ graph TD
     ROOT2["witty-diagnosis-agent/"]:::root
     ROOT2 --> SRC2["src/witty/ 插件核心"]:::ts
     ROOT2 --> XIAOO2["src/xiaoO/ xiaoO 运行时适配"]:::py
-    ROOT2 --> SKILLS2["skills/ 49个诊断 Skill"]:::root
+    ROOT2 --> SKILLS2["skills/ 45个 Skill"]:::root
     ROOT2 --> TESTD2["test/ 18个故障场景测试床"]:::root
     ROOT2 --> SCRIPTS2["script/ 构建期脚本"]:::root
     ROOT2 --> CFGH2["config/ · hooks/ 全局配置+会话钩子"]:::root
@@ -475,7 +475,7 @@ graph TD
             <tr><td class="mono">src/witty/web/frontend/</td><td>独立诊断 Web 控制台前端（React + Vite SPA）</td><td>约 2.9k 行 TS/TSX</td></tr>
             <tr><td class="mono">src/witty/web/server/</td><td>控制台后端：任务调度 / 鉴权 / QA 对话（Fastify + Knex）</td><td><code>src/{routes,driver,qa,db}/</code>，37 个文件，约 5.2k 行</td></tr>
             <tr><td class="mono">src/xiaoO/</td><td>xiaoO(Rust) 运行时适配：同一套 Agent 以 <code>command/*.md</code> + <code>config.toml</code> 暴露</td><td><code>command/{xuanyuan,fuxi,dayu,kuafu,baize}.md</code></td></tr>
-            <tr><td class="mono">skills/</td><td>49 个诊断 Skill（用户态/内核态/硬件三层），含 2 个 <code>online-*</code> 与 8 个 <code>offline-*</code>（带外）专项</td><td><code>fault-model/</code>、<code>fault-rca-report-generation/</code>、<code>euler-rag-json-search/</code> 等</td></tr>
+            <tr><td class="mono">skills/</td><td>45 个 Skill，其中 39 个故障诊断 Skill 覆盖用户态/内核态/硬件三层，含 2 个 <code>online-*</code> 与 8 个 <code>offline-*</code>（带外）专项</td><td><code>fault-model/</code>、<code>fault-rca-report-generation/</code>、<code>skill-openeuler-info/</code> 等</td></tr>
             <tr><td class="mono">test/</td><td>18 个故障场景测试床：故障注入脚本 + 参考诊断报告，非单元测试</td><td><code>swap-thrashing/</code>、<code>block-dm-raid-diagnosis/</code>、<code>kernel-io-uring-diagnosis/</code> 等</td></tr>
             <tr><td class="mono">script/</td><td>构建期脚本：生成配置 JSON Schema、打包二进制</td><td><code>build-schema.ts</code>、<code>build-binaries.js</code></td></tr>
             <tr><td class="mono">config/ · hooks/</td><td>全局默认配置 + OpenCode 会话钩子脚本</td><td><code>config/global.yaml</code>；<code>hooks/hooks.json</code> + <code>session-start.sh</code></td></tr>

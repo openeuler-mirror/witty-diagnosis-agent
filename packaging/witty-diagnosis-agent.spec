@@ -154,7 +154,7 @@ install -d %{buildroot}%{_docdir}/%{name}
 # 1) 构建产物：插件入口 + CLI + MCP server + 提示词
 cp -a dist %{buildroot}%{wittydir}/
 
-# 2) 诊断技能库（约 6.8M，47 个常规技能 + 1 个门控技能）
+# 2) 技能库（45 个常规技能 + 1 个门控技能）
 cp -a skills %{buildroot}%{wittydir}/
 # 门控技能（默认不暴露，需 CASE_KB_ID 才启用）单独成目录，使 skills/ 可整体软链
 cp -a skills-gated %{buildroot}%{wittydir}/
