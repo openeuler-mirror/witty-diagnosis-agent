@@ -7,9 +7,8 @@ description: >
   必须使用本技能。覆盖场景：nf_conntrack_max 溢出丢包、iptables/nftables 规则误命中导致 DROP/REJECT、
   NAT/SNAT/DNAT 映射异常、conntrack 状态(INVALID/UNREPLIED/UNESTABLISHED)丢包、TCP window tracking 异常、
   ct timeout 超时、helper/ALG 协议辅助模块异常、ipset 匹配失效。诊断定位路径：规则链遍历 → conntrack 表状态
-  → NAT 映射验证 → 内核丢包计数点定界。与 network-diagnosis（通用 IP/路由/ARP/接口诊断）和
-  X-diagnosis-network-analysis（TCP 协议栈工具诊断）区隔。本技能聚焦 Linux 内核 Netfilter 框架本身的问题，
-  而非通用网络连通性。
+  → NAT 映射验证 → 内核丢包计数点定界。与 network-diagnosis（通用 IP/路由/ARP/接口诊断）区隔。
+  本技能聚焦 Linux 内核 Netfilter 框架本身的问题，而非通用网络连通性。
 ---
 
 # Netfilter / iptables / conntrack 防火墙与连接跟踪诊断（双轨：规则链 + conntrack）

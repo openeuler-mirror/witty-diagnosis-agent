@@ -95,4 +95,4 @@ TCP window tracking 异常的可能原因:
 ANALYSIS
 
 echo ""
-echo "请结合 tcpdump 和 X-diagnosis-network-analysis（xd_tcpskinfo）进行 TCP 层深入分析。"
+echo "请结合 tcpdump、ss -ti 等手段进行 TCP 层深入分析。"

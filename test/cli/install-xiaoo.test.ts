@@ -39,10 +39,10 @@ console.log("xiaoO 安装场景")
 
 scenario("① 首次安装：技能 / 门控技能 / command / tools / config 全部就位", () => {
   const r = runXiaooInstall()
-  assert.equal(r.skills, 47)
+  assert.equal(r.skills, 45)
   assert.equal(r.gatedSkills, 1)
   assert.equal(r.configCreated, true, "配置不存在时应写入模板")
-  assert.equal(skillCount(path.join(HOME, "skills")), 47)
+  assert.equal(skillCount(path.join(HOME, "skills")), 45)
   assert.equal(skillCount(path.join(HOME, "skills-gated")), 1)
   assert.ok(fs.readdirSync(path.join(HOME, "command")).length > 0)
   assert.ok(fs.readdirSync(path.join(HOME, "tools")).length > 0)
@@ -71,7 +71,7 @@ scenario("③ 写入技能清单，且不含用户自放技能", () => {
   const manifest = path.join(HOME, "skills", ".witty-skills-manifest")
   assert.ok(fs.existsSync(manifest))
   const names = fs.readFileSync(manifest, "utf8").trim().split("\n")
-  assert.equal(names.length, 47)
+  assert.equal(names.length, 45)
   assert.ok(!names.includes("my-own-skill"))
 })
 
@@ -122,7 +122,7 @@ scenario("⑦ dry-run 不落盘", () => {
   process.env.XIAOO_HOME = probe
   process.env.XIAOO_CONFIG_DIR = path.join(ROOT, "dry", "config")
   const r = runXiaooInstall({ dryRun: true })
-  assert.equal(r.skills, 47)
+  assert.equal(r.skills, 45)
   assert.equal(fs.existsSync(probe), false, "dry-run 不应创建任何目录")
   process.env.XIAOO_HOME = HOME
   process.env.XIAOO_CONFIG_DIR = CONFIG

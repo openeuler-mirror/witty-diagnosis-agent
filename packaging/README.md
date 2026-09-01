@@ -34,7 +34,7 @@
 ```
 /usr/lib/witty-diagnosis-agent/         程序私有目录（用户不直接接触）
 ├── dist/                               插件入口 + CLI + MCP server + 提示词
-├── skills/                             47 个诊断技能包（可整体软链到项目）
+├── skills/                             45 个常规技能包（可整体软链到项目）
 ├── skills-gated/                       1 个门控技能（需 CASE_KB_ID 才暴露）
 ├── src/xiaoO/                          xiaoO 目标资源
 └── package.json                        包根路标（不可省略，见第七节）
@@ -287,7 +287,7 @@ rpm -ql witty-diagnosis-agent
 
 ### 包含
 
-`dist/`（插件入口、CLI、神农检索 MCP server、提示词）、`skills/`（47 个技能）、`skills-gated/`（1 个门控技能）、`src/xiaoO/`、`package.json`、README、LICENSE、配置 schema。
+`dist/`（插件入口、CLI、神农检索 MCP server、提示词）、`skills/`（45 个常规技能）、`skills-gated/`（1 个门控技能）、`src/xiaoO/`、`package.json`、README、LICENSE、配置 schema。
 
 安装体积约 8 MB。
 
